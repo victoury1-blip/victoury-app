@@ -1,0 +1,687 @@
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import {
+  Search,
+  Filter,
+  Printer,
+  Upload,
+  Download,
+  Settings,
+  Pencil,
+  Clock,
+  MessageCircle,
+  Phone,
+  MapPin,
+  Truck,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Copy,
+  Plus,
+  Check,
+  ChevronDown,
+  X,
+} from 'lucide-react';
+import { statusConfig } from '../data/orders';
+import OrderModal from './OrderModal';
+import OzoneModal from './OzoneModal';
+import StatusDropdown from './StatusDropdown';
+import { useStatuses } from '../contexts/StatusContext';
+import ContactModal from './ContactModal';
+import { supabase } from '../lib/supabase';
+
+async function generateVictId() {
+  try {
+    const { data, error } = await supabase.rpc('next_vict_id');
+    if (!error && data) return data;
+  } catch {}
+  /* fallback to localStorage if offline */
+  const last = parseInt(localStorage.getItem('vict_counter') || '0', 10);
+  const next = last + 1;
+  localStorage.setItem('vict_counter', String(next));
+  return 'VICT' + String(next).padStart(3, '0');
+}
+
+function now() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+const tabs = [
+  { id: 'a_confirmer', label: 'À confirmer', status: 'nouveau' },
+  { id: 'en_suivi', label: 'En suivi', status: 'en_suivi' },
+  { id: 'reporter', label: 'Reporter', status: 'reporter' },
+  { id: 'confirme', label: 'Confirmé', status: 'confirme' },
+];
+
+const FALLBACK_CITIES = [
+  { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' }, { id: '3', name: 'Fès' },
+  { id: '4', name: 'Marrakech' }, { id: '5', name: 'Agadir' }, { id: '6', name: 'Tanger' },
+  { id: '7', name: 'Meknès' }, { id: '8', name: 'Oujda' }, { id: '9', name: 'Tétouan' },
+  { id: '10', name: 'Safi' }, { id: '11', name: 'Kénitra' }, { id: '12', name: 'El Jadida' },
+  { id: '13', name: 'Béni Mellal' }, { id: '14', name: 'Témara' }, { id: '15', name: 'Mohammedia' },
+  { id: '16', name: 'Nador' }, { id: '17', name: 'Khouribga' }, { id: '18', name: 'Settat' },
+  { id: '19', name: 'Berrechid' }, { id: '20', name: 'Dar Bouazza' }, { id: '21', name: 'Boukkoura' },
+  { id: '22', name: 'Sala Al Jadida' }, { id: '23', name: 'Tiznit' }, { id: '24', name: 'Larache' },
+  { id: '25', name: 'Guercif' }, { id: '26', name: 'Sidi Slimane' }, { id: '27', name: 'Ouarzazate' },
+  { id: '28', name: 'Errachidia' }, { id: '29', name: 'Taza' }, { id: '30', name: 'Khemisset' },
+];
+
+function getOzoneConfig() {
+  try { return JSON.parse(localStorage.getItem('auzone_config') || '{}'); } catch { return {}; }
+}
+
+function resolveCityId(cityName, cities) {
+  if (!cityName) return null;
+  const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const n = norm(cityName);
+  const exact = cities.find((c) => norm(c.name) === n);
+  if (exact) return exact.id;
+  const partial = cities.find((c) => norm(c.name).includes(n) || n.includes(norm(c.name)));
+  return partial ? partial.id : null;
+}
+
+function Toggle({ checked, loading, onChange }) {
+  return (
+    <button
+      onClick={() => !loading && onChange(!checked)}
+      disabled={loading}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+        loading ? 'bg-blue-300 cursor-wait' : checked ? 'bg-blue-500' : 'bg-gray-300'
+      }`}
+    >
+      {loading
+        ? <Loader2 size={11} className="absolute left-1/2 -translate-x-1/2 text-white animate-spin" />
+        : <span
+            className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform"
+            style={{ transform: checked ? 'translateX(18px)' : 'translateX(2px)' }}
+          />}
+    </button>
+  );
+}
+
+function Toast({ toasts, onDismiss }) {
+  if (!toasts.length) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-50 space-y-2 max-w-sm">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm ${
+            t.type === 'success'
+              ? 'bg-green-50 border-green-200 text-green-800'
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}
+        >
+          {t.type === 'success'
+            ? <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
+            : <XCircle size={16} className="text-red-500 mt-0.5 shrink-0" />}
+          <div className="flex-1">
+            <p className="font-semibold">{t.title}</p>
+            {t.body && <p className="text-xs mt-0.5 opacity-80">{t.body}</p>}
+          </div>
+          <button onClick={() => onDismiss(t.id)} className="opacity-50 hover:opacity-100 ml-1">×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function isLight(hex) {
+  if (!hex || hex.length < 7) return true;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return (r*299+g*587+b*114)/1000 > 155;
+}
+
+function PhoneChip({ phone }) {
+  const [open, setOpen] = useState(false);
+  if (!phone) return null;
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full hover:bg-green-200 transition-colors"
+      >
+        <Phone size={9} /> {phone}
+      </button>
+      {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function StatusBadge({ status, reportDate }) {
+  const { getLive } = useStatuses();
+  const live = getLive(status);
+  const color = live.color || '#6B7280';
+  const light = isLight(color);
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span
+        className="px-2.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap"
+        style={{ backgroundColor: color, color: light ? '#111' : '#fff' }}
+      >
+        {live.label || status}
+      </span>
+      {reportDate && (
+        <span className="text-xs text-gray-500 flex items-center gap-1">
+          <Clock size={10} /> {reportDate}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ── Collapsible dark status picker for modal ── */
+function StatusPicker({ value, onChange }) {
+  const { statuses } = useStatuses();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const sorted = [...statuses].filter(s => s.showInCommandes !== false).sort((a, b) => a.order - b.order);
+  const current = statuses.find(s => s.value === value);
+
+  React.useEffect(() => {
+    if (!open) return;
+    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-[#2d2d3a] border border-[#3f3f52] rounded-lg text-white text-sm font-semibold hover:bg-[#38384a] transition-colors"
+      >
+        <span>{current?.label || value}</span>
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#2d2d3a] border border-[#3f3f52] rounded-lg shadow-2xl overflow-y-auto max-h-56">
+          {sorted.map(s => (
+            <button
+              key={s.value} type="button"
+              onClick={() => { onChange(s.value); setOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${s.value === value ? 'bg-[#3a3a50] text-white' : 'text-gray-200 hover:bg-[#38384a]'}`}
+            >
+              <span className="w-4 flex-shrink-0">{s.value === value && <Check size={13} />}</span>
+              <span>{s.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusChangeModal({ order, onClose, onSave }) {
+  const [newStatus, setNewStatus] = useState(order.status);
+  const [note, setNote] = useState('');
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-gray-800">Modifier le statut de la commande</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nouveau statut</label>
+            <StatusPicker value={newStatus} onChange={setNewStatus} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Note interne</label>
+            <textarea
+              value={note} onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+              placeholder="Ajouter une note interne..."
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-5">
+          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Annuler</button>
+          <button
+            onClick={() => onSave(order.id, newStatus, note)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700"
+          >Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading }) {
+  const orders = externalOrders;
+  function setOrders(updater) {
+    setExternalOrders(updater);
+  }
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState([]);
+  const [editOrder, setEditOrder] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [ozoneOrder, setOzoneOrder] = useState(null);
+  const [ozoneOpen, setOzoneOpen] = useState(false);
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [statusDropdown, setStatusDropdown] = useState(null); /* { order, anchor } */
+  const [toasts, setToasts] = useState([]);
+  const [modifiedIds, setModifiedIds] = useState(new Set());
+
+  const currentStatus = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
+
+  const filtered = useMemo(() => {
+    return orders.filter((o) => {
+      const matchStatus = o.status === currentStatus || modifiedIds.has(o.id);
+      const q = search.toLowerCase();
+      const matchSearch =
+        !q ||
+        o.id.toLowerCase().includes(q) ||
+        o.recipient.name.toLowerCase().includes(q) ||
+        o.recipient.phone.includes(q) ||
+        o.product.name.toLowerCase().includes(q);
+      return matchStatus && matchSearch;
+    });
+  }, [orders, currentStatus, search, modifiedIds]);
+
+  function toggleSelect(id) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  function toggleAll() {
+    if (selected.length === filtered.length) {
+      setSelected([]);
+    } else {
+      setSelected(filtered.map((o) => o.id));
+    }
+  }
+
+  function addToast(type, title, body) {
+    const id = Date.now();
+    setToasts((p) => [...p, { id, type, title, body }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 6000);
+  }
+
+  function openOzone(order) {
+    setOzoneOrder(order);
+    setOzoneOpen(true);
+  }
+
+  function handleOzoneSuccess(orderId, trackingNumber) {
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? { ...o, validated: true, trackingNumber, status: 'att_ramassage' } : o
+      )
+    );
+    addToast('success', `Colis créé — ${trackingNumber}`, 'Commande déplacée vers En suivi');
+    setOzoneOpen(false);
+  }
+
+  function openEdit(order) {
+    setEditOrder(order);
+    setModalOpen(true);
+  }
+
+  function saveOrder(updated) {
+    setModifiedIds(prev => new Set([...prev, updated.id]));
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+    setModalOpen(false);
+  }
+
+  const activeTabLabel = tabs.find((t) => t.id === activeTab)?.label || '';
+
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm text-gray-400 font-medium">Chargement des commandes…</p>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
+        <span className="font-bold text-gray-700 text-base mr-2">{activeTabLabel}</span>
+        <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{filtered.length}</span>
+        <div className="relative flex-1 max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Rechercher une commande..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+        </div>
+        <button className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50">
+          <Search size={14} />
+        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Filtrer">
+            <Filter size={14} />
+          </button>
+          <button className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer">
+            <Printer size={14} />
+          </button>
+          <button className="p-2 rounded-md bg-green-500 text-white hover:bg-green-600" title="Exporter">
+            <Upload size={14} />
+          </button>
+          <button className="p-2 rounded-md bg-blue-500 text-white hover:bg-blue-600" title="Importer">
+            <Download size={14} />
+          </button>
+          <button className="p-2 rounded-md bg-gray-500 text-white hover:bg-gray-600" title="Paramètres">
+            <Settings size={14} />
+          </button>
+          <button
+            onClick={() => setNewOrderOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold"
+            title="Nouvelle commande"
+          >
+            <Plus size={14} /> Nouveau
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm border-collapse min-w-[900px]">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+            <tr>
+              <th className="px-4 py-3 w-8">
+                <input
+                  type="checkbox"
+                  checked={filtered.length > 0 && selected.length === filtered.length}
+                  onChange={toggleAll}
+                  className="w-4 h-4 rounded"
+                />
+              </th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Destinataire</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Produits</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Prix</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">État</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 max-w-xs">Note</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Date</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Validé</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={9} className="text-center py-12 text-gray-400">
+                  Aucune commande trouvée
+                </td>
+              </tr>
+            )}
+            {filtered.map((order, idx) => (
+              <tr
+                key={order.id}
+                className={`border-b border-gray-100 hover:bg-blue-50/30 transition-colors ${
+                  idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                } ${selected.includes(order.id) ? 'bg-blue-50' : ''}`}
+              >
+                {/* Checkbox */}
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(order.id)}
+                    onChange={() => toggleSelect(order.id)}
+                    className="w-4 h-4 rounded"
+                  />
+                </td>
+
+                {/* Destinataire */}
+                <td className="px-4 py-3 min-w-[200px]">
+                  <div className="text-xs text-gray-400 font-mono mb-0.5">{order.id}</div>
+                  <div className="font-semibold text-gray-800">{order.recipient.name}</div>
+                  <div className="text-xs text-gray-500 mt-0.5 flex items-start gap-1">
+                    <MapPin size={10} className="mt-0.5 shrink-0" />
+                    <span>{order.recipient.address}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">{order.recipient.city}</div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <PhoneChip phone={order.recipient.phone} />
+                  </div>
+                  {order.recipient.delivery && (
+                    <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                      <Truck size={10} />
+                      <span className="italic">{order.recipient.delivery}</span>
+                    </div>
+                  )}
+                </td>
+
+                {/* Produits */}
+                <td className="px-4 py-3 min-w-[160px]">
+                  <div className="font-medium text-gray-800">{order.product.name} - {order.product.size}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    ({order.product.qty}x){' '}
+                    <span className={order.product.stock > 0 ? 'text-green-600' : 'text-red-500'}>
+                      stock{order.product.stock}
+                    </span>
+                  </div>
+                </td>
+
+                {/* Prix */}
+                <td className="px-4 py-3 min-w-[90px]">
+                  <div className="font-bold text-gray-800 text-base">
+                    {order.price.toLocaleString('fr-MA', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-xs text-gray-500">DH</div>
+                </td>
+
+                {/* État — click to change */}
+                <td className="px-4 py-3">
+                  <div className="flex flex-col items-start gap-1.5">
+                    <button
+                      onClick={() => setStatusDropdown({ order })}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      <StatusBadge status={order.status} reportDate={order.reportDate} />
+                    </button>
+                    {order.whatsapp && (
+                      <span className="flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                        <MessageCircle size={10} /> WA
+                      </span>
+                    )}
+                  </div>
+                </td>
+
+                {/* Note */}
+                <td className="px-4 py-3 max-w-[220px]">
+                  {order.note ? (
+                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
+                      {order.note}
+                    </p>
+                  ) : (
+                    <span className="text-gray-300 text-xs">—</span>
+                  )}
+                </td>
+
+                {/* Date */}
+                <td className="px-4 py-3 min-w-[140px]">
+                  <div className="text-xs text-gray-500">
+                    <span className="font-medium text-gray-600">Date ajout:</span>
+                    <br />
+                    {order.dateAdded}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    <span className="font-medium text-gray-600">Date mise à jour:</span>
+                    <br />
+                    {order.dateUpdated}
+                  </div>
+                </td>
+
+                {/* Validé → Envoyer à Ozon */}
+                <td className="px-4 py-3">
+                  <Toggle
+                    checked={!!order.validated}
+                    loading={false}
+                    onChange={() => { if (!order.validated) openOzone(order); }}
+                  />
+                  {order.trackingNumber && (
+                    <span className="text-xs text-blue-600 font-mono block mt-1 max-w-[70px] truncate" title={order.trackingNumber}>
+                      {order.trackingNumber}
+                    </span>
+                  )}
+                </td>
+
+                {/* Action */}
+                <td className="px-4 py-3">
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      onClick={() => openEdit(order)}
+                      className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                      title="Modifier"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                      title="Historique"
+                    >
+                      <Clock size={13} />
+                    </button>
+                    <button
+                      className="p-1.5 rounded bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
+                      title="WhatsApp"
+                    >
+                      <MessageCircle size={13} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer count */}
+      <div className="bg-white border-t border-gray-200 px-6 py-2 flex items-center justify-between text-xs text-gray-500">
+        <span>
+          {filtered.length} commande{filtered.length !== 1 ? 's' : ''} affichée{filtered.length !== 1 ? 's' : ''}
+          {selected.length > 0 && ` · ${selected.length} sélectionnée${selected.length > 1 ? 's' : ''}`}
+        </span>
+        <span>Total: {orders.length} commandes</span>
+      </div>
+
+      {/* Edit Modal */}
+      {modalOpen && editOrder && (
+        <OrderModal
+          order={editOrder}
+          onClose={() => setModalOpen(false)}
+          onSave={saveOrder}
+        />
+      )}
+
+      {ozoneOpen && ozoneOrder && (
+        <OzoneModal
+          order={ozoneOrder}
+          onClose={() => setOzoneOpen(false)}
+          onSuccess={handleOzoneSuccess}
+        />
+      )}
+
+      {/* Status change modal */}
+      {statusDropdown && (
+        <StatusChangeModal
+          order={statusDropdown.order}
+          onClose={() => setStatusDropdown(null)}
+          onSave={(orderId, newStatus, note) => {
+            const t = new Date();
+            const ts = `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+            setModifiedIds(prev => new Set([...prev, orderId]));
+            setOrders((prev) => prev.map((o) => {
+              if (o.id !== orderId) return o;
+              const prevNote = o.note || '';
+              const addedNote = note ? `\nNote interne: ${note}` : '';
+              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
+            }));
+            setStatusDropdown(null);
+          }}
+        />
+      )}
+
+      {/* New Order Modal */}
+      {newOrderOpen && (
+        <NewOrderModal
+          onClose={() => setNewOrderOpen(false)}
+          onSave={(order) => {
+            setOrders((prev) => [order, ...prev]);
+            setNewOrderOpen(false);
+            addToast('success', `Commande ${order.id} créée`, order.recipient.name);
+          }}
+        />
+      )}
+
+      <Toast toasts={toasts} onDismiss={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+    </div>
+  );
+}
+
+/* ─── Mini new-order form ─── */
+function NewOrderModal({ onClose, onSave }) {
+  const ic = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300';
+  const lc = 'block text-xs font-semibold text-gray-600 mb-1';
+  const [form, setForm] = useState({
+    nom: '', telephone: '', ville: '', adresse: '', produit: '', taille: '', prix: '', qty: '1',
+  });
+  function u(k, v) { setForm((p) => ({ ...p, [k]: v })); }
+
+  async function handleSave() {
+    if (!form.nom || !form.telephone || !form.prix) return;
+    const id = await generateVictId();
+    const t = now();
+    onSave({
+      id,
+      recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: null },
+      product: { name: form.produit, size: form.taille, qty: parseInt(form.qty) || 1, stock: 0 },
+      price: parseFloat(form.prix) || 0,
+      status: 'nouveau',
+      note: '',
+      dateAdded: t,
+      dateUpdated: t,
+      validated: false,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="font-bold text-gray-800">Nouvelle commande</h3>
+            <p className="text-xs text-indigo-600 font-mono mt-0.5">
+              ID : auto-généré
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><XCircle size={16} className="text-gray-400" /></button>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lc}>Nom client <span className="text-red-500">*</span></label><input value={form.nom} onChange={(e) => u('nom', e.target.value)} className={ic} /></div>
+            <div><label className={lc}>Téléphone <span className="text-red-500">*</span></label><input value={form.telephone} onChange={(e) => u('telephone', e.target.value)} className={ic} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lc}>Ville</label><input value={form.ville} onChange={(e) => u('ville', e.target.value)} className={ic} /></div>
+            <div><label className={lc}>Adresse</label><input value={form.adresse} onChange={(e) => u('adresse', e.target.value)} className={ic} /></div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2"><label className={lc}>Produit</label><input value={form.produit} onChange={(e) => u('produit', e.target.value)} className={ic} /></div>
+            <div><label className={lc}>Taille</label><input value={form.taille} onChange={(e) => u('taille', e.target.value)} className={ic} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lc}>Prix (DH) <span className="text-red-500">*</span></label><input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={ic} /></div>
+            <div><label className={lc}>Quantité</label><input type="number" value={form.qty} onChange={(e) => u('qty', e.target.value)} className={ic} /></div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-5">
+          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700">Annuler</button>
+          <button onClick={handleSave} disabled={!form.nom || !form.telephone || !form.prix}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
+            Créer la commande
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

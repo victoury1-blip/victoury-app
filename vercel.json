@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/wc-api/:path*", "destination": "https://victoury-maroc.com/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
