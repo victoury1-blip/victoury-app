@@ -51,6 +51,7 @@ export default function App() {
   const [session, setSession] = useState(undefined);
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isWooFetching, setIsWooFetching] = useState(true);
   const navigate = useNavigate();
 
   /* ── Auth ── */
@@ -132,6 +133,8 @@ export default function App() {
           return fresh.length ? [...fresh, ...prev] : prev;
         });
       } catch {
+      } finally {
+        setIsWooFetching(false);
       }
     }
     fetchWooOrders();
@@ -214,8 +217,8 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard orders={orders} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
-          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} />} />
-          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />
+          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />
+          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />
           <Route path="/stock" element={<StockPage />} />
           <Route path="/ramassage" element={<UnderConstruction />} />
           <Route path="/retour" element={<UnderConstruction />} />
