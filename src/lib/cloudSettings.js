@@ -35,7 +35,7 @@ export async function cloudSet(key, value) {
     const userId = await getUserId();
     const row = { key, value, updated_at: new Date().toISOString() };
     if (userId) row.user_id = userId;
-    const { error } = await supabase.from('settings').upsert(row, { onConflict: 'key' });
+    const { error } = await supabase.from('settings').upsert(row, { onConflict: 'key,user_id' });
     if (error) throw error;
   } catch (e) {
     console.error('cloudSet failed:', e?.message || e);

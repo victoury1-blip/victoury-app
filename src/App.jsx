@@ -52,6 +52,8 @@ export default function App() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isWooFetching, setIsWooFetching] = useState(true);
+  const [wooError, setWooError] = useState(null);
+  const [dbError, setDbError] = useState(null);
   const navigate = useNavigate();
 
   /* ── Auth ── */
@@ -69,7 +71,7 @@ export default function App() {
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
-      if (error || !data) { setIsLoading(false); return; }
+      if (error || !data) { setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes')); setIsLoading(false); return; }
       setOrders(data.map((o) => ({
         id: o.id,
         recipient: o.recipient,
@@ -102,7 +104,8 @@ export default function App() {
         const res = await fetch(
           `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&consumer_key=${config.consumerKey}&consumer_secret=${config.consumerSecret}`
         );
-        if (!res.ok) return;
+        if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
+        setWooError(null);
         const data = await res.json();
         const mapped = data.map((o) => ({
           id: `WC-${o.id}`,
@@ -132,7 +135,8 @@ export default function App() {
           if (fresh.length) saveOrdersToSupabase(fresh);
           return fresh.length ? [...fresh, ...prev] : prev;
         });
-      } catch {
+      } catch (e) {
+        setWooError('⚠️ WooCommerce inaccessible: ' + (e?.message || 'erreur réseau'));
       } finally {
         setIsWooFetching(false);
       }
@@ -212,7 +216,14 @@ export default function App() {
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       <Sidebar orders={orders} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto flex flex-col">
+        {(wooError || dbError) && (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center justify-between text-xs text-red-700 shrink-0">
+            <span>🔴 {dbError || wooError}</span>
+            <button onClick={() => { setWooError(null); setDbError(null); }} className="ml-4 text-red-400 hover:text-red-600 font-bold">✕</button>
+          </div>
+        )}
+        <div className="flex-1 overflow-auto">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard orders={orders} />} />
@@ -229,6 +240,7 @@ export default function App() {
           <Route path="/reglage" element={<SettingsPage onWooOrdersImported={handleWooImport} />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </div>
       </main>
     </div>
   );

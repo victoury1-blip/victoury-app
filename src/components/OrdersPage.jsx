@@ -454,11 +454,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
                 {/* Produits */}
                 <td className="px-4 py-3 min-w-[160px]">
-                  <div className="font-medium text-gray-800">{order.product.name} - {order.product.size}</div>
+                  <div className="font-medium text-gray-800">{order.product?.name}{order.product?.size ? ` - ${order.product.size}` : ''}</div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    ({order.product.qty}x){' '}
-                    <span className={order.product.stock > 0 ? 'text-green-600' : 'text-red-500'}>
-                      stock{order.product.stock}
+                    ({order.product?.qty ?? 1}x){' '}
+                    <span className={(order.product?.stock ?? 0) > 0 ? 'text-green-600' : 'text-red-500'}>
+                      stock{order.product?.stock ?? 0}
                     </span>
                   </div>
                 </td>
@@ -466,7 +466,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 {/* Prix */}
                 <td className="px-4 py-3 min-w-[90px]">
                   <div className="font-bold text-gray-800 text-base">
-                    {order.price.toLocaleString('fr-MA', { minimumFractionDigits: 2 })}
+                    {Number(order.price || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs text-gray-500">DH</div>
                 </td>
