@@ -24,7 +24,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://app.victoury-maroc.com',
+      redirectTo: `${window.location.origin}/`,
     });
     setLoading(false);
     if (err) { setError('Erreur lors de l\'envoi. Vérifiez l\'email.'); return; }
