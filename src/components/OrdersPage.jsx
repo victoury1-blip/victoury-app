@@ -416,9 +416,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             {filtered.map((order, idx) => (
               <tr
                 key={order.id}
-                className={`border-b border-gray-100 hover:bg-blue-50/30 transition-colors ${
-                  idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
-                } ${selected.includes(order.id) ? 'bg-blue-50' : ''}`}
+                className={`border-b border-gray-100 transition-colors ${
+                  selected.includes(order.id)
+                    ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
+                    : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-blue-50/30 border-l-[3px] border-transparent`
+                }`}
               >
                 {/* Checkbox */}
                 <td className="px-4 py-3">

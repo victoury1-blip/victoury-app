@@ -391,6 +391,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
   const [search, setSearch] = useState('');
   const [editOrder, setEditOrder] = useState(null);
+  const [selected, setSelected] = useState([]);
+
+  function toggleSelect(id) {
+    setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
+  function toggleAll() {
+    setSelected((prev) => prev.length === colis.length ? [] : colis.map((o) => o.id));
+  }
 
   /* Show only orders in the colis pipeline */
   const colis = useMemo(() => {
@@ -458,19 +466,26 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         <table className="w-full text-sm border-collapse min-w-[900px]">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              {['Destinataire', 'Produits', 'Prix', 'État', 'Note', 'LIV', 'Date', 'Validé', 'Action'].map((h) => (
+                <th className="px-4 py-3 w-8">
+                <input type="checkbox" checked={colis.length > 0 && selected.length === colis.length} onChange={toggleAll} className="w-4 h-4 rounded" />
+              </th>
+            {['Destinataire', 'Produits', 'Prix', 'État', 'Note', 'LIV', 'Date', 'Validé', 'Action'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {colis.length === 0 ? (
-              <tr><td colSpan={9} className="py-16 text-center text-gray-400 text-sm">Aucun colis dans le pipeline</td></tr>
+              <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">Aucun colis dans le pipeline</td></tr>
             ) : colis.map((o) => {
               const note = (o.note || '').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
               return (
-                <tr key={o.id} className="hover:bg-gray-50">
+                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : 'hover:bg-gray-50 border-l-[3px] border-transparent'}`}>
+                  {/* Checkbox */}
+                  <td className="px-4 py-3 w-8">
+                    <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />
+                  </td>
                   {/* Destinataire */}
                   <td className="px-4 py-3">
                     <div className="font-semibold text-blue-700 text-xs">{o.id}</div>
