@@ -102,7 +102,7 @@ export default function App() {
         const config = stored ? JSON.parse(stored) : (await cloudGet('woo_config') || {});
         if (!config.consumerKey || !config.consumerSecret) return;
         const res = await fetch(
-          `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&consumer_key=${config.consumerKey}&consumer_secret=${config.consumerSecret}`
+          `/wc-api/?rest_route=/wc/v3/orders&status=processing,pending&per_page=50&consumer_key=${config.consumerKey}&consumer_secret=${config.consumerSecret}`
         );
         if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
         setWooError(null);
