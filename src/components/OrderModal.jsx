@@ -3,13 +3,22 @@ import { X, Check, Phone, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useStatuses } from '../contexts/StatusContext';
 import { loadProducts, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
 
-const LIVREURS = [
-  { value: '', label: 'Sélectionner un livreur' },
-  { value: 'ozone_express', label: 'Ozone Express' },
-  { value: 'mohamed_younesse', label: 'Mohamed et Younesse' },
-  { value: 'local', label: 'Local' },
-  { value: 'blackmandelivery', label: 'blackmandelivery' },
-];
+function getLivreurs() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('livreurs') || '[]');
+    if (Array.isArray(stored) && stored.length > 0) {
+      return [{ value: '', label: 'Sélectionner un livreur' },
+        ...stored.filter(l => l.statut !== false).map(l => ({ value: l.nom, label: l.nom }))];
+    }
+  } catch {}
+  return [
+    { value: '', label: 'Sélectionner un livreur' },
+    { value: 'Ozon Express', label: 'Ozon Express' },
+    { value: 'Mohamed et Younesse', label: 'Mohamed et Younesse' },
+    { value: 'Local', label: 'Local' },
+    { value: 'blackmandelivery', label: 'blackmandelivery' },
+  ];
+}
 
 function SectionTitle({ icon, label }) {
   return (
@@ -160,7 +169,7 @@ export default function OrderModal({ order, onClose, onSave }) {
                   onChange={(e) => updateRecipient('delivery', e.target.value)}
                   className={inputCls}
                 >
-                  {LIVREURS.map((l) => (
+                  {getLivreurs().map((l) => (
                     <option key={l.value} value={l.value}>{l.label}</option>
                   ))}
                 </select>
