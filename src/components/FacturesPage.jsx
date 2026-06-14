@@ -388,12 +388,12 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 
 /* ─── Main FacturesPage ─── */
 export default function FacturesPage({ orders }) {
-  const [factures, setFactures] = useState([]);
+  const [factures, setFactures] = useState(() => loadFactures());
   const [newOpen, setNewOpen] = useState(false);
   const [autoGenerating, setAutoGenerating] = useState(false);
 
   useEffect(() => {
-    loadFacturesRemote().then(remote => { if (remote) setFactures(remote); });
+    loadFacturesRemote().then(remote => { if (remote && remote.length >= loadFactures().length) setFactures(remote); });
 
     const channel = supabase
       .channel('settings-factures')
