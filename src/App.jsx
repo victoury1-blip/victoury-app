@@ -74,7 +74,8 @@ export default function App() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error || !data) { setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes')); setIsLoading(false); return; }
-      setOrders(data.map((o) => ({
+      const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
+      setOrders(data.filter(o => !deletedIds.has(o.id)).map((o) => ({
         id: o.id,
         recipient: o.recipient,
         product: o.product,
@@ -131,9 +132,10 @@ export default function App() {
           dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
           validated: false,
         }));
+        const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
         setOrders((prev) => {
           const existingIds = new Set(prev.map((o) => o.id));
-          const fresh = mapped.filter((o) => !existingIds.has(o.id));
+          const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIds.has(o.id));
           if (fresh.length) saveOrdersToSupabase(fresh);
           return fresh.length ? [...fresh, ...prev] : prev;
         });
@@ -176,6 +178,8 @@ export default function App() {
 
   async function deleteOrderFromSupabase(orderId) {
     await supabase.from('orders').delete().eq('id', orderId);
+    const bl = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
+    if (!bl.includes(orderId)) { bl.push(orderId); localStorage.setItem('deleted_order_ids', JSON.stringify(bl)); }
   }
 
   async function updateOrderInSupabase(order) {
