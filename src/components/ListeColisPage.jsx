@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
@@ -385,6 +385,69 @@ function StatusModal({ order, onClose, onSave }) {
   );
 }
 
+/* ── Delivery status modal ── */
+const DELIVERY_STATUSES = [
+  { value: 'att_ramassage', label: 'En attente ramassage', color: '#f59e0b' },
+  { value: 'expedier',      label: 'Expédié',              color: '#3b82f6' },
+  { value: 'recu_livreur',  label: 'Reçu par livreur',     color: '#6366f1' },
+  { value: 'livre',         label: 'Livré',                color: '#16a34a' },
+  { value: 'change',        label: 'Échange',              color: '#0891b2' },
+  { value: 'refuse',        label: 'Refusé',               color: '#ef4444' },
+  { value: 'pas_rep_lv',    label: 'Pas répondu (liv.)',   color: '#9ca3af' },
+  { value: 'pret_retour',   label: 'Prêt retour',          color: '#7c3aed' },
+  { value: 'dem_suivi',     label: 'Dem. de suivi',        color: '#d97706' },
+  { value: 'injoignable',   label: 'Injoignable',          color: '#dc2626' },
+  { value: 'manque_stock',  label: 'Manque de stock',      color: '#b45309' },
+];
+
+function DeliveryStatusModal({ order, onClose, onSave }) {
+  const [status, setStatus] = useState(order.status);
+  const [note, setNote] = useState('');
+  const current = DELIVERY_STATUSES.find(s => s.value === status);
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-amber-100"><Truck size={15} className="text-amber-600" /></span>
+            <div>
+              <h3 className="font-bold text-gray-800 text-sm">Statut livraison</h3>
+              <p className="text-xs text-gray-400">{order.id} — {order.recipient?.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-1.5 mb-4 max-h-56 overflow-y-auto pr-1">
+          {DELIVERY_STATUSES.map(s => (
+            <button key={s.value} onClick={() => setStatus(s.value)}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-all border ${
+                status === s.value ? 'text-white font-semibold border-transparent' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+              style={status === s.value ? { backgroundColor: s.color, borderColor: s.color } : {}}>
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+              {s.label}
+              {status === s.value && <Check size={13} className="ml-auto" />}
+            </button>
+          ))}
+        </div>
+
+        <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Note interne (optionnel)..."
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none mb-4" />
+
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50">Annuler</button>
+          <button onClick={() => onSave(order.id, status, note)}
+            className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition"
+            style={{ backgroundColor: current?.color || '#f59e0b' }}>
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main page ── */
 const COLIS_PIPELINE = ['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi'];
 
@@ -393,6 +456,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [search, setSearch] = useState('');
   const [editOrder, setEditOrder] = useState(null);
   const [editOrderFull, setEditOrderFull] = useState(null);
+  const [deliveryOrder, setDeliveryOrder] = useState(null);
   const [selected, setSelected] = useState([]);
 
   function toggleSelect(id) {
@@ -584,9 +648,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     <div className="mt-1"><span className="font-medium text-gray-600">Date mise à jour:</span><br />{o.dateUpdated}</div>
                   </td>
 
-                  {/* Validé */}
-                  <td className="px-4 py-3">
-                    <span className={`w-4 h-4 rounded-full inline-block ${o.validated ? 'bg-green-400' : 'bg-gray-200'}`} />
+                  {/* Validé — green dot = active in pipeline, click to deactivate */}
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => deactivateOrder(o.id)}
+                      title="Désactiver → retour Confirmé"
+                      className="inline-flex items-center justify-center w-6 h-6 rounded-full hover:ring-2 hover:ring-green-300 transition-all"
+                    >
+                      <span className="w-4 h-4 rounded-full bg-green-400 shadow shadow-green-200 inline-block" />
+                    </button>
                   </td>
 
                   {/* Action */}
@@ -595,16 +665,16 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                       <button
                         onClick={() => setEditOrderFull(o)}
                         className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                        title="Modifier"
+                        title="Modifier la commande"
                       >
                         <Pencil size={13} />
                       </button>
                       <button
-                        onClick={() => deactivateOrder(o.id)}
-                        title="Désactiver → retour Confirmé"
-                        className="p-1 rounded hover:bg-gray-100 transition-colors flex items-center justify-center"
+                        onClick={() => setDeliveryOrder(o)}
+                        className="p-1.5 rounded bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors"
+                        title="Statut livraison"
                       >
-                        <span className="w-4 h-4 rounded-full bg-green-400 shadow-sm shadow-green-300 inline-block" />
+                        <Truck size={13} />
                       </button>
                     </div>
                   </td>
@@ -636,6 +706,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           order={editOrderFull}
           onClose={() => setEditOrderFull(null)}
           onSave={saveOrderFull}
+        />
+      )}
+
+      {deliveryOrder && (
+        <DeliveryStatusModal
+          order={deliveryOrder}
+          onClose={() => setDeliveryOrder(null)}
+          onSave={(id, status, note) => { handleStatusSave(id, status, note); setDeliveryOrder(null); }}
         />
       )}
     </div>
