@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil } from 'lucide-react';
+import OrderModal from './OrderModal';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -391,6 +392,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
   const [search, setSearch] = useState('');
   const [editOrder, setEditOrder] = useState(null);
+  const [editOrderFull, setEditOrderFull] = useState(null);
   const [selected, setSelected] = useState([]);
 
   function toggleSelect(id) {
@@ -414,15 +416,29 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     });
   }, [orders, search]);
 
+  function getTs() {
+    const tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca';
+    return new Date().toLocaleString('fr-FR', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
+  }
+
   function handleStatusSave(orderId, newStatus, note) {
-    const t = new Date();
-    const ts = `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+    const ts = getTs();
     setOrders((prev) => prev.map((o) => {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';
       const addedNote = note ? `\nNote interne: ${note}` : '';
       return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
     }));
+  }
+
+  function saveOrderFull(updated) {
+    setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+    setEditOrderFull(null);
+  }
+
+  function deactivateOrder(orderId) {
+    const ts = getTs();
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'confirme', dateUpdated: ts } : o));
   }
 
   if (isLoading) return (
@@ -575,12 +591,22 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
                   {/* Action */}
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => setEditOrder(o)}
-                      className="px-2 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100"
-                    >
-                      Statut
-                    </button>
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        onClick={() => setEditOrderFull(o)}
+                        className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                        title="Modifier"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => deactivateOrder(o.id)}
+                        title="Désactiver → retour Confirmé"
+                        className="p-1 rounded hover:bg-gray-100 transition-colors flex items-center justify-center"
+                      >
+                        <span className="w-4 h-4 rounded-full bg-green-400 shadow-sm shadow-green-300 inline-block" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -602,6 +628,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           order={editOrder}
           onClose={() => setEditOrder(null)}
           onSave={(id, status, note) => { handleStatusSave(id, status, note); setEditOrder(null); }}
+        />
+      )}
+
+      {editOrderFull && (
+        <OrderModal
+          order={editOrderFull}
+          onClose={() => setEditOrderFull(null)}
+          onSave={saveOrderFull}
         />
       )}
     </div>
