@@ -401,47 +401,161 @@ const DELIVERY_STATUSES = [
 ];
 
 function DeliveryStatusModal({ order, onClose, onSave }) {
+  const [tab, setTab] = useState(order.trackingNumber ? 'history' : 'manual');
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState('');
+  const [historyState, setHistoryState] = useState('idle'); /* idle | loading | ok | error */
+  const [historyData, setHistoryData] = useState(null);
   const current = DELIVERY_STATUSES.find(s => s.value === status);
+
+  async function fetchOzoneHistory() {
+    setHistoryState('loading');
+    setHistoryData(null);
+    try {
+      const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
+      if (!cfg.customerId || !cfg.apiKey) { setHistoryState('error'); return; }
+      const tn = order.trackingNumber;
+      /* Try multiple endpoint patterns */
+      const endpoints = [
+        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${tn}`,
+        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcels-history?tracking-number=${tn}`,
+        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/parcel-history/${tn}`,
+      ];
+      let raw = null;
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) { raw = await res.json(); break; }
+        } catch {}
+      }
+      if (!raw) { setHistoryState('error'); return; }
+      /* Parse response — Ozone wraps in GET-PARCEL or GET-PARCELS-HISTORY */
+      const parcel = raw['GET-PARCEL'] || raw['PARCEL'] || raw;
+      const histArr = parcel['PARCEL-HISTORY'] || parcel['history'] || parcel['HISTORY'] || parcel['events'] || [];
+      const info = {
+        tracking: tn,
+        receiver: parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || order.recipient?.name,
+        phone: parcel['PARCEL-PHONE'] || parcel['PHONE'] || order.recipient?.phone,
+        city: parcel['CITY_NAME'] || parcel['CITY'] || order.recipient?.city,
+        status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || '',
+        history: histArr,
+      };
+      setHistoryData(info);
+      setHistoryState('ok');
+    } catch { setHistoryState('error'); }
+  }
+
+  useEffect(() => {
+    if (tab === 'history' && order.trackingNumber && historyState === 'idle') fetchOzoneHistory();
+  }, [tab]);
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <span className="p-1.5 rounded-lg bg-amber-100"><Truck size={15} className="text-amber-600" /></span>
             <div>
-              <h3 className="font-bold text-gray-800 text-sm">Statut livraison</h3>
-              <p className="text-xs text-gray-400">{order.id} — {order.recipient?.name}</p>
+              <h3 className="font-bold text-gray-800 text-sm">Livraison — {order.trackingNumber || order.id}</h3>
+              <p className="text-xs text-gray-400">{order.recipient?.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
         </div>
 
-        <div className="grid grid-cols-1 gap-1.5 mb-4 max-h-56 overflow-y-auto pr-1">
-          {DELIVERY_STATUSES.map(s => (
-            <button key={s.value} onClick={() => setStatus(s.value)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-all border ${
-                status === s.value ? 'text-white font-semibold border-transparent' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-              }`}
-              style={status === s.value ? { backgroundColor: s.color, borderColor: s.color } : {}}>
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-              {s.label}
-              {status === s.value && <Check size={13} className="ml-auto" />}
-            </button>
-          ))}
-        </div>
+        {/* Tabs */}
+        {order.trackingNumber && (
+          <div className="flex border-b border-gray-100">
+            {[{ k:'history', l:'📦 Historique Ozone' }, { k:'manual', l:'✏️ Statut manuel' }].map(t => (
+              <button key={t.k} onClick={() => setTab(t.k)}
+                className={`flex-1 py-2 text-xs font-semibold transition-colors ${tab === t.k ? 'text-amber-600 border-b-2 border-amber-500' : 'text-gray-400 hover:text-gray-600'}`}>
+                {t.l}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Note interne (optionnel)..."
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none mb-4" />
+        <div className="p-4 max-h-[70vh] overflow-y-auto">
+          {/* History tab */}
+          {tab === 'history' && (
+            <div>
+              {historyState === 'loading' && (
+                <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
+                  <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs">Récupération de l'historique Ozone Express...</p>
+                </div>
+              )}
+              {historyState === 'error' && (
+                <div className="py-6 text-center">
+                  <p className="text-xs text-red-500 mb-2">Impossible de récupérer l'historique.</p>
+                  <p className="text-xs text-gray-400 mb-3">Vérifiez la config API dans Paramètres.</p>
+                  <button onClick={fetchOzoneHistory} className="text-xs text-amber-600 underline">Réessayer</button>
+                </div>
+              )}
+              {historyState === 'ok' && historyData && (
+                <div>
+                  {/* Parcel info */}
+                  <div className="bg-gray-50 rounded-lg p-3 mb-3 text-xs space-y-0.5">
+                    <p><span className="font-semibold text-gray-600">N° suivi:</span> <span className="font-mono text-amber-700">{historyData.tracking}</span></p>
+                    <p><span className="font-semibold text-gray-600">Client:</span> {historyData.receiver}</p>
+                    <p><span className="font-semibold text-gray-600">Téléphone:</span> {historyData.phone}</p>
+                    <p><span className="font-semibold text-gray-600">Ville:</span> {historyData.city}</p>
+                    {historyData.status && <p><span className="font-semibold text-gray-600">Statut actuel:</span> <span className="text-amber-700 font-semibold">{historyData.status}</span></p>}
+                  </div>
+                  {/* Timeline */}
+                  {historyData.history.length > 0 ? (
+                    <div className="relative pl-4">
+                      <div className="absolute left-1.5 top-0 bottom-0 w-px bg-gray-200" />
+                      {historyData.history.map((h, i) => {
+                        const label = h['STATUS'] || h['LABEL'] || h['status'] || h['label'] || h['event'] || JSON.stringify(h);
+                        const date  = h['DATE']   || h['date']   || h['DATE_TIME'] || '';
+                        return (
+                          <div key={i} className="relative mb-3 last:mb-0">
+                            <span className={`absolute -left-[11px] w-3 h-3 rounded-full border-2 border-white ${i === 0 ? 'bg-amber-500' : 'bg-gray-300'}`} />
+                            <p className={`text-xs font-semibold ${i === 0 ? 'text-amber-700' : 'text-gray-700'}`}>{label}</p>
+                            {date && <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">🕐 {date}</p>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 text-center py-3">Aucun événement disponible</p>
+                  )}
+                  <button onClick={fetchOzoneHistory} className="mt-3 w-full text-xs text-amber-600 border border-amber-200 rounded-lg py-1.5 hover:bg-amber-50 transition">🔄 Actualiser</button>
+                </div>
+              )}
+            </div>
+          )}
 
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50">Annuler</button>
-          <button onClick={() => onSave(order.id, status, note)}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition"
-            style={{ backgroundColor: current?.color || '#f59e0b' }}>
-            Enregistrer
-          </button>
+          {/* Manual tab */}
+          {tab === 'manual' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-1.5 max-h-52 overflow-y-auto pr-1">
+                {DELIVERY_STATUSES.map(s => (
+                  <button key={s.value} onClick={() => setStatus(s.value)}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-left transition-all border ${
+                      status === s.value ? 'text-white font-semibold border-transparent' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    }`}
+                    style={status === s.value ? { backgroundColor: s.color, borderColor: s.color } : {}}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                    {s.label}
+                    {status === s.value && <Check size={12} className="ml-auto" />}
+                  </button>
+                ))}
+              </div>
+              <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Note interne (optionnel)..."
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none" />
+              <div className="flex justify-end gap-2">
+                <button onClick={onClose} className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50">Annuler</button>
+                <button onClick={() => onSave(order.id, status, note)}
+                  className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition"
+                  style={{ backgroundColor: current?.color || '#f59e0b' }}>
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
