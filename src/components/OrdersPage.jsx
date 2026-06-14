@@ -20,6 +20,8 @@ import {
   Check,
   ChevronDown,
   X,
+  Trash2,
+  History,
 } from 'lucide-react';
 import { statusConfig } from '../data/orders';
 import OrderModal from './OrderModal';
@@ -214,6 +216,63 @@ function StatusPicker({ value, onChange }) {
   );
 }
 
+/* ─── History helpers ─── */
+function recordHistory(orderId, status, user) {
+  const key = `order_history_${orderId}`;
+  const hist = JSON.parse(localStorage.getItem(key) || '[]');
+  const t = new Date();
+  const ts = `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+  hist.push({ timestamp: ts, status, user: user || 'inconnu' });
+  localStorage.setItem(key, JSON.stringify(hist));
+}
+
+function HistoryModal({ order, onClose }) {
+  const hist = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]');
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900">Historique du commande</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{order.id}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
+          <p className="text-sm font-semibold text-gray-800">{order.recipient.name} // {order.recipient.city} ({order.recipient.phone})</p>
+          <p className="text-xs text-gray-500 mt-0.5">{order.recipient.address}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="px-6 py-2 text-left text-xs font-semibold text-gray-500">Date mise à jour</th>
+                <th className="px-6 py-2 text-left text-xs font-semibold text-gray-500">État</th>
+                <th className="px-6 py-2 text-left text-xs font-semibold text-gray-500">Utilisateur</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hist.length === 0 && (
+                <tr><td colSpan={3} className="px-6 py-6 text-center text-gray-400 text-xs">Aucun historique disponible</td></tr>
+              )}
+              {[...hist].reverse().map((h, i) => (
+                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="px-6 py-2.5 text-xs text-gray-700">{h.timestamp}</td>
+                  <td className="px-6 py-2.5"><StatusBadge status={h.status} /></td>
+                  <td className="px-6 py-2.5 text-xs text-gray-700 font-medium">{h.user}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-6 py-3 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusChangeModal({ order, onClose, onSave }) {
   const [newStatus, setNewStatus] = useState(order.status);
   const [note, setNote] = useState('');
@@ -251,7 +310,7 @@ function StatusChangeModal({ order, onClose, onSave }) {
   );
 }
 
-export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading }) {
+export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading, onDeleteOrder, currentUser }) {
   const orders = externalOrders;
   function setOrders(updater) {
     setExternalOrders(updater);
@@ -266,6 +325,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [statusDropdown, setStatusDropdown] = useState(null); /* { order, anchor } */
   const [toasts, setToasts] = useState([]);
   const [modifiedIds, setModifiedIds] = useState(new Set());
+  const [historyOrder, setHistoryOrder] = useState(null);
 
   const currentStatus = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
 
@@ -540,16 +600,23 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                       <Pencil size={13} />
                     </button>
                     <button
+                      onClick={() => setHistoryOrder(order)}
                       className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                       title="Historique"
                     >
-                      <Clock size={13} />
+                      <History size={13} />
                     </button>
                     <button
-                      className="p-1.5 rounded bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
-                      title="WhatsApp"
+                      onClick={() => {
+                        if (window.confirm(`Supprimer la commande ${order.id} ?`)) {
+                          setOrders(prev => prev.filter(o => o.id !== order.id));
+                          onDeleteOrder?.(order.id);
+                        }
+                      }}
+                      className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                      title="Supprimer"
                     >
-                      <MessageCircle size={13} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </td>
@@ -593,6 +660,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           onSave={(orderId, newStatus, note) => {
             const t = new Date();
             const ts = `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+            recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
@@ -603,6 +671,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             setStatusDropdown(null);
           }}
         />
+      )}
+
+      {/* History Modal */}
+      {historyOrder && (
+        <HistoryModal order={historyOrder} onClose={() => setHistoryOrder(null)} />
       )}
 
       {/* New Order Modal */}

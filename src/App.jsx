@@ -21,7 +21,7 @@ const TAB_FROM_PARAM = {
   'confirme':    'confirme',
 };
 
-function OrdersRoute({ orders, setOrdersWithSync, isLoading }) {
+function OrdersRoute({ orders, setOrdersWithSync, isLoading, onDeleteOrder, currentUser }) {
   const { tab } = useParams();
   const activeTab = TAB_FROM_PARAM[tab] || 'a_confirmer';
   const navigate = useNavigate();
@@ -32,6 +32,8 @@ function OrdersRoute({ orders, setOrdersWithSync, isLoading }) {
       externalOrders={orders}
       setExternalOrders={setOrdersWithSync}
       isLoading={isLoading}
+      onDeleteOrder={onDeleteOrder}
+      currentUser={currentUser}
     />
   );
 }
@@ -172,6 +174,10 @@ export default function App() {
     await supabase.from('orders').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
   }
 
+  async function deleteOrderFromSupabase(orderId) {
+    await supabase.from('orders').delete().eq('id', orderId);
+  }
+
   async function updateOrderInSupabase(order) {
     await supabase.from('orders').upsert({
       id: order.id,
@@ -228,7 +234,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard orders={orders} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
-          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />
+          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading || isWooFetching} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />
           <Route path="/stock" element={<StockPage />} />
           <Route path="/ramassage" element={<UnderConstruction />} />
