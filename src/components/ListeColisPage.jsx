@@ -591,6 +591,21 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     catch { return new Set(); }
   });
 
+  /* Reçu toggles stored in localStorage */
+  const [recuIds, setRecuIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('victoury_recu_ids') || '[]')); }
+    catch { return new Set(); }
+  });
+
+  function toggleRecu(orderId) {
+    setRecuIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) { next.delete(orderId); } else { next.add(orderId); }
+      localStorage.setItem('victoury_recu_ids', JSON.stringify([...next]));
+      return next;
+    });
+  }
+
   /* Derive facture status: auto (from factures) OR manual toggle */
   const facturedIds = useMemo(() => {
     try {
@@ -771,14 +786,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     )}
                     {(o.status === 'refuse' || o.status === 'annule') && (
                       <button
-                        onClick={() => setOrders(prev => prev.map(x => x.id === o.id ? { ...x, recu: !x.recu } : x))}
+                        onClick={() => toggleRecu(o.id)}
                         className={`mt-1 text-xs px-2 py-0.5 rounded-full border font-semibold transition-colors ${
-                          o.recu
-                            ? 'bg-blue-100 text-blue-700 border-blue-300'
+                          recuIds.has(o.id)
+                            ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
                             : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
                         }`}
                       >
-                        {o.recu ? '✓ Reçu' : 'Non reçu'}
+                        {recuIds.has(o.id) ? '✓ Reçus' : 'Non reçu'}
                       </button>
                     )}
                   </td>
