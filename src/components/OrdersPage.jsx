@@ -217,11 +217,19 @@ function StatusPicker({ value, onChange }) {
 }
 
 /* ─── History helpers ─── */
+function getUserDisplayName(email) {
+  try {
+    const profiles = JSON.parse(localStorage.getItem('user_profiles') || '[]');
+    const p = profiles.find(u => u.email === email);
+    return p ? `${p.name} (${p.role})` : (email || 'inconnu');
+  } catch { return email || 'inconnu'; }
+}
+
 function recordHistory(orderId, status, user) {
   const key = `order_history_${orderId}`;
   const hist = JSON.parse(localStorage.getItem(key) || '[]');
   const ts = now();
-  hist.push({ timestamp: ts, status, user: user || 'inconnu' });
+  hist.push({ timestamp: ts, status, user: getUserDisplayName(user) });
   localStorage.setItem(key, JSON.stringify(hist));
 }
 

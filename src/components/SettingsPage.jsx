@@ -3,7 +3,7 @@ import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
-  ShoppingCart, Truck, X, Clock,
+  ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2,
 } from 'lucide-react';
 
 const TIMEZONES = [
@@ -79,6 +79,38 @@ export default function SettingsPage({ onWooOrdersImported }) {
     setTzSaved(true);
   }
 
+  /* ── Users state ── */
+  const ROLES = ['Admin', 'Confirmation', 'Comptabilité', 'Suivi', 'Livraison'];
+  const [usersList, setUsersList] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user_profiles') || '[]'); } catch { return []; }
+  });
+  const [userForm, setUserForm] = useState({ name: '', email: '', role: 'Confirmation' });
+  const [usersSaved, setUsersSaved] = useState(false);
+
+  function saveUserProfiles(list) {
+    setUsersList(list);
+    localStorage.setItem('user_profiles', JSON.stringify(list));
+    cloudSet('user_profiles', list);
+    setUsersSaved(true);
+    setTimeout(() => setUsersSaved(false), 2000);
+  }
+  function addUser() {
+    if (!userForm.name.trim() || !userForm.email.trim()) return;
+    if (usersList.find(u => u.email === userForm.email)) return;
+    saveUserProfiles([...usersList, { ...userForm }]);
+    setUserForm({ name: '', email: '', role: 'Confirmation' });
+  }
+  function deleteUser(email) { saveUserProfiles(usersList.filter(u => u.email !== email)); }
+
+  useEffect(() => {
+    cloudGet('user_profiles').then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setUsersList(data);
+        localStorage.setItem('user_profiles', JSON.stringify(data));
+      }
+    });
+  }, []);
+
   /* ── Load configs from Supabase on mount ── */
   useEffect(() => {
     cloudGet('woo_config').then(saved => {
@@ -144,6 +176,16 @@ export default function SettingsPage({ onWooOrdersImported }) {
       cardBg: 'from-purple-50',
       saved: woo.saved,
       badge: woo.saved ? { label: 'Configuré', color: 'text-green-600 bg-green-50 border-green-200' } : null,
+    },
+    {
+      id: 'users',
+      title: 'Utilisateurs',
+      desc: "Gérez les comptes de votre équipe. Chaque utilisateur apparaît dans l'historique des commandes.",
+      icon: <Users size={22} className="text-indigo-600" />,
+      iconBg: 'bg-indigo-100',
+      cardBg: 'from-indigo-50',
+      saved: usersList.length > 0,
+      badge: usersList.length > 0 ? { label: `${usersList.length} utilisateur${usersList.length > 1 ? 's' : ''}`, color: 'text-indigo-700 bg-indigo-50 border-indigo-200' } : null,
     },
     {
       id: 'timezone',
@@ -233,6 +275,63 @@ export default function SettingsPage({ onWooOrdersImported }) {
             {woo.testStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-600"><XCircle size={12} /> Échec</span>}
             {woo.syncStatus === 'success' && <span className="flex items-center gap-1 text-xs text-purple-600"><CheckCircle2 size={12} /> Importées</span>}
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Users Modal ── */}
+      <Modal open={openModal === 'users'} onClose={() => setOpenModal(null)}
+        title="Gestion des utilisateurs" icon={<Users size={18} className="text-indigo-600" />}
+        iconBg="bg-gradient-to-r from-indigo-50 to-white">
+        <div className="space-y-4">
+          {/* List */}
+          {usersList.length > 0 && (
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Nom', 'Rôle', 'Email', ''].map(h => <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-500">{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {usersList.map(u => (
+                    <tr key={u.email}>
+                      <td className="px-3 py-2 font-semibold text-gray-800">{u.name}</td>
+                      <td className="px-3 py-2">
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{u.role}</span>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-500">{u.email}</td>
+                      <td className="px-3 py-2">
+                        <button onClick={() => deleteUser(u.email)} className="p-1 rounded bg-red-100 text-red-500 hover:bg-red-200">
+                          <Trash2 size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Add form */}
+          <div className="border border-dashed border-gray-300 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><UserPlus size={12} /> Ajouter un utilisateur</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input value={userForm.name} onChange={e => setUserForm(p => ({...p, name: e.target.value}))} placeholder="Nom complet" className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              <select value={userForm.role} onChange={e => setUserForm(p => ({...p, role: e.target.value}))} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                {ROLES.map(r => <option key={r}>{r}</option>)}
+              </select>
+            </div>
+            <input value={userForm.email} onChange={e => setUserForm(p => ({...p, email: e.target.value}))} placeholder="Email (même que le compte login)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <button onClick={addUser} disabled={!userForm.name || !userForm.email}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition">
+              <UserPlus size={12} /> Ajouter
+            </button>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
+            💡 Pour créer un accès login, invitez l’utilisateur via le tableau de bord Supabase → Authentication → Invite user.
+          </div>
+          {usersSaved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
         </div>
       </Modal>
 
