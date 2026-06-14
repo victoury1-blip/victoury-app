@@ -28,6 +28,7 @@ import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
 import { supabase } from '../lib/supabase';
+import { loadProducts } from '../data/products';
 
 async function generateVictId() {
   try {
@@ -623,20 +624,34 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 /* ─── Mini new-order form ─── */
 function NewOrderModal({ onClose, onSave }) {
   const ic = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300';
+  const icSm = 'border border-gray-200 rounded-md px-1.5 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white';
   const lc = 'block text-xs font-semibold text-gray-600 mb-1';
+  const stockProducts = loadProducts();
   const [form, setForm] = useState({
-    nom: '', telephone: '', ville: '', adresse: '', produit: '', taille: '', prix: '', qty: '1',
+    nom: '', telephone: '', ville: '', adresse: '', prix: '',
+    products: [{ name: '', size: '', qty: 1 }],
   });
   function u(k, v) { setForm((p) => ({ ...p, [k]: v })); }
+  function updateProduct(idx, field, value) {
+    setForm(p => {
+      const products = [...p.products];
+      products[idx] = { ...products[idx], [field]: value, ...(field === 'name' ? { size: '' } : {}) };
+      return { ...p, products };
+    });
+  }
+  function addProduct() { setForm(p => ({ ...p, products: [...p.products, { name: '', size: '', qty: 1 }] })); }
+  function removeProduct(idx) { setForm(p => ({ ...p, products: p.products.filter((_, i) => i !== idx) })); }
 
   async function handleSave() {
     if (!form.nom || !form.telephone || !form.prix) return;
     const id = await generateVictId();
     const t = now();
+    const firstProd = form.products[0] || {};
     onSave({
       id,
       recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: null },
-      product: { name: form.produit, size: form.taille, qty: parseInt(form.qty) || 1, stock: 0 },
+      product: { name: firstProd.name, size: firstProd.size, qty: firstProd.qty || 1, stock: 0 },
+      products: form.products,
       price: parseFloat(form.prix) || 0,
       status: 'nouveau',
       note: '',
@@ -652,9 +667,7 @@ function NewOrderModal({ onClose, onSave }) {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="font-bold text-gray-800">Nouvelle commande</h3>
-            <p className="text-xs text-indigo-600 font-mono mt-0.5">
-              ID : auto-généré
-            </p>
+            <p className="text-xs text-indigo-600 font-mono mt-0.5">ID : auto-généré</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><XCircle size={16} className="text-gray-400" /></button>
         </div>
@@ -667,13 +680,53 @@ function NewOrderModal({ onClose, onSave }) {
             <div><label className={lc}>Ville</label><input value={form.ville} onChange={(e) => u('ville', e.target.value)} className={ic} /></div>
             <div><label className={lc}>Adresse</label><input value={form.adresse} onChange={(e) => u('adresse', e.target.value)} className={ic} /></div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2"><label className={lc}>Produit</label><input value={form.produit} onChange={(e) => u('produit', e.target.value)} className={ic} /></div>
-            <div><label className={lc}>Taille</label><input value={form.taille} onChange={(e) => u('taille', e.target.value)} className={ic} /></div>
+
+          <div>
+            <label className={lc}>Produits</label>
+            <div className="space-y-1.5">
+              {form.products.map((prod, idx) => {
+                const selProd = stockProducts.find(p => p.name === prod.name);
+                const sizes = selProd ? selProd.variations.map(v => v.taille) : [];
+                return (
+                  <div key={idx} className="flex items-center gap-1.5">
+                    <select
+                      value={prod.name}
+                      onChange={(e) => updateProduct(idx, 'name', e.target.value)}
+                      className={`${ic} flex-1 min-w-0`}
+                    >
+                      <option value="">-- Produit --</option>
+                      {stockProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                    </select>
+                    <select
+                      value={prod.size || ''}
+                      onChange={(e) => updateProduct(idx, 'size', e.target.value)}
+                      className={`${icSm} w-16 shrink-0`}
+                    >
+                      <option value="">T.</option>
+                      {sizes.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <input
+                      type="number" min={1} value={prod.qty}
+                      onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
+                      className={`${icSm} w-12 text-center shrink-0`}
+                    />
+                    <button onClick={() => removeProduct(idx)}
+                      className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
+                      <X size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+              <button onClick={addProduct}
+                className="w-full border-2 border-dashed border-gray-300 rounded-md py-1.5 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-500 flex items-center justify-center gap-1">
+                <Plus size={12} /> Ajouter un produit
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={lc}>Prix (DH) <span className="text-red-500">*</span></label><input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={ic} /></div>
-            <div><label className={lc}>Quantité</label><input type="number" value={form.qty} onChange={(e) => u('qty', e.target.value)} className={ic} /></div>
+
+          <div>
+            <label className={lc}>Prix total (DH) <span className="text-red-500">*</span></label>
+            <input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={ic} />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-5">

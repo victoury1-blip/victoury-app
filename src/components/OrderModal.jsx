@@ -188,11 +188,11 @@ export default function OrderModal({ order, onClose, onSave }) {
                   ? selProd.variations.map(v => v.taille)
                   : (prod.size && isNaN(prod.size) ? SIZE_OPTIONS : NUMERIC_SIZES);
                 return (
-                  <div key={idx} className="flex items-center gap-2">
+                  <div key={idx} className="flex items-center gap-1.5">
                     <select
                       value={prod.name}
                       onChange={(e) => { updateProduct(idx, 'name', e.target.value); updateProduct(idx, 'size', ''); }}
-                      className={`${inputCls} flex-1`}
+                      className={`${inputCls} flex-1 min-w-0`}
                     >
                       <option value="">-- Choisir un produit --</option>
                       {stockProducts.map(p => (
@@ -202,22 +202,20 @@ export default function OrderModal({ order, onClose, onSave }) {
                     <select
                       value={prod.size || ''}
                       onChange={(e) => updateProduct(idx, 'size', e.target.value)}
-                      className={`${inputCls} w-24`}
+                      className="border border-gray-200 rounded-md px-1.5 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-16 shrink-0"
                     >
-                      <option value="">Taille</option>
+                      <option value="">T.</option>
                       {sizes.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <input
                       type="number" min={1} value={prod.qty}
                       onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
-                      className={`${inputCls} w-16 text-center`}
+                      className="border border-gray-200 rounded-md px-1 py-2 text-xs text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-12 shrink-0"
                     />
-                    {form.products.length > 1 && (
-                      <button onClick={() => removeProduct(idx)}
-                        className="p-2 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                    <button onClick={() => removeProduct(idx)}
+                      className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 );
               })}
