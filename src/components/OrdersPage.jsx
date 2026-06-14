@@ -339,8 +339,13 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
   const currentStatus = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
 
+  const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);
+
   const filtered = useMemo(() => {
     return orders.filter((o) => {
+      /* Orders in the colis pipeline (validated + tracking) must NOT appear in order tabs */
+      const inColisPipeline = COLIS_PIPELINE_SET.has(o.status) || !!(o.trackingNumber && o.validated);
+      if (inColisPipeline) return false;
       const matchStatus = o.status === currentStatus || modifiedIds.has(o.id);
       const q = search.toLowerCase();
       const matchSearch =
