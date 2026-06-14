@@ -596,7 +596,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const colis = useMemo(() => {
     const q = search.toLowerCase();
     return orders.filter((o) => {
-      const inPipeline = COLIS_PIPELINE.includes(o.status) || !!o.trackingNumber;
+      const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
       const matchSearch = !q ||
         o.id.toLowerCase().includes(q) ||
         o.recipient.name.toLowerCase().includes(q) ||
@@ -628,7 +628,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
   function deactivateOrder(orderId) {
     const ts = getTs();
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'confirme', dateUpdated: ts } : o));
+    setOrders(prev => prev.map(o => o.id === orderId
+      ? { ...o, status: 'confirme', dateUpdated: ts, validated: false, trackingNumber: null }
+      : o
+    ));
   }
 
   if (isLoading) return (
