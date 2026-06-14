@@ -3,8 +3,19 @@ import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
-  ShoppingCart, Truck, X,
+  ShoppingCart, Truck, X, Clock,
 } from 'lucide-react';
+
+const TIMEZONES = [
+  { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
+  { value: 'Europe/Paris',       label: 'France (Paris) — UTC+2' },
+  { value: 'Europe/London',      label: 'Royaume-Uni (Londres) — UTC+1' },
+  { value: 'Africa/Cairo',       label: 'Égypte (Le Caire) — UTC+3' },
+  { value: 'Asia/Riyadh',        label: 'Arabie Saoudite (Riyad) — UTC+3' },
+  { value: 'Asia/Dubai',         label: 'EAU (Dubaï) — UTC+4' },
+  { value: 'America/New_York',   label: 'USA Est (New York) — UTC-4' },
+  { value: 'UTC',                label: 'UTC — UTC+0' },
+];
 
 function InputField({ label, type = 'text', value, onChange, placeholder, show, onToggleShow }) {
   const isPassword = type === 'password';
@@ -57,6 +68,16 @@ export default function SettingsPage({ onWooOrdersImported }) {
 
   /* ── Ozon Express state ── */
   const [auzone, setAuzone] = useState({ customerId: '', apiKey: '', showKey: false, testStatus: 'idle', saved: false });
+
+  /* ── Timezone state ── */
+  const [timezone, setTimezone] = useState(localStorage.getItem('system_timezone') || 'Africa/Casablanca');
+  const [tzSaved, setTzSaved] = useState(!!localStorage.getItem('system_timezone'));
+
+  function saveTz(tz) {
+    localStorage.setItem('system_timezone', tz);
+    setTimezone(tz);
+    setTzSaved(true);
+  }
 
   /* ── Load configs from Supabase on mount ── */
   useEffect(() => {
@@ -123,6 +144,16 @@ export default function SettingsPage({ onWooOrdersImported }) {
       cardBg: 'from-purple-50',
       saved: woo.saved,
       badge: woo.saved ? { label: 'Configuré', color: 'text-green-600 bg-green-50 border-green-200' } : null,
+    },
+    {
+      id: 'timezone',
+      title: 'Fuseau horaire',
+      desc: "Définissez le fuseau horaire utilisé pour l'horodatage des commandes et de l'historique.",
+      icon: <Clock size={22} className="text-blue-600" />,
+      iconBg: 'bg-blue-100',
+      cardBg: 'from-blue-50',
+      saved: tzSaved,
+      badge: tzSaved ? { label: timezone.split('/')[1] || timezone, color: 'text-blue-700 bg-blue-50 border-blue-200' } : null,
     },
     {
       id: 'ozonexpress',
@@ -201,6 +232,36 @@ export default function SettingsPage({ onWooOrdersImported }) {
             {woo.testStatus === 'success' && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Connexion OK</span>}
             {woo.testStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-600"><XCircle size={12} /> Échec</span>}
             {woo.syncStatus === 'success' && <span className="flex items-center gap-1 text-xs text-purple-600"><CheckCircle2 size={12} /> Importées</span>}
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Timezone Modal ── */}
+      <Modal open={openModal === 'timezone'} onClose={() => setOpenModal(null)}
+        title="Fuseau horaire" icon={<Clock size={18} className="text-blue-600" />}
+        iconBg="bg-gradient-to-r from-blue-50 to-white">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Sélectionner le fuseau horaire</label>
+            <select
+              value={timezone}
+              onChange={(e) => { setTimezone(e.target.value); setTzSaved(false); }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              {TIMEZONES.map(tz => (
+                <option key={tz.value} value={tz.value}>{tz.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-700">
+            Heure actuelle : <strong>{new Date().toLocaleString('fr-FR', { timeZone: timezone, hour12: false })}</strong>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button onClick={() => saveTz(timezone)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition">
+              <Save size={12} /> Enregistrer
+            </button>
+            {tzSaved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
           </div>
         </div>
       </Modal>

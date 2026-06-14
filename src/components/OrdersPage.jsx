@@ -44,9 +44,9 @@ async function generateVictId() {
   return 'VICT' + String(next).padStart(3, '0');
 }
 
+function getSysTz() { return localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
 function now() {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return new Date().toLocaleString('fr-FR', { timeZone: getSysTz(), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
 }
 
 const tabs = [
@@ -220,8 +220,7 @@ function StatusPicker({ value, onChange }) {
 function recordHistory(orderId, status, user) {
   const key = `order_history_${orderId}`;
   const hist = JSON.parse(localStorage.getItem(key) || '[]');
-  const t = new Date();
-  const ts = `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+  const ts = now();
   hist.push({ timestamp: ts, status, user: user || 'inconnu' });
   localStorage.setItem(key, JSON.stringify(hist));
 }
@@ -658,8 +657,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           order={statusDropdown.order}
           onClose={() => setStatusDropdown(null)}
           onSave={(orderId, newStatus, note) => {
-            const t = new Date();
-            const ts = `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+            const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
             setOrders((prev) => prev.map((o) => {
