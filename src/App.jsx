@@ -157,7 +157,10 @@ export default function App() {
   /* ── Supabase helpers ── */
   async function saveOrdersToSupabase(newOrders) {
     if (!newOrders.length) return;
-    const rows = newOrders.map((o) => ({
+    const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
+    const filtered = newOrders.filter(o => !deletedIds.has(o.id));
+    if (!filtered.length) return;
+    const rows = filtered.map((o) => ({
       id: o.id,
       recipient: o.recipient,
       product: o.product,
@@ -177,9 +180,9 @@ export default function App() {
   }
 
   async function deleteOrderFromSupabase(orderId) {
-    await supabase.from('orders').delete().eq('id', orderId);
     const bl = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
     if (!bl.includes(orderId)) { bl.push(orderId); localStorage.setItem('deleted_order_ids', JSON.stringify(bl)); }
+    await supabase.from('orders').delete().eq('id', orderId);
   }
 
   async function updateOrderInSupabase(order) {
