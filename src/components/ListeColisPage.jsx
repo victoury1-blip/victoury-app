@@ -504,24 +504,36 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                     {historyData.status && <p><span className="font-semibold text-gray-600">Statut actuel:</span> <span className="text-amber-700 font-semibold">{historyData.status}</span></p>}
                   </div>
                   {/* Timeline */}
-                  {historyData.history.length > 0 ? (
-                    <div className="relative pl-4">
-                      <div className="absolute left-1.5 top-0 bottom-0 w-px bg-gray-200" />
-                      {historyData.history.map((h, i) => {
-                        const label = h['STATUS'] || h['LABEL'] || h['status'] || h['label'] || h['event'] || JSON.stringify(h);
-                        const date  = h['DATE']   || h['date']   || h['DATE_TIME'] || '';
-                        return (
+                  {(() => {
+                    /* Build events: API history + always show local status as fallback */
+                    const localEvent = {
+                      label: DELIVERY_STATUSES.find(s => s.value === order.status)?.label || order.status,
+                      date: order.dateUpdated || order.dateAdded || '',
+                      color: DELIVERY_STATUSES.find(s => s.value === order.status)?.color || '#f59e0b',
+                      local: true,
+                    };
+                    const apiEvents = historyData.history.map(h => ({
+                      label: h['STATUS'] || h['LABEL'] || h['status'] || h['label'] || h['event'] || JSON.stringify(h),
+                      date: h['DATE'] || h['date'] || h['DATE_TIME'] || '',
+                      color: '#f59e0b',
+                      local: false,
+                    }));
+                    const events = apiEvents.length > 0 ? apiEvents : [localEvent];
+                    return (
+                      <div className="relative pl-4">
+                        <div className="absolute left-1.5 top-0 bottom-0 w-px bg-gray-200" />
+                        {events.map((ev, i) => (
                           <div key={i} className="relative mb-3 last:mb-0">
-                            <span className={`absolute -left-[11px] w-3 h-3 rounded-full border-2 border-white ${i === 0 ? 'bg-amber-500' : 'bg-gray-300'}`} />
-                            <p className={`text-xs font-semibold ${i === 0 ? 'text-amber-700' : 'text-gray-700'}`}>{label}</p>
-                            {date && <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">🕐 {date}</p>}
+                            <span className="absolute -left-[11px] w-3 h-3 rounded-full border-2 border-white"
+                              style={{ backgroundColor: i === 0 ? ev.color : '#d1d5db' }} />
+                            <p className={`text-xs font-semibold ${i === 0 ? 'text-amber-700' : 'text-gray-700'}`}>{ev.label}</p>
+                            {ev.date && <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">🕐 {ev.date}</p>}
+                            {ev.local && <p className="text-[10px] text-blue-400 mt-0.5">📍 Statut local (non Ozone)</p>}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400 text-center py-3">Aucun événement disponible</p>
-                  )}
+                        ))}
+                      </div>
+                    );
+                  })()}
                   <button onClick={fetchOzoneHistory} className="mt-3 w-full text-xs text-amber-600 border border-amber-200 rounded-lg py-1.5 hover:bg-amber-50 transition">🔄 Actualiser</button>
                 </div>
               )}
