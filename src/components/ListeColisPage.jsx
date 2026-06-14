@@ -585,13 +585,29 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [deliveryOrder, setDeliveryOrder] = useState(null);
   const [selected, setSelected] = useState([]);
 
-  /* Derive facture status from localStorage - persists across refresh */
+  /* Manual facture toggles stored in localStorage */
+  const [manualFacture, setManualFacture] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('victoury_manual_facture') || '[]')); }
+    catch { return new Set(); }
+  });
+
+  /* Derive facture status: auto (from factures) OR manual toggle */
   const facturedIds = useMemo(() => {
     try {
       const list = JSON.parse(localStorage.getItem('victoury_factures') || '[]');
-      return new Set(list.flatMap(f => (f.colis || []).map(c => c.orderId)));
-    } catch { return new Set(); }
-  }, [orders]);
+      const autoIds = new Set(list.flatMap(f => (f.colis || []).map(c => c.orderId)));
+      return new Set([...autoIds, ...manualFacture]);
+    } catch { return new Set([...manualFacture]); }
+  }, [orders, manualFacture]);
+
+  function toggleFacture(orderId) {
+    setManualFacture(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) { next.delete(orderId); } else { next.add(orderId); }
+      localStorage.setItem('victoury_manual_facture', JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   function toggleSelect(id) {
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -740,17 +756,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                       <ChevronDown size={10} className="text-gray-400 group-hover:text-gray-600" />
                     </button>
 
-                    {/* Sub-status: facture indicator (derived from factures localStorage) */}
+                    {/* Sub-status: facture toggle (persisted in localStorage) */}
                     {o.status === 'livre' && (
-                      <span
-                        className={`mt-1 text-xs px-2 py-0.5 rounded-full border font-semibold ${
+                      <button
+                        onClick={() => toggleFacture(o.id)}
+                        className={`mt-1 text-xs px-2 py-0.5 rounded-full border font-semibold transition-colors ${
                           facturedIds.has(o.id)
-                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                            : 'bg-gray-100 text-gray-500 border-gray-300'
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
+                            : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-700'
                         }`}
                       >
                         {facturedIds.has(o.id) ? '✓ Facturé' : 'Pas facturé'}
-                      </span>
+                      </button>
                     )}
                     {(o.status === 'refuse' || o.status === 'annule') && (
                       <button
