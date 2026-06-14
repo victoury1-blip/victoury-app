@@ -346,7 +346,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       /* Orders in the colis pipeline (validated + tracking) must NOT appear in order tabs */
       const inColisPipeline = COLIS_PIPELINE_SET.has(o.status) || !!(o.trackingNumber && o.validated);
       if (inColisPipeline) return false;
-      const matchStatus = o.status === currentStatus || modifiedIds.has(o.id);
+      const matchStatus = o.status === currentStatus;
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
