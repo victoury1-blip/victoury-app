@@ -226,7 +226,10 @@ function recordHistory(orderId, status, user) {
 }
 
 function HistoryModal({ order, onClose }) {
-  const hist = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]');
+  const saved = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]');
+  const hist = saved.length > 0 ? saved : [
+    { timestamp: order.dateAdded || '—', status: order.status, user: 'Création' }
+  ];
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
@@ -383,6 +386,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   }
 
   function saveOrder(updated) {
+    const prev = orders.find(o => o.id === updated.id);
+    if (prev && prev.status !== updated.status) {
+      recordHistory(updated.id, updated.status, currentUser);
+    }
     setModifiedIds(prev => new Set([...prev, updated.id]));
     setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
     setModalOpen(false);
