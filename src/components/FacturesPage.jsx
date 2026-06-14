@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw, Zap } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
 
@@ -390,6 +390,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 export default function FacturesPage({ orders }) {
   const [factures, setFactures] = useState([]);
   const [newOpen, setNewOpen] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
 
   useEffect(() => {
     loadFacturesRemote().then(remote => { if (remote) setFactures(remote); });
@@ -440,6 +441,61 @@ export default function FacturesPage({ orders }) {
   }
   function reset() { setFilterLivreur(''); setFilterStatut(''); }
 
+  /* ── Auto-generate factures for eligible unprocessed orders ── */
+  async function autoGenerate() {
+    /* Build set of order IDs already in any facture */
+    const already = new Set(factures.flatMap(f => f.colis.map(c => c.orderId)));
+    /* Find eligible orders not yet in a facture */
+    const pending = orders.filter(o => ELIGIBLE_STATUSES.includes(o.status) && !already.has(o.id));
+    if (!pending.length) { alert('Aucune commande éligible à facturer.'); return; }
+    setAutoGenerating(true);
+    /* Group by livreur */
+    const byLivreur = {};
+    pending.forEach(o => {
+      const lv = o.recipient?.delivery || 'Manuel';
+      if (!byLivreur[lv]) byLivreur[lv] = [];
+      byLivreur[lv].push(o);
+    });
+    const fraisDefault = 25;
+    let list = [...factures];
+    for (const [lv, cols] of Object.entries(byLivreur)) {
+      const ref = await nextRef();
+      const livres = cols.filter(o => o.status === 'livre');
+      const totalLivre = livres.reduce((s, o) => s + (o.price || 0), 0);
+      const totalFrais = cols.length * fraisDefault;
+      const totalNet = totalLivre - totalFrais;
+      list.push({
+        id: ref, ref,
+        dateCreation: nowTs(),
+        datePaiement: null,
+        statut: 'en_attente',
+        livreur: lv,
+        colis: cols.map(o => ({
+          orderId: o.id,
+          status: o.status,
+          prix: o.price || 0,
+          fraisLivraison: fraisDefault,
+          recipient: o.recipient?.name,
+          city: o.recipient?.city,
+          phone: o.recipient?.phone,
+          product: o.product?.name || '',
+          date: o.dateUpdated || o.dateAdded || '',
+        })),
+        totalLivre, totalFrais, totalNet,
+        locked: false,
+      });
+    }
+    setFactures(list);
+    saveFactures(list);
+    setAutoGenerating(false);
+  }
+
+  /* Count pending orders not in any facture */
+  const pendingCount = useMemo(() => {
+    const already = new Set(factures.flatMap(f => f.colis.map(c => c.orderId)));
+    return orders.filter(o => ELIGIBLE_STATUSES.includes(o.status) && !already.has(o.id)).length;
+  }, [factures, orders]);
+
   const selCls = 'border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
 
   /* ── Detail view ── */
@@ -464,10 +520,22 @@ export default function FacturesPage({ orders }) {
             <h1 className="text-xl font-bold text-gray-800">Liste des Factures</h1>
             <p className="text-xs text-gray-500 mt-0.5">Gestion des factures des livreurs</p>
           </div>
-          <button onClick={() => setNewOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
-            <Plus size={14} /> Nouvelle facture
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={autoGenerate} disabled={autoGenerating || pendingCount === 0}
+              className="relative flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600 disabled:opacity-50">
+              <Zap size={14} />
+              {autoGenerating ? 'Génération...' : 'Générer auto'}
+              {pendingCount > 0 && !autoGenerating && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </span>
+              )}
+            </button>
+            <button onClick={() => setNewOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+              <Plus size={14} /> Nouvelle facture
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
