@@ -455,13 +455,14 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
                 {/* Produits */}
                 <td className="px-4 py-3 min-w-[160px]">
-                  <div className="font-medium text-gray-800">{order.product?.name}{order.product?.size ? ` - ${order.product.size}` : ''}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    ({order.product?.qty ?? 1}x){' '}
-                    <span className={(order.product?.stock ?? 0) > 0 ? 'text-green-600' : 'text-red-500'}>
-                      stock{order.product?.stock ?? 0}
-                    </span>
-                  </div>
+                  {(order.products?.length > 0 ? order.products : [order.product]).map((p, i) => p && (
+                    <div key={i} className="text-sm leading-snug mb-0.5">
+                      <span className="font-medium text-gray-800">{p.name}</span>
+                      {p.color && <span className="ml-1 text-xs font-medium text-blue-600">{p.color}</span>}
+                      {p.size && <span className="ml-1 text-xs text-gray-500">/ {p.size}</span>}
+                      <span className="ml-1 text-xs text-gray-400">×{p.qty || 1}</span>
+                    </div>
+                  ))}
                 </td>
 
                 {/* Prix */}
@@ -688,32 +689,42 @@ function NewOrderModal({ onClose, onSave }) {
                 const selProd = stockProducts.find(p => p.name === prod.name);
                 const sizes = selProd ? selProd.variations.map(v => v.taille) : [];
                 return (
-                  <div key={idx} className="flex items-center gap-1.5">
-                    <select
-                      value={prod.name}
-                      onChange={(e) => updateProduct(idx, 'name', e.target.value)}
-                      className={`${ic} flex-1 min-w-0`}
-                    >
-                      <option value="">-- Produit --</option>
-                      {stockProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                    </select>
-                    <select
-                      value={prod.size || ''}
-                      onChange={(e) => updateProduct(idx, 'size', e.target.value)}
-                      className={`${icSm} w-16 shrink-0`}
-                    >
-                      <option value="">T.</option>
-                      {sizes.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <input
-                      type="number" min={1} value={prod.qty}
-                      onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
-                      className={`${icSm} w-12 text-center shrink-0`}
-                    />
-                    <button onClick={() => removeProduct(idx)}
-                      className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
-                      <X size={12} />
-                    </button>
+                  <div key={idx} className="flex flex-col gap-1 border border-gray-100 rounded-lg p-1.5 bg-gray-50">
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={prod.name}
+                        onChange={(e) => updateProduct(idx, 'name', e.target.value)}
+                        className={`${ic} flex-1 min-w-0 py-1.5 text-xs`}
+                      >
+                        <option value="">-- Produit --</option>
+                        {stockProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      </select>
+                      <button onClick={() => removeProduct(idx)}
+                        className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        value={prod.color || ''}
+                        onChange={(e) => updateProduct(idx, 'color', e.target.value)}
+                        placeholder="Couleur"
+                        className={`${icSm} flex-1 min-w-0`}
+                      />
+                      <select
+                        value={prod.size || ''}
+                        onChange={(e) => updateProduct(idx, 'size', e.target.value)}
+                        className={`${icSm} w-16 shrink-0`}
+                      >
+                        <option value="">T.</option>
+                        {sizes.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <input
+                        type="number" min={1} value={prod.qty}
+                        onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
+                        className={`${icSm} w-12 text-center shrink-0`}
+                      />
+                    </div>
                   </div>
                 );
               })}
