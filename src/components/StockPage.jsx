@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp, Check, ImageIcon, X,
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
+import { importProductsFromWooCommerce } from '../lib/woocommerce';
 
 /* ─── helpers ─── */
 function stockColor(n) {
@@ -219,6 +220,40 @@ export default function StockPage() {
   const [expanded, setExpanded] = useState({});
   const [addOpen, setAddOpen] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSynchroniser() {
+    setSyncing(true);
+    setSyncStatus({ type: 'syncing', message: 'Connexion à WooCommerce...' });
+    const result = await importProductsFromWooCommerce((msg) => {
+      setSyncStatus({ type: 'syncing', message: msg });
+    });
+    setSyncing(false);
+    if (!result.success) {
+      setSyncStatus({ type: 'error', message: `Erreur: ${result.error}` });
+      setTimeout(() => setSyncStatus(null), 4000);
+      return;
+    }
+    setProducts(prev => {
+      const updated = [...prev];
+      let added = 0, updated_count = 0;
+      for (const wp of result.products) {
+        const idx = updated.findIndex(p => p.wooId === wp.wooId);
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], name: wp.name, ref: wp.ref, prix: wp.prix, compareAt: wp.compareAt, statut: wp.statut, image: wp.image || updated[idx].image, variations: wp.variations };
+          updated_count++;
+        } else {
+          updated.unshift(wp);
+          added++;
+        }
+      }
+      saveProducts(updated);
+      setSyncStatus({ type: 'success', message: `✓ ${added} produit(s) ajouté(s), ${updated_count} mis à jour` });
+      setTimeout(() => setSyncStatus(null), 3000);
+      return updated;
+    });
+  }
 
   useEffect(() => {
     loadProductsRemote().then(remote => {
@@ -284,6 +319,20 @@ export default function StockPage() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
+      {/* Sync Status Notification */}
+      {syncStatus && (
+        <div className={`px-6 py-3 text-sm font-medium flex items-center gap-2 ${
+          syncStatus.type === 'success' ? 'bg-green-100 text-green-800' :
+          syncStatus.type === 'error' ? 'bg-red-100 text-red-800' :
+          'bg-blue-100 text-blue-800'
+        }`}>
+          {syncStatus.type === 'syncing' && <RefreshCw size={16} className="animate-spin" />}
+          {syncStatus.type === 'success' && <Check size={16} />}
+          {syncStatus.type === 'error' && <X size={16} />}
+          {syncStatus.message}
+        </div>
+      )}
+      
       {/* Toolbar */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex flex-wrap items-center gap-2">
         <button onClick={() => { setEditProduct(null); setAddOpen(true); }}
@@ -293,8 +342,11 @@ export default function StockPage() {
         <button className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
           <Upload size={14} /> Ajouter Stock
         </button>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600">
-          <RefreshCw size={14} /> Synchroniser
+        <button
+          onClick={handleSynchroniser}
+          disabled={syncing}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 disabled:opacity-60">
+          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} /> Synchroniser
         </button>
 
         <div className="flex items-center gap-2 ml-2">

@@ -1,0 +1,18 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  VITE_WOO_CONSUMER_KEY = "ck_80002f30dc327e073f38b771ce6484879ff2e0e3"
+  VITE_WOO_CONSUMER_SECRET = "cs_df9e68224d3139159b19a803981ef820a4a06ceb"
+
+[[redirects]]
+  from = "/wc-api/*"
+  to = "https://victoury-maroc.com/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
