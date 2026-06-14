@@ -66,6 +66,10 @@ function ProductModal({ initial, onClose, onSave }) {
     setForm(p => ({ ...p, variations: [...p.variations, emptyVar('?')] }));
   }
 
+  function removeVariation(idx) {
+    setForm(p => ({ ...p, variations: p.variations.filter((_, i) => i !== idx) }));
+  }
+
   const ic = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
   const lc = 'block text-xs font-semibold text-gray-600 mb-1';
 
@@ -162,7 +166,7 @@ function ProductModal({ initial, onClose, onSave }) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    {['Taille', 'Stock', 'Prix (MAD)', 'Compare-At'].map(h => (
+                    {['Taille', 'Stock', 'Prix (MAD)', 'Compare-At', ''].map(h => (
                       <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-500">{h}</th>
                     ))}
                   </tr>
@@ -185,6 +189,12 @@ function ProductModal({ initial, onClose, onSave }) {
                       <td className="px-3 py-2">
                         <input type="number" value={v.compareAt} onChange={e => updateVar(i, 'compareAt', parseFloat(e.target.value) || 0)}
                           className="border border-gray-200 rounded px-2 py-1 text-xs w-24" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <button onClick={() => removeVariation(i)}
+                          className="p-1 rounded bg-red-100 text-red-500 hover:bg-red-200 transition-colors">
+                          <X size={12} />
+                        </button>
                       </td>
                     </tr>
                   ))}
