@@ -102,6 +102,13 @@ export default function App() {
     load();
   }, [session]);
 
+  /* ── Error logger → Supabase error_logs table ── */
+  function logError(source, message, details = {}) {
+    supabase.from('error_logs').insert({ source, message, details }).then(({ error }) => {
+      if (error) console.error('[logError] failed to write to error_logs:', error.message);
+    });
+  }
+
   /* ── WC sync logger ── */
   function logWcSync(entry) {
     const MAX = 100;
@@ -135,53 +142,59 @@ export default function App() {
         if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
         setWooError(null);
         const data = await res.json();
-        const mapped = data.map((o) => {
-          /* Helper: extract meta value by key (supports pa_* and attribute_pa_*) */
-          const getMeta = (meta, ...keys) => {
-            for (const k of keys) { const m = meta?.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); }
-            return '';
-          };
-          /* Map ALL line_items to products array */
-          const products = (o.line_items || []).map(item => ({
-            name: item.name || 'Produit',
-            size: getMeta(item.meta_data, 'pa_taille', 'taille', 'size'),
-            color: getMeta(item.meta_data, 'pa_couleur', 'couleur', 'color'),
-            qty: item.quantity || 1,
-          }));
-          const firstItem = o.line_items?.[0] || {};
-          return {
-            id: `WC-${o.id}`,
-            recipient: {
-              name: `${o.billing.first_name} ${o.billing.last_name}`.trim(),
-              address: o.billing.address_1 || '',
-              city: o.billing.city || '',
-              phone: o.billing.phone || '',
-              delivery: null,
-            },
-            /* Primary product = first item (for backward compat display) */
-            product: {
-              name: firstItem.name || 'Produit WC',
-              size: getMeta(firstItem.meta_data, 'pa_taille', 'taille', 'size'),
-              color: getMeta(firstItem.meta_data, 'pa_couleur', 'couleur', 'color'),
-              qty: (o.line_items || []).reduce((s, i) => s + (i.quantity || 1), 0),
-              stock: 0,
-            },
-            /* Full multi-product list */
-            products: products.length > 0 ? products : null,
-            price: parseFloat(o.total) || 0,
-            status: 'nouveau',
-            note: o.customer_note || '',
-            dateAdded: new Date(o.date_created).toLocaleString('fr-MA'),
-            dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
-            validated: false,
-          };
-        });
+        const getMeta = (meta, ...keys) => {
+          for (const k of keys) { const m = meta?.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); }
+          return '';
+        };
+        /* Map each WC order individually — bad order is skipped, not crashes the whole poll */
+        const mapped = [];
+        for (const o of data) {
+          try {
+            const products = (o.line_items || []).map(item => ({
+              name: item.name || 'Produit',
+              size: getMeta(item.meta_data, 'pa_taille', 'taille', 'size'),
+              color: getMeta(item.meta_data, 'pa_couleur', 'couleur', 'color'),
+              qty: item.quantity || 1,
+            }));
+            const firstItem = o.line_items?.[0] || {};
+            mapped.push({
+              id: `WC-${o.id}`,
+              recipient: {
+                name: `${o.billing.first_name} ${o.billing.last_name}`.trim(),
+                address: o.billing.address_1 || '',
+                city: o.billing.city || '',
+                phone: o.billing.phone || '',
+                delivery: null,
+              },
+              product: {
+                name: firstItem.name || 'Produit WC',
+                size: getMeta(firstItem.meta_data, 'pa_taille', 'taille', 'size'),
+                color: getMeta(firstItem.meta_data, 'pa_couleur', 'couleur', 'color'),
+                qty: (o.line_items || []).reduce((s, i) => s + (i.quantity || 1), 0),
+                stock: 0,
+              },
+              products: products.length > 0 ? products : null,
+              price: parseFloat(o.total) || 0,
+              status: 'nouveau',
+              note: o.customer_note || '',
+              dateAdded: new Date(o.date_created).toLocaleString('fr-MA'),
+              dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
+              validated: false,
+            });
+          } catch (orderErr) {
+            logError('wc_order_mapping', `Failed to map WC order #${o.id}: ${orderErr.message}`, { wc_id: o.id, error: orderErr.message });
+          }
+        }
         /* Use localStorage which is already synced with Supabase on startup */
         const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
         setOrders((prev) => {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIds.has(o.id));
-          if (fresh.length) saveOrdersToSupabase(fresh);
+          if (fresh.length) {
+            saveOrdersToSupabase(fresh).catch(err =>
+              logError('supabase_save', `Failed to save ${fresh.length} orders: ${err.message}`, { count: fresh.length, error: err.message })
+            );
+          }
           /* Update price + products of existing WC orders (to apply discounts / multi-product changes) */
           const priceMap = new Map(mapped.map(m => [m.id, { price: m.price, product: m.product, products: m.products }]));
           const changedWC = [];
@@ -194,7 +207,10 @@ export default function App() {
             return next;
           });
           /* Persist price changes to Supabase */
-          changedWC.forEach(o => supabase.from('orders').upsert({ id: o.id, price: o.price, product: o.product, products: o.products }, { onConflict: 'id' }).then(() => {}));
+          changedWC.forEach(o =>
+            supabase.from('orders').upsert({ id: o.id, price: o.price, product: o.product, products: o.products }, { onConflict: 'id' })
+              .then(({ error }) => { if (error) logError('supabase_price_update', `Failed to update price for ${o.id}: ${error.message}`, { order_id: o.id, error: error.message }); })
+          );
           /* Log success */
           if (fresh.length || changedWC.length) logWcSync({ status: 'success', newOrders: fresh.length, updatedOrders: changedWC.length });
           return fresh.length ? [...fresh, ...updated] : updated;
@@ -204,6 +220,7 @@ export default function App() {
         const msg = isTimeout ? 'délai dépassé (8s) — serveur WooCommerce lent' : (e?.message || 'erreur réseau');
         setWooError('⚠️ WooCommerce: ' + msg);
         logWcSync({ status: 'error', error: msg });
+        logError('wc_poll', msg, { timeout: isTimeout });
       } finally {
         setIsWooFetching(false);
       }
@@ -239,7 +256,8 @@ export default function App() {
       note_livraison: o.noteLivraison || '',
       tracking_number: o.trackingNumber || null,
     }));
-    await supabase.from('orders').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+    const { error } = await supabase.from('orders').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
   }
 
   async function deleteOrderFromSupabase(orderId) {
