@@ -102,6 +102,16 @@ export default function App() {
     load();
   }, [session]);
 
+  /* ── WC sync logger ── */
+  function logWcSync(entry) {
+    const MAX = 100;
+    supabase.from('settings').select('value').eq('key', 'wc_sync_logs').single().then(({ data }) => {
+      const logs = Array.isArray(data?.value) ? data.value : [];
+      const next = [{ ...entry, ts: new Date().toISOString() }, ...logs].slice(0, MAX);
+      supabase.from('settings').upsert({ key: 'wc_sync_logs', value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {});
+    });
+  }
+
   /* ── WooCommerce polling ── */
   useEffect(() => {
     if (!session) return;
@@ -176,10 +186,14 @@ export default function App() {
           });
           /* Persist price changes to Supabase */
           changedWC.forEach(o => supabase.from('orders').upsert({ id: o.id, price: o.price, product: o.product, products: o.products }, { onConflict: 'id' }).then(() => {}));
+          /* Log success */
+          if (fresh.length || changedWC.length) logWcSync({ status: 'success', newOrders: fresh.length, updatedOrders: changedWC.length });
           return fresh.length ? [...fresh, ...updated] : updated;
         });
       } catch (e) {
-        setWooError('⚠️ WooCommerce inaccessible: ' + (e?.message || 'erreur réseau'));
+        const msg = e?.message || 'erreur réseau';
+        setWooError('⚠️ WooCommerce inaccessible: ' + msg);
+        logWcSync({ status: 'error', error: msg });
       } finally {
         setIsWooFetching(false);
       }
