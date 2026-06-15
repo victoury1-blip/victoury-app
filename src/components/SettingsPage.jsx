@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import { supabase } from '../lib/supabase';
 import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
-  ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2,
+  ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap,
 } from 'lucide-react';
 
 const TIMEZONES = [
@@ -214,6 +215,49 @@ export default function SettingsPage({ onWooOrdersImported }) {
       <div className="flex items-center gap-2 mb-6">
         <Settings size={22} className="text-gray-700" />
         <h1 className="text-2xl font-bold text-gray-800">Réglages</h1>
+      </div>
+
+      {/* Cache / DB section */}
+      <div className="mb-5 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-red-50 to-white px-5 pt-5 pb-4">
+          <div className="inline-flex p-2.5 rounded-xl bg-red-100 mb-3"><DatabaseZap size={22} className="text-red-600" /></div>
+          <h3 className="font-bold text-gray-800 text-base">Cache local &amp; Base de données</h3>
+          <p className="text-xs text-gray-500 mt-1 leading-relaxed">Vider le cache local pour recharger toutes les données depuis Supabase. À utiliser si des commandes supposément supprimées réapparaissent sur un autre appareil.</p>
+        </div>
+        <div className="px-5 pb-4 pt-3 border-t border-gray-50 flex flex-wrap gap-2">
+          <button
+            onClick={async () => {
+              if (!window.confirm('Vider le cache local et recharger depuis Supabase ?')) return;
+              /* Sync remote deleted IDs first */
+              const { data } = await supabase.from('settings').select('value').eq('key', 'deleted_order_ids').single();
+              const remote = Array.isArray(data?.value) ? data.value : [];
+              const local = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
+              const merged = [...new Set([...remote, ...local])];
+              localStorage.setItem('deleted_order_ids', JSON.stringify(merged));
+              window.location.reload();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition"
+          >
+            <RefreshCw size={12} /> Actualiser depuis Supabase
+          </button>
+          <button
+            onClick={async () => {
+              if (!window.confirm('⚠️ Réinitialiser TOUT le cache local ? (les suppressions seront sync depuis Supabase)')) return;
+              const keepsafe = ['auzone_config','woo_config','livreurs','system_timezone','user_profiles','frais_1','victoury_factures','victoury_manual_facture','victoury_recu_ids'];
+              const saved = {};
+              keepsafe.forEach(k => { const v = localStorage.getItem(k); if (v) saved[k] = v; });
+              localStorage.clear();
+              Object.entries(saved).forEach(([k, v]) => localStorage.setItem(k, v));
+              /* Re-sync deleted IDs from Supabase */
+              const { data } = await supabase.from('settings').select('value').eq('key', 'deleted_order_ids').single();
+              if (data?.value) localStorage.setItem('deleted_order_ids', JSON.stringify(data.value));
+              window.location.reload();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition"
+          >
+            <Trash2 size={12} /> Réinitialiser le cache
+          </button>
+        </div>
       </div>
 
       {/* Cards grid */}

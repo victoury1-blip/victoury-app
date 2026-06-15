@@ -651,7 +651,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           {filtered.length} commande{filtered.length !== 1 ? 's' : ''} affichée{filtered.length !== 1 ? 's' : ''}
           {selected.length > 0 && ` · ${selected.length} sélectionnée${selected.length > 1 ? 's' : ''}`}
         </span>
-        <span>Total: {orders.length} commandes</span>
+        <span className="text-gray-400">Total tous onglets : {orders.length}</span>
       </div>
 
       {/* Edit Modal */}
