@@ -163,7 +163,20 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIds.has(o.id));
           if (fresh.length) saveOrdersToSupabase(fresh);
-          return fresh.length ? [...fresh, ...prev] : prev;
+          /* Update price + products of existing WC orders (to apply discounts / multi-product changes) */
+          const priceMap = new Map(mapped.map(m => [m.id, { price: m.price, product: m.product, products: m.products }]));
+          const changedWC = [];
+          const updated = prev.map(o => {
+            if (!o.id.startsWith('WC-')) return o;
+            const wc = priceMap.get(o.id);
+            if (!wc || (wc.price === o.price && JSON.stringify(wc.products) === JSON.stringify(o.products))) return o;
+            const next = { ...o, price: wc.price, product: wc.product, products: wc.products };
+            changedWC.push(next);
+            return next;
+          });
+          /* Persist price changes to Supabase */
+          changedWC.forEach(o => supabase.from('orders').upsert({ id: o.id, price: o.price, product: o.product, products: o.products }, { onConflict: 'id' }).then(() => {}));
+          return fresh.length ? [...fresh, ...updated] : updated;
         });
       } catch (e) {
         setWooError('⚠️ WooCommerce inaccessible: ' + (e?.message || 'erreur réseau'));
