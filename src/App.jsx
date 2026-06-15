@@ -119,10 +119,19 @@ export default function App() {
       try {
         const stored = localStorage.getItem('woo_config');
         const config = stored ? JSON.parse(stored) : (await cloudGet('woo_config') || {});
-        if (!config.consumerKey || !config.consumerSecret) return;
-        const res = await fetch(
-          `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&consumer_key=${config.consumerKey}&consumer_secret=${config.consumerSecret}`
-        );
+        if (!config.consumerKey || !config.consumerSecret) {
+          setWooError('⚙️ WooCommerce non configuré — ajoutez vos clés API dans Paramètres');
+          return;
+        }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        let res;
+        try {
+          res = await fetch(
+            `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&consumer_key=${config.consumerKey}&consumer_secret=${config.consumerSecret}`,
+            { signal: controller.signal }
+          );
+        } finally { clearTimeout(timeout); }
         if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
         setWooError(null);
         const data = await res.json();
@@ -191,8 +200,9 @@ export default function App() {
           return fresh.length ? [...fresh, ...updated] : updated;
         });
       } catch (e) {
-        const msg = e?.message || 'erreur réseau';
-        setWooError('⚠️ WooCommerce inaccessible: ' + msg);
+        const isTimeout = e?.name === 'AbortError';
+        const msg = isTimeout ? 'délai dépassé (8s) — serveur WooCommerce lent' : (e?.message || 'erreur réseau');
+        setWooError('⚠️ WooCommerce: ' + msg);
         logWcSync({ status: 'error', error: msg });
       } finally {
         setIsWooFetching(false);
