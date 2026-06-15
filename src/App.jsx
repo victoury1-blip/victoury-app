@@ -116,28 +116,47 @@ export default function App() {
         if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
         setWooError(null);
         const data = await res.json();
-        const mapped = data.map((o) => ({
-          id: `WC-${o.id}`,
-          recipient: {
-            name: `${o.billing.first_name} ${o.billing.last_name}`.trim(),
-            address: o.billing.address_1 || '',
-            city: o.billing.city || '',
-            phone: o.billing.phone || '',
-            delivery: null,
-          },
-          product: {
-            name: o.line_items?.[0]?.name || 'Produit WC',
-            size: o.line_items?.[0]?.meta_data?.find((m) => m.key === 'pa_taille')?.value || '',
-            qty: o.line_items?.[0]?.quantity || 1,
-            stock: 0,
-          },
-          price: parseFloat(o.total) || 0,
-          status: 'nouveau',
-          note: o.customer_note || '',
-          dateAdded: new Date(o.date_created).toLocaleString('fr-MA'),
-          dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
-          validated: false,
-        }));
+        const mapped = data.map((o) => {
+          /* Helper: extract meta value by key (supports pa_* and attribute_pa_*) */
+          const getMeta = (meta, ...keys) => {
+            for (const k of keys) { const m = meta?.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); }
+            return '';
+          };
+          /* Map ALL line_items to products array */
+          const products = (o.line_items || []).map(item => ({
+            name: item.name || 'Produit',
+            size: getMeta(item.meta_data, 'pa_taille', 'taille', 'size'),
+            color: getMeta(item.meta_data, 'pa_couleur', 'couleur', 'color'),
+            qty: item.quantity || 1,
+          }));
+          const firstItem = o.line_items?.[0] || {};
+          return {
+            id: `WC-${o.id}`,
+            recipient: {
+              name: `${o.billing.first_name} ${o.billing.last_name}`.trim(),
+              address: o.billing.address_1 || '',
+              city: o.billing.city || '',
+              phone: o.billing.phone || '',
+              delivery: null,
+            },
+            /* Primary product = first item (for backward compat display) */
+            product: {
+              name: firstItem.name || 'Produit WC',
+              size: getMeta(firstItem.meta_data, 'pa_taille', 'taille', 'size'),
+              color: getMeta(firstItem.meta_data, 'pa_couleur', 'couleur', 'color'),
+              qty: (o.line_items || []).reduce((s, i) => s + (i.quantity || 1), 0),
+              stock: 0,
+            },
+            /* Full multi-product list */
+            products: products.length > 0 ? products : null,
+            price: parseFloat(o.total) || 0,
+            status: 'nouveau',
+            note: o.customer_note || '',
+            dateAdded: new Date(o.date_created).toLocaleString('fr-MA'),
+            dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
+            validated: false,
+          };
+        });
         /* Use localStorage which is already synced with Supabase on startup */
         const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
         setOrders((prev) => {
