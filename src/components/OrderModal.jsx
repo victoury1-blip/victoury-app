@@ -196,45 +196,37 @@ export default function OrderModal({ order, onClose, onSave }) {
                 const sizes = selProd
                   ? selProd.variations.map(v => v.taille)
                   : (prod.size && isNaN(prod.size) ? SIZE_OPTIONS : NUMERIC_SIZES);
+                /* Include current WC size in options even if not in stock */
+                const sizeOptions = sizes.includes(prod.size || '') || !prod.size ? sizes : [prod.size, ...sizes];
                 return (
-                  <div key={idx} className="flex flex-col gap-1 border border-gray-100 rounded-lg p-1.5 bg-gray-50">
-                    <div className="flex items-center gap-1.5">
-                      <select
-                        value={prod.name}
-                        onChange={(e) => { updateProduct(idx, 'name', e.target.value); updateProduct(idx, 'size', ''); }}
-                        className={`${inputCls} flex-1 min-w-0 py-1.5 text-xs`}
-                      >
-                        <option value="">-- Choisir un produit --</option>
-                        {stockProducts.map(p => (
-                          <option key={p.id} value={p.name}>{p.name}</option>
-                        ))}
-                      </select>
-                      <button onClick={() => removeProduct(idx)}
-                        className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        value={prod.color || ''}
-                        onChange={(e) => updateProduct(idx, 'color', e.target.value)}
-                        placeholder="Couleur"
-                        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white flex-1 min-w-0"
-                      />
-                      <select
-                        value={prod.size || ''}
-                        onChange={(e) => updateProduct(idx, 'size', e.target.value)}
-                        className="border border-gray-200 rounded-md px-1.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-16 shrink-0"
-                      >
-                        <option value="">T.</option>
-                        {sizes.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                      <input
-                        type="number" min={1} value={prod.qty}
-                        onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
-                        className="border border-gray-200 rounded-md px-1 py-1.5 text-xs text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-12 shrink-0"
-                      />
-                    </div>
+                  <div key={idx} className="flex items-center gap-1.5 border border-gray-100 rounded-lg p-1.5 bg-gray-50">
+                    <select
+                      value={prod.name}
+                      onChange={(e) => { updateProduct(idx, 'name', e.target.value); updateProduct(idx, 'size', ''); }}
+                      className={`${inputCls} flex-1 min-w-0 py-1.5 text-xs`}
+                    >
+                      <option value="">-- Choisir un produit --</option>
+                      {stockProducts.map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={prod.size || ''}
+                      onChange={(e) => updateProduct(idx, 'size', e.target.value)}
+                      className="border border-gray-200 rounded-md px-1.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-16 shrink-0"
+                    >
+                      <option value="">T.</option>
+                      {sizeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <input
+                      type="number" min={1} value={prod.qty}
+                      onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
+                      className="border border-gray-200 rounded-md px-1 py-1.5 text-xs text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-12 shrink-0"
+                    />
+                    <button onClick={() => removeProduct(idx)}
+                      className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 );
               })}
