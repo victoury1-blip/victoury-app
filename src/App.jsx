@@ -74,7 +74,13 @@ export default function App() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error || !data) { setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes')); setIsLoading(false); return; }
-      const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
+      /* Merge remote + local deleted IDs so deletions sync across devices */
+      const { data: delData } = await supabase.from('settings').select('value').eq('key', 'deleted_order_ids').single();
+      const remoteDeleted = Array.isArray(delData?.value) ? delData.value : [];
+      const localDeleted = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
+      const mergedDeleted = [...new Set([...remoteDeleted, ...localDeleted])];
+      localStorage.setItem('deleted_order_ids', JSON.stringify(mergedDeleted));
+      const deletedIds = new Set(mergedDeleted);
       setOrders(data.filter(o => !deletedIds.has(o.id)).map((o) => ({
         id: o.id,
         recipient: o.recipient,
@@ -132,6 +138,7 @@ export default function App() {
           dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
           validated: false,
         }));
+        /* Use localStorage which is already synced with Supabase on startup */
         const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
         setOrders((prev) => {
           const existingIds = new Set(prev.map((o) => o.id));
@@ -182,6 +189,8 @@ export default function App() {
   async function deleteOrderFromSupabase(orderId) {
     const bl = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
     if (!bl.includes(orderId)) { bl.push(orderId); localStorage.setItem('deleted_order_ids', JSON.stringify(bl)); }
+    /* Sync blacklist to Supabase so all devices respect the deletion */
+    supabase.from('settings').upsert({ key: 'deleted_order_ids', value: bl, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {});
     await supabase.from('orders').delete().eq('id', orderId);
   }
 
