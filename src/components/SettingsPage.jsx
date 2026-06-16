@@ -151,7 +151,12 @@ export default function SettingsPage({ onWooOrdersImported }) {
       const res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&consumer_key=${woo.consumerKey}&consumer_secret=${woo.consumerSecret}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      const getMeta = (meta, ...keys) => { for (const k of keys) { const m = meta?.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); } return ''; };
+      const getMeta = (meta, ...keys) => {
+        if (!meta) return '';
+        for (const k of keys) { const m = meta.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); }
+        for (const k of keys) { const m = meta.find(x => x.key?.toLowerCase().includes(k.replace('pa_', ''))); if (m?.display_value || m?.value) return String(m.display_value || m.value); }
+        return '';
+      };
       const mapped = data.map((o) => {
         const products = (o.line_items || []).map(item => ({ name: item.name || 'Produit', size: getMeta(item.meta_data, 'pa_taille', 'taille', 'size'), color: getMeta(item.meta_data, 'pa_couleur', 'couleur', 'color'), qty: item.quantity || 1 }));
         const firstItem = o.line_items?.[0] || {};

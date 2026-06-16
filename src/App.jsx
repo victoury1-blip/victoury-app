@@ -142,7 +142,17 @@ export default function App() {
         setWooError(null);
         const data = await res.json();
         const getMeta = (meta, ...keys) => {
-          for (const k of keys) { const m = meta?.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); }
+          if (!meta) return '';
+          /* Exact & attribute_ prefix match */
+          for (const k of keys) {
+            const m = meta.find(x => x.key === k || x.key === `attribute_${k}`);
+            if (m?.value) return String(m.value);
+          }
+          /* Fallback: search any key containing the word (case-insensitive) */
+          for (const k of keys) {
+            const m = meta.find(x => x.key?.toLowerCase().includes(k.replace('pa_', '')));
+            if (m?.display_value || m?.value) return String(m.display_value || m.value);
+          }
           return '';
         };
         /* Map each WC order individually — bad order is skipped, not crashes the whole poll */
