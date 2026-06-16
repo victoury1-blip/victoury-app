@@ -225,6 +225,23 @@ function printFacture(f) {
   w.document.close();
 }
 
+/* ─── helpers: get delivery fee from localStorage frais_{id} ─── */
+function getLivreurFrais(livreurName, city, status) {
+  try {
+    const livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+    const liv = livreursList.find(l => l.nom === livreurName);
+    if (!liv) return null;
+    const fraisList = JSON.parse(localStorage.getItem(`frais_${liv.id}`) || '[]');
+    const cityRow = fraisList.find(c => c.ville?.toLowerCase() === city?.toLowerCase());
+    if (!cityRow) return null;
+    if (status === 'livre') return cityRow.livre ?? null;
+    if (status === 'refuse') return cityRow.refuse ?? null;
+    if (status === 'annule') return cityRow.annule ?? null;
+    if (status === 'change') return cityRow.change ?? null;
+    return cityRow.livre ?? null;
+  } catch { return null; }
+}
+
 /* ─── New Facture Modal ─── */
 function NewFactureModal({ orders, onClose, onCreated }) {
   const [livreur, setLivreur] = useState('');
@@ -237,12 +254,17 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 
   const livreurs = [...new Set(orders.map(o => o.recipient?.delivery).filter(Boolean))];
 
+  function getFraisForOrder(o) {
+    const auto = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status);
+    return auto !== null ? auto : fraisDefault;
+  }
+
   function toggleAll() {
     if (Object.keys(selected).length === eligible.length) {
       setSelected({});
     } else {
       const s = {};
-      eligible.forEach(o => { s[o.id] = fraisDefault; });
+      eligible.forEach(o => { s[o.id] = getFraisForOrder(o); });
       setSelected(s);
     }
   }
@@ -250,7 +272,10 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   function toggleOne(id) {
     setSelected(prev => {
       const n = { ...prev };
-      if (n[id] !== undefined) { delete n[id]; } else { n[id] = fraisDefault; }
+      if (n[id] !== undefined) { delete n[id]; } else {
+        const o = eligible.find(x => x.id === id);
+        n[id] = o ? getFraisForOrder(o) : fraisDefault;
+      }
       return n;
     });
   }
@@ -335,6 +360,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-blue-700">{o.id}</div>
                       <div className="text-xs text-gray-600 truncate">{o.recipient?.name}</div>
+                      {o.recipient?.city && <div className="text-xs text-gray-400">{o.recipient.city}</div>}
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
                       o.status === 'livre' ? 'bg-green-100 text-green-700 border-green-300' :
@@ -342,14 +368,18 @@ function NewFactureModal({ orders, onClose, onCreated }) {
                       'bg-gray-100 text-gray-600 border-gray-300'
                     }`}>{statusLabel(o.status)}</span>
                     <div className="font-bold text-gray-800 text-sm w-20 text-right">{fmt(o.price)} DH</div>
-                    {selected[o.id] !== undefined && (
-                      <div className="flex items-center gap-1 w-28">
-                        <span className="text-xs text-gray-400">Frais:</span>
-                        <input type="number" value={selected[o.id]}
-                          onChange={e => setSelected(prev => ({ ...prev, [o.id]: Number(e.target.value) }))}
-                          className="border border-gray-200 rounded px-2 py-0.5 text-xs w-16 text-center" />
-                      </div>
-                    )}
+                    {selected[o.id] !== undefined && (() => {
+                      const autoFrais = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status);
+                      return (
+                        <div className="flex items-center gap-1 w-32">
+                          <span className="text-xs text-gray-400">Frais:</span>
+                          <input type="number" value={selected[o.id]}
+                            onChange={e => setSelected(prev => ({ ...prev, [o.id]: Number(e.target.value) }))}
+                            className="border border-gray-200 rounded px-2 py-0.5 text-xs w-16 text-center" />
+                          {autoFrais !== null && <span className="text-xs text-green-500" title="Frais auto-détecté">✓</span>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
