@@ -206,6 +206,10 @@ export default function OrderModal({ order, onClose, onSave }) {
                       className={`${inputCls} flex-1 min-w-0 py-1.5 text-xs`}
                     >
                       <option value="">-- Choisir un produit --</option>
+                      {/* Show WC product name even if not in local stock */}
+                      {prod.name && !stockProducts.find(p => p.name === prod.name) && (
+                        <option value={prod.name}>{prod.name}</option>
+                      )}
                       {stockProducts.map(p => (
                         <option key={p.id} value={p.name}>{p.name}</option>
                       ))}
@@ -213,15 +217,15 @@ export default function OrderModal({ order, onClose, onSave }) {
                     <select
                       value={prod.size || ''}
                       onChange={(e) => updateProduct(idx, 'size', e.target.value)}
-                      className="border border-gray-200 rounded-md px-1.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-16 shrink-0"
+                      className="border border-gray-200 rounded-md px-1.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-24 shrink-0"
                     >
-                      <option value="">T.</option>
+                      <option value="">Taille</option>
                       {sizeOptions.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <input
                       type="number" min={1} value={prod.qty}
                       onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
-                      className="border border-gray-200 rounded-md px-1 py-1.5 text-xs text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-12 shrink-0"
+                      className="border border-gray-200 rounded-md px-1 py-1.5 text-xs text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-9 shrink-0"
                     />
                     <button onClick={() => removeProduct(idx)}
                       className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
