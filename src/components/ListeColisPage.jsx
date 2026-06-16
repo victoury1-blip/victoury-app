@@ -580,6 +580,18 @@ const COLIS_PIPELINE = ['att_ramassage','expedier','recu_livreur','livre','chang
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
   const [search, setSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '' };
+  const [filterForm, setFilterForm] = useState(emptyFilter);
+  const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
+  const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
+  function applyFilter() { setAppliedFilter({ ...filterForm }); setFilterOpen(false); }
+  function resetFilter() { setFilterForm(emptyFilter); setAppliedFilter(emptyFilter); }
+  function parseFrDate(str) {
+    if (!str) return null;
+    const m = str.match(/(\d+)\/(\d+)\/(\d+)/);
+    return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+  }
   const [editOrder, setEditOrder] = useState(null);
   const [editOrderFull, setEditOrderFull] = useState(null);
   const [deliveryOrder, setDeliveryOrder] = useState(null);
@@ -634,16 +646,32 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   /* Show only orders in the colis pipeline */
   const colis = useMemo(() => {
     const q = search.toLowerCase();
+    const af = appliedFilter;
     return orders.filter((o) => {
       const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
+      if (!inPipeline) return false;
       const matchSearch = !q ||
         o.id.toLowerCase().includes(q) ||
         o.recipient.name.toLowerCase().includes(q) ||
         o.recipient.city.toLowerCase().includes(q) ||
         (o.trackingNumber || '').toLowerCase().includes(q);
-      return inPipeline && matchSearch;
+      if (!matchSearch) return false;
+      if (af.livreur && !(o.recipient.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
+      if (af.ville && !(o.recipient.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
+      if (af.produit) {
+        const prods = o.products?.length ? o.products : [o.product];
+        if (!prods.some(p => p?.name?.toLowerCase().includes(af.produit.toLowerCase()))) return false;
+      }
+      if (af.dateFrom || af.dateTo) {
+        const d = parseFrDate(o.dateAdded);
+        if (d) {
+          if (af.dateFrom && d < new Date(af.dateFrom)) return false;
+          if (af.dateTo && d > new Date(af.dateTo)) return false;
+        }
+      }
+      return true;
     });
-  }, [orders, search]);
+  }, [orders, search, appliedFilter]);
 
   function getTs() {
     const tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca';
@@ -705,7 +733,64 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
             />
           </div>
         )}
+        {tab === 'colis' && (
+          <button
+            onClick={() => setFilterOpen(o => !o)}
+            className={`ml-auto p-2 rounded-md border text-sm transition-colors ${
+              isFilterActive ? 'border-indigo-400 bg-indigo-50 text-indigo-600'
+              : filterOpen ? 'border-gray-400 bg-gray-100 text-gray-700'
+              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+            }`}
+            title="Filtre avancé"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          </button>
+        )}
       </div>
+
+      {/* Advanced Filter Panel */}
+      {filterOpen && tab === 'colis' && (
+        <div className="bg-gray-900 text-white px-6 py-4 border-b border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-bold text-sm">Filtre avancé</span>
+            <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-white"><X size={14} /></button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Livreurs</label>
+              <div className="relative">
+                <input value={filterForm.livreur} onChange={e => setFilterForm(p => ({ ...p, livreur: e.target.value }))} placeholder="Rechercher un livreur..." className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-400 pr-7" />
+                <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Villes</label>
+              <div className="relative">
+                <input value={filterForm.ville} onChange={e => setFilterForm(p => ({ ...p, ville: e.target.value }))} placeholder="Rechercher une ville..." className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-400 pr-7" />
+                <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Produits</label>
+              <div className="relative">
+                <input value={filterForm.produit} onChange={e => setFilterForm(p => ({ ...p, produit: e.target.value }))} placeholder="Rechercher un produit..." className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-400 pr-7" />
+                <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Date d'ajout</label>
+              <div className="flex gap-1">
+                <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400" />
+                <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400" />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={resetFilter} className="px-4 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-sm text-gray-200 font-medium transition-colors">Réinitialiser</button>
+            <button onClick={applyFilter} className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors">Appliquer les filtres</button>
+          </div>
+        </div>
+      )}
 
       {tab === 'sheet' && <SheetImportSection />}
 

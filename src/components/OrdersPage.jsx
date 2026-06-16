@@ -337,26 +337,51 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [modifiedIds, setModifiedIds] = useState(new Set());
   const [historyOrder, setHistoryOrder] = useState(null);
 
+  /* ── Advanced filter ── */
+  const [filterOpen, setFilterOpen] = useState(false);
+  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '' };
+  const [filterForm, setFilterForm] = useState(emptyFilter);
+  const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
+  const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
+  function applyFilter() { setAppliedFilter({ ...filterForm }); setFilterOpen(false); }
+  function resetFilter() { setFilterForm(emptyFilter); setAppliedFilter(emptyFilter); }
+  function parseFrDate(str) {
+    if (!str) return null;
+    const m = str.match(/(\d+)\/(\d+)\/(\d+)/);
+    return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+  }
+
   const currentStatus = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
 
   const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);
 
   const filtered = useMemo(() => {
+    const af = appliedFilter;
     return orders.filter((o) => {
-      /* Orders in the colis pipeline (validated + tracking) must NOT appear in order tabs */
+      /* Orders in the colis pipeline must NOT appear in order tabs */
       const inColisPipeline = COLIS_PIPELINE_SET.has(o.status) || !!(o.trackingNumber && o.validated);
       if (inColisPipeline) return false;
-      const matchStatus = o.status === currentStatus;
+      if (o.status !== currentStatus) return false;
+      /* Search */
       const q = search.toLowerCase();
-      const matchSearch =
-        !q ||
-        o.id.toLowerCase().includes(q) ||
-        o.recipient.name.toLowerCase().includes(q) ||
-        o.recipient.phone.includes(q) ||
-        o.product.name.toLowerCase().includes(q);
-      return matchStatus && matchSearch;
+      if (q && !o.id.toLowerCase().includes(q) && !o.recipient.name.toLowerCase().includes(q) && !o.recipient.phone.includes(q) && !o.product.name.toLowerCase().includes(q)) return false;
+      /* Advanced filters */
+      if (af.livreur && !(o.recipient.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
+      if (af.ville && !(o.recipient.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
+      if (af.produit) {
+        const prods = o.products?.length ? o.products : [o.product];
+        if (!prods.some(p => p?.name?.toLowerCase().includes(af.produit.toLowerCase()))) return false;
+      }
+      if (af.dateFrom || af.dateTo) {
+        const d = parseFrDate(o.dateAdded);
+        if (d) {
+          if (af.dateFrom && d < new Date(af.dateFrom)) return false;
+          if (af.dateTo && d > new Date(af.dateTo)) return false;
+        }
+      }
+      return true;
     });
-  }, [orders, currentStatus, search, modifiedIds]);
+  }, [orders, currentStatus, search, appliedFilter, modifiedIds]);
 
   function toggleSelect(id) {
     setSelected((prev) =>
@@ -437,7 +462,17 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           <Search size={14} />
         </button>
         <div className="ml-auto flex items-center gap-2">
-          <button className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Filtrer">
+          <button
+            onClick={() => setFilterOpen(o => !o)}
+            className={`p-2 rounded-md border text-sm font-medium transition-colors ${
+              isFilterActive
+                ? 'border-indigo-400 bg-indigo-50 text-indigo-600'
+                : filterOpen
+                ? 'border-gray-400 bg-gray-100 text-gray-700'
+                : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+            }`}
+            title="Filtre avancé"
+          >
             <Filter size={14} />
           </button>
           <button className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer">
@@ -461,6 +496,81 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           </button>
         </div>
       </div>
+
+      {/* Advanced Filter Panel */}
+      {filterOpen && (
+        <div className="bg-gray-900 text-white px-6 py-4 border-b border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-bold text-sm">Filtre avancé</span>
+            <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-white"><X size={14} /></button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Livreurs */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Livreurs</label>
+              <div className="relative">
+                <input
+                  value={filterForm.livreur}
+                  onChange={e => setFilterForm(p => ({ ...p, livreur: e.target.value }))}
+                  placeholder="Rechercher un livreur..."
+                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-400 pr-7"
+                />
+                <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+            {/* Villes */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Villes</label>
+              <div className="relative">
+                <input
+                  value={filterForm.ville}
+                  onChange={e => setFilterForm(p => ({ ...p, ville: e.target.value }))}
+                  placeholder="Rechercher une ville..."
+                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-400 pr-7"
+                />
+                <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+            {/* Produits */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Produits</label>
+              <div className="relative">
+                <input
+                  value={filterForm.produit}
+                  onChange={e => setFilterForm(p => ({ ...p, produit: e.target.value }))}
+                  placeholder="Rechercher un produit..."
+                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-400 pr-7"
+                />
+                <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+              </div>
+            </div>
+            {/* Date d'ajout */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Date d'ajout</label>
+              <div className="flex gap-1">
+                <input type="date" value={filterForm.dateFrom}
+                  onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))}
+                  className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
+                />
+                <input type="date" value={filterForm.dateTo}
+                  onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))}
+                  className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={resetFilter}
+              className="px-4 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-sm text-gray-200 font-medium transition-colors">
+              Réinitialiser
+            </button>
+            <button onClick={applyFilter}
+              className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors">
+              Appliquer les filtres
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
