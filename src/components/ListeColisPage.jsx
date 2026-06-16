@@ -581,17 +581,25 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
   const [search, setSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [livreurOpen, setLivreurOpen] = useState(false);
+  const livreurRef = useRef(null);
   const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
   const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
   const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
   function applyFilter() { setAppliedFilter({ ...filterForm }); setFilterOpen(false); }
-  function resetFilter() { setFilterForm(emptyFilter); setAppliedFilter(emptyFilter); }
+  function resetFilter() { setFilterForm(emptyFilter); setAppliedFilter(emptyFilter); setLivreurOpen(false); }
   function parseFrDate(str) {
     if (!str) return null;
     const m = str.match(/(\d+)\/(\d+)\/(\d+)/);
     return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
   }
+  React.useEffect(() => {
+    if (!livreurOpen) return;
+    function handler(e) { if (livreurRef.current && !livreurRef.current.contains(e.target)) setLivreurOpen(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [livreurOpen]);
   const [editOrder, setEditOrder] = useState(null);
   const [editOrderFull, setEditOrderFull] = useState(null);
   const [deliveryOrder, setDeliveryOrder] = useState(null);
@@ -751,50 +759,69 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       {/* Advanced Filter Panel */}
       {filterOpen && tab === 'colis' && (() => {
         const livreursList = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
+        const livFiltered = livreursList.filter(l => l.statut !== false && (!filterForm.livreur || l.nom.toLowerCase().includes(filterForm.livreur.toLowerCase())));
         return (
-          <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-bold text-gray-800 text-sm">Filtre avancé</span>
-              <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+          <div className="bg-[#1a1a2e] border-b border-[#2a2a42] px-6 py-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-bold text-white text-sm tracking-wide">Filtre avancé</span>
+              <button onClick={() => setFilterOpen(false)} className="text-gray-500 hover:text-gray-300"><X size={14} /></button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Livreurs</label>
-                <select
-                  value={filterForm.livreur}
-                  onChange={e => setFilterForm(p => ({ ...p, livreur: e.target.value }))}
-                  className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                >
-                  <option value="">Tous les livreurs</option>
-                  {livreursList.filter(l => l.statut !== false).map(l => (
-                    <option key={l.id} value={l.nom}>{l.nom}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Villes</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {/* Livreurs — autocomplete */}
+              <div ref={livreurRef} className="relative">
+                <label className="block text-xs text-gray-400 mb-1">Livreurs</label>
                 <div className="relative">
-                  <input value={filterForm.ville} onChange={e => setFilterForm(p => ({ ...p, ville: e.target.value }))} placeholder="Rechercher une ville..." className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-7" />
-                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={filterForm.livreur}
+                    onChange={e => { setFilterForm(p => ({ ...p, livreur: e.target.value })); setLivreurOpen(true); }}
+                    onFocus={() => setLivreurOpen(true)}
+                    placeholder="Rechercher un livreur..."
+                    className="w-full bg-[#12122a] border border-[#3a3a5a] rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-400 pr-7"
+                  />
+                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+                </div>
+                {livreurOpen && livFiltered.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded shadow-lg max-h-44 overflow-y-auto">
+                    {filterForm.livreur && (
+                      <div className="px-3 py-2 text-xs text-gray-400 cursor-pointer hover:bg-gray-50" onMouseDown={() => { setFilterForm(p => ({ ...p, livreur: '' })); setLivreurOpen(false); }}>— Tous les livreurs</div>
+                    )}
+                    {livFiltered.map(l => (
+                      <div key={l.id}
+                        onMouseDown={() => { setFilterForm(p => ({ ...p, livreur: l.nom })); setLivreurOpen(false); }}
+                        className="px-3 py-2 text-sm text-gray-800 cursor-pointer hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                        {l.nom} {l.telephone ? <span className="text-gray-400">({l.telephone})</span> : <span className="text-gray-400">()</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Villes */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Villes</label>
+                <div className="relative">
+                  <input value={filterForm.ville} onChange={e => setFilterForm(p => ({ ...p, ville: e.target.value }))} placeholder="Rechercher une ville..." className="w-full bg-[#12122a] border border-[#3a3a5a] rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-400 pr-7" />
+                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
                 </div>
               </div>
+              {/* Produits */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Produits</label>
+                <label className="block text-xs text-gray-400 mb-1">Produits</label>
                 <div className="relative">
-                  <input value={filterForm.produit} onChange={e => setFilterForm(p => ({ ...p, produit: e.target.value }))} placeholder="Rechercher un produit..." className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-7" />
-                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input value={filterForm.produit} onChange={e => setFilterForm(p => ({ ...p, produit: e.target.value }))} placeholder="Rechercher un produit..." className="w-full bg-[#12122a] border border-[#3a3a5a] rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-400 pr-7" />
+                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
                 </div>
               </div>
+              {/* Date d'ajout */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Date d'ajout</label>
+                <label className="block text-xs text-gray-400 mb-1">Date d'ajout</label>
                 <div className="flex gap-1">
-                  <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="flex-1 bg-white border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                  <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="flex-1 bg-white border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="flex-1 bg-[#12122a] border border-[#3a3a5a] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400" />
+                  <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="flex-1 bg-[#12122a] border border-[#3a3a5a] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400" />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={resetFilter} className="px-4 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-sm text-gray-700 font-medium transition-colors border border-gray-200">Réinitialiser</button>
+              <button onClick={resetFilter} className="px-4 py-1.5 rounded bg-[#2a2a42] hover:bg-[#353555] text-sm text-gray-300 font-medium transition-colors border border-[#3a3a5a]">Réinitialiser</button>
               <button onClick={applyFilter} className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors">Appliquer les filtres</button>
             </div>
           </div>
