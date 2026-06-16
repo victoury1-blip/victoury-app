@@ -867,13 +867,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   </td>
 
                   {/* Produits */}
-                  <td className="px-4 py-3">
-                    <div className="text-xs font-medium text-gray-800">
-                      {o.product?.name} {o.product?.size && `- ${o.product.size}`}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      (1x) {o.product?.stock !== undefined && `(stock:${o.product.stock})`}
-                    </div>
+                  <td className="px-4 py-3 min-w-[160px]">
+                    {(o.products?.length > 0 ? o.products : [o.product]).map((p, i) => p && (
+                      <div key={i} className="text-sm leading-snug mb-0.5">
+                        <span className="font-medium text-gray-800">{p.name}</span>
+                        {p.size && <span className="ml-1 text-xs text-gray-500">/ {p.size}</span>}
+                        <span className="ml-1 text-xs text-gray-400">×{p.qty || 1}</span>
+                      </div>
+                    ))}
                   </td>
 
                   {/* Prix */}
