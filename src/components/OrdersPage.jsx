@@ -784,10 +784,27 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
       {/* Footer count */}
       <div className="bg-white border-t border-gray-200 px-6 py-2 flex items-center justify-between text-xs text-gray-500">
-        <span>
-          {filtered.length} commande{filtered.length !== 1 ? 's' : ''} affichée{filtered.length !== 1 ? 's' : ''}
-          {selected.length > 0 && ` · ${selected.length} sélectionnée${selected.length > 1 ? 's' : ''}`}
-        </span>
+        <div className="flex items-center gap-3">
+          <span>
+            {filtered.length} commande{filtered.length !== 1 ? 's' : ''} affichée{filtered.length !== 1 ? 's' : ''}
+            {selected.length > 0 && ` · ${selected.length} sélectionnée${selected.length > 1 ? 's' : ''}`}
+          </span>
+          {selected.length > 0 && (
+            <button
+              onClick={async () => {
+                if (!window.confirm(`Supprimer définitivement ${selected.length} commande${selected.length > 1 ? 's' : ''} ?`)) return;
+                for (const id of selected) {
+                  setOrders(prev => prev.filter(o => o.id !== id));
+                  onDeleteOrder?.(id);
+                }
+                setSelected([]);
+              }}
+              className="flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold transition-colors"
+            >
+              <Trash2 size={11} /> Supprimer la sélection ({selected.length})
+            </button>
+          )}
+        </div>
         <span className="text-gray-400">Total tous onglets : {orders.length}</span>
       </div>
 
