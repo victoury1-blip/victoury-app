@@ -69,19 +69,18 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     async function load() {
+      /* Load only non-deleted orders */
       const { data, error } = await supabase
         .from('orders')
         .select('*')
+        .neq('is_deleted', true)
         .order('created_at', { ascending: false });
       if (error || !data) { setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes')); setIsLoading(false); return; }
-      /* Merge remote + local deleted IDs so deletions sync across devices */
-      const { data: delData } = await supabase.from('settings').select('value').eq('key', 'deleted_order_ids').single();
-      const remoteDeleted = Array.isArray(delData?.value) ? delData.value : [];
-      const localDeleted = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
-      const mergedDeleted = [...new Set([...remoteDeleted, ...localDeleted])];
-      localStorage.setItem('deleted_order_ids', JSON.stringify(mergedDeleted));
-      const deletedIds = new Set(mergedDeleted);
-      setOrders(data.filter(o => !deletedIds.has(o.id)).map((o) => ({
+      /* Build blacklist from soft-deleted rows — survives cache resets */
+      const { data: delRows } = await supabase.from('orders').select('id').eq('is_deleted', true);
+      const deletedIds = (delRows || []).map(r => r.id);
+      localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
+      setOrders(data.map((o) => ({
         id: o.id,
         recipient: o.recipient,
         product: o.product,
@@ -255,17 +254,18 @@ export default function App() {
       report_date: o.reportDate || null,
       note_livraison: o.noteLivraison || '',
       tracking_number: o.trackingNumber || null,
+      is_deleted: false,
     }));
     const { error } = await supabase.from('orders').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
     if (error) throw new Error(error.message);
   }
 
   async function deleteOrderFromSupabase(orderId) {
+    /* Soft delete — mark the row instead of removing it so it survives cache resets */
+    await supabase.from('orders').update({ is_deleted: true }).eq('id', orderId);
+    /* Update local blacklist immediately */
     const bl = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
     if (!bl.includes(orderId)) { bl.push(orderId); localStorage.setItem('deleted_order_ids', JSON.stringify(bl)); }
-    /* Sync blacklist to Supabase so all devices respect the deletion */
-    supabase.from('settings').upsert({ key: 'deleted_order_ids', value: bl, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {});
-    await supabase.from('orders').delete().eq('id', orderId);
   }
 
   async function updateOrderInSupabase(order) {
