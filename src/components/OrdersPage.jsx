@@ -510,22 +510,22 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         const livreursList = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
         const livFiltered = livreursList.filter(l => l.statut !== false && (!filterForm.livreur || l.nom.toLowerCase().includes(filterForm.livreur.toLowerCase())));
         return (
-          <div className="bg-[#1a1a2e] border-b border-[#2a2a42] px-6 py-4">
+          <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <span className="font-bold text-white text-sm tracking-wide">Filtre avancé</span>
-              <button onClick={() => setFilterOpen(false)} className="text-gray-500 hover:text-gray-300"><X size={14} /></button>
+              <span className="font-bold text-gray-700 text-sm tracking-wide">Filtre avancé</span>
+              <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {/* Livreurs — autocomplete */}
               <div ref={livreurRef} className="relative">
-                <label className="block text-xs text-gray-400 mb-1">Livreurs</label>
+                <label className="block text-xs text-gray-500 font-semibold mb-1">Livreurs</label>
                 <div className="relative">
                   <input
                     value={filterForm.livreur}
                     onChange={e => { setFilterForm(p => ({ ...p, livreur: e.target.value })); setLivreurOpen(true); }}
                     onFocus={() => setLivreurOpen(true)}
                     placeholder="Rechercher un livreur..."
-                    className="w-full bg-[#12122a] border border-[#3a3a5a] rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-400 pr-7"
+                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 pr-7"
                   />
                   <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
                 </div>
@@ -546,48 +546,48 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               </div>
               {/* Villes */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Villes</label>
+                <label className="block text-xs text-gray-500 font-semibold mb-1">Villes</label>
                 <div className="relative">
                   <input
                     value={filterForm.ville}
                     onChange={e => setFilterForm(p => ({ ...p, ville: e.target.value }))}
                     placeholder="Rechercher une ville..."
-                    className="w-full bg-[#12122a] border border-[#3a3a5a] rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-400 pr-7"
+                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 pr-7"
                   />
                   <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
                 </div>
               </div>
               {/* Produits */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Produits</label>
+                <label className="block text-xs text-gray-500 font-semibold mb-1">Produits</label>
                 <div className="relative">
                   <input
                     value={filterForm.produit}
                     onChange={e => setFilterForm(p => ({ ...p, produit: e.target.value }))}
                     placeholder="Rechercher un produit..."
-                    className="w-full bg-[#12122a] border border-[#3a3a5a] rounded px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-400 pr-7"
+                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 pr-7"
                   />
                   <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
                 </div>
               </div>
               {/* Date d'ajout */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Date d'ajout</label>
+                <label className="block text-xs text-gray-500 font-semibold mb-1">Date d'ajout</label>
                 <div className="flex gap-1">
                   <input type="date" value={filterForm.dateFrom}
                     onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))}
-                    className="flex-1 bg-[#12122a] border border-[#3a3a5a] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
+                    className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-indigo-400"
                   />
                   <input type="date" value={filterForm.dateTo}
                     onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))}
-                    className="flex-1 bg-[#12122a] border border-[#3a3a5a] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400"
+                    className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-indigo-400"
                   />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={resetFilter}
-                className="px-4 py-1.5 rounded bg-[#2a2a42] hover:bg-[#353555] text-sm text-gray-300 font-medium transition-colors border border-[#3a3a5a]">
+                className="px-4 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-sm text-gray-600 font-medium transition-colors border border-gray-300">
                 Réinitialiser
               </button>
               <button onClick={applyFilter}
