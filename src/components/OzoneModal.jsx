@@ -82,6 +82,9 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     fragile: '0',
     replace: order.echange ? '1' : '0',
     stock: '0',
+    quartier: '',
+    nature: '',
+    commentaire: '',
   });
 
   function parseCities(data) {
@@ -180,6 +183,9 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     body.append('parcel-fragile', form.fragile);
     body.append('parcel-replace', form.replace);
     if (form.note) body.append('parcel-note', form.note);
+    if (form.quartier) body.append('parcel-quarter', form.quartier);
+    if (form.nature) body.append('parcel-designation', form.nature);
+    if (form.commentaire) body.append('parcel-comment', form.commentaire);
     body.append('tracking-number', order.id);
 
     try {
@@ -369,10 +375,16 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                 )}
               </div>
 
-              <div>
-                <label className={labelCls}>Adresse <span className="text-red-500">*</span></label>
-                <textarea value={form.address} onChange={(e) => f('address', e.target.value)}
-                  rows={2} className={`${inputCls} resize-none`} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Adresse <span className="text-red-500">*</span></label>
+                  <input value={form.address} onChange={(e) => f('address', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Quartier</label>
+                  <input value={form.quartier} onChange={(e) => f('quartier', e.target.value)}
+                    placeholder="Ex: Hay Riad..." className={inputCls} />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -415,9 +427,21 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
               </div>
 
               <div>
-                <label className={labelCls}>Note (optionnel)</label>
+                <label className={labelCls}>Nature du produit</label>
+                <input value={form.nature} onChange={(e) => f('nature', e.target.value)}
+                  placeholder="Ex: Vêtements, Chaussures..." className={inputCls} />
+              </div>
+
+              <div>
+                <label className={labelCls}>Note / Produits</label>
                 <input value={form.note} onChange={(e) => f('note', e.target.value)}
                   className={inputCls} placeholder="Instructions spéciales..." />
+              </div>
+
+              <div>
+                <label className={labelCls}>Commentaire (autre tél, date livraison...)</label>
+                <input value={form.commentaire} onChange={(e) => f('commentaire', e.target.value)}
+                  placeholder="Ex: 0612345678, Livrer le soir..." className={inputCls} />
               </div>
 
               {status === 'error' && (
