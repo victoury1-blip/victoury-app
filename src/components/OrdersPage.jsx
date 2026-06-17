@@ -652,10 +652,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 {/* Destinataire */}
                 <td className="px-4 py-3 min-w-[200px]">
                   <div className="text-xs text-gray-400 font-mono mb-0.5">{order.id}</div>
-                  <div className="font-semibold text-gray-800">{order.recipient.name}</div>
+                  <div className="font-semibold text-gray-800 max-w-[200px] truncate">{order.recipient.name}</div>
                   <div className="text-xs text-gray-500 mt-0.5 flex items-start gap-1">
                     <MapPin size={10} className="mt-0.5 shrink-0" />
-                    <span>{order.recipient.address}</span>
+                    <span className="line-clamp-2">{order.recipient.address}</span>
                   </div>
                   <div className="text-xs text-gray-500">{order.recipient.city}</div>
                   <div className="mt-1 flex items-center gap-1.5">
