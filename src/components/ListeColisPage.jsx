@@ -863,7 +863,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                       <MapPin size={10} className="mt-0.5 shrink-0" />
                       <span className="line-clamp-2">{o.recipient.address}</span>
                     </div>
-                    <div className="text-xs text-gray-500">{o.recipient.city}</div>
+                    <div className="font-semibold text-gray-800">{o.recipient.city}</div>
                     <div className="mt-1 flex items-center gap-1.5">
                       <PhoneChip phone={o.recipient.phone} />
                     </div>
