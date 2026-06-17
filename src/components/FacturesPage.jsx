@@ -277,7 +277,21 @@ function NewFactureModal({ orders, onClose, onCreated }) {
         return [l.id, local];
       })
     ).then(entries => {
-      setFraisCache(Object.fromEntries(entries));
+      const cache = Object.fromEntries(entries);
+      setFraisCache(cache);
+      /* Recalculate frais for already-selected orders once cache is ready */
+      setSelected(prev => {
+        if (!Object.keys(prev).length) return prev;
+        const updated = { ...prev };
+        for (const id of Object.keys(updated)) {
+          const o = orders.find(x => x.id === id);
+          if (!o) continue;
+          const liv = o.recipient?.delivery || '';
+          const auto = getLivreurFrais(liv, o.recipient?.city, o.status, cache);
+          if (auto !== null) updated[id] = auto;
+        }
+        return updated;
+      });
     });
   }, []);
 
