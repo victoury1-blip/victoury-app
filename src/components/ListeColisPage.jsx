@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
@@ -856,14 +856,29 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />
                   </td>
                   {/* Destinataire */}
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-blue-700 text-xs">{o.id}</div>
-                    <div className="font-medium text-gray-800">{o.recipient.name}</div>
-                    <div className="text-xs text-gray-400">{o.recipient.address}</div>
+                  <td className="px-4 py-3 min-w-[200px]">
+                    <div className="text-xs text-gray-400 font-mono mb-0.5">{o.id}</div>
+                    <div className="font-semibold text-gray-800">{o.recipient.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5 flex items-start gap-1">
+                      <MapPin size={10} className="mt-0.5 shrink-0" />
+                      <span>{o.recipient.address}</span>
+                    </div>
                     <div className="text-xs text-gray-500">{o.recipient.city}</div>
-                    {o.recipient.phone && <div className="mt-0.5"><PhoneChip phone={o.recipient.phone} /></div>}
-                    {delivery !== '—' && <div className="text-xs text-blue-500 mt-0.5">🚚 {delivery}</div>}
-                    {o.trackingNumber && <div className="text-xs text-orange-600 font-mono mt-0.5">📦 {o.trackingNumber}</div>}
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <PhoneChip phone={o.recipient.phone} />
+                    </div>
+                    {delivery !== '—' && (
+                      <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                        <Truck size={10} />
+                        <span className="italic">{delivery}</span>
+                      </div>
+                    )}
+                    {o.trackingNumber && (
+                      <div className="mt-0.5 flex items-center gap-1 text-xs text-green-600 font-mono font-semibold">
+                        <Truck size={10} />
+                        <span>{o.trackingNumber}</span>
+                      </div>
+                    )}
                   </td>
 
                   {/* Produits */}
