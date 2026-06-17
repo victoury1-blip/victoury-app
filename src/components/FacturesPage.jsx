@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw, Zap } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
+import { cloudGet } from '../lib/cloudSettings';
 
 /* ─── helpers ─── */
 function fmt(n) { return Number(n || 0).toFixed(2); }
@@ -225,20 +226,33 @@ function printFacture(f) {
   w.document.close();
 }
 
-/* ─── helpers: get delivery fee from localStorage frais_{id} ─── */
-function getLivreurFrais(livreurName, city, status) {
+/* ─── helpers: get delivery fee from fraisList (supports partial city match) ─── */
+function getLivreurFraisFromList(fraisList, city, status) {
+  if (!fraisList?.length || !city) return null;
+  const cn = city.toLowerCase().trim();
+  /* 1. Exact match */
+  let row = fraisList.find(c => (c.ville || '').toLowerCase().trim() === cn);
+  /* 2. Partial match (French includes order-city or vice versa) */
+  if (!row) row = fraisList.find(c => {
+    const vl = (c.ville || '').toLowerCase().trim();
+    return vl && (vl.includes(cn) || cn.includes(vl));
+  });
+  if (!row) return null;
+  if (status === 'livre')  return row.livre  ?? null;
+  if (status === 'refuse') return row.refuse ?? null;
+  if (status === 'annule') return row.annule ?? null;
+  if (status === 'change') return row.change ?? null;
+  return row.livre ?? null;
+}
+
+function getLivreurFrais(livreurName, city, status, fraisCache) {
   try {
     const livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
     const liv = livreursList.find(l => l.nom === livreurName);
     if (!liv) return null;
-    const fraisList = JSON.parse(localStorage.getItem(`frais_${liv.id}`) || '[]');
-    const cityRow = fraisList.find(c => c.ville?.toLowerCase() === city?.toLowerCase());
-    if (!cityRow) return null;
-    if (status === 'livre') return cityRow.livre ?? null;
-    if (status === 'refuse') return cityRow.refuse ?? null;
-    if (status === 'annule') return cityRow.annule ?? null;
-    if (status === 'change') return cityRow.change ?? null;
-    return cityRow.livre ?? null;
+    /* Use pre-loaded cache if available, else fall back to localStorage */
+    const fraisList = fraisCache?.[liv.id] || JSON.parse(localStorage.getItem(`frais_${liv.id}`) || '[]');
+    return getLivreurFraisFromList(fraisList, city, status);
   } catch { return null; }
 }
 
@@ -247,6 +261,25 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   const [livreur, setLivreur] = useState('');
   const [fraisDefault, setFraisDefault] = useState(25);
   const [selected, setSelected] = useState({});
+  const [fraisCache, setFraisCache] = useState({});
+
+  /* Load frais from cloud for all livreurs so city matching works even without localStorage */
+  useEffect(() => {
+    const livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+    Promise.all(
+      livreursList.map(async (l) => {
+        const remote = await cloudGet(`frais_${l.id}`);
+        if (Array.isArray(remote) && remote.length) {
+          localStorage.setItem(`frais_${l.id}`, JSON.stringify(remote));
+          return [l.id, remote];
+        }
+        const local = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
+        return [l.id, local];
+      })
+    ).then(entries => {
+      setFraisCache(Object.fromEntries(entries));
+    });
+  }, []);
 
   const eligible = useMemo(() => orders.filter(o =>
     ELIGIBLE_STATUSES.includes(o.status) && (livreur ? (o.recipient?.delivery || '') === livreur : true)
@@ -255,7 +288,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   const livreurs = [...new Set(orders.map(o => o.recipient?.delivery).filter(Boolean))];
 
   function getFraisForOrder(o) {
-    const auto = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status);
+    const auto = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache);
     return auto !== null ? auto : fraisDefault;
   }
 
@@ -369,7 +402,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
                     }`}>{statusLabel(o.status)}</span>
                     <div className="font-bold text-gray-800 text-sm w-20 text-right">{fmt(o.price)} DH</div>
                     {selected[o.id] !== undefined && (() => {
-                      const autoFrais = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status);
+                      const autoFrais = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache);
                       return (
                         <div className="flex items-center gap-1 w-32">
                           <span className="text-xs text-gray-400">Frais:</span>
