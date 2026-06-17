@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
-  ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap,
+  ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
 } from 'lucide-react';
 
 const TIMEZONES = [
@@ -75,6 +75,37 @@ export default function SettingsPage({ onWooOrdersImported }) {
 
   /* ── Ozon Express state ── */
   const [auzone, setAuzone] = useState({ customerId: '', apiKey: '', showKey: false, testStatus: 'idle', saved: false });
+
+  /* ── Notification sound state ── */
+  const [notifCfg, setNotifCfg] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('notification_sound') || '{}'); } catch { return {}; }
+  });
+
+  function saveNotifCfg(cfg) {
+    setNotifCfg(cfg);
+    localStorage.setItem('notification_sound', JSON.stringify(cfg));
+  }
+
+  function playTestSound(cfg) {
+    const volume = (cfg.volume ?? 80) / 100;
+    if (cfg.customSound) {
+      const audio = new Audio(cfg.customSound);
+      audio.volume = volume;
+      audio.play().catch(() => {});
+    } else {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
+      } catch {}
+    }
+  }
 
   /* ── Timezone state ── */
   const [timezone, setTimezone] = useState(localStorage.getItem('system_timezone') || 'Africa/Casablanca');
@@ -224,6 +255,16 @@ export default function SettingsPage({ onWooOrdersImported }) {
       cardBg: 'from-orange-50',
       saved: auzone.saved,
       badge: auzone.saved ? { label: 'Configuré', color: 'text-green-600 bg-green-50 border-green-200' } : null,
+    },
+    {
+      id: 'notifications',
+      title: 'Notifications',
+      desc: 'Configurez les sons de notification pour les nouvelles commandes (upload son, volume).',
+      icon: <Volume2 size={22} className="text-green-600" />,
+      iconBg: 'bg-green-100',
+      cardBg: 'from-green-50',
+      saved: notifCfg.enabled !== false,
+      badge: notifCfg.enabled !== false ? { label: 'Activé', color: 'text-green-600 bg-green-50 border-green-200' } : null,
     },
   ];
 
@@ -455,6 +496,63 @@ export default function SettingsPage({ onWooOrdersImported }) {
             </button>
             {tzSaved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Notifications Modal ── */}
+      <Modal open={openModal === 'notifications'} onClose={() => setOpenModal(null)}
+        title="Notifications sonores" icon={<Volume2 size={18} className="text-green-600" />}
+        iconBg="bg-gradient-to-r from-green-50 to-white">
+        <div className="space-y-5">
+          {/* Enable toggle */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-700">Activer le son</p>
+              <p className="text-xs text-gray-500">Jouer un son à chaque nouvelle commande</p>
+            </div>
+            <button
+              onClick={() => saveNotifCfg({ ...notifCfg, enabled: notifCfg.enabled === false ? true : false })}
+              className={`relative w-11 h-6 rounded-full transition-colors ${notifCfg.enabled !== false ? 'bg-green-500' : 'bg-gray-300'}`}>
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${notifCfg.enabled !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          {/* Volume */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Volume : {notifCfg.volume ?? 80}%</label>
+            <input type="range" min="0" max="100" value={notifCfg.volume ?? 80}
+              onChange={e => saveNotifCfg({ ...notifCfg, volume: Number(e.target.value) })}
+              className="w-full accent-green-500" />
+          </div>
+
+          {/* Upload custom sound */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Son personnalisé (mp3 / wav)</label>
+            <label className="flex items-center gap-2 cursor-pointer border border-dashed border-green-300 rounded-lg px-3 py-2.5 hover:bg-green-50 transition">
+              <Volume2 size={14} className="text-green-600" />
+              <span className="text-xs text-gray-600">{notifCfg.soundName || 'Cliquer pour importer un fichier audio…'}</span>
+              <input type="file" accept="audio/*" className="hidden" onChange={e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => saveNotifCfg({ ...notifCfg, customSound: ev.target.result, soundName: file.name });
+                reader.readAsDataURL(file);
+              }} />
+            </label>
+            {notifCfg.customSound && (
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-xs text-green-600 font-medium">{notifCfg.soundName}</span>
+                <button onClick={() => saveNotifCfg({ ...notifCfg, customSound: null, soundName: null })}
+                  className="text-xs text-red-500 hover:underline">Supprimer</button>
+              </div>
+            )}
+          </div>
+
+          {/* Test */}
+          <button onClick={() => playTestSound(notifCfg)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition">
+            <Play size={12} /> Tester le son
+          </button>
         </div>
       </Modal>
 

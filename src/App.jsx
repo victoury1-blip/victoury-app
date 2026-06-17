@@ -200,6 +200,25 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIds.has(o.id));
           if (fresh.length) {
+            /* Play notification sound */
+            try {
+              const nc = JSON.parse(localStorage.getItem('notification_sound') || '{}');
+              if (nc.enabled !== false) {
+                const vol = (nc.volume ?? 80) / 100;
+                if (nc.customSound) {
+                  const a = new Audio(nc.customSound); a.volume = vol; a.play().catch(() => {});
+                } else {
+                  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                  const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                  osc.connect(gain); gain.connect(ctx.destination);
+                  osc.frequency.setValueAtTime(880, ctx.currentTime);
+                  osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+                  gain.gain.setValueAtTime(vol, ctx.currentTime);
+                  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                  osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
+                }
+              }
+            } catch {}
             saveOrdersToSupabase(fresh).catch(err =>
               logError('supabase_save', `Failed to save ${fresh.length} orders: ${err.message}`, { count: fresh.length, error: err.message })
             );
