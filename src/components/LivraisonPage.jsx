@@ -183,10 +183,19 @@ function EditFraisModal({ city, onClose, onSave }) {
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-800">{city.ville}</h3>
+          <h3 className="font-bold text-gray-800">{form.ville || 'Nouvelle ville'}</h3>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><XCircle size={16} className="text-gray-400" /></button>
         </div>
         <div className="space-y-3">
+          <div>
+            <label className={labelCls}>Ville</label>
+            <input
+              value={form.ville || ''}
+              onChange={(e) => setForm((p) => ({ ...p, ville: e.target.value }))}
+              placeholder="Ex: Casablanca"
+              className={inputCls}
+            />
+          </div>
           {[['livre', 'Frais Livré'], ['refuse', 'Frais Refusé'], ['annule', 'Frais Annulé'], ['change', 'Frais Changé']].map(([key, lbl]) => (
             <div key={key}>
               <label className={labelCls}>{lbl} (DH)</label>

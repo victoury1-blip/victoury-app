@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
 
@@ -40,6 +40,16 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
 
   const [cities, setCities] = useState([]);
   const [citiesLoading, setCitiesLoading] = useState(true);
+  const [citySearch, setCitySearch] = useState('');
+  const [cityDropOpen, setCityDropOpen] = useState(false);
+  const cityRef = useRef(null);
+
+  useEffect(() => {
+    if (!cityDropOpen) return;
+    function handleClick(e) { if (cityRef.current && !cityRef.current.contains(e.target)) setCityDropOpen(false); }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [cityDropOpen]);
 
   /* Load config from Supabase if not in localStorage (new device) */
   useEffect(() => {
@@ -327,19 +337,36 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                 </div>
               </div>
 
-              <div>
+              <div ref={cityRef} className="relative">
                 <label className={labelCls}>
                   Ville <span className="text-red-500">*</span>
                   {citiesLoading
                     ? <span className="text-orange-500 font-normal ml-1 inline-flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Chargement...</span>
                     : <span className="text-gray-400 font-normal ml-1">({cities.length} villes)</span>}
                 </label>
-                <select value={form.cityId} onChange={(e) => f('cityId', e.target.value)} className={inputCls} disabled={citiesLoading}>
-                  <option value="">-- Sélectionnez une ville --</option>
-                  {cities.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <input
+                  value={citySearch || cityName}
+                  onChange={(e) => { setCitySearch(e.target.value); setCityDropOpen(true); f('cityId', ''); }}
+                  onFocus={() => { setCitySearch(''); setCityDropOpen(true); }}
+                  placeholder="Rechercher une ville..."
+                  className={inputCls}
+                  disabled={citiesLoading}
+                />
+                {cityDropOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {cities
+                      .filter(c => !citySearch || c.name.toLowerCase().includes(citySearch.toLowerCase()))
+                      .slice(0, 50)
+                      .map(c => (
+                        <div key={c.id}
+                          onMouseDown={() => { f('cityId', c.id); setCitySearch(''); setCityDropOpen(false); }}
+                          className="px-3 py-2 text-sm text-gray-700 cursor-pointer hover:bg-orange-50 hover:text-orange-700">
+                          {c.name}
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
               </div>
 
               <div>
