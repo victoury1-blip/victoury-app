@@ -473,14 +473,22 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
       }
 
       const histArr = tracking['PARCEL-HISTORY'] || tracking['history'] || tracking['HISTORY'] || tracking['events'] || [];
+      const ozStatus = parcel['PARCEL-STATUS'] || parcel['STATUS'] || tracking['PARCEL-STATUS'] || tracking['STATUS'] || tracking['LAST-STATUS'] || '';
+      const histList = Array.isArray(histArr) ? histArr : [];
+
+      if (!ozStatus && histList.length === 0) {
+        setHistoryState('not_found');
+        return;
+      }
+
       const info = {
         tracking: realOzTn || usedTn,
         receiver: parcel['RECIPIENT-NAME'] || parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || tracking['RECEIVER'] || order.recipient?.name,
         phone: parcel['RECIPIENT-PHONE'] || parcel['PARCEL-PHONE'] || parcel['PHONE'] || order.recipient?.phone,
         city: parcel['RECIPIENT-CITY'] || parcel['CITY_NAME'] || parcel['CITY'] || order.recipient?.city,
-        status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || tracking['PARCEL-STATUS'] || tracking['STATUS'] || tracking['LAST-STATUS'] || '',
+        status: ozStatus,
         cod: parcel['COD'] || parcel['PRIX'] || '',
-        history: Array.isArray(histArr) ? histArr : [],
+        history: histList,
       };
       setHistoryData(info);
       setHistoryState('ok');
