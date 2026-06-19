@@ -97,6 +97,7 @@ export default function App() {
         reportDate: o.report_date || null,
         noteLivraison: o.note_livraison || '',
         trackingNumber: o.tracking_number || null,
+        manuallyModified: o.manually_modified || false,
       })));
       setIsLoading(false);
     }
@@ -230,7 +231,7 @@ export default function App() {
           const changedWC = [];
           const updated = prev.map(o => {
             if (!o.id.startsWith('WC-')) return o;
-            if (modifiedIdsRef.current.has(o.id)) return o;
+            if (modifiedIdsRef.current.has(o.id) || o.manuallyModified) return o;
             const wc = priceMap.get(o.id);
             if (!wc || (wc.price === o.price && JSON.stringify(wc.products) === JSON.stringify(o.products))) return o;
             const next = { ...o, price: wc.price, product: wc.product, products: wc.products };
@@ -316,6 +317,7 @@ export default function App() {
       report_date: order.reportDate || null,
       note_livraison: order.noteLivraison || '',
       tracking_number: order.trackingNumber || null,
+      manually_modified: order.manuallyModified || false,
     }, { onConflict: 'id' });
   }
 
@@ -328,7 +330,7 @@ export default function App() {
       });
       changed.forEach((o) => {
         modifiedIdsRef.current.add(o.id);
-        updateOrderInSupabase(o);
+        updateOrderInSupabase({ ...o, manuallyModified: true });
       });
       return next;
     });
