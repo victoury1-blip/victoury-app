@@ -108,7 +108,9 @@ export default function ProfitPage({ orders = [] }) {
     let cost = 0;
     for (const p of prods) {
       if (!p?.name) continue;
-      const sp = stockProducts.find(s => s.name === p.name);
+      const pn = (p.name || '').trim().toLowerCase();
+      const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
+        || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn));
       if (sp && sp.prixAchat) {
         cost += (parseFloat(sp.prixAchat) || 0) * (p.qty || 1);
       }
