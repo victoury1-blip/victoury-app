@@ -471,6 +471,25 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     setModalOpen(false);
   }
 
+  function exportOrdersCSV(data) {
+    const header = ['ID','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
+    const csvRows = [header.join(',')];
+    data.forEach(o => {
+      const st = statuses.find(s => s.value === o.status);
+      csvRows.push([
+        o.id, o.recipient?.name || '', o.recipient?.phone || '',
+        o.recipient?.city || '', `"${(o.recipient?.address || '').replace(/"/g, '""')}"`,
+        o.recipient?.delivery || '', (o.products?.[0]?.name || o.product?.name || ''),
+        o.price || 0, st?.label || o.status, o.dateAdded || ''
+      ].join(','));
+    });
+    const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `commandes_${activeTab}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
   const activeTabLabel = tabs.find((t) => t.id === activeTab)?.label || '';
 
   if (isLoading) return (
@@ -512,14 +531,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           >
             <Filter size={14} />
           </button>
-          <button className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer">
+          <button onClick={() => window.print()} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer">
             <Printer size={14} />
           </button>
-          <button className="p-2 rounded-md bg-green-500 text-white hover:bg-green-600" title="Exporter">
+          <button onClick={() => exportOrdersCSV(filtered)} className="p-2 rounded-md bg-green-500 text-white hover:bg-green-600" title="Exporter CSV">
             <Upload size={14} />
-          </button>
-          <button className="p-2 rounded-md bg-blue-500 text-white hover:bg-blue-600" title="Importer">
-            <Download size={14} />
           </button>
           <button className="p-2 rounded-md bg-gray-500 text-white hover:bg-gray-600" title="Paramètres">
             <Settings size={14} />

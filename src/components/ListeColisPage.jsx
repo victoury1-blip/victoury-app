@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
@@ -889,14 +889,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     });
   }
 
-  /* Derive facture status: auto (from factures) OR manual toggle */
-  const facturedIds = useMemo(() => {
-    try {
-      const list = JSON.parse(localStorage.getItem('victoury_factures') || '[]');
-      const autoIds = new Set(list.flatMap(f => (f.colis || []).map(c => c.orderId)));
-      return new Set([...autoIds, ...manualFacture]);
-    } catch { return new Set([...manualFacture]); }
-  }, [orders, manualFacture]);
+  const facturedIds = useMemo(() => new Set([...manualFacture]), [manualFacture]);
 
   function toggleFacture(orderId) {
     setManualFacture(prev => {
@@ -997,6 +990,25 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     </div>
   );
 
+  function exportColisCSV(data) {
+    const header = ['ID','Tracking','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
+    const csvRows = [header.join(',')];
+    data.forEach(o => {
+      const st = statuses.find(s => s.value === o.status);
+      csvRows.push([
+        o.id, o.trackingNumber || '', o.recipient?.name || '', o.recipient?.phone || '',
+        o.recipient?.city || '', `"${(o.recipient?.address || '').replace(/"/g, '""')}"`,
+        o.recipient?.delivery || '', (o.products?.[0]?.name || o.product?.name || ''),
+        o.price || 0, st?.label || o.status, o.dateAdded || ''
+      ].join(','));
+    });
+    const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `colis_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with tabs */}
@@ -1024,7 +1036,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
             </button>
           </div>
         )}
-        {tab === 'colis' && (
+        {tab === 'colis' && (<>
           <button
             onClick={() => setFilterOpen(o => !o)}
             className={`ml-auto p-2 rounded-md border text-sm transition-colors ${
@@ -1036,7 +1048,13 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           </button>
-        )}
+          <button onClick={() => exportColisCSV(colis)} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Exporter CSV">
+            <Download size={14} />
+          </button>
+          <button onClick={() => window.print()} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer">
+            <Printer size={14} />
+          </button>
+        </>)}
       </div>
 
       {/* Advanced Filter Panel */}

@@ -140,6 +140,8 @@ export default function Dashboard({ orders = [] }) {
     att_ram:   slice.filter(o => o.status === 'att_ramassage').length,
   };
 
+  const retourCA = slice.filter(o => ['refuse','annule','retour','pret_retour'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
+  const tauxRetour = counts.total > 0 ? Math.round(((counts.refuse + counts.annule) / counts.total) * 100) : 0;
   const taux = counts.total > 0 ? Math.round((counts.livre / counts.total) * 100) : 0;
 
   /* ── period summary cards data ── */
@@ -226,6 +228,7 @@ export default function Dashboard({ orders = [] }) {
             {[
               { label: 'Total confirmées', val: slice.filter(o=>['confirme','livre'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-green-700', bg: 'bg-green-50' },
               { label: 'Total livrées', val: livreCA, color: 'text-emerald-700', bg: 'bg-emerald-50' },
+              { label: 'Retours / Refusés', val: retourCA, color: 'text-red-700', bg: 'bg-red-50' },
               { label: 'En attente', val: slice.filter(o=>['nouveau','reporter','en_suivi','att_ramassage'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-amber-700', bg: 'bg-amber-50' },
             ].map(item => (
               <div key={item.label} className={`${item.bg} rounded-xl px-4 py-3`}>
@@ -235,17 +238,24 @@ export default function Dashboard({ orders = [] }) {
                 </p>
               </div>
             ))}
-            {/* Taux de livraison */}
-            <div className="mt-auto">
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                <span>Taux de livraison</span>
-                <span className="font-bold text-gray-700">{taux}%</span>
+            <div className="mt-auto space-y-2">
+              <div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span>Taux de livraison</span>
+                  <span className="font-bold text-green-600">{taux}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-2 rounded-full transition-all" style={{ width: `${taux}%` }} />
+                </div>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-green-400 to-emerald-500 h-2 rounded-full transition-all"
-                  style={{ width: `${taux}%` }}
-                />
+              <div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span>Taux de retour</span>
+                  <span className="font-bold text-red-500">{tauxRetour}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-red-400 to-red-500 h-2 rounded-full transition-all" style={{ width: `${tauxRetour}%` }} />
+                </div>
               </div>
             </div>
           </div>
