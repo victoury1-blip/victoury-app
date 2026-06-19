@@ -8,6 +8,13 @@ import { cloudGet } from '../lib/cloudSettings';
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function pct(val, total) { return total ? ((val / total) * 100).toFixed(1) : '0.0'; }
 
+const EXPENSE_CATS = [
+  { value: 'facebook', label: 'Facebook Ads', color: 'text-blue-600', bg: 'bg-blue-50' },
+  { value: 'tiktok', label: 'TikTok Ads', color: 'text-pink-600', bg: 'bg-pink-50' },
+  { value: 'livraison', label: 'Frais Livraison extra', color: 'text-orange-600', bg: 'bg-orange-50' },
+  { value: 'autres', label: 'Autres dépenses', color: 'text-gray-600', bg: 'bg-gray-100' },
+];
+
 function KpiCard({ label, value, unit = 'MAD', subtitle, color, icon: Icon, progress }) {
   return (
     <div className={`bg-white border-l-4 ${color.border} rounded-xl p-5 shadow-sm`}>
@@ -35,7 +42,7 @@ export default function ProfitPage({ orders = [] }) {
   const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay });
 
   const [adTransfers, setAdTransfers] = useState([]);
-  const [newTransfer, setNewTransfer] = useState({ label: '', amount: '' });
+  const [newTransfer, setNewTransfer] = useState({ label: '', amount: '', category: 'facebook' });
   const [showAdModal, setShowAdModal] = useState(false);
 
   const [factures, setFactures] = useState(() => loadFactures());
@@ -61,11 +68,12 @@ export default function ProfitPage({ orders = [] }) {
     if (!newTransfer.amount) return;
     saveAdTransfers([...adTransfers, {
       id: Date.now(),
-      label: newTransfer.label || 'Transfert pub',
+      label: newTransfer.label || EXPENSE_CATS.find(c => c.value === newTransfer.category)?.label || 'Dépense',
       amount: parseFloat(newTransfer.amount) || 0,
+      category: newTransfer.category || 'facebook',
       date: new Date().toISOString().slice(0, 10),
     }]);
-    setNewTransfer({ label: '', amount: '' });
+    setNewTransfer({ label: '', amount: '', category: 'facebook' });
   }
 
   function removeTransfer(id) { saveAdTransfers(adTransfers.filter(t => t.id !== id)); }
@@ -163,7 +171,12 @@ export default function ProfitPage({ orders = [] }) {
               const pa = getProductCost(c); const m = (c.prix||0) - pa - (c.fraisLivraison||0);
               rows.push([c.factureRef, c.orderId, c.recipient||'', c.city||'', c.status, c.prix||0, pa.toFixed(2), c.fraisLivraison||0, m.toFixed(2)].join(','));
             });
-            rows.push(''); rows.push(`Total Pub,${totalPub.toFixed(2)}`); rows.push(`Profit Net,${profitNet.toFixed(2)}`);
+            rows.push('');
+            EXPENSE_CATS.forEach(cat => {
+              const t = adTransfers.filter(x => (x.category || 'facebook') === cat.value).reduce((s, x) => s + (x.amount || 0), 0);
+              if (t) rows.push(`${cat.label},${t.toFixed(2)}`);
+            });
+            rows.push(`Total Dépenses,${totalPub.toFixed(2)}`); rows.push(`Profit Net,${profitNet.toFixed(2)}`);
             const blob = new Blob(['﻿'+rows.join('\n')], {type:'text/csv;charset=utf-8'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
             a.download = `profit_${applied.dateFrom}_${applied.dateTo}.csv`; a.click();
@@ -226,9 +239,16 @@ export default function ProfitPage({ orders = [] }) {
             </div>
             <div className="text-gray-400 font-bold text-xl hidden sm:flex items-center justify-center">−</div>
             <div className="bg-purple-50 rounded-xl p-4">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Frais Pub / Ads</div>
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">Total Dépenses</div>
               <div className="text-lg font-black text-purple-600">{fmt(totalPub)}</div>
-              <button onClick={() => setShowAdModal(true)} className="text-[10px] text-purple-600 hover:underline mt-1">Gérer les transferts →</button>
+              <div className="flex flex-wrap justify-center gap-1 mt-2">
+                {EXPENSE_CATS.map(cat => {
+                  const t = adTransfers.filter(x => (x.category || 'facebook') === cat.value).reduce((s, x) => s + (x.amount || 0), 0);
+                  if (!t) return null;
+                  return <span key={cat.value} className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${cat.bg} ${cat.color}`}>{cat.label}: {fmt(t)}</span>;
+                })}
+              </div>
+              <button onClick={() => setShowAdModal(true)} className="text-[10px] text-purple-600 hover:underline mt-2">Gérer les dépenses →</button>
             </div>
           </div>
 
@@ -298,7 +318,7 @@ export default function ProfitPage({ orders = [] }) {
                     <td className={`px-4 py-3 font-black ${sousTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(sousTotal)}</td>
                   </tr>
                   <tr className="border-t border-gray-300">
-                    <td colSpan={8} className="px-4 py-2 text-xs font-bold text-gray-500 text-right">Pub / Ads :</td>
+                    <td colSpan={8} className="px-4 py-2 text-xs font-bold text-gray-500 text-right">Dépenses :</td>
                     <td className="px-4 py-2 font-bold text-purple-600 text-xs">−{fmt(totalPub)}</td>
                   </tr>
                   <tr className="bg-teal-50">
@@ -318,44 +338,63 @@ export default function ProfitPage({ orders = [] }) {
           <div className="fixed inset-0 bg-black/40" />
           <div className="relative bg-white rounded-t-xl sm:rounded-xl w-full sm:max-w-md max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-xl z-10">
-              <h2 className="text-lg font-bold text-gray-800">Transferts Publicitaires</h2>
+              <h2 className="text-lg font-bold text-gray-800">Gestion des dépenses</h2>
               <button onClick={() => setShowAdModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 text-xl">&times;</button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-xs text-gray-500">Ajoutez vos paiements de factures publicitaires (Facebook Ads, Google Ads, etc.). Le total sera déduit du sous-total pour calculer le profit net.</p>
+              <p className="text-xs text-gray-500">Ajoutez vos dépenses par catégorie. Le total sera déduit du sous-total pour calculer le profit net.</p>
 
-              {adTransfers.length > 0 && (
-                <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
-                  {adTransfers.map(t => (
-                    <div key={t.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-800">{t.label}</div>
-                        <div className="text-xs text-gray-400">{t.date}</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-black text-purple-600">{fmt(t.amount)} MAD</span>
-                        <button onClick={() => removeTransfer(t.id)} className="p-1 rounded bg-red-50 text-red-500 hover:bg-red-100">
-                          <Trash2 size={12} />
-                        </button>
+              {EXPENSE_CATS.map(cat => {
+                const items = adTransfers.filter(t => (t.category || 'facebook') === cat.value);
+                if (!items.length) return null;
+                const catTotal = items.reduce((s, t) => s + (t.amount || 0), 0);
+                return (
+                  <div key={cat.value}>
+                    <div className={`text-xs font-bold ${cat.color} mb-1`}>{cat.label}</div>
+                    <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                      {items.map(t => (
+                        <div key={t.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
+                          <div>
+                            <div className="text-sm font-semibold text-gray-800">{t.label}</div>
+                            <div className="text-xs text-gray-400">{t.date}</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-sm font-black ${cat.color}`}>{fmt(t.amount)} MAD</span>
+                            <button onClick={() => removeTransfer(t.id)} className="p-1 rounded bg-red-50 text-red-500 hover:bg-red-100">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className={`px-4 py-2 ${cat.bg} flex items-center justify-between`}>
+                        <span className="text-xs font-bold text-gray-600">Sous-total</span>
+                        <span className={`font-black ${cat.color}`}>{fmt(catTotal)} MAD</span>
                       </div>
                     </div>
-                  ))}
-                  <div className="px-4 py-2.5 bg-purple-50 flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-600">TOTAL</span>
-                    <span className="font-black text-purple-700">{fmt(totalPub)} MAD</span>
                   </div>
+                );
+              })}
+
+              {adTransfers.length > 0 && (
+                <div className="px-4 py-2.5 bg-purple-50 rounded-xl flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-600">TOTAL DÉPENSES</span>
+                  <span className="font-black text-purple-700">{fmt(totalPub)} MAD</span>
                 </div>
               )}
 
               <div className="border border-dashed border-gray-300 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Plus size={12} /> Nouveau transfert</p>
+                <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Plus size={12} /> Nouvelle dépense</p>
+                <select value={newTransfer.category} onChange={e => setNewTransfer(p => ({ ...p, category: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+                  {EXPENSE_CATS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
                 <input value={newTransfer.label} onChange={e => setNewTransfer(p => ({ ...p, label: e.target.value }))}
-                  placeholder="Ex: Facebook Ads Juin" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                  placeholder="Description (ex: Facebook Ads Juin)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
                 <input type="number" value={newTransfer.amount} onChange={e => setNewTransfer(p => ({ ...p, amount: e.target.value }))}
                   placeholder="Montant en MAD" min={0} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
                 <button onClick={addTransfer} disabled={!newTransfer.amount}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-40 transition">
-                  <Plus size={14} /> Ajouter le transfert
+                  <Plus size={14} /> Ajouter
                 </button>
               </div>
             </div>
