@@ -147,10 +147,11 @@ function PhoneChip({ phone }) {
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full hover:bg-green-200 transition-colors"
+        className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 active:bg-green-200 transition-colors"
       >
-        <Phone size={9} /> {phone}
+        <Phone size={12} /> {phone}
       </button>
       {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
     </>
@@ -713,7 +714,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <div className="text-base font-bold text-gray-900 max-w-[220px] truncate">{order.recipient.name}</div>
                   <div className="text-sm text-gray-500 mt-0.5">{order.recipient.address}</div>
                   <div className="text-sm font-bold text-gray-800">{order.recipient.city}</div>
-                  <div className="mt-1.5 font-bold text-sm text-gray-900">{order.recipient.phone}</div>
+                  <PhoneChip phone={order.recipient.phone} />
                   {order.recipient.delivery && (
                     <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
                       <Truck size={11} />

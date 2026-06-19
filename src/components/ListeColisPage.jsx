@@ -489,10 +489,11 @@ function PhoneChip({ phone }) {
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full hover:bg-green-200 transition-colors"
+        className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 active:bg-green-200 transition-colors"
       >
-        <Phone size={9} /> {phone}
+        <Phone size={12} /> {phone}
       </button>
       {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
     </>
