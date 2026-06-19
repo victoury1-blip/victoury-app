@@ -22,7 +22,15 @@ const NAV_ITEMS = [
   },
   { path: '/liste-colis', label: 'Liste des colis', icon: Package },
   { path: '/stock',       label: 'Stock',           icon: Archive },
-  { path: '/ramassage',   label: 'Ramassage',       icon: Truck },
+  {
+    path: '/ramassage',
+    label: 'Ramassage',
+    icon: Truck,
+    children: [
+      { path: '/ramassage/scanner', label: 'Scanner' },
+      { path: '/ramassage/bons',    label: 'Bon' },
+    ],
+  },
   { path: '/retour',      label: 'Retour',          icon: RotateCcw },
   { path: '/factures',    label: 'Factures',        icon: FileText },
   { path: '/profit',      label: 'Profit',          icon: TrendingUp },
@@ -33,12 +41,11 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ orders = [] }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [commandesOpen, setCommandesOpen] = useState(true);
+  const [openMenus, setOpenMenus] = useState({ '/commandes': true, '/ramassage': true });
   const navigate = useNavigate();
   const location = useLocation();
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
-  const isCommandes = location.pathname.startsWith('/commandes');
 
   return (
     <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 flex flex-col transition-all duration-200 shrink-0 h-screen`}>
@@ -59,18 +66,18 @@ export default function Sidebar({ orders = [] }) {
             return (
               <div key={item.path}>
                 <button
-                  onClick={() => { navigate(item.path); setCommandesOpen(o => !o); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${isCommandes ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                  onClick={() => { navigate(item.children[0]?.path || item.path); setOpenMenus(prev => ({ ...prev, [item.path]: !prev[item.path] })); }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${isActive(item.path) ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
                 >
                   <Icon size={16} className="shrink-0" />
                   {!collapsed && (
                     <>
                       <span className="flex-1 text-left">{item.label}</span>
-                      {commandesOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      {openMenus[item.path] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </>
                   )}
                 </button>
-                {commandesOpen && !collapsed && (
+                {openMenus[item.path] && !collapsed && (
                   <div className="pl-8">
                     {item.children.map((child) => {
                       const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);

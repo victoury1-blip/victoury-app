@@ -10,6 +10,7 @@ import ListeColisPage from './components/ListeColisPage';
 import StockPage from './components/StockPage';
 import FacturesPage from './components/FacturesPage';
 import ProfitPage from './components/ProfitPage';
+import RamassagePage from './components/RamassagePage';
 import LoginPage from './components/LoginPage';
 import { supabase } from './lib/supabase';
 import { cloudGet } from './lib/cloudSettings';
@@ -356,7 +357,9 @@ export default function App() {
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading || isWooFetching} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />
           <Route path="/stock" element={<StockPage />} />
-          <Route path="/ramassage" element={<UnderConstruction />} />
+          <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
+          <Route path="/ramassage/scanner" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
+          <Route path="/ramassage/bons" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/retour" element={<UnderConstruction />} />
           <Route path="/factures" element={<FacturesPage orders={orders} />} />
           <Route path="/profit" element={<ProfitPage orders={orders} />} />
