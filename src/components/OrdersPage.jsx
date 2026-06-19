@@ -304,6 +304,8 @@ function HistoryModal({ order, onClose }) {
 }
 
 function StatusChangeModal({ order, onClose, onSave }) {
+  const { statuses } = useStatuses();
+  const sorted = [...statuses].filter(s => s.showInCommandes !== false).sort((a, b) => a.order - b.order);
   const [newStatus, setNewStatus] = useState(order.status);
   const [note, setNote] = useState('');
   return (
@@ -311,12 +313,20 @@ function StatusChangeModal({ order, onClose, onSave }) {
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-800">Modifier le statut de la commande</h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
+          <button type="button" onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Nouveau statut</label>
-            <StatusPicker value={newStatus} onChange={setNewStatus} />
+            <select
+              value={newStatus}
+              onChange={e => setNewStatus(e.target.value)}
+              className="w-full px-4 py-3 bg-[#2d2d3a] text-white rounded-lg text-sm font-semibold border border-[#3f3f52] focus:outline-none"
+            >
+              {sorted.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Note interne</label>
