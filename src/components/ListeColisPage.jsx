@@ -402,7 +402,7 @@ const DELIVERY_STATUSES = [
 
 function DeliveryStatusModal({ order, onClose, onSave }) {
   const ozTn = order.ozoneTracking || order.trackingNumber;
-  const [tab, setTab] = useState(ozTn ? 'history' : 'manual');
+  const [tab, setTab] = useState('history');
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState('');
   const [historyState, setHistoryState] = useState('idle');
@@ -414,52 +414,64 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
     setHistoryData(null);
     try {
       const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
-      if (!cfg.customerId || !cfg.apiKey) { setHistoryState('error'); return; }
+      if (!cfg.customerId || !cfg.apiKey) { setHistoryState('no_config'); return; }
       const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
       const trackingNumbers = [...new Set([ozTn, order.trackingNumber, order.id].filter(Boolean))];
 
-      let raw = null;
+      let trackingResult = null;
+      let parcelResult = null;
       let usedTn = '';
 
       for (const tn of trackingNumbers) {
-        const body = new FormData();
-        body.append('tracking-number', tn);
-        try {
-          const res = await fetch(`${base}/tracking`, { method: 'POST', body });
-          if (res.ok) {
-            const json = await res.json();
-            const result = (json['TRACKING']?.['RESULT'] || json['RESULT'] || '').toUpperCase();
-            if (result === 'ERROR') continue;
-            raw = json;
-            usedTn = tn;
-            break;
-          }
-        } catch {}
-        try {
-          const body2 = new FormData();
-          body2.append('tracking-number', tn);
-          const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: body2 });
-          if (res.ok) {
-            const json = await res.json();
-            const result = (json['PARCEL-INFO']?.['RESULT'] || json['RESULT'] || '').toUpperCase();
-            if (result === 'ERROR') continue;
-            raw = json;
-            usedTn = tn;
-            break;
-          }
-        } catch {}
+        if (!trackingResult) {
+          try {
+            const body = new FormData();
+            body.append('tracking-number', tn);
+            const res = await fetch(`${base}/tracking`, { method: 'POST', body });
+            if (res.ok) {
+              const json = await res.json();
+              const tracking = json['TRACKING'] || json;
+              const result = (tracking['RESULT'] || '').toUpperCase();
+              if (result !== 'ERROR') {
+                trackingResult = json;
+                usedTn = tn;
+              }
+            }
+          } catch {}
+        }
+        if (!parcelResult) {
+          try {
+            const body2 = new FormData();
+            body2.append('tracking-number', tn);
+            const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: body2 });
+            if (res.ok) {
+              const json = await res.json();
+              const pi = json['PARCEL-INFO'] || json;
+              const result = (pi['RESULT'] || '').toUpperCase();
+              if (result !== 'ERROR') {
+                parcelResult = json;
+                if (!usedTn) usedTn = tn;
+              }
+            }
+          } catch {}
+        }
+        if (trackingResult && parcelResult) break;
       }
 
-      if (!raw) { setHistoryState('error'); return; }
-      const parcel = raw['TRACKING'] || raw['PARCEL-INFO'] || raw['GET-PARCEL'] || raw['PARCEL'] || raw;
-      const histArr = parcel['PARCEL-HISTORY'] || parcel['history'] || parcel['HISTORY'] || parcel['events'] || [];
+      if (!trackingResult && !parcelResult) { setHistoryState('error'); return; }
+
+      const tracking = trackingResult ? (trackingResult['TRACKING'] || trackingResult) : {};
+      const parcel = parcelResult ? (parcelResult['PARCEL-INFO'] || parcelResult) : {};
+
+      const histArr = tracking['PARCEL-HISTORY'] || tracking['history'] || tracking['HISTORY'] || tracking['events'] || [];
       const info = {
         tracking: usedTn,
-        receiver: parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || parcel['RECEIVER-NAME'] || order.recipient?.name,
-        phone: parcel['PARCEL-PHONE'] || parcel['PHONE'] || order.recipient?.phone,
-        city: parcel['CITY_NAME'] || parcel['CITY'] || order.recipient?.city,
-        status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || '',
-        history: histArr,
+        receiver: parcel['RECIPIENT-NAME'] || parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || tracking['RECEIVER'] || order.recipient?.name,
+        phone: parcel['RECIPIENT-PHONE'] || parcel['PARCEL-PHONE'] || parcel['PHONE'] || order.recipient?.phone,
+        city: parcel['RECIPIENT-CITY'] || parcel['CITY_NAME'] || parcel['CITY'] || order.recipient?.city,
+        status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || tracking['PARCEL-STATUS'] || tracking['STATUS'] || tracking['LAST-STATUS'] || '',
+        cod: parcel['COD'] || parcel['PRIX'] || '',
+        history: Array.isArray(histArr) ? histArr : [],
       };
       setHistoryData(info);
       setHistoryState('ok');
@@ -467,7 +479,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
   }
 
   useEffect(() => {
-    if (tab === 'history' && ozTn && historyState === 'idle') fetchOzoneHistory();
+    if (tab === 'history' && historyState === 'idle') fetchOzoneHistory();
   }, [tab]);
 
   return (
@@ -486,16 +498,14 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
         </div>
 
         {/* Tabs */}
-        {ozTn && (
-          <div className="flex border-b border-gray-100">
-            {[{ k:'history', l:'📦 Historique Ozone' }, { k:'manual', l:'✏️ Statut manuel' }].map(t => (
-              <button key={t.k} onClick={() => setTab(t.k)}
-                className={`flex-1 py-2 text-xs font-semibold transition-colors ${tab === t.k ? 'text-amber-600 border-b-2 border-amber-500' : 'text-gray-400 hover:text-gray-600'}`}>
-                {t.l}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex border-b border-gray-100">
+          {[{ k:'history', l:'📦 Statut Ozone' }, { k:'manual', l:'✏️ Statut manuel' }].map(t => (
+            <button key={t.k} onClick={() => setTab(t.k)}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors ${tab === t.k ? 'text-amber-600 border-b-2 border-amber-500' : 'text-gray-400 hover:text-gray-600'}`}>
+              {t.l}
+            </button>
+          ))}
+        </div>
 
         <div className="p-4 max-h-[70vh] overflow-y-auto">
           {/* History tab */}
@@ -507,10 +517,16 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                   <p className="text-xs">Récupération de l'historique Ozone Express...</p>
                 </div>
               )}
+              {historyState === 'no_config' && (
+                <div className="py-6 text-center">
+                  <p className="text-xs text-amber-600 mb-2">API Ozone non configurée.</p>
+                  <p className="text-xs text-gray-400 mb-3">Allez dans Réglages → Ozon Express pour ajouter vos identifiants API.</p>
+                </div>
+              )}
               {historyState === 'error' && (
                 <div className="py-6 text-center">
-                  <p className="text-xs text-red-500 mb-2">Impossible de récupérer l'historique.</p>
-                  <p className="text-xs text-gray-400 mb-3">Vérifiez la config API dans Paramètres.</p>
+                  <p className="text-xs text-red-500 mb-2">Colis introuvable sur Ozone Express.</p>
+                  <p className="text-xs text-gray-400 mb-3">Tracking testé: {[ozTn, order.trackingNumber, order.id].filter(Boolean).join(', ')}</p>
                   <button onClick={fetchOzoneHistory} className="text-xs text-amber-600 underline">Réessayer</button>
                 </div>
               )}
@@ -522,6 +538,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                     <p><span className="font-semibold text-gray-600">Client:</span> {historyData.receiver}</p>
                     <p><span className="font-semibold text-gray-600">Téléphone:</span> {historyData.phone}</p>
                     <p><span className="font-semibold text-gray-600">Ville:</span> {historyData.city}</p>
+                    {historyData.cod && <p><span className="font-semibold text-gray-600">COD:</span> <span className="font-semibold text-gray-800">{historyData.cod} DH</span></p>}
                     {historyData.status && <p><span className="font-semibold text-gray-600">Statut actuel:</span> <span className="text-amber-700 font-semibold">{historyData.status}</span></p>}
                   </div>
                   {/* Timeline */}
