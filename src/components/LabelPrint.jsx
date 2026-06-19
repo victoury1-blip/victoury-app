@@ -128,17 +128,33 @@ export default function LabelPrint({ orders, onClose }) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { alert('Popup bloqué. Autorisez les popups.'); return; }
     printWindow.document.write(`
-      <html><head><title>Étiquettes</title>
+      <html><head><title>Étiquettes VICTOURY</title>
       <style>
         @page { size: 100mm 100mm; margin: 0; }
-        body { margin: 0; padding: 0; }
-        .label-page { page-break-after: always; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 20px; background: #f3f4f6; font-family: Arial, sans-serif; }
+        .label-page { page-break-after: always; margin: 0 auto 20px; }
         .label-page:last-child { page-break-after: avoid; }
+        .print-header { text-align: center; margin-bottom: 20px; }
+        .print-header h1 { font-size: 18px; color: #1f2937; margin: 0 0 4px; }
+        .print-header p { font-size: 12px; color: #9ca3af; margin: 0; }
+        .print-btn { display: inline-block; margin: 10px auto; padding: 10px 28px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .print-btn:hover { background: #1d4ed8; }
+        @media print {
+          body { padding: 0; background: #fff; }
+          .print-header, .print-btn { display: none !important; }
+        }
       </style>
-      </head><body>${printRef.current.innerHTML}</body></html>
+      </head><body>
+        <div class="print-header">
+          <h1>Étiquettes (${orders.length})</h1>
+          <p>Utilisez Ctrl+P ou le bouton ci-dessous pour imprimer / enregistrer en PDF</p>
+          <button class="print-btn" onclick="window.print()">Imprimer / PDF</button>
+        </div>
+        ${printRef.current.innerHTML}
+      </body></html>
     `);
     printWindow.document.close();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 300);
   }
 
   return (
