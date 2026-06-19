@@ -533,7 +533,8 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                       color: DELIVERY_STATUSES.find(s => s.value === order.status)?.color || '#f59e0b',
                       local: true,
                     };
-                    const apiEvents = historyData.history.map(h => ({
+                    const histList = Array.isArray(historyData.history) ? historyData.history : [];
+                    const apiEvents = histList.map(h => ({
                       label: h['STATUS'] || h['LABEL'] || h['status'] || h['label'] || h['event'] || JSON.stringify(h),
                       date: h['DATE'] || h['date'] || h['DATE_TIME'] || '',
                       color: '#f59e0b',
