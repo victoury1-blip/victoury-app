@@ -235,13 +235,27 @@ function recordHistory(orderId, status, user) {
   const key = `order_history_${orderId}`;
   const hist = JSON.parse(localStorage.getItem(key) || '[]');
   const ts = now();
-  hist.push({ timestamp: ts, status, user: getUserDisplayName(user) });
+  const entry = { timestamp: ts, status, user: getUserDisplayName(user) };
+  hist.push(entry);
   localStorage.setItem(key, JSON.stringify(hist));
+  supabase.from('order_history').insert({ order_id: orderId, status, user_name: entry.user, timestamp: ts }).catch(() => {});
 }
 
 function HistoryModal({ order, onClose }) {
-  const saved = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]');
-  const hist = saved.length > 0 ? saved : [
+  const [hist, setHist] = useState([]);
+  React.useEffect(() => {
+    const local = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]');
+    if (local.length) setHist(local);
+    supabase.from('order_history').select('*').eq('order_id', order.id).order('timestamp', { ascending: true })
+      .then(({ data }) => {
+        if (data?.length) {
+          const mapped = data.map(r => ({ timestamp: r.timestamp, status: r.status, user: r.user_name }));
+          setHist(mapped);
+          localStorage.setItem(`order_history_${order.id}`, JSON.stringify(mapped));
+        }
+      });
+  }, [order.id]);
+  const displayHist = hist.length > 0 ? hist : [
     { timestamp: order.dateAdded || '—', status: order.status, user: 'Création' }
   ];
   return (
@@ -268,10 +282,10 @@ function HistoryModal({ order, onClose }) {
               </tr>
             </thead>
             <tbody>
-              {hist.length === 0 && (
+              {displayHist.length === 0 && (
                 <tr><td colSpan={3} className="px-6 py-6 text-center text-gray-400 text-xs">Aucun historique disponible</td></tr>
               )}
-              {[...hist].reverse().map((h, i) => (
+              {[...displayHist].reverse().map((h, i) => (
                 <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-6 py-2.5 text-xs text-gray-700">{h.timestamp}</td>
                   <td className="px-6 py-2.5"><StatusBadge status={h.status} /></td>
@@ -428,7 +442,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         o.id === orderId ? { ...o, validated: true, trackingNumber: o.trackingNumber || ozoneTracking, ozoneTracking: ozoneTracking, status: 'att_ramassage' } : o
       )
     );
-    addToast('success', `Colis créé — ${trackingNumber}`, 'Commande déplacée vers En suivi');
+    addToast('success', `Colis créé — ${ozoneTracking}`, 'Commande déplacée vers En suivi');
     setOzoneOpen(false);
   }
 
@@ -842,8 +856,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              const trackNum = o.trackingNumber || generateTrackingNumber();
-              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, trackingNumber: trackNum };
+              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
             }));
             setStatusDropdown(null);
           }}

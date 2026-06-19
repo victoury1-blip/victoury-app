@@ -15,6 +15,7 @@ import RetourPage from './components/RetourPage';
 import LoginPage from './components/LoginPage';
 import { supabase } from './lib/supabase';
 import { cloudGet } from './lib/cloudSettings';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const TAB_FROM_PARAM = {
   'a-confirmer': 'a_confirmer',
@@ -59,6 +60,9 @@ export default function App() {
   const [wooError, setWooError] = useState(null);
   const [dbError, setDbError] = useState(null);
   const modifiedIdsRef = useRef(new Set());
+  const deletedIdsRef = useRef(new Set());
+  const wooConfigRef = useRef(null);
+  const notifConfigRef = useRef(null);
   const navigate = useNavigate();
 
   /* ── Auth ── */
@@ -82,6 +86,7 @@ export default function App() {
       /* Build blacklist from soft-deleted rows — survives cache resets */
       const { data: delRows } = await supabase.from('orders').select('id').eq('is_deleted', true);
       const deletedIds = (delRows || []).map(r => r.id);
+      deletedIdsRef.current = new Set(deletedIds);
       localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
       setOrders(data.map((o) => ({
         id: o.id,
@@ -128,8 +133,11 @@ export default function App() {
     if (!session) return;
     async function fetchWooOrders() {
       try {
-        const stored = localStorage.getItem('woo_config');
-        const config = stored ? JSON.parse(stored) : (await cloudGet('woo_config') || {});
+        if (!wooConfigRef.current) {
+          const stored = localStorage.getItem('woo_config');
+          wooConfigRef.current = stored ? JSON.parse(stored) : (await cloudGet('woo_config') || {});
+        }
+        const config = wooConfigRef.current;
         if (!config.consumerKey || !config.consumerSecret) {
           setWooError('⚙️ WooCommerce non configuré — ajoutez vos clés API dans Paramètres');
           return;
@@ -200,14 +208,14 @@ export default function App() {
           }
         }
         /* Use localStorage which is already synced with Supabase on startup */
-        const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
         setOrders((prev) => {
           const existingIds = new Set(prev.map((o) => o.id));
-          const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIds.has(o.id));
+          const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
             /* Play notification sound */
             try {
-              const nc = JSON.parse(localStorage.getItem('notification_sound') || '{}');
+              if (!notifConfigRef.current) notifConfigRef.current = JSON.parse(localStorage.getItem('notification_sound') || '{}');
+              const nc = notifConfigRef.current;
               if (nc.enabled !== false) {
                 const vol = (nc.volume ?? 80) / 100;
                 if (nc.customSound) {
@@ -235,7 +243,7 @@ export default function App() {
             if (!o.id.startsWith('WC-')) return o;
             if (modifiedIdsRef.current.has(o.id) || o.manuallyModified) return o;
             const wc = priceMap.get(o.id);
-            if (!wc || (wc.price === o.price && JSON.stringify(wc.products) === JSON.stringify(o.products))) return o;
+            if (!wc || wc.price === o.price) return o;
             const next = { ...o, price: wc.price, product: wc.product, products: wc.products };
             changedWC.push(next);
             return next;
@@ -260,7 +268,7 @@ export default function App() {
       }
     }
     fetchWooOrders();
-    const interval = setInterval(fetchWooOrders, 10000);
+    const interval = setInterval(fetchWooOrders, 30000);
     return () => clearInterval(interval);
   }, [session]);
 
@@ -271,8 +279,7 @@ export default function App() {
   /* ── Supabase helpers ── */
   async function saveOrdersToSupabase(newOrders) {
     if (!newOrders.length) return;
-    const deletedIds = new Set(JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'));
-    const filtered = newOrders.filter(o => !deletedIds.has(o.id));
+    const filtered = newOrders.filter(o => !deletedIdsRef.current.has(o.id));
     if (!filtered.length) return;
     const rows = filtered.map((o) => ({
       id: o.id,
@@ -298,9 +305,7 @@ export default function App() {
   async function deleteOrderFromSupabase(orderId) {
     /* Soft delete — mark the row instead of removing it so it survives cache resets */
     await supabase.from('orders').update({ is_deleted: true }).eq('id', orderId);
-    /* Update local blacklist immediately */
-    const bl = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
-    if (!bl.includes(orderId)) { bl.push(orderId); localStorage.setItem('deleted_order_ids', JSON.stringify(bl)); }
+    deletedIdsRef.current.add(orderId);
   }
 
   async function updateOrderInSupabase(order) {
@@ -327,9 +332,16 @@ export default function App() {
   const setOrdersWithSync = (updater) => {
     setOrders((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      const prevMap = new Map(prev.map(o => [o.id, o]));
       const changed = next.filter((o) => {
-        const old = prev.find((p) => p.id === o.id);
-        return !old || JSON.stringify(old) !== JSON.stringify(o);
+        const old = prevMap.get(o.id);
+        if (!old) return true;
+        return o.status !== old.status || o.note !== old.note || o.validated !== old.validated
+          || o.price !== old.price || o.trackingNumber !== old.trackingNumber
+          || o.ozoneTracking !== old.ozoneTracking || o.recipient !== old.recipient
+          || o.product !== old.product || o.echange !== old.echange
+          || o.reportDate !== old.reportDate || o.noteLivraison !== old.noteLivraison
+          || o.ozoneLastStatus !== old.ozoneLastStatus;
       });
       changed.forEach((o) => {
         modifiedIdsRef.current.add(o.id);
@@ -360,6 +372,7 @@ export default function App() {
           </div>
         )}
         <div className="flex-1 overflow-auto">
+        <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard orders={orders} />} />
@@ -382,6 +395,7 @@ export default function App() {
           <Route path="/reglage" element={<SettingsPage onWooOrdersImported={handleWooImport} orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </ErrorBoundary>
         </div>
       </main>
     </div>
