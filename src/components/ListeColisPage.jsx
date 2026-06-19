@@ -415,37 +415,50 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
     try {
       const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
       if (!cfg.customerId || !cfg.apiKey) { setHistoryState('error'); return; }
-      const tn = ozTn;
-      const endpoints = [
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${tn}`,
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcels-history?tracking-number=${tn}`,
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/parcel-history/${tn}`,
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${order.trackingNumber}`,
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${order.id}`,
-      ];
+      const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
+      const trackingNumbers = [...new Set([ozTn, order.trackingNumber, order.id].filter(Boolean))];
+
       let raw = null;
-      for (const url of [...new Set(endpoints)]) {
+      let usedTn = '';
+
+      for (const tn of trackingNumbers) {
+        const body = new FormData();
+        body.append('tracking-number', tn);
         try {
-          const res = await fetch(url);
+          const res = await fetch(`${base}/tracking`, { method: 'POST', body });
           if (res.ok) {
             const json = await res.json();
-            const result = json['GET-PARCEL']?.['RESULT'] || json['RESULT'] || '';
-            if (result.toUpperCase() === 'ERROR') continue;
+            const result = (json['TRACKING']?.['RESULT'] || json['RESULT'] || '').toUpperCase();
+            if (result === 'ERROR') continue;
             raw = json;
+            usedTn = tn;
+            break;
+          }
+        } catch {}
+        try {
+          const body2 = new FormData();
+          body2.append('tracking-number', tn);
+          const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: body2 });
+          if (res.ok) {
+            const json = await res.json();
+            const result = (json['PARCEL-INFO']?.['RESULT'] || json['RESULT'] || '').toUpperCase();
+            if (result === 'ERROR') continue;
+            raw = json;
+            usedTn = tn;
             break;
           }
         } catch {}
       }
+
       if (!raw) { setHistoryState('error'); return; }
-      /* Parse response — Ozone wraps in GET-PARCEL or GET-PARCELS-HISTORY */
-      const parcel = raw['GET-PARCEL'] || raw['PARCEL'] || raw;
+      const parcel = raw['TRACKING'] || raw['PARCEL-INFO'] || raw['GET-PARCEL'] || raw['PARCEL'] || raw;
       const histArr = parcel['PARCEL-HISTORY'] || parcel['history'] || parcel['HISTORY'] || parcel['events'] || [];
       const info = {
-        tracking: tn,
-        receiver: parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || order.recipient?.name,
+        tracking: usedTn,
+        receiver: parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || parcel['RECEIVER-NAME'] || order.recipient?.name,
         phone: parcel['PARCEL-PHONE'] || parcel['PHONE'] || order.recipient?.phone,
         city: parcel['CITY_NAME'] || parcel['CITY'] || order.recipient?.city,
-        status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || '',
+        status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || '',
         history: histArr,
       };
       setHistoryData(info);
