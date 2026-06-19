@@ -41,7 +41,7 @@ async function generateVictId() {
   const last = parseInt(localStorage.getItem('vict_counter') || '0', 10);
   const next = last + 1;
   localStorage.setItem('vict_counter', String(next));
-  return 'VICT' + String(next).padStart(3, '0');
+  return 'VICT' + String(next).padStart(4, '0');
 }
 
 function getSysTz() { return localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
@@ -830,15 +830,17 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         <StatusChangeModal
           order={statusDropdown.order}
           onClose={() => setStatusDropdown(null)}
-          onSave={(orderId, newStatus, note) => {
+          onSave={async (orderId, newStatus, note) => {
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
+            const order = orders.find(o => o.id === orderId);
+            const newTrackingNumber = order?.trackingNumber || order?.id || null;
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
+              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, trackingNumber: newTrackingNumber };
             }));
             setStatusDropdown(null);
           }}
