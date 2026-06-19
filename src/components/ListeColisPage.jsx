@@ -635,6 +635,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
+  const [whatsappPopup, setWhatsappPopup] = useState(null);
   const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
   const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
@@ -740,12 +741,29 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
   function handleStatusSave(orderId, newStatus, note) {
     const ts = getTs();
+    const order = orders.find(o => o.id === orderId);
     setOrders((prev) => prev.map((o) => {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';
       const addedNote = note ? `\nNote interne: ${note}` : '';
       return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
     }));
+    const WA_STATUSES = ['ramasse', 'expedier', 'recu_livreur'];
+    if (order && WA_STATUSES.includes(newStatus) && order.recipient?.phone) {
+      const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
+      const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
+      const statusLabels = { ramasse: 'Ramassé', expedier: 'Expédié', recu_livreur: 'Reçu par le livreur' };
+      const phone = order.recipient.phone.replace(/\s+/g, '').replace(/^0/, '212');
+      const tn = order.ozoneTracking || order.trackingNumber || order.id;
+      let msg = `✅ سلام ${order.recipient.name}، الطلب ديالك رقم ${tn} `;
+      if (livreur) {
+        msg += `خداه الليفرور ${livreur.nom}`;
+        if (livreur.telephone) msg += ` — ${livreur.telephone}`;
+        msg += `. `;
+      }
+      msg += `الحالة: ${statusLabels[newStatus] || newStatus}. غادي يتواصل معاك للتوصيل إن شاء الله.`;
+      setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id });
+    }
   }
 
   function saveOrderFull(updated) {
@@ -1078,6 +1096,48 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
             if (!newOzTn) setDeliveryOrder(null);
           }}
         />
+      )}
+
+      {/* WhatsApp Notification Popup */}
+      {whatsappPopup && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-green-50">
+              <div className="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-green-600 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.61.61l4.458-1.495A11.952 11.952 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.37 0-4.567-.816-6.3-2.183l-.44-.348-2.865.96.96-2.865-.348-.44A9.965 9.965 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                <span className="font-bold text-green-800 text-sm">Envoyer WhatsApp</span>
+              </div>
+              <button onClick={() => setWhatsappPopup(null)} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-gray-500">Client: <span className="font-bold text-gray-800">{whatsappPopup.name}</span> — {whatsappPopup.orderId}</p>
+              <textarea
+                value={whatsappPopup.msg}
+                onChange={e => setWhatsappPopup(p => ({ ...p, msg: e.target.value }))}
+                rows={4}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setWhatsappPopup(null)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Ignorer
+                </button>
+                <button
+                  onClick={() => {
+                    window.open(`https://wa.me/${whatsappPopup.phone}?text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
+                    setWhatsappPopup(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                  Envoyer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
