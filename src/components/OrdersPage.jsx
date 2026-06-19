@@ -37,10 +37,16 @@ async function generateVictId() {
     const { data, error } = await supabase.rpc('next_vict_id');
     if (!error && data) return data;
   } catch {}
-  /* fallback to localStorage if offline */
   const last = parseInt(localStorage.getItem('vict_counter') || '0', 10);
   const next = last + 1;
   localStorage.setItem('vict_counter', String(next));
+  return 'VICT' + String(next).padStart(4, '0');
+}
+
+function generateTrackingNumber() {
+  const last = parseInt(localStorage.getItem('tracking_counter') || '0', 10);
+  const next = last + 1;
+  localStorage.setItem('tracking_counter', String(next));
   return 'VICT' + String(next).padStart(4, '0');
 }
 
@@ -830,20 +836,17 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         <StatusChangeModal
           order={statusDropdown.order}
           onClose={() => setStatusDropdown(null)}
-          onSave={async (orderId, newStatus, note) => {
+          onSave={(orderId, newStatus, note) => {
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
             const order = orders.find(o => o.id === orderId);
-            let newTrackingNumber = order?.trackingNumber || null;
-            if (!newTrackingNumber) {
-              newTrackingNumber = await generateVictId();
-            }
+            const trackNum = order?.trackingNumber || generateTrackingNumber();
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, trackingNumber: newTrackingNumber };
+              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, ...(trackNum ? { trackingNumber: trackNum } : {}) };
             }));
             setStatusDropdown(null);
           }}
