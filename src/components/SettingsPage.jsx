@@ -640,30 +640,30 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                         const infoJson = infoRes.ok ? await infoRes.json() : null;
 
                         const trackData = trackJson?.['TRACKING'] || trackJson || {};
-                        const parcelData = infoJson?.['PARCEL-INFO'] || infoJson || {};
+                        const parcelRaw = infoJson?.['PARCEL-INFO'] || infoJson || {};
+                        const parcelInfos = parcelRaw['INFOS'] || parcelRaw;
 
                         const trackError = (trackData['RESULT'] || '').toUpperCase() === 'ERROR';
-                        const parcelError = (parcelData['RESULT'] || '').toUpperCase() === 'ERROR';
+                        const parcelError = (parcelRaw['RESULT'] || '').toUpperCase() === 'ERROR';
 
                         if (trackError && parcelError) {
-                          setOzoneTrackResult({ error: parcelData['MESSAGE'] || trackData['MESSAGE'] || 'Colis introuvable', history: [], raw: { trackJson, infoJson } });
+                          setOzoneTrackResult({ error: parcelRaw['MESSAGE'] || trackData['MESSAGE'] || 'Colis introuvable', history: [], raw: { trackJson, infoJson } });
                         } else {
-                          const pick = (...keys) => {
-                            for (const src of [parcelData, trackData]) {
-                              for (const k of keys) { if (src[k]) return src[k]; }
-                            }
-                            return '';
-                          };
-                          const histArr = trackData['PARCEL-HISTORY'] || trackData['history'] || trackData['HISTORY']
-                            || trackData['EVENTS'] || trackData['events'] || parcelData['PARCEL-HISTORY'] || [];
+                          const lastTrack = trackData['LAST_TRACKING'] || trackData['LAST-TRACKING'] || {};
+                          const ozStatus = lastTrack['STATUT'] || lastTrack['STATUS'] || parcelInfos['PARCEL-STATUS'] || parcelInfos['STATUS'] || trackData['STATUT'] || '';
+
+                          const histRaw = trackData['HISTORY'] || trackData['PARCEL-HISTORY'] || trackData['history'] || {};
+                          const histList = Array.isArray(histRaw) ? histRaw : Object.values(histRaw);
+
                           setOzoneTrackResult({
-                            status: pick('PARCEL-STATUS','STATUS','LAST-STATUS','STATUT','statut','last_status','ETAT','etat'),
-                            tracking: pick('TRACKING-NUMBER','TRACKING','tracking_number','tracking-number') || tn,
-                            recipient: pick('RECIPIENT-NAME','PARCEL-RECEIVER','RECEIVER','RECEIVER-NAME','NOM','DESTINATAIRE','receiver_name'),
-                            city: pick('RECIPIENT-CITY','CITY_NAME','CITY','VILLE','city','ville','receiver_city'),
-                            phone: pick('RECIPIENT-PHONE','PARCEL-PHONE','PHONE','TELEPHONE','phone','receiver_phone'),
-                            price: pick('COD','PRIX','PRICE','cod','price','MONTANT'),
-                            history: Array.isArray(histArr) ? histArr : [],
+                            status: ozStatus,
+                            tracking: parcelInfos['TRACKING-NUMBER'] || trackData['TRACKING-NUMBER'] || tn,
+                            recipient: parcelInfos['RECEIVER'] || parcelInfos['RECIPIENT-NAME'] || '',
+                            city: parcelInfos['CITY_NAME'] || parcelInfos['CITY'] || '',
+                            phone: parcelInfos['PHONE'] || parcelInfos['RECIPIENT-PHONE'] || '',
+                            price: parcelInfos['PRICE'] || parcelInfos['COD'] || '',
+                            deliveryFee: parcelInfos['DELIVERED-PRICE'] || '',
+                            history: histList,
                             raw: { trackJson, infoJson },
                             error: null,
                           });
@@ -714,12 +714,12 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                             <div key={i} className="px-4 py-2 flex items-start gap-3 text-xs">
                               <span className="mt-1 w-2 h-2 rounded-full bg-teal-400 shrink-0" />
                               <div>
-                                <span className="font-semibold text-gray-700">{h.status || h.STATUS || h.label || h['LABEL'] || ''}</span>
-                                {(h.date || h.DATE || h.created_at || h['DATE_TIME']) && (
-                                  <span className="ml-2 text-gray-400">{h.date || h.DATE || h.created_at || h['DATE_TIME']}</span>
+                                <span className="font-semibold text-gray-700">{h.STATUT || h.STATUS || h.status || h.label || ''}</span>
+                                {(h.TIME_STR || h.DATE || h.date || h.created_at) && (
+                                  <span className="ml-2 text-gray-400">{h.TIME_STR || h.DATE || h.date || h.created_at}</span>
                                 )}
-                                {(h.location || h.LOCATION || h.city || h['COMMENT']) && (
-                                  <span className="ml-2 text-gray-400">— {h.location || h.LOCATION || h.city || h['COMMENT']}</span>
+                                {h.COMMENT && (
+                                  <span className="ml-2 text-gray-400">— {h.COMMENT}</span>
                                 )}
                               </div>
                             </div>
@@ -764,22 +764,34 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                         'Prêt pour retour': 'pret_retour', 'Pret pour retour': 'pret_retour',
                         'Pas de réponse': 'pas_rep_lv', 'Pas de reponse': 'pas_rep_lv',
                         'Injoignable': 'injoignable',
+                        'Mise en distribution': 'expedier',
+                        'Attente De Ramassage': 'att_ramassage', 'Attente de ramassage': 'att_ramassage',
+                        'Reporté': 'reporte', 'Reporte': 'reporte',
                       };
                       for (let i = 0; i < validatedOrders.length; i++) {
                         const o = validatedOrders[i];
                         const tn = o.ozoneTracking || o.trackingNumber || o.id;
                         setOzoneSyncState(p => ({ ...p, message: `${i + 1}/${validatedOrders.length}: ${tn}` }));
                         try {
-                          const body = new FormData();
-                          body.append('tracking-number', tn);
-                          const res = await fetch(`${base}/parcel-info`, { method: 'POST', body });
-                          if (!res.ok) continue;
-                          const json = await res.json();
-                          const parcel = json['PARCEL-INFO'] || json;
+                          const trackBody = new FormData();
+                          trackBody.append('tracking-number', tn);
+                          const infoBody = new FormData();
+                          infoBody.append('tracking-number', tn);
+                          const [trackRes, infoRes] = await Promise.all([
+                            fetch(`${base}/tracking`, { method: 'POST', body: trackBody }),
+                            fetch(`${base}/parcel-info`, { method: 'POST', body: infoBody }),
+                          ]);
+                          const trackJson = trackRes.ok ? await trackRes.json() : null;
+                          const infoJson = infoRes.ok ? await infoRes.json() : null;
+                          const track = trackJson?.['TRACKING'] || trackJson || {};
+                          const parcel = infoJson?.['PARCEL-INFO'] || infoJson || {};
+                          const parcelInfos = parcel['INFOS'] || parcel;
                           const result = (parcel['RESULT'] || '').toUpperCase();
-                          if (result === 'ERROR') continue;
-                          const ozStatus = parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || '';
-                          const ozTracking = parcel['TRACKING-NUMBER'] || parcel['TRACKING'] || tn;
+                          const trackResult = (track['RESULT'] || '').toUpperCase();
+                          if (result === 'ERROR' && trackResult === 'ERROR') continue;
+                          const lastTrack = track['LAST_TRACKING'] || track['LAST-TRACKING'] || {};
+                          const ozStatus = lastTrack['STATUT'] || lastTrack['STATUS'] || parcelInfos['PARCEL-STATUS'] || '';
+                          const ozTracking = parcelInfos['TRACKING-NUMBER'] || track['TRACKING-NUMBER'] || tn;
                           const mapped = statusMap[ozStatus] || statusMap[ozStatus.trim()];
                           if (mapped && mapped !== o.status) {
                             setOrders(prev => prev.map(ord =>

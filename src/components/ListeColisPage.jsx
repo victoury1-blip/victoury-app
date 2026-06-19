@@ -449,13 +449,15 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
             }
             return '';
           };
-          const ozStatus = pick('PARCEL-STATUS','STATUS','LAST-STATUS','STATUT','ETAT','last_status');
-          const histArr = track['PARCEL-HISTORY'] || track['history'] || track['HISTORY'] || track['EVENTS'] || track['events'] || parcel['PARCEL-HISTORY'] || [];
-          const histList = Array.isArray(histArr) ? histArr : [];
+          const parcelInfos = parcel['INFOS'] || parcel;
+          const lastTrack = track['LAST_TRACKING'] || track['LAST-TRACKING'] || {};
+          const ozStatus = lastTrack['STATUT'] || lastTrack['STATUS'] || parcelInfos['PARCEL-STATUS'] || parcelInfos['STATUS'] || track['STATUT'] || '';
+          const histRaw = track['HISTORY'] || track['PARCEL-HISTORY'] || track['history'] || {};
+          const histList = Array.isArray(histRaw) ? histRaw : Object.values(histRaw);
 
           if (!ozStatus && histList.length === 0) continue;
 
-          const realTn = pick('TRACKING-NUMBER','TRACKING','tracking_number') || tn;
+          const realTn = parcelInfos['TRACKING-NUMBER'] || track['TRACKING-NUMBER'] || tn;
           if (realTn && realTn !== order.ozoneTracking) {
             onSave(order.id, order.status, '', realTn);
           }
@@ -463,10 +465,10 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
           setOzoneData({
             tracking: realTn,
             status: ozStatus,
-            receiver: pick('RECIPIENT-NAME','PARCEL-RECEIVER','RECEIVER','RECEIVER-NAME','NOM','DESTINATAIRE'),
-            phone: pick('RECIPIENT-PHONE','PARCEL-PHONE','PHONE','TELEPHONE'),
-            city: pick('RECIPIENT-CITY','CITY_NAME','CITY','VILLE'),
-            cod: pick('COD','PRIX','PRICE','MONTANT'),
+            receiver: parcelInfos['RECEIVER'] || parcelInfos['RECIPIENT-NAME'] || '',
+            phone: parcelInfos['PHONE'] || parcelInfos['RECIPIENT-PHONE'] || '',
+            city: parcelInfos['CITY_NAME'] || parcelInfos['CITY'] || '',
+            cod: parcelInfos['PRICE'] || parcelInfos['COD'] || '',
             history: histList,
           });
           setOzoneState('ok');
@@ -571,8 +573,9 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                           <div key={i} className="relative">
                             <span className="absolute -left-[7px] w-2 h-2 rounded-full border border-white"
                               style={{ backgroundColor: i === 0 ? '#f59e0b' : '#d1d5db' }} />
-                            <p className="text-[11px] font-semibold text-gray-700 pl-1">{h['STATUS'] || h['LABEL'] || h['status'] || h['label'] || JSON.stringify(h)}</p>
-                            {(h['DATE'] || h['date']) && <p className="text-[10px] text-gray-400 pl-1">{h['DATE'] || h['date']}</p>}
+                            <p className="text-[11px] font-semibold text-gray-700 pl-1">{h['STATUT'] || h['STATUS'] || h['status'] || ''}</p>
+                            {(h['TIME_STR'] || h['DATE'] || h['date']) && <p className="text-[10px] text-gray-400 pl-1">{h['TIME_STR'] || h['DATE'] || h['date']}</p>}
+                            {h['COMMENT'] && <p className="text-[10px] text-gray-400 pl-1">{h['COMMENT']}</p>}
                           </div>
                         ))}
                       </div>
