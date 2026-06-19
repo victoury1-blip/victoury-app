@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import Pagination, { paginate } from './Pagination';
 import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { openLabelPage } from './LabelPrint';
@@ -844,6 +845,8 @@ const isCasa = (city) => {
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
   const [search, setSearch] = useState('');
+  const [pgPage, setPgPage] = useState(1);
+  const [pgPer, setPgPer] = useState(10);
   const [filterOpen, setFilterOpen] = useState(false);
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
@@ -951,6 +954,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       return true;
     });
   }, [orders, search, appliedFilter]);
+
+  const pagedColis = useMemo(() => paginate(colis, pgPage, pgPer), [colis, pgPage, pgPer]);
+  const safePage = Math.min(pgPage, Math.max(1, Math.ceil(colis.length / pgPer)));
+  if (safePage !== pgPage && colis.length > 0) setPgPage(safePage);
 
   function getTs() {
     let tz; try { const raw = localStorage.getItem('system_timezone'); tz = raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
@@ -1190,7 +1197,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           <tbody className="divide-y divide-gray-50">
             {colis.length === 0 ? (
               <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">Aucun colis dans le pipeline</td></tr>
-            ) : colis.map((o) => {
+            ) : pagedColis.map((o) => {
               const note = (o.note || '').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
               return (
@@ -1332,12 +1339,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         </table>
       </div>
 
-      {/* Footer */}
       {tab === 'colis' && (
-        <div className="bg-white border-t border-gray-200 px-6 py-2 text-xs text-gray-500 flex justify-between">
-          <span>{colis.length} colis affichés</span>
-          <span>Total: {orders.length} commandes</span>
-        </div>
+        <Pagination total={colis.length} page={pgPage} perPage={pgPer} onPageChange={setPgPage} onPerPageChange={setPgPer} />
       )}
 
       {editOrder && (

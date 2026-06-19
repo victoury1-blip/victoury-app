@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
+import Pagination, { paginate } from './Pagination';
 import {
   Search,
   Filter,
@@ -362,6 +363,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     setExternalOrders(updater);
   }
   const [search, setSearch] = useState('');
+  const [pgPage, setPgPage] = useState(1);
+  const [pgPer, setPgPer] = useState(10);
   const [selected, setSelected] = useState([]);
   const [editOrder, setEditOrder] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -434,6 +437,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       return true;
     });
   }, [orders, currentStatuses, search, appliedFilter, modifiedIds]);
+
+  const paged = useMemo(() => paginate(filtered, pgPage, pgPer), [filtered, pgPage, pgPer]);
+  const safePage = Math.min(pgPage, Math.max(1, Math.ceil(filtered.length / pgPer)));
+  if (safePage !== pgPage && filtered.length > 0) setPgPage(safePage);
 
   function toggleSelect(id) {
     setSelected((prev) =>
@@ -691,7 +698,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 </td>
               </tr>
             )}
-            {filtered.map((order, idx) => (
+            {paged.map((order, idx) => (
               <tr
                 key={order.id}
                 className={`border-b border-gray-100 transition-colors ${
@@ -839,6 +846,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           </tbody>
         </table>
       </div>
+
+      <Pagination total={filtered.length} page={pgPage} perPage={pgPer} onPageChange={setPgPage} onPerPageChange={setPgPer} />
 
       {/* Footer count */}
       <div className="bg-white border-t border-gray-200 px-6 py-2 flex items-center justify-between text-xs text-gray-500">
