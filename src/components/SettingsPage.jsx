@@ -149,7 +149,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   }
 
   /* ── Timezone state ── */
-  const [timezone, setTimezone] = useState(localStorage.getItem('system_timezone') || 'Africa/Casablanca');
+  const [timezone, setTimezone] = useState(() => { try { const raw = localStorage.getItem('system_timezone'); return raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { return localStorage.getItem('system_timezone') || 'Africa/Casablanca'; } });
   const [tzSaved, setTzSaved] = useState(!!localStorage.getItem('system_timezone'));
 
   function saveTz(tz) {

@@ -54,7 +54,7 @@ async function generateTrackingNumber() {
   return 'VICT' + String(next).padStart(4, '0');
 }
 
-function getSysTz() { return localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
+function getSysTz() { try { const raw = localStorage.getItem('system_timezone'); return raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { return localStorage.getItem('system_timezone') || 'Africa/Casablanca'; } }
 function now() {
   return new Date().toLocaleString('fr-FR', { timeZone: getSysTz(), day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
 }

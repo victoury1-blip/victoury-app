@@ -952,7 +952,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   }, [orders, search, appliedFilter]);
 
   function getTs() {
-    const tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca';
+    let tz; try { const raw = localStorage.getItem('system_timezone'); tz = raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
     return new Date().toLocaleString('fr-FR', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
   }
 
