@@ -103,12 +103,22 @@ function SheetImportSection({ orders = [], setOrders }) {
   const [filterStatus, setFilterStatus] = useState('');
   const [modifiedIds, setModifiedIds] = useState(new Set());
   const fileRef = useRef(null);
+  const [mappingOpen, setMappingOpen] = useState(false);
+  const [pendingData, setPendingData] = useState(null);
+  const [colMap, setColMap] = useState({});
 
   useEffect(() => {
     const stored = localStorage.getItem('gs_import');
-    if (stored) { const p = JSON.parse(stored); setHeaders(p.headers); setRows(p.rows); }
+    if (stored) {
+      const p = JSON.parse(stored);
+      setHeaders(p.headers); setRows(p.rows);
+      if (p.colMap) setColMap(p.colMap);
+    }
     cloudGet('gs_import').then(remote => {
-      if (remote?.headers?.length) { setHeaders(remote.headers); setRows(remote.rows || []); }
+      if (remote?.headers?.length) {
+        setHeaders(remote.headers); setRows(remote.rows || []);
+        if (remote.colMap) setColMap(remote.colMap);
+      }
     });
   }, []);
 
@@ -122,12 +132,22 @@ function SheetImportSection({ orders = [], setOrders }) {
         text = text.split('\n').map(l => l.split('\t').map(c => c.includes(',') ? `"${c}"` : c).join(',')).join('\n');
       }
       const { headers: h, rows: r } = parseCSV(text);
-      if (!h.length) { alert('Fichier non reconnu. Essayez CSV (séparateur: virgule ou point-virgule).'); return; }
-      setHeaders(h); setRows(r);
-      cloudSet('gs_import', { headers: h, rows: r });
+      if (!h.length) { alert('Fichier non reconnu.'); return; }
+      setPendingData({ headers: h, rows: r });
+      setMappingOpen(true);
     };
     reader.readAsText(file, 'UTF-8');
     e.target.value = '';
+  }
+
+  function applyMapping(mapping) {
+    if (!pendingData) return;
+    setColMap(mapping);
+    setHeaders(pendingData.headers);
+    setRows(pendingData.rows);
+    cloudSet('gs_import', { headers: pendingData.headers, rows: pendingData.rows, colMap: mapping });
+    setPendingData(null);
+    setMappingOpen(false);
   }
 
   function updateRow(id, patch) {
@@ -146,7 +166,7 @@ function SheetImportSection({ orders = [], setOrders }) {
     cloudSet('gs_import', { headers: [], rows: [] });
   }
 
-  const productCol = headers.find(h => PRODUCT_KEYS.includes(h.toLowerCase()));
+  const productCol = colMap['product'] || headers.find(h => PRODUCT_KEYS.includes(h.toLowerCase()));
 
   const PHONE_KEYS = ['telephone','téléphone','tel','tél','phone','numero','numéro','mobile','gsm','num'];
   const NAME_KEYS = ['nom','name','destinataire','client','receiver','prenom','prénom'];
@@ -155,16 +175,19 @@ function SheetImportSection({ orders = [], setOrders }) {
   const PRICE_KEYS = ['prix','price','montant','total','cod','amount'];
   const CODE_KEYS = ['code','id','ref','reference','référence','code denvoi','code_denvoi','tracking'];
 
-  const findCol = (keys) => headers.find(h => {
-    const low = h.toLowerCase().replace(/[^a-zàâéèêëïîôùûüç0-9]/g, '');
-    return keys.some(k => low === k || low.includes(k));
-  });
-  const phoneCol = findCol(PHONE_KEYS);
-  const nameCol = findCol(NAME_KEYS);
-  const cityCol = findCol(CITY_KEYS);
-  const addressCol = findCol(ADDRESS_KEYS);
-  const priceCol = findCol(PRICE_KEYS);
-  const codeCol = findCol(CODE_KEYS);
+  const findCol = (field, keys) => {
+    if (colMap[field]) return colMap[field];
+    return headers.find(h => {
+      const low = h.toLowerCase().replace(/[^a-zàâéèêëïîôùûüç0-9]/g, '');
+      return keys.some(k => low === k || low.includes(k));
+    });
+  };
+  const phoneCol = findCol('phone', PHONE_KEYS);
+  const nameCol = findCol('name', NAME_KEYS);
+  const cityCol = findCol('city', CITY_KEYS);
+  const addressCol = findCol('address', ADDRESS_KEYS);
+  const priceCol = findCol('price', PRICE_KEYS);
+  const codeCol = findCol('code', CODE_KEYS);
 
   const normalizePhone = (p) => (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0').slice(-9);
 
@@ -226,24 +249,77 @@ function SheetImportSection({ orders = [], setOrders }) {
     return acc;
   }, {});
 
+  const MAPPING_FIELDS = [
+    { key: 'code',    label: 'Code / ID',    icon: '#' },
+    { key: 'name',    label: 'Nom client',   icon: '👤' },
+    { key: 'phone',   label: 'Téléphone',    icon: '📞' },
+    { key: 'address', label: 'Adresse',      icon: '📍' },
+    { key: 'city',    label: 'Ville',        icon: '🏙️' },
+    { key: 'price',   label: 'Prix',         icon: '💰' },
+    { key: 'product', label: 'Produit',      icon: '📦' },
+  ];
+
+  const mappingModal = mappingOpen && pendingData && (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-green-50">
+          <h3 className="font-bold text-green-800 text-sm">Mapping des colonnes</h3>
+          <p className="text-xs text-green-600 mt-0.5">Associez chaque champ à la bonne colonne du CSV</p>
+        </div>
+        <div className="p-4 space-y-2.5">
+          <div className="bg-gray-50 rounded-lg p-2 text-[10px] text-gray-500 mb-2">
+            Aperçu: <span className="font-mono font-semibold">{pendingData.headers.join(' | ')}</span>
+          </div>
+          {MAPPING_FIELDS.map(f => (
+            <div key={f.key} className="flex items-center gap-3">
+              <span className="w-24 text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                <span>{f.icon}</span> {f.label}
+              </span>
+              <select
+                value={colMap[f.key] || ''}
+                onChange={e => setColMap(p => ({ ...p, [f.key]: e.target.value || undefined }))}
+                className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-300"
+              >
+                <option value="">— Auto —</option>
+                {pendingData.headers.map(h => (
+                  <option key={h} value={h}>{h}{pendingData.rows[0] ? ` (ex: ${String(pendingData.rows[0][h] || '').slice(0, 20)})` : ''}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+          <button onClick={() => { setMappingOpen(false); setPendingData(null); }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Annuler</button>
+          <button onClick={() => applyMapping(colMap)}
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700">Confirmer</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (!headers.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-        <FileSpreadsheet size={48} className="text-green-400 mb-4" />
-        <p className="text-gray-600 font-semibold text-lg mb-2">Importer depuis Google Sheets</p>
-        <p className="text-gray-400 text-sm mb-6">Exportez votre feuille en CSV puis importez-la ici</p>
-        <button onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
-          <Upload size={15} /> Importer fichier CSV
-        </button>
-        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
-        <p className="text-gray-400 text-xs mt-4">Dans Google Sheets : Fichier → Télécharger → CSV</p>
-      </div>
+      <>
+        {mappingModal}
+        <div className="flex flex-col items-center justify-center h-full py-20 text-center">
+          <FileSpreadsheet size={48} className="text-green-400 mb-4" />
+          <p className="text-gray-600 font-semibold text-lg mb-2">Importer depuis Google Sheets</p>
+          <p className="text-gray-400 text-sm mb-6">Exportez votre feuille en CSV puis importez-la ici</p>
+          <button onClick={() => fileRef.current?.click()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+            <Upload size={15} /> Importer fichier CSV
+          </button>
+          <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
+          <p className="text-gray-400 text-xs mt-4">Dans Google Sheets : Fichier → Télécharger → CSV</p>
+        </div>
+      </>
     );
   }
 
   return (
     <div className="flex flex-col h-full">
+      {mappingModal}
       {/* Subheader */}
       <div className="bg-white border-b px-4 py-2 flex flex-wrap items-center gap-2">
         <div className="flex gap-1.5 flex-wrap">
