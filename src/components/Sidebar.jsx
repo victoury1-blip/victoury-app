@@ -31,7 +31,15 @@ const NAV_ITEMS = [
       { path: '/ramassage/bons',    label: 'Bon' },
     ],
   },
-  { path: '/retour',      label: 'Retour',          icon: RotateCcw },
+  {
+    path: '/retour',
+    label: 'Retour',
+    icon: RotateCcw,
+    children: [
+      { path: '/retour/scanner', label: 'Scanner' },
+      { path: '/retour/bons',    label: 'Liste des Bons' },
+    ],
+  },
   { path: '/factures',    label: 'Factures',        icon: FileText },
   { path: '/profit',      label: 'Profit',          icon: TrendingUp },
   { path: '/etats',       label: 'États',           icon: BarChart2 },
@@ -41,7 +49,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ orders = [] }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [openMenus, setOpenMenus] = useState({ '/commandes': true, '/ramassage': true });
+  const [openMenus, setOpenMenus] = useState({ '/commandes': true, '/ramassage': true, '/retour': true });
   const navigate = useNavigate();
   const location = useLocation();
 

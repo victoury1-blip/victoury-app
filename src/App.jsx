@@ -11,6 +11,7 @@ import StockPage from './components/StockPage';
 import FacturesPage from './components/FacturesPage';
 import ProfitPage from './components/ProfitPage';
 import RamassagePage from './components/RamassagePage';
+import RetourPage from './components/RetourPage';
 import LoginPage from './components/LoginPage';
 import { supabase } from './lib/supabase';
 import { cloudGet } from './lib/cloudSettings';
@@ -368,7 +369,10 @@ export default function App() {
           <Route path="/ramassage/scanner" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/ramassage/bons" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/ramassage/bon/:bonId" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
-          <Route path="/retour" element={<UnderConstruction />} />
+          <Route path="/retour" element={<Navigate to="/retour/scanner" replace />} />
+          <Route path="/retour/scanner" element={<RetourPage orders={orders} setOrders={setOrdersWithSync} />} />
+          <Route path="/retour/bons" element={<RetourPage orders={orders} setOrders={setOrdersWithSync} />} />
+          <Route path="/retour/bon/:bonId" element={<RetourPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/factures" element={<FacturesPage orders={orders} />} />
           <Route path="/profit" element={<ProfitPage orders={orders} />} />
           <Route path="/etats" element={<EtatsPage />} />
