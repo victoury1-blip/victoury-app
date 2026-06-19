@@ -89,6 +89,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   function saveNotifCfg(cfg) {
     setNotifCfg(cfg);
     localStorage.setItem('notification_sound', JSON.stringify(cfg));
+    cloudSet('notification_sound', cfg);
   }
 
   function playTestSound(cfg) {
@@ -148,6 +149,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
   function saveTz(tz) {
     localStorage.setItem('system_timezone', tz);
+    cloudSet('system_timezone', tz);
     setTimezone(tz);
     setTzSaved(true);
   }
@@ -197,6 +199,12 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         setAppCfg(data.value);
         localStorage.setItem('victoury_app_config', JSON.stringify(data.value));
       }
+    });
+    cloudGet('notification_sound').then(saved => {
+      if (saved && typeof saved === 'object') { setNotifCfg(saved); localStorage.setItem('notification_sound', JSON.stringify(saved)); }
+    });
+    cloudGet('system_timezone').then(saved => {
+      if (saved) { setTimezone(saved); localStorage.setItem('system_timezone', saved); setTzSaved(true); }
     });
     supabase.from('settings').select('value').eq('key', 'victoury_shop_config').single().then(({ data }) => {
       if (data?.value && Object.keys(data.value).length > 0) {
