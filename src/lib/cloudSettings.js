@@ -47,9 +47,9 @@ export async function cloudGet(key) {
 
 export async function cloudSet(key, value) {
   try {
-    const { error } = await supabase.from('settings').upsert(
-      { key, value, updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
+    await supabase.from('settings').delete().eq('key', key);
+    const { error } = await supabase.from('settings').insert(
+      { key, value, user_id: null, updated_at: new Date().toISOString() }
     );
     if (error) throw error;
   } catch (e) {

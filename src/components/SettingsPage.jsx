@@ -122,10 +122,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   function saveAppCfg(cfg) {
     setAppCfg(cfg);
     localStorage.setItem('victoury_app_config', JSON.stringify(cfg));
-    // Delete all old rows first, then insert fresh
-    supabase.from('settings').delete().eq('key', 'victoury_app_config').then(() => {
-      supabase.from('settings').insert({ key: 'victoury_app_config', value: cfg, updated_at: new Date().toISOString() }).then(() => {});
-    });
+    cloudSet('victoury_app_config', cfg);
     setAppSaved(true);
     setTimeout(() => setAppSaved(false), 2000);
   }
@@ -139,11 +136,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   function saveShopCfg(cfg) {
     setShopCfg(cfg);
     localStorage.setItem('victoury_shop_config', JSON.stringify(cfg));
-    supabase.from('settings').delete().eq('key', 'victoury_shop_config').then(() => {
-      supabase.from('settings').insert({ key: 'victoury_shop_config', value: cfg, updated_at: new Date().toISOString() }).then(({ error }) => {
-        if (error) console.error('shop config save error:', error);
-      });
-    });
+    cloudSet('victoury_shop_config', cfg);
     setShopSaved(true);
     setTimeout(() => setShopSaved(false), 2000);
   }
@@ -199,11 +192,8 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     cloudGet('auzone_config').then(saved => {
       if (saved?.apiKey) setAuzone(p => ({ ...p, customerId: saved.customerId || '', apiKey: saved.apiKey, saved: true }));
     });
-    supabase.from('settings').select('value').eq('key', 'victoury_app_config').order('updated_at', { ascending: false }).limit(1).maybeSingle().then(({ data }) => {
-      if (data?.value && Object.keys(data.value).length > 0) {
-        setAppCfg(data.value);
-        localStorage.setItem('victoury_app_config', JSON.stringify(data.value));
-      }
+    cloudGet('victoury_app_config').then(saved => {
+      if (saved && Object.keys(saved).length > 0) setAppCfg(saved);
     });
     cloudGet('notification_sound').then(saved => {
       if (saved && typeof saved === 'object') { setNotifCfg(saved); localStorage.setItem('notification_sound', JSON.stringify(saved)); }
@@ -211,11 +201,8 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     cloudGet('system_timezone').then(saved => {
       if (saved) { setTimezone(saved); localStorage.setItem('system_timezone', saved); setTzSaved(true); }
     });
-    supabase.from('settings').select('value').eq('key', 'victoury_shop_config').order('updated_at', { ascending: false }).limit(1).maybeSingle().then(({ data }) => {
-      if (data?.value && Object.keys(data.value).length > 0) {
-        setShopCfg(data.value);
-        localStorage.setItem('victoury_shop_config', JSON.stringify(data.value));
-      }
+    cloudGet('victoury_shop_config').then(saved => {
+      if (saved && Object.keys(saved).length > 0) setShopCfg(saved);
     });
   }, []);
 
