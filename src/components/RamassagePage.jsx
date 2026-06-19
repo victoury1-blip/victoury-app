@@ -237,16 +237,8 @@ function ScannerPage({ orders, setOrders }) {
               </button>
             </div>
             <div className="p-4">
-              <div className="relative rounded-lg overflow-hidden bg-black">
+              <div className="rounded-lg overflow-hidden bg-black">
                 <video ref={videoRef} className="w-full aspect-[3/4] object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-48 h-48 relative">
-                    <div className="absolute top-0 left-0 w-8 h-8 border-t-3 border-l-3 border-white rounded-tl-lg" style={{borderWidth: '3px'}} />
-                    <div className="absolute top-0 right-0 w-8 h-8 border-t-3 border-r-3 border-white rounded-tr-lg" style={{borderWidth: '3px'}} />
-                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-3 border-l-3 border-white rounded-bl-lg" style={{borderWidth: '3px'}} />
-                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-3 border-r-3 border-white rounded-br-lg" style={{borderWidth: '3px'}} />
-                  </div>
-                </div>
               </div>
               <button
                 onClick={stopScanner}
