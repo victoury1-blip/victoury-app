@@ -931,8 +931,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   </td>
 
                   {/* Note */}
-                  <td className="px-4 py-3 max-w-[180px]">
-                    {note && <span className="text-xs text-gray-600 line-clamp-2">Note interne: {note}</span>}
+                  <td className="px-4 py-3 max-w-[250px]">
+                    {note && <span className="text-sm text-gray-700 font-medium whitespace-pre-wrap">Note interne:<br/>{note}</span>}
                   </td>
 
                   {/* LIV */}
