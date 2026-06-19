@@ -58,11 +58,11 @@ function LabelContent({ order, config }) {
   const date = order.dateAdded?.split(' ')[0] || new Date().toLocaleDateString('fr-MA');
 
   return (
-    <div className="label-page" style={{ width: '100mm', minHeight: '140mm', border: '2px solid #000', fontFamily: 'Arial, sans-serif', padding: 0, margin: '0 auto', background: '#fff', pageBreakAfter: 'always' }}>
+    <div className="label-page" style={{ width: '100mm', minHeight: '100mm', border: '2px solid #000', fontFamily: 'Arial, sans-serif', padding: 0, margin: '0 auto', background: '#fff', pageBreakAfter: 'always' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '2px solid #000' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {config.logo && <img src={config.logo} alt="" style={{ height: '28px', objectFit: 'contain' }} />}
+          {config.logo && <img src={config.logo} alt="" style={{ height: '50px', objectFit: 'contain' }} />}
           <span style={{ fontWeight: 900, fontSize: '22px', letterSpacing: '1px' }}>{shopName}</span>
         </div>
         {shopPhone && <span style={{ fontSize: '13px', color: '#333' }}>Sav: {shopPhone}</span>}
@@ -126,7 +126,7 @@ export default function LabelPrint({ orders, onClose }) {
     printWindow.document.write(`
       <html><head><title>Étiquettes</title>
       <style>
-        @page { size: 100mm auto; margin: 0; }
+        @page { size: 100mm 100mm; margin: 0; }
         body { margin: 0; padding: 0; }
         .label-page { page-break-after: always; }
         .label-page:last-child { page-break-after: avoid; }
