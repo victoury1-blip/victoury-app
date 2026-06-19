@@ -442,6 +442,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     if (prev && prev.status !== updated.status) {
       recordHistory(updated.id, updated.status, currentUser);
     }
+    if (!updated.trackingNumber) {
+      updated.trackingNumber = generateTrackingNumber();
+    }
     setModifiedIds(prev => new Set([...prev, updated.id]));
     setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
     setModalOpen(false);
