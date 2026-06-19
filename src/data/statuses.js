@@ -58,6 +58,7 @@ export function loadStatuses() {
 
 export function saveStatuses(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  import('../lib/cloudSettings').then(({ cloudSet }) => cloudSet(STORAGE_KEY, list));
 }
 
 /** Get live status config (from localStorage if saved, else fallback to ALL_STATUSES) */

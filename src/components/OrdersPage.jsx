@@ -43,7 +43,11 @@ async function generateVictId() {
   return 'VICT' + String(next).padStart(4, '0');
 }
 
-function generateTrackingNumber() {
+async function generateTrackingNumber() {
+  try {
+    const { data, error } = await supabase.rpc('next_vict_id');
+    if (!error && data) return data;
+  } catch {}
   const last = parseInt(localStorage.getItem('tracking_counter') || '0', 10);
   const next = last + 1;
   localStorage.setItem('tracking_counter', String(next));
