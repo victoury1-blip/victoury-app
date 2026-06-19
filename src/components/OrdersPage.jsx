@@ -315,8 +315,8 @@ function StatusChangeModal({ order, onClose, onSave }) {
   const [newStatus, setNewStatus] = useState(order.status);
   const [note, setNote] = useState('');
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
-      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-800">Modifier le statut de la commande</h3>
           <button type="button" onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
@@ -327,7 +327,7 @@ function StatusChangeModal({ order, onClose, onSave }) {
             <select
               value={newStatus}
               onChange={e => setNewStatus(e.target.value)}
-              className="w-full px-4 py-3 bg-[#2d2d3a] text-white rounded-lg text-sm font-semibold border border-[#3f3f52] focus:outline-none"
+              className="w-full px-4 py-3 bg-white text-gray-800 rounded-lg text-sm font-semibold border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
               {sorted.map(s => (
                 <option key={s.value} value={s.value}>{s.label}</option>

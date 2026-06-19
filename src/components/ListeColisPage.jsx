@@ -523,7 +523,7 @@ function StatusPicker({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-[#2d2d3a] border border-[#3f3f52] rounded-lg text-white text-sm font-semibold hover:bg-[#38384a] transition-colors"
+        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-800 text-sm font-semibold hover:bg-gray-50 transition-colors"
       >
         <span>{current?.label || value}</span>
         <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -531,13 +531,13 @@ function StatusPicker({ value, onChange }) {
 
       {/* Dropdown list */}
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#2d2d3a] border border-[#3f3f52] rounded-lg shadow-2xl overflow-y-auto max-h-56">
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-2xl overflow-y-auto max-h-56">
           {sorted.map(s => (
             <button
               key={s.value} type="button"
               onClick={() => { onChange(s.value); setOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors
-                ${s.value === value ? 'bg-[#3a3a50] text-white' : 'text-gray-200 hover:bg-[#38384a]'}`}
+                ${s.value === value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
             >
               <span className="w-4 flex-shrink-0">{s.value === value && <Check size={13} />}</span>
               <span>{s.label}</span>
@@ -555,8 +555,8 @@ function StatusModal({ order, onClose, onSave }) {
   const [note, setNote] = useState('');
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-800">Modifier le statut de la commande</h3>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
