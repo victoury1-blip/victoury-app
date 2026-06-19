@@ -379,7 +379,7 @@ export default function App() {
           <Route path="/profit" element={<ProfitPage orders={orders} />} />
           <Route path="/etats" element={<EtatsPage />} />
           <Route path="/livraison" element={<LivraisonPage />} />
-          <Route path="/reglage" element={<SettingsPage onWooOrdersImported={handleWooImport} />} />
+          <Route path="/reglage" element={<SettingsPage onWooOrdersImported={handleWooImport} orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         </div>

@@ -61,9 +61,10 @@ function Modal({ open, onClose, title, icon, iconBg, children }) {
   );
 }
 
-export default function SettingsPage({ onWooOrdersImported }) {
+export default function SettingsPage({ onWooOrdersImported, orders = [], setOrders }) {
   const [openModal, setOpenModal] = useState(null);
   const [syncLogs, setSyncLogs] = useState([]);
+  const [ozoneSyncState, setOzoneSyncState] = useState({ status: 'idle', message: '', count: 0 });
 
   useEffect(() => {
     supabase.from('settings').select('value').eq('key', 'wc_sync_logs').single()
@@ -578,6 +579,93 @@ export default function SettingsPage({ onWooOrdersImported }) {
             </button>
             {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
           </div>
+
+          {/* Sync statuts from Ozone */}
+          {auzone.saved && (
+            <div className="border-t border-orange-200 pt-4 mt-4">
+              <h4 className="text-sm font-bold text-gray-700 mb-2">Synchroniser les statuts Ozone</h4>
+              <p className="text-xs text-gray-500 mb-3">Récupère les statuts de tous les colis validés depuis l'API Ozone Express et met à jour automatiquement.</p>
+              <button
+                onClick={async () => {
+                  if (!auzone.customerId || !auzone.apiKey) return;
+                  setOzoneSyncState({ status: 'loading', message: 'Synchronisation en cours...', count: 0 });
+                  try {
+                    const base = `https://api.ozonexpress.ma/customers/${auzone.customerId}/${auzone.apiKey}`;
+                    const validatedOrders = orders.filter(o => o.validated);
+                    let updated = 0;
+                    const statusMap = {
+                      'En attente de ramassage': 'att_ramassage',
+                      'Ramassé': 'ramasse',
+                      'Ramasse': 'ramasse',
+                      'Expédié': 'expedier',
+                      'Expedie': 'expedier',
+                      'Reçu par le livreur': 'recu_livreur',
+                      'Recu par le livreur': 'recu_livreur',
+                      'Livré': 'livre',
+                      'Livre': 'livre',
+                      'Refusé': 'refuse',
+                      'Refuse': 'refuse',
+                      'Annulé': 'annule',
+                      'Annule': 'annule',
+                      'Échange': 'change',
+                      'Echange': 'change',
+                      'En cours de livraison': 'expedier',
+                      'Prêt pour retour': 'pret_retour',
+                      'Pret pour retour': 'pret_retour',
+                      'Pas de réponse': 'pas_rep_lv',
+                      'Pas de reponse': 'pas_rep_lv',
+                      'Injoignable': 'injoignable',
+                    };
+                    for (let i = 0; i < validatedOrders.length; i++) {
+                      const o = validatedOrders[i];
+                      const tn = o.ozoneTracking || o.trackingNumber || o.id;
+                      setOzoneSyncState(p => ({ ...p, message: `${i + 1}/${validatedOrders.length}: ${tn}` }));
+                      try {
+                        const body = new FormData();
+                        body.append('tracking-number', tn);
+                        const res = await fetch(`${base}/parcel-info`, { method: 'POST', body });
+                        if (!res.ok) continue;
+                        const json = await res.json();
+                        const parcel = json['PARCEL-INFO'] || json;
+                        const result = (parcel['RESULT'] || '').toUpperCase();
+                        if (result === 'ERROR') continue;
+                        const ozStatus = parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || '';
+                        const ozTracking = parcel['TRACKING-NUMBER'] || parcel['TRACKING'] || tn;
+                        const mapped = statusMap[ozStatus] || statusMap[ozStatus.trim()];
+                        if (mapped && mapped !== o.status) {
+                          setOrders(prev => prev.map(ord =>
+                            ord.id === o.id ? { ...ord, status: mapped, ozoneTracking: ozTracking } : ord
+                          ));
+                          updated++;
+                        } else if (!o.ozoneTracking && ozTracking !== tn) {
+                          setOrders(prev => prev.map(ord =>
+                            ord.id === o.id ? { ...ord, ozoneTracking: ozTracking } : ord
+                          ));
+                        }
+                      } catch {}
+                    }
+                    setOzoneSyncState({ status: 'done', message: `${updated} commande(s) mise(s) à jour`, count: updated });
+                  } catch (err) {
+                    setOzoneSyncState({ status: 'error', message: err.message, count: 0 });
+                  }
+                }}
+                disabled={ozoneSyncState.status === 'loading'}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 disabled:opacity-60 transition w-full justify-center"
+              >
+                {ozoneSyncState.status === 'loading' ? (
+                  <><Loader2 size={13} className="animate-spin" /> {ozoneSyncState.message}</>
+                ) : (
+                  <><RefreshCw size={13} /> Sync statuts depuis Ozone</>
+                )}
+              </button>
+              {ozoneSyncState.status === 'done' && (
+                <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><CheckCircle2 size={12} /> {ozoneSyncState.message}</p>
+              )}
+              {ozoneSyncState.status === 'error' && (
+                <p className="text-xs text-red-500 mt-2">{ozoneSyncState.message}</p>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>
