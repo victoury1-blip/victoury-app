@@ -25,6 +25,22 @@ function ScannerPage({ orders, setOrders }) {
     if (data) setBonsEnCours(data);
   }
 
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(1200, ctx.currentTime);
+      osc.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch {}
+  }
+
   function showMessage(text, type = 'success') {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
@@ -47,6 +63,7 @@ function ScannerPage({ orders, setOrders }) {
       time: new Date().toLocaleTimeString('fr-MA'),
       status: 'scanné',
     };
+    playBeep();
     setScanHistory(prev => [entry, ...prev]);
 
     if (order.status !== 'att_ramassage') {
