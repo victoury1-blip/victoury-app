@@ -54,7 +54,7 @@ const NAV_ITEMS = [
 export default function Sidebar({ orders = [] }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openMenus, setOpenMenus] = useState({ '/commandes': true, '/ramassage': true, '/retour': true });
+  const [openMenus, setOpenMenus] = useState({ '/commandes': true });
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermission, isAdmin, currentModerator } = usePermissions();
@@ -107,7 +107,7 @@ export default function Sidebar({ orders = [] }) {
             return (
               <div key={item.path}>
                 <button
-                  onClick={() => { handleNav(item.children[0]?.path || item.path); setOpenMenus(prev => ({ ...prev, [item.path]: !prev[item.path] })); }}
+                  onClick={() => { if (!isMobile) handleNav(item.children[0]?.path || item.path); setOpenMenus(prev => ({ ...prev, [item.path]: !prev[item.path] })); }}
                   className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${isActive(item.path) ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
                 >
                   <Icon size={16} className="shrink-0" />
