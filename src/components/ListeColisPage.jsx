@@ -414,7 +414,16 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
     setHistoryState('loading');
     setHistoryData(null);
     try {
-      const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
+      let cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
+      if (!cfg.customerId || !cfg.apiKey) {
+        try {
+          const remote = await cloudGet('auzone_config');
+          if (remote?.customerId && remote?.apiKey) {
+            cfg = remote;
+            localStorage.setItem('auzone_config', JSON.stringify(remote));
+          }
+        } catch {}
+      }
       if (!cfg.customerId || !cfg.apiKey) { setHistoryState('no_config'); return; }
       const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
       const trackingNumbers = customTn
