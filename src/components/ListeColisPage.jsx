@@ -856,21 +856,16 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />
                   </td>
                   {/* Destinataire */}
-                  <td className="px-4 py-3 min-w-[200px]">
-                    <div className="text-xs text-gray-400 font-mono mb-0.5">{o.id}</div>
-                    <div className="font-semibold text-gray-800 max-w-[200px] truncate">{o.recipient.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5 flex items-start gap-1">
-                      <MapPin size={10} className="mt-0.5 shrink-0" />
-                      <span className="line-clamp-2">{o.recipient.address}</span>
-                    </div>
-                    <div className="font-semibold text-gray-800">{o.recipient.city}</div>
-                    <div className="mt-1 flex items-center gap-1.5">
-                      <PhoneChip phone={o.recipient.phone} />
-                    </div>
+                  <td className="px-4 py-4 min-w-[220px]">
+                    <div className="text-sm font-bold text-orange-600 font-mono mb-1">{o.trackingNumber || o.id}</div>
+                    <div className="text-base font-bold text-gray-900 max-w-[220px] truncate">{o.recipient.name}</div>
+                    <div className="text-sm text-gray-500 mt-0.5">{o.recipient.address}</div>
+                    <div className="text-sm font-bold text-gray-800">{o.recipient.city}</div>
+                    <div className="mt-1.5 font-bold text-sm text-gray-900">{o.recipient.phone}</div>
                     {delivery !== '—' && (
-                      <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                        <Truck size={10} />
-                        <span className="italic">{delivery}</span>
+                      <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
+                        <Truck size={11} />
+                        <span>{delivery}</span>
                       </div>
                     )}
                     {o.trackingNumber && (

@@ -188,7 +188,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
       body.append('parcel-note', form.note);
       body.append('parcel-comment', form.note);
     }
-    body.append('tracking-number', order.id);
+    body.append('tracking-number', order.trackingNumber || order.id);
 
     try {
       const res = await fetch(url, { method: 'POST', body });
