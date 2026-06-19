@@ -407,16 +407,19 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
   const [note, setNote] = useState('');
   const [historyState, setHistoryState] = useState('idle');
   const [historyData, setHistoryData] = useState(null);
+  const [manualTn, setManualTn] = useState('');
   const current = DELIVERY_STATUSES.find(s => s.value === status);
 
-  async function fetchOzoneHistory() {
+  async function fetchOzoneHistory(customTn) {
     setHistoryState('loading');
     setHistoryData(null);
     try {
       const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
       if (!cfg.customerId || !cfg.apiKey) { setHistoryState('no_config'); return; }
       const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
-      const trackingNumbers = [...new Set([ozTn, order.trackingNumber, order.id].filter(Boolean))];
+      const trackingNumbers = customTn
+        ? [customTn]
+        : [...new Set([ozTn, order.trackingNumber, order.id].filter(Boolean))];
 
       let trackingResult = null;
       let parcelResult = null;
@@ -458,14 +461,20 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
         if (trackingResult && parcelResult) break;
       }
 
-      if (!trackingResult && !parcelResult) { setHistoryState('error'); return; }
+      if (!trackingResult && !parcelResult) { setHistoryState('not_found'); return; }
 
       const tracking = trackingResult ? (trackingResult['TRACKING'] || trackingResult) : {};
       const parcel = parcelResult ? (parcelResult['PARCEL-INFO'] || parcelResult) : {};
 
+      const realOzTn = parcel['TRACKING-NUMBER'] || parcel['TRACKING'] || tracking['TRACKING-NUMBER'] || usedTn;
+
+      if (realOzTn && realOzTn !== order.ozoneTracking) {
+        onSave(order.id, order.status, '', realOzTn);
+      }
+
       const histArr = tracking['PARCEL-HISTORY'] || tracking['history'] || tracking['HISTORY'] || tracking['events'] || [];
       const info = {
-        tracking: usedTn,
+        tracking: realOzTn || usedTn,
         receiver: parcel['RECIPIENT-NAME'] || parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || tracking['RECEIVER'] || order.recipient?.name,
         phone: parcel['RECIPIENT-PHONE'] || parcel['PARCEL-PHONE'] || parcel['PHONE'] || order.recipient?.phone,
         city: parcel['RECIPIENT-CITY'] || parcel['CITY_NAME'] || parcel['CITY'] || order.recipient?.city,
@@ -523,11 +532,27 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                   <p className="text-xs text-gray-400 mb-3">Allez dans Réglages → Ozon Express pour ajouter vos identifiants API.</p>
                 </div>
               )}
-              {historyState === 'error' && (
-                <div className="py-6 text-center">
-                  <p className="text-xs text-red-500 mb-2">Colis introuvable sur Ozone Express.</p>
-                  <p className="text-xs text-gray-400 mb-3">Tracking testé: {[ozTn, order.trackingNumber, order.id].filter(Boolean).join(', ')}</p>
-                  <button onClick={fetchOzoneHistory} className="text-xs text-amber-600 underline">Réessayer</button>
+              {(historyState === 'error' || historyState === 'not_found') && (
+                <div className="py-4">
+                  <p className="text-xs text-red-500 mb-1 text-center">Colis introuvable avec: {[ozTn, order.trackingNumber, order.id].filter(Boolean).join(', ')}</p>
+                  <p className="text-xs text-gray-400 mb-3 text-center">Entrez le numéro de suivi Ozone (ex: OZE...)</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={manualTn}
+                      onChange={e => setManualTn(e.target.value)}
+                      placeholder="Numéro Ozone..."
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300"
+                      onKeyDown={e => { if (e.key === 'Enter' && manualTn.trim()) fetchOzoneHistory(manualTn.trim()); }}
+                    />
+                    <button
+                      onClick={() => manualTn.trim() && fetchOzoneHistory(manualTn.trim())}
+                      disabled={!manualTn.trim()}
+                      className="px-3 py-2 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition"
+                    >
+                      Chercher
+                    </button>
+                  </div>
+                  <button onClick={() => fetchOzoneHistory()} className="mt-2 w-full text-xs text-amber-600 underline">Réessayer avec les numéros existants</button>
                 </div>
               )}
               {historyState === 'ok' && historyData && (
@@ -557,7 +582,13 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                       color: '#f59e0b',
                       local: false,
                     }));
-                    const events = apiEvents.length > 0 ? apiEvents : [localEvent];
+                    const ozoneStatusEvent = historyData.status ? [{
+                      label: historyData.status,
+                      date: '',
+                      color: '#f59e0b',
+                      local: false,
+                    }] : [];
+                    const events = apiEvents.length > 0 ? apiEvents : (ozoneStatusEvent.length > 0 ? ozoneStatusEvent : [localEvent]);
                     return (
                       <div className="relative pl-4">
                         <div className="absolute left-1.5 top-0 bottom-0 w-px bg-gray-200" />
@@ -1052,7 +1083,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         <DeliveryStatusModal
           order={deliveryOrder}
           onClose={() => setDeliveryOrder(null)}
-          onSave={(id, status, note) => { handleStatusSave(id, status, note); setDeliveryOrder(null); }}
+          onSave={(id, newStatus, newNote, newOzTn) => {
+            if (newOzTn) {
+              setOrders(prev => prev.map(o => o.id === id ? { ...o, ozoneTracking: newOzTn, ...(newNote !== '' || newStatus !== o.status ? { status: newStatus } : {}) } : o));
+            }
+            if (newNote !== '' || newStatus !== deliveryOrder?.status) {
+              handleStatusSave(id, newStatus, newNote);
+            }
+            if (!newOzTn) setDeliveryOrder(null);
+          }}
         />
       )}
     </div>
