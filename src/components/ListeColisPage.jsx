@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer } from 'lucide-react';
 import OrderModal from './OrderModal';
-import LabelPrint from './LabelPrint';
+import { openLabelPage } from './LabelPrint';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -868,7 +868,6 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [editOrderFull, setEditOrderFull] = useState(null);
   const [deliveryOrder, setDeliveryOrder] = useState(null);
   const [selected, setSelected] = useState([]);
-  const [showLabels, setShowLabels] = useState(false);
 
   /* Manual facture toggles stored in localStorage */
   const [manualFacture, setManualFacture] = useState(() => {
@@ -1056,7 +1055,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           <button onClick={() => {
             const toPrint = selected.length > 0 ? colis.filter(o => selected.includes(o.id)) : colis;
             if (toPrint.length === 0) return;
-            setShowLabels(toPrint);
+            openLabelPage(toPrint);
           }} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer étiquettes">
             <Printer size={14} />
           </button>
@@ -1401,7 +1400,6 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           </div>
         </div>
       )}
-      {showLabels && <LabelPrint orders={showLabels} onClose={() => setShowLabels(false)} />}
     </div>
   );
 }
