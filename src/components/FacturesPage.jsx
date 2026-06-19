@@ -508,12 +508,23 @@ export default function FacturesPage({ orders }) {
     });
 
     (async () => {
+      const livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+      const fraisCache = {};
+      await Promise.all(livreursList.map(async (l) => {
+        const remote = await cloudGet(`frais_${l.id}`);
+        if (Array.isArray(remote) && remote.length) {
+          localStorage.setItem(`frais_${l.id}`, JSON.stringify(remote));
+          fraisCache[l.id] = remote;
+        } else {
+          fraisCache[l.id] = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
+        }
+      }));
+
       let list = [...factures];
       for (const [lv, cols] of Object.entries(byLivreur)) {
         const ref = await nextRef();
         const livres = cols.filter(o => o.status === 'livre');
         const totalLivre = livres.reduce((s, o) => s + (o.price || 0), 0);
-        const fraisCache = {};
         const totalFrais = cols.reduce((s, o) => {
           const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache);
           return s + (auto !== null ? auto : fraisDefault);
