@@ -106,6 +106,7 @@ function SheetImportSection({ orders = [], setOrders }) {
   const [mappingOpen, setMappingOpen] = useState(false);
   const [pendingData, setPendingData] = useState(null);
   const [colMap, setColMap] = useState({});
+  const [importStatus, setImportStatus] = useState('att_ramassage');
 
   useEffect(() => {
     const stored = localStorage.getItem('gs_import');
@@ -210,7 +211,7 @@ function SheetImportSection({ orders = [], setOrders }) {
         product: { name: product, size: '', color: '', qty: 1, stock: 0 },
         products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
         price,
-        status: 'att_ramassage',
+        status: importStatus,
         note: '',
         dateAdded: ts,
         dateUpdated: ts,
@@ -259,6 +260,17 @@ function SheetImportSection({ orders = [], setOrders }) {
     { key: 'product', label: 'Produit',      icon: '📦' },
   ];
 
+  const IMPORT_STATUSES = [
+    { value: 'att_ramassage', label: 'En attente ramassage', color: '#f59e0b' },
+    { value: 'livre',         label: 'Livré',               color: '#16a34a' },
+    { value: 'refuse',        label: 'Refusé',              color: '#ef4444' },
+    { value: 'annule',        label: 'Annulé',              color: '#dc2626' },
+    { value: 'retour',        label: 'Retour',              color: '#7c3aed' },
+    { value: 'expedier',      label: 'Expédié',             color: '#3b82f6' },
+    { value: 'ramasse',       label: 'Ramassé',             color: '#6366f1' },
+  ];
+
+
   const mappingModal = mappingOpen && pendingData && (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
@@ -287,6 +299,20 @@ function SheetImportSection({ orders = [], setOrders }) {
               </select>
             </div>
           ))}
+        </div>
+        <div className="px-4 pb-3">
+          <p className="text-xs font-semibold text-gray-700 mb-1.5">Statut à l'import :</p>
+          <div className="flex flex-wrap gap-1.5">
+            {IMPORT_STATUSES.map(s => (
+              <button key={s.value} onClick={() => setImportStatus(s.value)}
+                className="px-2.5 py-1 rounded-full text-xs font-semibold border transition"
+                style={importStatus === s.value
+                  ? { background: s.color, color: '#fff', borderColor: s.color }
+                  : { background: '#f9fafb', color: s.color, borderColor: s.color + '44' }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
           <button onClick={() => { setMappingOpen(false); setPendingData(null); }}
@@ -806,6 +832,11 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
 
 /* ── Main page ── */
 const COLIS_PIPELINE = ['ramasse','att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi'];
+const isCasa = (city) => {
+  if (!city) return false;
+  const c = city.toLowerCase().replace(/[\s\-]/g, '');
+  return ['casa','casablanca','كازا','كازابلانكا','الدارالبيضاء','الدار البيضاء','dar el beida','darelbeida'].some(k => c.includes(k.replace(/[\s\-]/g, '')));
+};
 
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
@@ -1098,7 +1129,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
               const note = (o.note || '').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
               return (
-                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : 'hover:bg-gray-50 border-l-[3px] border-transparent'}`}>
+                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60' : 'hover:bg-gray-50 border-l-[3px] border-transparent'}`}>
                   {/* Checkbox */}
                   <td className="px-4 py-3 w-8">
                     <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />

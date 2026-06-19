@@ -383,6 +383,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
   const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);
 
+  const isCasa = (city) => {
+    if (!city) return false;
+    const c = city.toLowerCase().replace(/[\s\-]/g, '');
+    return ['casa','casablanca','كازا','كازابلانكا','الدارالبيضاء','الدار البيضاء','dar el beida','darelbeida'].some(k => c.includes(k.replace(/[\s\-]/g, '')));
+  };
+
   const filtered = useMemo(() => {
     const af = appliedFilter;
     return orders.filter((o) => {
@@ -659,7 +665,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 className={`border-b border-gray-100 transition-colors ${
                   selected.includes(order.id)
                     ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
-                    : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-blue-50/30 border-l-[3px] border-transparent`
+                    : isCasa(order.recipient?.city)
+                      ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60'
+                      : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-blue-50/30 border-l-[3px] border-transparent`
                 }`}
               >
                 {/* Checkbox */}
@@ -872,10 +880,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       {newOrderOpen && (
         <NewOrderModal
           onClose={() => setNewOrderOpen(false)}
-          onSave={(order) => {
-            setOrders((prev) => [order, ...prev]);
+          onSave={(ordersList) => {
+            setOrders((prev) => [...ordersList, ...prev]);
             setNewOrderOpen(false);
-            addToast('success', `Commande ${order.id} créée`, order.recipient.name);
+            addToast('success', `${ordersList.length} commande(s) créée(s)`, ordersList[0]?.recipient.name);
           }}
         />
       )}
@@ -891,9 +899,12 @@ function NewOrderModal({ onClose, onSave }) {
   const icSm = 'border border-gray-200 rounded-md px-1.5 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white';
   const lc = 'block text-xs font-semibold text-gray-600 mb-1';
   const stockProducts = loadProducts();
+  const { statuses } = useStatuses();
   const [form, setForm] = useState({
     nom: '', telephone: '', ville: '', adresse: '', prix: '',
     products: [{ name: '', size: '', qty: 1 }],
+    status: 'nouveau',
+    qty: 1,
   });
   function u(k, v) { setForm((p) => ({ ...p, [k]: v })); }
   function updateProduct(idx, field, value) {
@@ -908,21 +919,26 @@ function NewOrderModal({ onClose, onSave }) {
 
   async function handleSave() {
     if (!form.nom || !form.telephone || !form.prix) return;
-    const id = await generateVictId();
+    const count = Math.max(1, Math.min(form.qty || 1, 500));
     const t = now();
     const firstProd = form.products[0] || {};
-    onSave({
-      id,
-      recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: null },
-      product: { name: firstProd.name, size: firstProd.size, qty: firstProd.qty || 1, stock: 0 },
-      products: form.products,
-      price: parseFloat(form.prix) || 0,
-      status: 'nouveau',
-      note: '',
-      dateAdded: t,
-      dateUpdated: t,
-      validated: false,
-    });
+    const createdOrders = [];
+    for (let i = 0; i < count; i++) {
+      const id = await generateVictId();
+      createdOrders.push({
+        id,
+        recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: null },
+        product: { name: firstProd.name, size: firstProd.size, qty: firstProd.qty || 1, stock: 0 },
+        products: form.products,
+        price: parseFloat(form.prix) || 0,
+        status: form.status || 'nouveau',
+        note: '',
+        dateAdded: t,
+        dateUpdated: t,
+        validated: false,
+      });
+    }
+    onSave(createdOrders);
   }
 
   return (
@@ -998,16 +1014,26 @@ function NewOrderModal({ onClose, onSave }) {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lc}>Prix total (DH) <span className="text-red-500">*</span></label>
+            <input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={ic} /></div>
+            <div><label className={lc}>Nombre de commandes</label>
+            <input type="number" min={1} max={500} value={form.qty} onChange={(e) => u('qty', Math.max(1, Number(e.target.value)))} className={ic} /></div>
+          </div>
           <div>
-            <label className={lc}>Prix total (DH) <span className="text-red-500">*</span></label>
-            <input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={ic} />
+            <label className={lc}>Statut</label>
+            <select value={form.status} onChange={(e) => u('status', e.target.value)} className={ic}>
+              {statuses.filter(s => s.showInCommandes !== false).map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-5">
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700">Annuler</button>
           <button onClick={handleSave} disabled={!form.nom || !form.telephone || !form.prix}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
-            Créer la commande
+            {form.qty > 1 ? `Créer ${form.qty} commandes` : 'Créer la commande'}
           </button>
         </div>
       </div>
