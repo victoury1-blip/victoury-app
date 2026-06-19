@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { X, Printer } from 'lucide-react';
-import { cloudGet } from '../lib/cloudSettings';
+import { supabase } from '../lib/supabase';
 
 function getShopConfig() {
   try { return JSON.parse(localStorage.getItem('victoury_shop_config') || '{}'); } catch { return {}; }
@@ -126,10 +126,10 @@ export default function LabelPrint({ orders, onClose }) {
   const printRef = useRef(null);
 
   useEffect(() => {
-    cloudGet('victoury_shop_config').then(saved => {
-      if (saved && Object.keys(saved).length > 0) {
-        setConfig(saved);
-        localStorage.setItem('victoury_shop_config', JSON.stringify(saved));
+    supabase.from('settings').select('value').eq('key', 'victoury_shop_config').single().then(({ data }) => {
+      if (data?.value && Object.keys(data.value).length > 0) {
+        setConfig(data.value);
+        localStorage.setItem('victoury_shop_config', JSON.stringify(data.value));
       }
     });
   }, []);
