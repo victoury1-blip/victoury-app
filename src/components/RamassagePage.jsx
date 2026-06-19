@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, Search, CheckCircle, Package, List, Clock, Trash2, X } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { supabase } from '../lib/supabase';
 
 function ScannerPage({ orders, setOrders }) {
@@ -9,8 +10,8 @@ function ScannerPage({ orders, setOrders }) {
   const [bonsEnCours, setBonsEnCours] = useState([]);
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null);
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  const scannerRef = useRef(null);
+  const scannedIdsRef = useRef(new Set());
 
   useEffect(() => {
     loadBonsEnCours();
@@ -46,56 +47,72 @@ function ScannerPage({ orders, setOrders }) {
     setTimeout(() => setMessage(null), 3000);
   }
 
-  async function handleTraiter() {
-    const input = manualInput.trim();
-    if (!input) return;
+  const processScannedCode = useCallback((code) => {
+    if (scannedIdsRef.current.has(code)) return;
+    scannedIdsRef.current.add(code);
 
-    const order = orders.find(o => o.id === input || o.trackingNumber === input);
-    if (!order) {
-      showMessage('Commande introuvable: ' + input, 'error');
-      return;
-    }
+    const order = orders.find(o => o.id === code || o.trackingNumber === code);
 
     const entry = {
-      id: order.id,
-      recipient: order.recipient?.name || 'Inconnu',
-      city: order.recipient?.city || '',
+      id: code,
+      recipient: order?.recipient?.name || 'Inconnu',
+      city: order?.recipient?.city || '',
       time: new Date().toLocaleTimeString('fr-MA'),
-      status: 'scanné',
+      status: order ? 'scanné' : 'non trouvé',
     };
     playBeep();
     setScanHistory(prev => [entry, ...prev]);
 
-    if (order.status !== 'att_ramassage') {
+    if (order && order.status !== 'att_ramassage') {
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'att_ramassage' } : o));
     }
 
-    showMessage(`Commande ${order.id} ajoutée au ramassage`);
+    showMessage(order ? `Commande ${code} ajoutée au ramassage` : `Code scanné: ${code}`, order ? 'success' : 'error');
+  }, [orders, setOrders]);
+
+  async function handleTraiter() {
+    const input = manualInput.trim();
+    if (!input) return;
+    processScannedCode(input);
     setManualInput('');
   }
 
   async function startScanner() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      streamRef.current = stream;
-      setScanning(true);
-    } catch {
-      showMessage('Impossible d\'accéder à la caméra', 'error');
-    }
+    setScanning(true);
   }
 
   useEffect(() => {
-    if (scanning && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [scanning]);
+    if (!scanning) return;
+    let html5Qr;
+    const timer = setTimeout(async () => {
+      try {
+        html5Qr = new Html5Qrcode('qr-reader');
+        scannerRef.current = html5Qr;
+        await html5Qr.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => processScannedCode(decodedText),
+          () => {}
+        );
+      } catch {
+        showMessage('Impossible d\'accéder à la caméra', 'error');
+        setScanning(false);
+      }
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+      if (html5Qr && html5Qr.isScanning) {
+        html5Qr.stop().catch(() => {});
+      }
+    };
+  }, [scanning, processScannedCode]);
 
   function stopScanner() {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
     }
+    scannedIdsRef.current.clear();
     setScanning(false);
   }
 
@@ -257,9 +274,7 @@ function ScannerPage({ orders, setOrders }) {
               </button>
             </div>
             <div className="p-4">
-              <div className="rounded-lg overflow-hidden bg-black">
-                <video ref={videoRef} className="w-full aspect-[3/4] object-cover" />
-              </div>
+              <div id="qr-reader" className="rounded-lg overflow-hidden" />
               <button
                 onClick={stopScanner}
                 className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium transition"
