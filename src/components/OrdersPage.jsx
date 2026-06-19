@@ -840,13 +840,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
-            const order = orders.find(o => o.id === orderId);
-            const trackNum = order?.trackingNumber || generateTrackingNumber();
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, ...(trackNum ? { trackingNumber: trackNum } : {}) };
+              const trackNum = o.trackingNumber || generateTrackingNumber();
+              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, trackingNumber: trackNum };
             }));
             setStatusDropdown(null);
           }}
