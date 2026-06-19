@@ -65,11 +65,32 @@ function SheetStatusPicker({ value, onChange }) {
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-  const rows = lines.slice(1).map((line, idx) => {
-    const vals = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|^(?=,)|(?<=,)$)/g) || [];
+
+  function splitCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if ((ch === ',' || ch === ';') && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  const headers = splitCSVLine(lines[0]);
+  const rows = lines.slice(1).filter(l => l.trim()).map((line, idx) => {
+    const vals = splitCSVLine(line);
     const obj = { _id: `gs-${Date.now()}-${idx}`, _status: '' };
-    headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g, '').trim(); });
+    headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
     return obj;
   });
   return { headers, rows };
@@ -96,7 +117,12 @@ function SheetImportSection({ orders = [] }) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const { headers: h, rows: r } = parseCSV(ev.target.result);
+      let text = ev.target.result;
+      if (text.includes('\t') && !text.includes(',') && !text.includes(';')) {
+        text = text.split('\n').map(l => l.split('\t').map(c => c.includes(',') ? `"${c}"` : c).join(',')).join('\n');
+      }
+      const { headers: h, rows: r } = parseCSV(text);
+      if (!h.length) { alert('Fichier non reconnu. Essayez CSV (séparateur: virgule ou point-virgule).'); return; }
       setHeaders(h); setRows(r);
       cloudSet('gs_import', { headers: h, rows: r });
     };
@@ -162,7 +188,7 @@ function SheetImportSection({ orders = [] }) {
           className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
           <Upload size={15} /> Importer fichier CSV
         </button>
-        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
         <p className="text-gray-400 text-xs mt-4">Dans Google Sheets : Fichier → Télécharger → CSV</p>
       </div>
     );
@@ -198,7 +224,7 @@ function SheetImportSection({ orders = [] }) {
             <Trash2 size={13} /> Effacer
           </button>
         </div>
-        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
       </div>
 
       {/* Table */}
