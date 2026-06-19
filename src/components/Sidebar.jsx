@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { usePermissions } from '../lib/permissions';
 import {
   LayoutDashboard, ShoppingCart, Package, Archive,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown,
-  ChevronRight, Menu, Settings, FileText, TrendingUp, Shield,
+  ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -53,10 +53,14 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ orders = [] }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [openMenus, setOpenMenus] = useState({ '/commandes': true, '/ramassage': true, '/retour': true });
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermission, isAdmin, currentModerator } = usePermissions();
+
+  // Close mobile sidebar on route change
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
@@ -66,43 +70,55 @@ export default function Sidebar({ orders = [] }) {
     return true;
   });
 
-  return (
-    <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 flex flex-col transition-all duration-200 shrink-0 h-screen`}>
+  function handleNav(path) {
+    navigate(path);
+    setMobileOpen(false);
+  }
+
+  const sidebarContent = (isMobile) => (
+    <>
       {/* Logo */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-        {!collapsed && (() => {
+        {(!collapsed || isMobile) && (() => {
           try {
             const cfg = JSON.parse(localStorage.getItem('victoury_app_config') || '{}');
             if (cfg.appLogo) return <img src={cfg.appLogo} alt="" className="h-12 object-contain" />;
             return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">{cfg.appName || 'VICTOURY'}</span>;
           } catch { return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">VICTOURY</span>; }
         })()}
-        <button onClick={() => setCollapsed(!collapsed)} className="p-1 rounded hover:bg-gray-100 text-gray-500">
-          <Menu size={18} />
-        </button>
+        {isMobile ? (
+          <button onClick={() => setMobileOpen(false)} className="p-1 rounded hover:bg-gray-100 text-gray-500">
+            <X size={20} />
+          </button>
+        ) : (
+          <button onClick={() => setCollapsed(!collapsed)} className="p-1 rounded hover:bg-gray-100 text-gray-500">
+            <Menu size={18} />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-2">
         {visibleItems.map((item) => {
           const Icon = item.icon;
+          const showLabel = isMobile || !collapsed;
 
           if (item.children) {
             return (
               <div key={item.path}>
                 <button
-                  onClick={() => { navigate(item.children[0]?.path || item.path); setOpenMenus(prev => ({ ...prev, [item.path]: !prev[item.path] })); }}
+                  onClick={() => { handleNav(item.children[0]?.path || item.path); setOpenMenus(prev => ({ ...prev, [item.path]: !prev[item.path] })); }}
                   className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${isActive(item.path) ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
                 >
                   <Icon size={16} className="shrink-0" />
-                  {!collapsed && (
+                  {showLabel && (
                     <>
                       <span className="flex-1 text-left">{item.label}</span>
                       {openMenus[item.path] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </>
                   )}
                 </button>
-                {openMenus[item.path] && !collapsed && (
+                {openMenus[item.path] && showLabel && (
                   <div className="pl-8">
                     {item.children.map((child) => {
                       const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);
@@ -114,7 +130,7 @@ export default function Sidebar({ orders = [] }) {
                       return (
                         <button
                           key={child.path}
-                          onClick={() => navigate(child.path)}
+                          onClick={() => handleNav(child.path)}
                           className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors mb-0.5 ${active ? 'bg-blue-600 text-white font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                           <span>{child.label}</span>
@@ -136,22 +152,22 @@ export default function Sidebar({ orders = [] }) {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
               className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${active ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
             >
               <Icon size={16} className="shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {showLabel && <span>{item.label}</span>}
             </button>
           );
         })}
       </nav>
 
       {/* Footer */}
-      <div className={`px-3 py-3 border-t border-gray-100 flex items-center ${collapsed ? 'justify-center' : 'gap-2'}`}>
+      <div className={`px-3 py-3 border-t border-gray-100 flex items-center ${!isMobile && collapsed ? 'justify-center' : 'gap-2'}`}>
         <div className="w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
           {currentModerator?.name?.[0]?.toUpperCase() || 'V'}
         </div>
-        {!collapsed && (
+        {(isMobile || !collapsed) && (
           <div className="flex-1 min-w-0">
             <span className="text-sm text-gray-700 font-medium block truncate">{currentModerator?.name || 'Admin'}</span>
             <button onClick={() => supabase.auth.signOut()} className="text-xs text-red-400 hover:text-red-600 transition">
@@ -160,6 +176,33 @@ export default function Sidebar({ orders = [] }) {
           </div>
         )}
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile: hamburger button fixed top-left */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed top-3 left-3 z-40 p-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 sm:hidden"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Mobile: overlay sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 sm:hidden" onClick={() => setMobileOpen(false)}>
+          <div className="fixed inset-0 bg-black/40" />
+          <aside className="relative w-64 h-full bg-white flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            {sidebarContent(true)}
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop: normal sidebar */}
+      <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 flex-col transition-all duration-200 shrink-0 h-screen hidden sm:flex`}>
+        {sidebarContent(false)}
+      </aside>
+    </>
   );
 }
