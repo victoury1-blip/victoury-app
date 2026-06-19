@@ -5,7 +5,7 @@ import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
   ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
-  Search, ArrowDownCircle,
+  Search, ArrowDownCircle, Tag, Upload,
 } from 'lucide-react';
 
 const TIMEZONES = [
@@ -110,6 +110,19 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
       } catch {}
     }
+  }
+
+  /* ── Shop / Label config state ── */
+  const [shopCfg, setShopCfg] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('victoury_shop_config') || '{}'); } catch { return {}; }
+  });
+  const [shopSaved, setShopSaved] = useState(false);
+
+  function saveShopCfg(cfg) {
+    setShopCfg(cfg);
+    localStorage.setItem('victoury_shop_config', JSON.stringify(cfg));
+    setShopSaved(true);
+    setTimeout(() => setShopSaved(false), 2000);
   }
 
   /* ── Timezone state ── */
@@ -270,6 +283,16 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       cardBg: 'from-teal-50',
       saved: auzone.saved,
       badge: auzone.saved ? { label: 'Prêt', color: 'text-teal-700 bg-teal-50 border-teal-200' } : null,
+    },
+    {
+      id: 'etiquettes',
+      title: 'Étiquettes',
+      desc: 'Personnalisez vos étiquettes de livraison : logo, nom, téléphone SAV et note.',
+      icon: <Tag size={22} className="text-pink-600" />,
+      iconBg: 'bg-pink-100',
+      cardBg: 'from-pink-50',
+      saved: !!shopCfg.shopName,
+      badge: shopCfg.shopName ? { label: shopCfg.shopName, color: 'text-pink-700 bg-pink-50 border-pink-200' } : null,
     },
     {
       id: 'notifications',
@@ -592,6 +615,57 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               <Save size={12} /> Enregistrer
             </button>
             {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Étiquettes Modal ── */}
+      <Modal open={openModal === 'etiquettes'} onClose={() => setOpenModal(null)}
+        title="Configuration étiquettes" icon={<Tag size={18} className="text-pink-600" />}
+        iconBg="bg-gradient-to-r from-pink-50 to-white">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Nom de la boutique</label>
+            <input value={shopCfg.shopName || ''} onChange={e => setShopCfg(p => ({ ...p, shopName: e.target.value }))}
+              placeholder="VICTOURY" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Téléphone SAV</label>
+            <input value={shopCfg.shopPhone || ''} onChange={e => setShopCfg(p => ({ ...p, shopPhone: e.target.value }))}
+              placeholder="06 XX XX XX XX" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Note sur étiquette</label>
+            <textarea value={shopCfg.labelNote || ''} onChange={e => setShopCfg(p => ({ ...p, labelNote: e.target.value }))}
+              placeholder="Ex: Merci pour votre confiance !" rows={2}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 resize-none" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Logo</label>
+            <div className="flex items-center gap-4">
+              {shopCfg.logo && <img src={shopCfg.logo} alt="Logo" className="h-12 object-contain rounded border border-gray-200 p-1" />}
+              <label className="flex items-center gap-2 cursor-pointer border border-dashed border-pink-300 rounded-lg px-3 py-2.5 hover:bg-pink-50 transition">
+                <Upload size={14} className="text-pink-600" />
+                <span className="text-xs text-gray-600">{shopCfg.logo ? 'Changer le logo' : 'Importer un logo...'}</span>
+                <input type="file" accept="image/*" className="hidden" onChange={e => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => setShopCfg(p => ({ ...p, logo: ev.target.result }));
+                  reader.readAsDataURL(file);
+                }} />
+              </label>
+              {shopCfg.logo && (
+                <button onClick={() => setShopCfg(p => ({ ...p, logo: null }))} className="text-xs text-red-500 hover:underline">Supprimer</button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button onClick={() => saveShopCfg(shopCfg)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-pink-600 text-white text-xs font-medium hover:bg-pink-700 transition">
+              <Save size={12} /> Enregistrer
+            </button>
+            {shopSaved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
           </div>
         </div>
       </Modal>
