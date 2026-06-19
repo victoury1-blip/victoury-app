@@ -260,8 +260,8 @@ function HistoryModal({ order, onClose }) {
     { timestamp: order.dateAdded || '—', status: order.status, user: 'Création' }
   ];
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg">
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="font-bold text-gray-900">Historique du commande</h2>

@@ -125,7 +125,7 @@ export default function ProfitPage({ orders = [] }) {
 
       <div className="flex-1 p-6 space-y-6">
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Chiffre d'Affaires" value={ca} icon={ShoppingBag}
             subtitle={`${livres.length} commandes livrées`}
             color={{ border: 'border-blue-500', icon: 'text-blue-500', text: 'text-blue-700', bar: 'bg-blue-500' }} />
@@ -145,7 +145,7 @@ export default function ProfitPage({ orders = [] }) {
           <h2 className="font-bold text-gray-700 mb-4 flex items-center gap-2 text-sm">
             <span className="text-base">⏱</span> Répartition des coûts
           </h2>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-3 h-3 rounded-sm bg-red-500" />

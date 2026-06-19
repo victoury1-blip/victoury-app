@@ -553,8 +553,8 @@ function StatusModal({ order, onClose, onSave }) {
   const [note, setNote] = useState('');
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-800">Modifier le statut de la commande</h3>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
@@ -689,8 +689,8 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <div className="flex items-center gap-2">

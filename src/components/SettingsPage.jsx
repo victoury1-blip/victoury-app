@@ -46,9 +46,9 @@ function InputField({ label, type = 'text', value, onChange, placeholder, show, 
 function Modal({ open, onClose, title, icon, iconBg, children }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 overflow-hidden">
+      <div className="relative bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg z-10 overflow-hidden">
         <div className={`flex items-center gap-3 px-6 py-4 border-b ${iconBg}`}>
           <div className="p-2 rounded-lg bg-white/60">{icon}</div>
           <h2 className="font-bold text-gray-800 text-lg">{title}</h2>
