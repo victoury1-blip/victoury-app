@@ -18,10 +18,8 @@ function getOzoneConfig() {
 
 /* ─── default livreurs ─── */
 const DEFAULT_LIVREURS = [
-  { id: 1, nom: 'Ozon Express', telephone: '', adresse: '', statut: true,  isOzone: true  },
-  { id: 2, nom: 'Mohamed et Younesse', telephone: '', adresse: '', statut: true,  isOzone: false },
-  { id: 3, nom: 'Local',               telephone: '', adresse: 'Local',   statut: true,  isOzone: false },
-  { id: 4, nom: 'blackmandelivery',    telephone: '', adresse: 'Hors Casa', statut: true, isOzone: false },
+  { id: 1, nom: 'Ozon Express',   telephone: '',           adresse: '',            statut: true, isOzone: true  },
+  { id: 2, nom: 'MOHAMED AFKYR',  telephone: '0663372556', adresse: 'CASABLANCA',  statut: true, isOzone: false },
 ];
 
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
@@ -528,7 +526,7 @@ export default function LivraisonPage() {
     });
     /* Pre-cache configs */
     cloudGet('auzone_config').then(remote => { if (remote?.apiKey) save('auzone_config', remote); });
-    [1, 2, 3, 4].forEach(id => {
+    [1, 2].forEach(id => {
       cloudGet(`api_config_${id}`).then(remote => { if (remote) save(`api_config_${id}`, remote); });
     });
   }, []);
