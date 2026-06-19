@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw, Zap } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
@@ -489,6 +489,64 @@ export default function FacturesPage({ orders }) {
   const [filterLivreur, setFilterLivreur] = useState('');
   const [filterStatut, setFilterStatut] = useState('');
   const [notes, setNotes] = useState({});
+  const autoGenRef = useRef(new Set());
+
+  /* ── Auto-create facture when order status changes to eligible ── */
+  useEffect(() => {
+    const already = new Set(factures.flatMap(f => f.colis.map(c => c.orderId)));
+    const pending = orders.filter(o => ELIGIBLE_STATUSES.includes(o.status) && !already.has(o.id) && !autoGenRef.current.has(o.id));
+    if (!pending.length) return;
+
+    pending.forEach(o => autoGenRef.current.add(o.id));
+
+    const fraisDefault = 25;
+    const byLivreur = {};
+    pending.forEach(o => {
+      const lv = o.recipient?.delivery || 'Manuel';
+      if (!byLivreur[lv]) byLivreur[lv] = [];
+      byLivreur[lv].push(o);
+    });
+
+    (async () => {
+      let list = [...factures];
+      for (const [lv, cols] of Object.entries(byLivreur)) {
+        const ref = await nextRef();
+        const livres = cols.filter(o => o.status === 'livre');
+        const totalLivre = livres.reduce((s, o) => s + (o.price || 0), 0);
+        const fraisCache = {};
+        const totalFrais = cols.reduce((s, o) => {
+          const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache);
+          return s + (auto !== null ? auto : fraisDefault);
+        }, 0);
+        const totalNet = totalLivre - totalFrais;
+        list.push({
+          id: ref, ref,
+          dateCreation: nowTs(),
+          datePaiement: null,
+          statut: 'en_attente',
+          livreur: lv,
+          colis: cols.map(o => {
+            const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache);
+            return {
+              orderId: o.id,
+              status: o.status,
+              prix: o.price || 0,
+              fraisLivraison: auto !== null ? auto : fraisDefault,
+              recipient: o.recipient?.name,
+              city: o.recipient?.city,
+              phone: o.recipient?.phone,
+              product: o.product?.name || '',
+              date: o.dateUpdated || o.dateAdded || '',
+            };
+          }),
+          totalLivre, totalFrais, totalNet,
+          locked: false,
+        });
+      }
+      setFactures(list);
+      saveFactures(list);
+    })();
+  }, [orders]);
 
   const livreurs = [...new Set(factures.map(f => f.livreur).filter(Boolean))];
 
