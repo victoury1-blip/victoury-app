@@ -63,8 +63,8 @@ function ScannerPage({ orders, setOrders }) {
     playBeep();
     setScanHistory(prev => [entry, ...prev]);
 
-    if (order && order.status !== 'att_ramassage') {
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'att_ramassage' } : o));
+    if (order && order.status !== 'ramasse') {
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'ramasse' } : o));
     }
 
     showMessage(order ? `Commande ${code} ajoutée au ramassage` : `Code scanné: ${code}`, order ? 'success' : 'error');
