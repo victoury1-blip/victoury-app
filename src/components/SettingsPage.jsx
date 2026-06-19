@@ -626,31 +626,43 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                       setOzoneTrackLoading(true);
                       setOzoneTrackResult(null);
                       const base = `https://api.ozonexpress.ma/customers/${auzone.customerId}/${auzone.apiKey}`;
+                      const tn = ozoneTrackInput.trim();
                       try {
-                        const body = new FormData();
-                        body.append('tracking-number', ozoneTrackInput.trim());
+                        const trackBody = new FormData();
+                        trackBody.append('tracking-number', tn);
+                        const infoBody = new FormData();
+                        infoBody.append('tracking-number', tn);
                         const [trackRes, infoRes] = await Promise.all([
-                          fetch(`${base}/tracking`, { method: 'POST', body }),
-                          fetch(`${base}/parcel-info`, { method: 'POST', body: (() => { const f = new FormData(); f.append('tracking-number', ozoneTrackInput.trim()); return f; })() }),
+                          fetch(`${base}/tracking`, { method: 'POST', body: trackBody }),
+                          fetch(`${base}/parcel-info`, { method: 'POST', body: infoBody }),
                         ]);
                         const trackJson = trackRes.ok ? await trackRes.json() : null;
                         const infoJson = infoRes.ok ? await infoRes.json() : null;
-                        const parcel = infoJson?.['PARCEL-INFO'] || infoJson || {};
-                        const historyData = trackJson?.history || trackJson?.TRACKING || trackJson || {};
-                        const histList = Array.isArray(historyData) ? historyData : (Array.isArray(historyData.history) ? historyData.history : []);
-                        setOzoneTrackResult({
-                          status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || 'Inconnu',
-                          tracking: parcel['TRACKING-NUMBER'] || parcel['TRACKING'] || ozoneTrackInput.trim(),
-                          recipient: parcel['RECIPIENT-NAME'] || parcel['NOM'] || '',
-                          city: parcel['RECIPIENT-CITY'] || parcel['VILLE'] || '',
-                          phone: parcel['RECIPIENT-PHONE'] || parcel['TELEPHONE'] || '',
-                          price: parcel['COD'] || parcel['PRIX'] || '',
-                          history: histList,
-                          raw: { parcel, trackJson },
-                          error: (parcel['RESULT'] || '').toUpperCase() === 'ERROR' ? (parcel['MESSAGE'] || 'Colis introuvable') : null,
-                        });
+
+                        const trackData = trackJson?.['TRACKING'] || trackJson || {};
+                        const parcelData = infoJson?.['PARCEL-INFO'] || infoJson || {};
+
+                        const trackError = (trackData['RESULT'] || '').toUpperCase() === 'ERROR';
+                        const parcelError = (parcelData['RESULT'] || '').toUpperCase() === 'ERROR';
+
+                        if (trackError && parcelError) {
+                          setOzoneTrackResult({ error: parcelData['MESSAGE'] || trackData['MESSAGE'] || 'Colis introuvable', history: [], raw: { trackJson, infoJson } });
+                        } else {
+                          const histArr = trackData['PARCEL-HISTORY'] || trackData['history'] || trackData['HISTORY'] || [];
+                          setOzoneTrackResult({
+                            status: parcelData['PARCEL-STATUS'] || parcelData['STATUS'] || trackData['PARCEL-STATUS'] || trackData['STATUS'] || trackData['LAST-STATUS'] || '',
+                            tracking: parcelData['TRACKING-NUMBER'] || trackData['TRACKING-NUMBER'] || tn,
+                            recipient: parcelData['RECIPIENT-NAME'] || parcelData['PARCEL-RECEIVER'] || trackData['RECEIVER'] || '',
+                            city: parcelData['RECIPIENT-CITY'] || parcelData['CITY_NAME'] || trackData['CITY'] || '',
+                            phone: parcelData['RECIPIENT-PHONE'] || parcelData['PARCEL-PHONE'] || '',
+                            price: parcelData['COD'] || parcelData['PRIX'] || parcelData['PRICE'] || '',
+                            history: Array.isArray(histArr) ? histArr : [],
+                            raw: { trackJson, infoJson },
+                            error: null,
+                          });
+                        }
                       } catch (err) {
-                        setOzoneTrackResult({ error: err.message, history: [] });
+                        setOzoneTrackResult({ error: 'Erreur réseau: ' + err.message, history: [], raw: null });
                       }
                       setOzoneTrackLoading(false);
                     }}
@@ -666,15 +678,21 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               {ozoneTrackResult && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   {ozoneTrackResult.error ? (
-                    <div className="px-4 py-3 bg-red-50 text-red-600 text-xs flex items-center gap-2">
-                      <XCircle size={14} /> {ozoneTrackResult.error}
+                    <div className="px-4 py-3 bg-red-50">
+                      <p className="text-red-600 text-xs flex items-center gap-2 mb-2"><XCircle size={14} /> {ozoneTrackResult.error}</p>
+                      {ozoneTrackResult.raw && (
+                        <details className="mt-1">
+                          <summary className="text-[10px] text-gray-400 cursor-pointer">Réponse API brute</summary>
+                          <pre className="text-[10px] text-gray-500 mt-1 overflow-x-auto max-h-32 bg-white rounded p-2">{JSON.stringify(ozoneTrackResult.raw, null, 2)}</pre>
+                        </details>
+                      )}
                     </div>
                   ) : (
                     <>
                       <div className="px-4 py-3 bg-teal-50 border-b border-teal-100">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-semibold text-gray-500">Tracking: {ozoneTrackResult.tracking}</span>
-                          <span className="text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">{ozoneTrackResult.status}</span>
+                          {ozoneTrackResult.status && <span className="text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">{ozoneTrackResult.status}</span>}
                         </div>
                         {ozoneTrackResult.recipient && <p className="text-sm font-semibold text-gray-800">{ozoneTrackResult.recipient}</p>}
                         <div className="flex gap-3 mt-1 text-xs text-gray-500">
@@ -689,16 +707,24 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                             <div key={i} className="px-4 py-2 flex items-start gap-3 text-xs">
                               <span className="mt-1 w-2 h-2 rounded-full bg-teal-400 shrink-0" />
                               <div>
-                                <span className="font-semibold text-gray-700">{h.status || h.STATUS || h.label || ''}</span>
-                                {(h.date || h.DATE || h.created_at) && (
-                                  <span className="ml-2 text-gray-400">{h.date || h.DATE || h.created_at}</span>
+                                <span className="font-semibold text-gray-700">{h.status || h.STATUS || h.label || h['LABEL'] || ''}</span>
+                                {(h.date || h.DATE || h.created_at || h['DATE_TIME']) && (
+                                  <span className="ml-2 text-gray-400">{h.date || h.DATE || h.created_at || h['DATE_TIME']}</span>
                                 )}
-                                {(h.location || h.LOCATION || h.city) && (
-                                  <span className="ml-2 text-gray-400">— {h.location || h.LOCATION || h.city}</span>
+                                {(h.location || h.LOCATION || h.city || h['COMMENT']) && (
+                                  <span className="ml-2 text-gray-400">— {h.location || h.LOCATION || h.city || h['COMMENT']}</span>
                                 )}
                               </div>
                             </div>
                           ))}
+                        </div>
+                      )}
+                      {ozoneTrackResult.raw && (
+                        <div className="px-4 py-2 border-t border-gray-100">
+                          <details>
+                            <summary className="text-[10px] text-gray-400 cursor-pointer">Réponse API brute</summary>
+                            <pre className="text-[10px] text-gray-500 mt-1 overflow-x-auto max-h-40 bg-gray-50 rounded p-2">{JSON.stringify(ozoneTrackResult.raw, null, 2)}</pre>
+                          </details>
                         </div>
                       )}
                     </>
