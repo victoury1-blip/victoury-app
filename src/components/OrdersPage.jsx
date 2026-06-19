@@ -422,10 +422,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     setOzoneOpen(true);
   }
 
-  function handleOzoneSuccess(orderId, trackingNumber) {
+  function handleOzoneSuccess(orderId, ozoneTracking) {
     setOrders((prev) =>
       prev.map((o) =>
-        o.id === orderId ? { ...o, validated: true, trackingNumber, status: 'att_ramassage' } : o
+        o.id === orderId ? { ...o, validated: true, trackingNumber: o.trackingNumber || ozoneTracking, status: 'att_ramassage' } : o
       )
     );
     addToast('success', `Colis créé — ${trackingNumber}`, 'Commande déplacée vers En suivi');
