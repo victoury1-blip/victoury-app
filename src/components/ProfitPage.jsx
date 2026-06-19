@@ -32,8 +32,7 @@ export default function ProfitPage({ orders = [] }) {
 
   const [dateFrom, setDateFrom] = useState(firstDay);
   const [dateTo,   setDateTo]   = useState(lastDay);
-  const [coutPct,  setCoutPct]  = useState(33);
-  const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay, coutPct: 33 });
+  const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay });
 
   const [adTransfers, setAdTransfers] = useState([]);
   const [newTransfer, setNewTransfer] = useState({ label: '', amount: '' });
@@ -71,10 +70,10 @@ export default function ProfitPage({ orders = [] }) {
 
   function removeTransfer(id) { saveAdTransfers(adTransfers.filter(t => t.id !== id)); }
 
-  function apply() { setApplied({ dateFrom, dateTo, coutPct: Number(coutPct) }); }
+  function apply() { setApplied({ dateFrom, dateTo }); }
   function reset() {
-    setDateFrom(firstDay); setDateTo(lastDay); setCoutPct(33);
-    setApplied({ dateFrom: firstDay, dateTo: lastDay, coutPct: 33 });
+    setDateFrom(firstDay); setDateTo(lastDay);
+    setApplied({ dateFrom: firstDay, dateTo: lastDay });
   }
 
   const stockProducts = useMemo(() => loadProducts(), []);
@@ -104,7 +103,7 @@ export default function ProfitPage({ orders = [] }) {
 
   function getProductCost(colis) {
     const order = orderMap.get(colis.orderId);
-    if (!order) return (colis.prix || 0) * (applied.coutPct / 100);
+    if (!order) return 0;
     const prods = order.products?.length ? order.products : [order.product];
     let cost = 0;
     for (const p of prods) {
@@ -112,8 +111,6 @@ export default function ProfitPage({ orders = [] }) {
       const sp = stockProducts.find(s => s.name === p.name);
       if (sp && sp.prixAchat) {
         cost += (parseFloat(sp.prixAchat) || 0) * (p.qty || 1);
-      } else {
-        cost += (order.price || 0) * (applied.coutPct / 100) * ((p.qty || 1) / (prods.reduce((s, x) => s + (x?.qty || 1), 0) || 1));
       }
     }
     return cost;
@@ -152,11 +149,6 @@ export default function ProfitPage({ orders = [] }) {
             <span className="text-gray-400 text-sm">–</span>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={selCls} />
           </div>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Taux coût d'achat (%) :</label>
-          <input type="number" value={coutPct} onChange={e => setCoutPct(e.target.value)} className={`${selCls} w-24`} min={0} max={100} />
-          <p className="text-[10px] text-gray-400 mt-0.5">Utilisé si pas de prix d'achat en stock</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={apply} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900">Filtrer</button>
@@ -248,7 +240,7 @@ export default function ProfitPage({ orders = [] }) {
 
         {/* Info about cost source */}
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
-          💡 <strong>Coût d'achat :</strong> calculé depuis le <strong>prix d'achat</strong> dans Stock (pour chaque produit × quantité). Si le produit n'a pas de prix d'achat en stock, le taux <strong>{applied.coutPct}%</strong> du prix de vente est utilisé.
+          💡 <strong>Coût d'achat :</strong> calculé depuis le <strong>prix d'achat</strong> dans Stock (pour chaque produit × quantité).
         </div>
 
         {/* Orders table from factures */}
