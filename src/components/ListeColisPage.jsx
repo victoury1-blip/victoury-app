@@ -845,7 +845,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
   const [whatsappPopup, setWhatsappPopup] = useState(null);
-  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '' };
+  const { statuses } = useStatuses();
+  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '', status: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
   const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
   const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
@@ -926,6 +927,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         o.recipient.city.toLowerCase().includes(q) ||
         (o.trackingNumber || '').toLowerCase().includes(q);
       if (!matchSearch) return false;
+      if (af.status && o.status !== af.status) return false;
       if (af.livreur && !(o.recipient.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
       if (af.ville && !(o.recipient.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
       if (af.produit) {
@@ -1011,13 +1013,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           </button>
         </div>
         {tab === 'colis' && (
-          <div className="relative flex-1 max-w-xs">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <div className="relative flex items-center flex-1 max-w-xs">
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un colis..."
-              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              placeholder="Rechercher une commande..."
+              className="w-full pl-3 pr-10 py-1.5 border border-gray-300 rounded-l-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
+            <button className="px-3 py-[7px] bg-blue-600 text-white rounded-r-md hover:bg-blue-700 transition">
+              <Search size={16} />
+            </button>
           </div>
         )}
         {tab === 'colis' && (
@@ -1040,68 +1044,93 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         const livreursList = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
         const livFiltered = livreursList.filter(l => l.statut !== false && (!filterForm.livreur || l.nom.toLowerCase().includes(filterForm.livreur.toLowerCase())));
         return (
-          <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <span className="font-bold text-gray-700 text-sm tracking-wide">Filtre avancé</span>
-              <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+          <div className="border-b border-gray-200 shadow-sm">
+            {/* Dark header */}
+            <div className="bg-gray-800 px-6 py-2.5 flex items-center justify-between">
+              <span className="font-bold text-white text-sm tracking-wide">Filtre avancé</span>
+              <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-white transition"><X size={14} /></button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {/* Livreurs — autocomplete */}
-              <div ref={livreurRef} className="relative">
-                <label className="block text-xs text-gray-500 font-semibold mb-1">Livreurs</label>
-                <div className="relative">
-                  <input
-                    value={filterForm.livreur}
-                    onChange={e => { setFilterForm(p => ({ ...p, livreur: e.target.value })); setLivreurOpen(true); }}
-                    onFocus={() => setLivreurOpen(true)}
-                    placeholder="Rechercher un livreur..."
-                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 pr-7"
-                  />
-                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+            {/* Filter body */}
+            <div className="bg-white px-6 py-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {/* État */}
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">État</label>
+                  <select
+                    value={filterForm.status || ''}
+                    onChange={e => setFilterForm(p => ({ ...p, status: e.target.value }))}
+                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+                  >
+                    <option value="">Tous les états</option>
+                    {statuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
                 </div>
-                {livreurOpen && livFiltered.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded shadow-lg max-h-44 overflow-y-auto">
-                    {filterForm.livreur && (
-                      <div className="px-3 py-2 text-xs text-gray-400 cursor-pointer hover:bg-gray-50" onMouseDown={() => { setFilterForm(p => ({ ...p, livreur: '' })); setLivreurOpen(false); }}>— Tous les livreurs</div>
-                    )}
-                    {livFiltered.map(l => (
-                      <div key={l.id}
-                        onMouseDown={() => { setFilterForm(p => ({ ...p, livreur: l.nom })); setLivreurOpen(false); }}
-                        className="px-3 py-2 text-sm text-gray-800 cursor-pointer hover:bg-gray-50 border-b border-gray-50 last:border-0">
-                        {l.nom} {l.telephone ? <span className="text-gray-400">({l.telephone})</span> : <span className="text-gray-400">()</span>}
-                      </div>
-                    ))}
+                {/* Livreurs — autocomplete */}
+                <div ref={livreurRef} className="relative">
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Livreurs</label>
+                  <div className="relative">
+                    <input
+                      value={filterForm.livreur}
+                      onChange={e => { setFilterForm(p => ({ ...p, livreur: e.target.value })); setLivreurOpen(true); }}
+                      onFocus={() => setLivreurOpen(true)}
+                      placeholder="Rechercher un..."
+                      className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-400 pr-8"
+                    />
+                    <Search size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-500" />
                   </div>
-                )}
-              </div>
-              {/* Villes */}
-              <div>
-                <label className="block text-xs text-gray-500 font-semibold mb-1">Villes</label>
-                <div className="relative">
-                  <input value={filterForm.ville} onChange={e => setFilterForm(p => ({ ...p, ville: e.target.value }))} placeholder="Rechercher une ville..." className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 pr-7" />
-                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+                  {livreurOpen && livFiltered.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded shadow-lg max-h-44 overflow-y-auto">
+                      {filterForm.livreur && (
+                        <div className="px-3 py-2 text-xs text-gray-400 cursor-pointer hover:bg-gray-50" onMouseDown={() => { setFilterForm(p => ({ ...p, livreur: '' })); setLivreurOpen(false); }}>— Tous les livreurs</div>
+                      )}
+                      {livFiltered.map(l => (
+                        <div key={l.id}
+                          onMouseDown={() => { setFilterForm(p => ({ ...p, livreur: l.nom })); setLivreurOpen(false); }}
+                          className="px-3 py-2 text-sm text-gray-800 cursor-pointer hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                          {l.nom} {l.telephone ? <span className="text-gray-400">({l.telephone})</span> : <span className="text-gray-400">()</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Villes */}
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Villes</label>
+                  <div className="relative">
+                    <input value={filterForm.ville} onChange={e => setFilterForm(p => ({ ...p, ville: e.target.value }))} placeholder="Rechercher une..." className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-400 pr-8" />
+                    <Search size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-500" />
+                  </div>
+                </div>
+                {/* Produits */}
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Produits</label>
+                  <div className="relative">
+                    <input value={filterForm.produit} onChange={e => setFilterForm(p => ({ ...p, produit: e.target.value }))} placeholder="Rechercher un..." className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-400 pr-8" />
+                    <Search size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-500" />
+                  </div>
                 </div>
               </div>
-              {/* Produits */}
-              <div>
-                <label className="block text-xs text-gray-500 font-semibold mb-1">Produits</label>
-                <div className="relative">
-                  <input value={filterForm.produit} onChange={e => setFilterForm(p => ({ ...p, produit: e.target.value }))} placeholder="Rechercher un produit..." className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-400 pr-7" />
-                  <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
+                {/* Date d'ajout */}
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date d'ajout</label>
+                  <div className="flex gap-1">
+                    <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" placeholder="Sélectionner une plage" />
+                  </div>
+                </div>
+                {/* Date de mise à jour */}
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date de mise à jour</label>
+                  <div className="flex gap-1">
+                    <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" placeholder="Sélectionner une plage" />
+                  </div>
+                </div>
+                {/* Buttons */}
+                <div className="col-span-2 flex items-end justify-end gap-2">
+                  <button onClick={resetFilter} className="px-4 py-1.5 rounded bg-teal-500 hover:bg-teal-600 text-sm text-white font-semibold transition-colors">Réinitialiser</button>
+                  <button onClick={applyFilter} className="px-4 py-1.5 rounded bg-gray-700 hover:bg-gray-800 text-sm text-white font-semibold transition-colors">Appliquer les filtres</button>
                 </div>
               </div>
-              {/* Date d'ajout */}
-              <div>
-                <label className="block text-xs text-gray-500 font-semibold mb-1">Date d'ajout</label>
-                <div className="flex gap-1">
-                  <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-indigo-400" />
-                  <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-indigo-400" />
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={resetFilter} className="px-4 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-sm text-gray-600 font-medium transition-colors border border-gray-300">Réinitialiser</button>
-              <button onClick={applyFilter} className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors">Appliquer les filtres</button>
             </div>
           </div>
         );
