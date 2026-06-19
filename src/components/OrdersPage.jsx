@@ -238,7 +238,7 @@ function recordHistory(orderId, status, user) {
   const entry = { timestamp: ts, status, user: getUserDisplayName(user) };
   hist.push(entry);
   localStorage.setItem(key, JSON.stringify(hist));
-  supabase.from('order_history').insert({ order_id: orderId, status, user_name: entry.user, timestamp: ts }).catch(() => {});
+  supabase.from('order_history').insert({ order_id: orderId, status, user_name: entry.user, timestamp: ts }).then(() => {}).catch?.(() => {});
 }
 
 function HistoryModal({ order, onClose }) {
