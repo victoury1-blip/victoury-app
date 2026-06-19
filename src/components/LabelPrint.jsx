@@ -62,7 +62,7 @@ function LabelContent({ order, config }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '2px solid #000' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {config.logo ? <img src={config.logo} alt="" style={{ height: '50px', objectFit: 'contain' }} /> : <span style={{ fontWeight: 900, fontSize: '22px', letterSpacing: '1px' }}>{shopName}</span>}
+          {config.logo ? <img src={config.logo} alt="" style={{ height: '80px', objectFit: 'contain' }} /> : <span style={{ fontWeight: 900, fontSize: '22px', letterSpacing: '1px' }}>{shopName}</span>}
         </div>
         {shopPhone && <span style={{ fontSize: '13px', color: '#333' }}>Sav: {shopPhone}</span>}
       </div>
