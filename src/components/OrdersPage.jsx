@@ -56,7 +56,7 @@ function now() {
 }
 
 const tabs = [
-  { id: 'a_confirmer', label: 'À confirmer', status: 'nouveau' },
+  { id: 'a_confirmer', label: 'À confirmer', status: ['nouveau', 'attente', 'en_attente', 'pas_rep'] },
   { id: 'en_suivi', label: 'En suivi', status: 'en_suivi' },
   { id: 'reporter', label: 'Reporter', status: 'reporter' },
   { id: 'confirme', label: 'Confirmé', status: 'confirme' },
@@ -380,7 +380,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     return () => document.removeEventListener('mousedown', handler);
   }, [livreurOpen]);
 
-  const currentStatus = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
+  const currentStatusRaw = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
+  const currentStatuses = Array.isArray(currentStatusRaw) ? currentStatusRaw : [currentStatusRaw];
 
   const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);
 
@@ -396,7 +397,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       /* Orders in the colis pipeline must NOT appear in order tabs */
       const inColisPipeline = COLIS_PIPELINE_SET.has(o.status) || !!(o.trackingNumber && o.validated);
       if (inColisPipeline) return false;
-      if (o.status !== currentStatus) return false;
+      if (!currentStatuses.includes(o.status)) return false;
       /* Search */
       const q = search.toLowerCase();
       if (q && !o.id.toLowerCase().includes(q) && !o.recipient.name.toLowerCase().includes(q) && !o.recipient.phone.includes(q) && !o.product.name.toLowerCase().includes(q)) return false;
@@ -417,7 +418,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       }
       return true;
     });
-  }, [orders, currentStatus, search, appliedFilter, modifiedIds]);
+  }, [orders, currentStatuses, search, appliedFilter, modifiedIds]);
 
   function toggleSelect(id) {
     setSelected((prev) =>
