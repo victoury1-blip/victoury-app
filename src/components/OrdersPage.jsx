@@ -656,43 +656,38 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 </td>
 
                 {/* Destinataire */}
-                <td className="px-4 py-3 min-w-[200px]">
-                  <div className="text-xs text-gray-400 font-mono mb-0.5">{order.trackingNumber || order.id}</div>
-                  <div className="font-semibold text-gray-800 max-w-[200px] truncate">{order.recipient.name}</div>
-                  <div className="text-xs text-gray-500 mt-0.5 flex items-start gap-1">
-                    <MapPin size={10} className="mt-0.5 shrink-0" />
-                    <span className="line-clamp-2">{order.recipient.address}</span>
-                  </div>
-                  <div className="font-semibold text-gray-800">{order.recipient.city}</div>
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <PhoneChip phone={order.recipient.phone} />
-                  </div>
+                <td className="px-4 py-4 min-w-[220px]">
+                  <div className="text-sm font-bold text-orange-600 font-mono mb-1">{order.trackingNumber || order.id}</div>
+                  <div className="text-base font-bold text-gray-900 max-w-[220px] truncate">{order.recipient.name}</div>
+                  <div className="text-sm text-gray-500 mt-0.5">{order.recipient.address}</div>
+                  <div className="text-sm font-bold text-gray-800">{order.recipient.city}</div>
+                  <div className="mt-1.5 font-bold text-sm text-gray-900">{order.recipient.phone}</div>
                   {order.recipient.delivery && (
-                    <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                      <Truck size={10} />
-                      <span className="italic">{order.recipient.delivery}</span>
+                    <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
+                      <Truck size={11} />
+                      <span>{order.recipient.delivery}</span>
                     </div>
                   )}
                 </td>
 
                 {/* Produits */}
-                <td className="px-4 py-3 min-w-[160px]">
+                <td className="px-4 py-4 min-w-[180px]">
                   {(order.products?.length > 0 ? order.products : [order.product]).map((p, i) => p && (
-                    <div key={i} className="text-sm leading-snug mb-0.5">
-                      <span className="font-medium text-gray-800">{p.name}</span>
-                      {p.color && <span className="ml-1 text-xs font-medium text-blue-600">{p.color}</span>}
-                      {p.size && <span className="ml-1 text-xs text-gray-500">/ {p.size}</span>}
-                      <span className="ml-1 text-xs text-gray-400">×{p.qty || 1}</span>
+                    <div key={i} className="text-sm leading-relaxed mb-0.5">
+                      <span className="font-semibold text-gray-800">{p.name}</span>
+                      {p.color && <span className="ml-1 text-sm font-semibold text-blue-600">{p.color}</span>}
+                      {p.size && <span className="ml-1 text-sm text-gray-600">- {p.size}</span>}
+                      <div className="text-sm text-gray-500">({p.qty || 1}x)</div>
                     </div>
                   ))}
                 </td>
 
                 {/* Prix */}
-                <td className="px-4 py-3 min-w-[90px]">
-                  <div className="font-bold text-gray-800 text-base">
+                <td className="px-4 py-4 min-w-[100px]">
+                  <div className="font-extrabold text-gray-900 text-xl">
                     {Number(order.price || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 })}
                   </div>
-                  <div className="text-xs text-gray-500">DH</div>
+                  <div className="text-sm font-semibold text-gray-500">DH</div>
                 </td>
 
                 {/* État — click to change */}
