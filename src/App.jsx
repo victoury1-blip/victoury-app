@@ -360,6 +360,7 @@ export default function App() {
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
           <Route path="/ramassage/scanner" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/ramassage/bons" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
+          <Route path="/ramassage/bon/:bonId" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/retour" element={<UnderConstruction />} />
           <Route path="/factures" element={<FacturesPage orders={orders} />} />
           <Route path="/profit" element={<ProfitPage orders={orders} />} />
