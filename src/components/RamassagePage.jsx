@@ -61,15 +61,18 @@ function ScannerPage({ orders, setOrders }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
       setScanning(true);
     } catch {
       showMessage('Impossible d\'accéder à la caméra', 'error');
     }
   }
+
+  useEffect(() => {
+    if (scanning && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [scanning]);
 
   function stopScanner() {
     if (streamRef.current) {
