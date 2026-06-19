@@ -130,22 +130,13 @@ function ScannerPage({ orders, setOrders }) {
             <h2 className="font-semibold text-gray-700">Scanner</h2>
           </div>
           <div className="p-4 space-y-4">
-            {scanning ? (
-              <div className="relative">
-                <video ref={videoRef} className="w-full rounded-lg bg-black" />
-                <button onClick={stopScanner} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600">
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={startScanner}
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition"
-              >
-                <QrCode size={18} />
-                Scanner QR Code
-              </button>
-            )}
+            <button
+              onClick={startScanner}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition"
+            >
+              <QrCode size={18} />
+              Scanner QR Code
+            </button>
 
             <div>
               <p className="text-sm text-gray-500 mb-2">Ou saisir manuellement :</p>
@@ -234,6 +225,39 @@ function ScannerPage({ orders, setOrders }) {
           )}
         </div>
       </div>
+
+      {/* Scanner Modal */}
+      {scanning && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-800">Scanner</h3>
+              <button onClick={stopScanner} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="relative rounded-lg overflow-hidden bg-black">
+                <video ref={videoRef} className="w-full aspect-[3/4] object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-48 relative">
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-3 border-l-3 border-white rounded-tl-lg" style={{borderWidth: '3px'}} />
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-3 border-r-3 border-white rounded-tr-lg" style={{borderWidth: '3px'}} />
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-3 border-l-3 border-white rounded-bl-lg" style={{borderWidth: '3px'}} />
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-3 border-r-3 border-white rounded-br-lg" style={{borderWidth: '3px'}} />
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={stopScanner}
+                className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium transition"
+              >
+                Arrêter le scan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
