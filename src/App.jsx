@@ -13,9 +13,11 @@ import ProfitPage from './components/ProfitPage';
 import RamassagePage from './components/RamassagePage';
 import RetourPage from './components/RetourPage';
 import LoginPage from './components/LoginPage';
+import ModeratorsPage from './components/ModeratorsPage';
 import { supabase } from './lib/supabase';
 import { cloudGet } from './lib/cloudSettings';
 import ErrorBoundary from './components/ErrorBoundary';
+import { PermissionsProvider, usePermissions } from './lib/permissions';
 
 const TAB_FROM_PARAM = {
   'a-confirmer': 'a_confirmer',
@@ -39,6 +41,12 @@ function OrdersRoute({ orders, setOrdersWithSync, isLoading, onDeleteOrder, curr
       currentUser={currentUser}
     />
   );
+}
+
+function PermGate({ perm, children }) {
+  const { hasPermission } = usePermissions();
+  if (!hasPermission(perm)) return <div className="flex items-center justify-center h-full text-gray-400"><p>Accès non autorisé</p></div>;
+  return children;
 }
 
 function UnderConstruction() {
@@ -401,6 +409,7 @@ export default function App() {
   }
 
   return (
+    <PermissionsProvider session={session}>
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       <Sidebar orders={orders} />
       <main className="flex-1 overflow-auto flex flex-col">
@@ -418,25 +427,27 @@ export default function App() {
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading || isWooFetching} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />
-          <Route path="/stock" element={<StockPage />} />
+          <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
-          <Route path="/ramassage/scanner" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
-          <Route path="/ramassage/bons" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
-          <Route path="/ramassage/bon/:bonId" element={<RamassagePage orders={orders} setOrders={setOrdersWithSync} />} />
+          <Route path="/ramassage/scanner" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
+          <Route path="/ramassage/bons" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
+          <Route path="/ramassage/bon/:bonId" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/retour" element={<Navigate to="/retour/scanner" replace />} />
-          <Route path="/retour/scanner" element={<RetourPage orders={orders} setOrders={setOrdersWithSync} />} />
-          <Route path="/retour/bons" element={<RetourPage orders={orders} setOrders={setOrdersWithSync} />} />
-          <Route path="/retour/bon/:bonId" element={<RetourPage orders={orders} setOrders={setOrdersWithSync} />} />
-          <Route path="/factures" element={<FacturesPage orders={orders} />} />
-          <Route path="/profit" element={<ProfitPage orders={orders} />} />
-          <Route path="/etats" element={<EtatsPage />} />
-          <Route path="/livraison" element={<LivraisonPage />} />
-          <Route path="/reglage" element={<SettingsPage onWooOrdersImported={handleWooImport} orders={orders} setOrders={setOrdersWithSync} />} />
+          <Route path="/retour/scanner" element={<PermGate perm="retour"><RetourPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
+          <Route path="/retour/bons" element={<PermGate perm="retour"><RetourPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
+          <Route path="/retour/bon/:bonId" element={<PermGate perm="retour"><RetourPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
+          <Route path="/factures" element={<PermGate perm="factures"><FacturesPage orders={orders} /></PermGate>} />
+          <Route path="/profit" element={<PermGate perm="profit"><ProfitPage orders={orders} /></PermGate>} />
+          <Route path="/etats" element={<PermGate perm="etats"><EtatsPage /></PermGate>} />
+          <Route path="/livraison" element={<PermGate perm="livraison"><LivraisonPage /></PermGate>} />
+          <Route path="/moderateurs" element={<ModeratorsPage />} />
+          <Route path="/reglage" element={<PermGate perm="reglages"><SettingsPage onWooOrdersImported={handleWooImport} orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         </ErrorBoundary>
         </div>
       </main>
     </div>
+    </PermissionsProvider>
   );
 }

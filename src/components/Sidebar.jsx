@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { usePermissions } from '../lib/permissions';
 import {
   LayoutDashboard, ShoppingCart, Package, Archive,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown,
-  ChevronRight, Menu, Settings, FileText, TrendingUp,
+  ChevronRight, Menu, Settings, FileText, TrendingUp, Shield,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -21,11 +22,12 @@ const NAV_ITEMS = [
     ],
   },
   { path: '/liste-colis', label: 'Liste des colis', icon: Package },
-  { path: '/stock',       label: 'Stock',           icon: Archive },
+  { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
   {
     path: '/ramassage',
     label: 'Ramassage',
     icon: Truck,
+    perm: 'ramassage',
     children: [
       { path: '/ramassage/scanner', label: 'Scanner' },
       { path: '/ramassage/bons',    label: 'Bon' },
@@ -35,16 +37,18 @@ const NAV_ITEMS = [
     path: '/retour',
     label: 'Retour',
     icon: RotateCcw,
+    perm: 'retour',
     children: [
       { path: '/retour/scanner', label: 'Scanner' },
       { path: '/retour/bons',    label: 'Liste des Bons' },
     ],
   },
-  { path: '/factures',    label: 'Factures',        icon: FileText },
-  { path: '/profit',      label: 'Profit',          icon: TrendingUp },
-  { path: '/etats',       label: 'États',           icon: BarChart2 },
-  { path: '/livraison',   label: 'Livraison',       icon: MapPin },
-  { path: '/reglage',     label: 'Paramètres',      icon: Settings },
+  { path: '/factures',    label: 'Factures',        icon: FileText, perm: 'factures' },
+  { path: '/profit',      label: 'Profit',          icon: TrendingUp, perm: 'profit' },
+  { path: '/etats',       label: 'États',           icon: BarChart2, perm: 'etats' },
+  { path: '/livraison',   label: 'Livraison',       icon: MapPin, perm: 'livraison' },
+  { path: '/moderateurs', label: 'Modérateurs',     icon: Shield, adminOnly: true },
+  { path: '/reglage',     label: 'Paramètres',      icon: Settings, perm: 'reglages' },
 ];
 
 export default function Sidebar({ orders = [] }) {
@@ -52,8 +56,15 @@ export default function Sidebar({ orders = [] }) {
   const [openMenus, setOpenMenus] = useState({ '/commandes': true, '/ramassage': true, '/retour': true });
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermission, isAdmin, currentModerator } = usePermissions();
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+
+  const visibleItems = NAV_ITEMS.filter(item => {
+    if (item.adminOnly) return isAdmin;
+    if (item.perm) return hasPermission(item.perm);
+    return true;
+  });
 
   return (
     <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 flex flex-col transition-all duration-200 shrink-0 h-screen`}>
@@ -73,7 +84,7 @@ export default function Sidebar({ orders = [] }) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-2">
-        {NAV_ITEMS.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
 
           if (item.children) {
@@ -137,10 +148,12 @@ export default function Sidebar({ orders = [] }) {
 
       {/* Footer */}
       <div className={`px-3 py-3 border-t border-gray-100 flex items-center ${collapsed ? 'justify-center' : 'gap-2'}`}>
-        <div className="w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">V</div>
+        <div className="w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+          {currentModerator?.name?.[0]?.toUpperCase() || 'V'}
+        </div>
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <span className="text-sm text-gray-700 font-medium block truncate">Admin</span>
+            <span className="text-sm text-gray-700 font-medium block truncate">{currentModerator?.name || 'Admin'}</span>
             <button onClick={() => supabase.auth.signOut()} className="text-xs text-red-400 hover:text-red-600 transition">
               Déconnexion
             </button>
