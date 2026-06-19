@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt } from 'lucide-react';
+import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package } from 'lucide-react';
 import { loadProducts } from '../data/products';
+import { loadFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet } from '../lib/cloudSettings';
 
@@ -34,33 +35,18 @@ export default function ProfitPage({ orders = [] }) {
   const [coutPct,  setCoutPct]  = useState(33);
   const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay, coutPct: 33 });
 
-  // Ad spend transfers
   const [adTransfers, setAdTransfers] = useState([]);
   const [newTransfer, setNewTransfer] = useState({ label: '', amount: '' });
   const [showAdModal, setShowAdModal] = useState(false);
 
-  // Delivery fees lookup
-  const [deliveryFees, setDeliveryFees] = useState({});
+  const [factures, setFactures] = useState(() => loadFactures());
 
   useEffect(() => {
-    // Load ad transfers from supabase
     supabase.from('settings').select('value').eq('key', 'ad_transfers').single().then(({ data }) => {
       if (Array.isArray(data?.value)) setAdTransfers(data.value);
     });
-    // Load delivery fees from all livreurs
-    const livreurs = JSON.parse(localStorage.getItem('livreurs') || '[]');
-    const ids = livreurs.length ? livreurs.map(l => l.id) : [1];
-    Promise.all(ids.map(id => cloudGet(`frais_${id}`).then(d => ({ id, data: d })))).then(results => {
-      const map = {};
-      for (const r of results) {
-        if (Array.isArray(r.data)) {
-          for (const f of r.data) {
-            const city = (f.ville || f.city || '').toLowerCase().trim();
-            if (city && f.frais != null) map[city] = parseFloat(f.frais) || 0;
-          }
-        }
-      }
-      setDeliveryFees(map);
+    supabase.from('settings').select('value').eq('key', 'victoury_factures').single().then(({ data }) => {
+      if (Array.isArray(data?.value)) setFactures(data.value);
     });
   }, []);
 
@@ -74,19 +60,16 @@ export default function ProfitPage({ orders = [] }) {
 
   function addTransfer() {
     if (!newTransfer.amount) return;
-    const entry = {
+    saveAdTransfers([...adTransfers, {
       id: Date.now(),
       label: newTransfer.label || 'Transfert pub',
       amount: parseFloat(newTransfer.amount) || 0,
       date: new Date().toISOString().slice(0, 10),
-    };
-    saveAdTransfers([...adTransfers, entry]);
+    }]);
     setNewTransfer({ label: '', amount: '' });
   }
 
-  function removeTransfer(id) {
-    saveAdTransfers(adTransfers.filter(t => t.id !== id));
-  }
+  function removeTransfer(id) { saveAdTransfers(adTransfers.filter(t => t.id !== id)); }
 
   function apply() { setApplied({ dateFrom, dateTo, coutPct: Number(coutPct) }); }
   function reset() {
@@ -94,16 +77,34 @@ export default function ProfitPage({ orders = [] }) {
     setApplied({ dateFrom: firstDay, dateTo: lastDay, coutPct: 33 });
   }
 
-  const inPeriod = useMemo(() => orders.filter(o => {
-    if (!o.dateAdded) return true;
-    const d = o.dateAdded.split('/').reverse().join('-');
-    return d >= applied.dateFrom && d <= applied.dateTo;
-  }), [orders, applied]);
-
-  const livres = inPeriod.filter(o => o.status === 'livre');
   const stockProducts = useMemo(() => loadProducts(), []);
 
-  function getProductCost(order) {
+  // Get all colis from factures, within the period
+  const allFactureColis = useMemo(() => {
+    const colis = [];
+    for (const f of factures) {
+      // Parse facture date (DD/MM/YYYY HH:MM format)
+      let fDate = '';
+      if (f.dateCreation) {
+        const parts = f.dateCreation.split(' ')[0].split('/');
+        if (parts.length === 3) fDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+      if (fDate && (fDate < applied.dateFrom || fDate > applied.dateTo)) continue;
+      for (const c of (f.colis || [])) {
+        colis.push({ ...c, factureRef: f.ref, factureId: f.id, livreur: f.livreur, factureDateCreation: f.dateCreation });
+      }
+    }
+    return colis;
+  }, [factures, applied]);
+
+  const livresColis = allFactureColis.filter(c => c.status === 'livre');
+
+  // Match each colis to its order for product cost calculation
+  const orderMap = useMemo(() => new Map(orders.map(o => [o.id, o])), [orders]);
+
+  function getProductCost(colis) {
+    const order = orderMap.get(colis.orderId);
+    if (!order) return (colis.prix || 0) * (applied.coutPct / 100);
     const prods = order.products?.length ? order.products : [order.product];
     let cost = 0;
     for (const p of prods) {
@@ -118,29 +119,22 @@ export default function ProfitPage({ orders = [] }) {
     return cost;
   }
 
-  function getDeliveryCost(order) {
-    const city = (order.recipient?.city || '').toLowerCase().trim();
-    if (deliveryFees[city] != null) return deliveryFees[city];
-    // Try partial match
-    for (const [k, v] of Object.entries(deliveryFees)) {
-      if (city.includes(k) || k.includes(city)) return v;
-    }
-    return 0;
-  }
-
   // Calculations
-  const ca = livres.reduce((s, o) => s + (o.price || 0), 0);
-  const coutAchat = livres.reduce((s, o) => s + getProductCost(o), 0);
-  const fraisLiv = livres.reduce((s, o) => s + getDeliveryCost(o), 0);
+  const ca = livresColis.reduce((s, c) => s + (c.prix || 0), 0);
+  const coutAchat = livresColis.reduce((s, c) => s + getProductCost(c), 0);
+  const fraisLiv = allFactureColis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
   const sousTotal = ca - coutAchat - fraisLiv;
   const totalPub = adTransfers.reduce((s, t) => s + (t.amount || 0), 0);
   const profitNet = sousTotal - totalPub;
+
+  const totalRefuse = allFactureColis.filter(c => c.status === 'refuse').length;
+  const totalLivre = livresColis.length;
 
   const selCls = 'border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
 
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-auto">
-      {/* Hero header */}
+      {/* Hero */}
       <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 px-6 sm:px-8 py-7 text-white">
         <div className="flex items-center gap-3 mb-1">
           <TrendingUp size={24} />
@@ -162,6 +156,7 @@ export default function ProfitPage({ orders = [] }) {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Taux coût d'achat (%) :</label>
           <input type="number" value={coutPct} onChange={e => setCoutPct(e.target.value)} className={`${selCls} w-24`} min={0} max={100} />
+          <p className="text-[10px] text-gray-400 mt-0.5">Utilisé si pas de prix d'achat en stock</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={apply} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900">Filtrer</button>
@@ -169,14 +164,12 @@ export default function ProfitPage({ orders = [] }) {
             <RefreshCw size={13} /> Réinitialiser
           </button>
           <button onClick={() => {
-            const rows = [['ID','Client','Ville','Date','Produit','Prix Vente','Prix Achat','Frais Livraison','Marge'].join(',')];
-            livres.forEach(o => {
-              const pa = getProductCost(o); const fl = getDeliveryCost(o); const m = (o.price||0) - pa - fl;
-              rows.push([o.id, o.recipient?.name||'', o.recipient?.city||'', o.dateAdded||'', o.product?.name||'', o.price||0, pa.toFixed(2), fl.toFixed(2), m.toFixed(2)].join(','));
+            const rows = [['Facture','ID Colis','Client','Ville','Statut','Prix Vente','Coût Achat','Frais Liv.','Marge'].join(',')];
+            livresColis.forEach(c => {
+              const pa = getProductCost(c); const m = (c.prix||0) - pa - (c.fraisLivraison||0);
+              rows.push([c.factureRef, c.orderId, c.recipient||'', c.city||'', c.status, c.prix||0, pa.toFixed(2), c.fraisLivraison||0, m.toFixed(2)].join(','));
             });
-            rows.push('');
-            rows.push(`Total Pub,${totalPub.toFixed(2)}`);
-            rows.push(`Profit Net,${profitNet.toFixed(2)}`);
+            rows.push(''); rows.push(`Total Pub,${totalPub.toFixed(2)}`); rows.push(`Profit Net,${profitNet.toFixed(2)}`);
             const blob = new Blob(['﻿'+rows.join('\n')], {type:'text/csv;charset=utf-8'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
             a.download = `profit_${applied.dateFrom}_${applied.dateTo}.csv`; a.click();
@@ -190,57 +183,62 @@ export default function ProfitPage({ orders = [] }) {
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Chiffre d'Affaires" value={ca} icon={ShoppingBag}
-            subtitle={`${livres.length} commandes livrées`}
+            subtitle={`${totalLivre} livrée${totalLivre > 1 ? 's' : ''} | ${totalRefuse} refusée${totalRefuse > 1 ? 's' : ''}`}
             color={{ border: 'border-blue-500', icon: 'text-blue-500', text: 'text-blue-700', bar: 'bg-blue-500' }} />
-          <KpiCard label="Marge Brute" value={sousTotal} icon={Percent}
-            subtitle={`CA - Achat - Livraison`} progress={parseFloat(pct(sousTotal, ca))}
-            color={{ border: 'border-green-500', icon: 'text-green-500', text: 'text-green-700', bar: 'bg-green-500' }} />
-          <KpiCard label="Frais Publicitaires" value={totalPub} icon={Receipt}
-            subtitle={`${adTransfers.length} transfert${adTransfers.length > 1 ? 's' : ''}`}
+          <KpiCard label="Coût d'Achat" value={coutAchat} icon={Package}
+            subtitle={`${pct(coutAchat, ca)}% du CA`}
+            color={{ border: 'border-red-400', icon: 'text-red-500', text: 'text-red-600', bar: 'bg-red-400' }} />
+          <KpiCard label="Frais Livraison" value={fraisLiv} icon={Truck}
+            subtitle={`${allFactureColis.length} colis au total`}
             color={{ border: 'border-orange-400', icon: 'text-orange-500', text: 'text-orange-600', bar: 'bg-orange-400' }} />
           <KpiCard label="Profit Net" value={profitNet} icon={DollarSign}
-            subtitle={`${pct(profitNet, ca)}% du CA`} progress={Math.max(0, parseFloat(pct(profitNet, ca)))}
+            subtitle={`${pct(profitNet, ca)}% du CA (après pub)`} progress={Math.max(0, parseFloat(pct(profitNet, ca)))}
             color={{ border: 'border-teal-500', icon: 'text-teal-500', text: profitNet >= 0 ? 'text-teal-700' : 'text-red-600', bar: 'bg-teal-500' }} />
         </div>
 
         {/* Formula breakdown */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="font-bold text-gray-700 mb-4 text-sm">Détail du calcul</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-center text-center">
+
+          {/* Step 1: CA - Achat - Livraison = Sous-total */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-center text-center">
             <div className="bg-blue-50 rounded-xl p-4">
               <div className="text-[10px] font-semibold text-gray-500 uppercase">Prix de vente</div>
               <div className="text-lg font-black text-blue-700">{fmt(ca)}</div>
             </div>
-            <div className="text-gray-400 font-bold text-xl hidden sm:block">−</div>
+            <div className="text-gray-400 font-bold text-xl hidden sm:flex items-center justify-center">−</div>
             <div className="bg-red-50 rounded-xl p-4">
               <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût d'achat</div>
               <div className="text-lg font-black text-red-600">{fmt(coutAchat)}</div>
-              <div className="text-[10px] text-gray-400">{pct(coutAchat, ca)}% du CA</div>
             </div>
-            <div className="text-gray-400 font-bold text-xl hidden sm:block">−</div>
+            <div className="text-gray-400 font-bold text-xl hidden sm:flex items-center justify-center">−</div>
             <div className="bg-orange-50 rounded-xl p-4">
               <div className="text-[10px] font-semibold text-gray-500 uppercase">Frais livraison</div>
               <div className="text-lg font-black text-orange-600">{fmt(fraisLiv)}</div>
-              <div className="text-[10px] text-gray-400">{pct(fraisLiv, ca)}% du CA</div>
             </div>
           </div>
+
           <div className="flex items-center justify-center gap-3 my-4 text-sm text-gray-500">
             <div className="h-px flex-1 bg-gray-200" />
-            <span className="font-bold">= Sous-total: <span className="text-green-700">{fmt(sousTotal)} MAD</span></span>
+            <span className="font-bold">= Sous-total: <span className={sousTotal >= 0 ? 'text-green-700' : 'text-red-600'}>{fmt(sousTotal)} MAD</span></span>
             <div className="h-px flex-1 bg-gray-200" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center text-center">
+
+          {/* Step 2: Sous-total - Pub = Profit */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center text-center">
             <div className="bg-green-50 rounded-xl p-4">
               <div className="text-[10px] font-semibold text-gray-500 uppercase">Sous-total</div>
               <div className="text-lg font-black text-green-700">{fmt(sousTotal)}</div>
             </div>
-            <div className="text-gray-400 font-bold text-xl hidden sm:block">−</div>
+            <div className="text-gray-400 font-bold text-xl hidden sm:flex items-center justify-center">−</div>
             <div className="bg-purple-50 rounded-xl p-4">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Pub / Ads</div>
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">Frais Pub / Ads</div>
               <div className="text-lg font-black text-purple-600">{fmt(totalPub)}</div>
               <button onClick={() => setShowAdModal(true)} className="text-[10px] text-purple-600 hover:underline mt-1">Gérer les transferts →</button>
             </div>
           </div>
+
+          {/* Result */}
           <div className="mt-4 bg-gradient-to-r from-teal-50 to-green-50 rounded-xl p-5 text-center border border-teal-200">
             <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Profit Net Final</div>
             <div className={`text-3xl font-black ${profitNet >= 0 ? 'text-teal-700' : 'text-red-600'}`}>{fmt(profitNet)} <span className="text-sm font-semibold">MAD</span></div>
@@ -248,36 +246,46 @@ export default function ProfitPage({ orders = [] }) {
           </div>
         </div>
 
-        {/* Orders table */}
+        {/* Info about cost source */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+          💡 <strong>Coût d'achat :</strong> calculé depuis le <strong>prix d'achat</strong> dans Stock (pour chaque produit × quantité). Si le produit n'a pas de prix d'achat en stock, le taux <strong>{applied.coutPct}%</strong> du prix de vente est utilisé.
+        </div>
+
+        {/* Orders table from factures */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-2">
-            <h2 className="font-bold text-gray-700 text-sm">Commandes livrées ({livres.length})</h2>
+          <div className="px-5 py-3 border-b bg-gray-50 flex items-center justify-between">
+            <h2 className="font-bold text-gray-700 text-sm">Commandes des factures ({livresColis.length} livrées)</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  {['ID','Client','Ville','Date','Produit','Prix Vente','Coût Achat','Frais Liv.','Marge'].map(h => (
+                  {['Facture','ID Colis','Client','Ville','Produit','Prix Vente','Coût Achat','Frais Liv.','Marge'].map(h => (
                     <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {livres.length === 0 && (
-                  <tr><td colSpan={9} className="py-10 text-center text-gray-400 text-sm">Aucune commande livrée dans cette période</td></tr>
+                {livresColis.length === 0 && (
+                  <tr><td colSpan={9} className="py-10 text-center text-gray-400 text-sm">Aucune commande livrée dans les factures de cette période</td></tr>
                 )}
-                {livres.map(o => {
-                  const pv = o.price || 0;
-                  const pa = getProductCost(o);
-                  const fl = getDeliveryCost(o);
+                {livresColis.map((c, i) => {
+                  const pv = c.prix || 0;
+                  const pa = getProductCost(c);
+                  const fl = c.fraisLivraison || 0;
                   const marge = pv - pa - fl;
+                  const order = orderMap.get(c.orderId);
+                  const prodName = c.product || order?.product?.name || '—';
                   return (
-                    <tr key={o.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 font-mono text-xs font-bold text-blue-600">{o.id}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-700">{o.recipient?.name || '—'}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-500">{o.recipient?.city || '—'}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-500">{o.dateAdded || '—'}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[150px] truncate">{o.product?.name || '—'}</td>
+                    <tr key={`${c.orderId}-${i}`} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 text-xs text-gray-500">{c.factureRef}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs font-bold text-blue-600">{c.orderId}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-700">{c.recipient || '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500">{c.city || order?.recipient?.city || '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[150px] truncate">
+                        {prodName}
+                        {order?.products?.length > 1 && <span className="text-[10px] text-gray-400 ml-1">(+{order.products.length - 1})</span>}
+                      </td>
                       <td className="px-4 py-2.5 font-semibold text-gray-800">{fmt(pv)}</td>
                       <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{fmt(pa)}</td>
                       <td className="px-4 py-2.5 text-orange-500 text-xs font-semibold">{fmt(fl)}</td>
@@ -286,18 +294,18 @@ export default function ProfitPage({ orders = [] }) {
                   );
                 })}
               </tbody>
-              {livres.length > 0 && (
+              {livresColis.length > 0 && (
                 <tfoot className="border-t-2 border-gray-200 bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-4 py-3 text-xs font-bold text-gray-600">TOTAL ({livres.length})</td>
+                    <td colSpan={5} className="px-4 py-3 text-xs font-bold text-gray-600">TOTAL ({livresColis.length} livrées)</td>
                     <td className="px-4 py-3 font-black text-gray-800">{fmt(ca)}</td>
                     <td className="px-4 py-3 font-bold text-red-500">{fmt(coutAchat)}</td>
                     <td className="px-4 py-3 font-bold text-orange-500">{fmt(fraisLiv)}</td>
                     <td className={`px-4 py-3 font-black ${sousTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(sousTotal)}</td>
                   </tr>
                   <tr className="border-t border-gray-300">
-                    <td colSpan={8} className="px-4 py-2 text-xs font-bold text-gray-500 text-right">Pub:</td>
-                    <td className="px-4 py-2 font-bold text-purple-600 text-xs">-{fmt(totalPub)}</td>
+                    <td colSpan={8} className="px-4 py-2 text-xs font-bold text-gray-500 text-right">Pub / Ads :</td>
+                    <td className="px-4 py-2 font-bold text-purple-600 text-xs">−{fmt(totalPub)}</td>
                   </tr>
                   <tr className="bg-teal-50">
                     <td colSpan={8} className="px-4 py-3 text-sm font-black text-gray-700 text-right">PROFIT NET :</td>
@@ -322,7 +330,6 @@ export default function ProfitPage({ orders = [] }) {
             <div className="p-5 space-y-4">
               <p className="text-xs text-gray-500">Ajoutez vos paiements de factures publicitaires (Facebook Ads, Google Ads, etc.). Le total sera déduit du sous-total pour calculer le profit net.</p>
 
-              {/* List */}
               {adTransfers.length > 0 && (
                 <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
                   {adTransfers.map(t => (
@@ -346,7 +353,6 @@ export default function ProfitPage({ orders = [] }) {
                 </div>
               )}
 
-              {/* Add form */}
               <div className="border border-dashed border-gray-300 rounded-xl p-4 space-y-3">
                 <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Plus size={12} /> Nouveau transfert</p>
                 <input value={newTransfer.label} onChange={e => setNewTransfer(p => ({ ...p, label: e.target.value }))}
