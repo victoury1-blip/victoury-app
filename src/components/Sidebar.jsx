@@ -62,7 +62,7 @@ export default function Sidebar({ orders = [] }) {
         {!collapsed && (() => {
           try {
             const cfg = JSON.parse(localStorage.getItem('victoury_app_config') || '{}');
-            if (cfg.appLogo) return <img src={cfg.appLogo} alt="" className="h-8 object-contain" />;
+            if (cfg.appLogo) return <img src={cfg.appLogo} alt="" className="h-12 object-contain" />;
             return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">{cfg.appName || 'VICTOURY'}</span>;
           } catch { return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">VICTOURY</span>; }
         })()}
