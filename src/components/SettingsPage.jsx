@@ -5,6 +5,7 @@ import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
   ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
+  Search, ArrowDownCircle,
 } from 'lucide-react';
 
 const TIMEZONES = [
@@ -65,6 +66,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   const [openModal, setOpenModal] = useState(null);
   const [syncLogs, setSyncLogs] = useState([]);
   const [ozoneSyncState, setOzoneSyncState] = useState({ status: 'idle', message: '', count: 0 });
+  const [ozoneTrackInput, setOzoneTrackInput] = useState('');
+  const [ozoneTrackResult, setOzoneTrackResult] = useState(null);
+  const [ozoneTrackLoading, setOzoneTrackLoading] = useState(false);
 
   useEffect(() => {
     supabase.from('settings').select('value').eq('key', 'wc_sync_logs').single()
@@ -256,6 +260,16 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       cardBg: 'from-orange-50',
       saved: auzone.saved,
       badge: auzone.saved ? { label: 'Configuré', color: 'text-green-600 bg-green-50 border-green-200' } : null,
+    },
+    {
+      id: 'ozonesync',
+      title: 'Sync statuts Ozone',
+      desc: 'Récupérez les statuts de vos colis depuis Ozone Express via tracking number.',
+      icon: <ArrowDownCircle size={22} className="text-teal-600" />,
+      iconBg: 'bg-teal-100',
+      cardBg: 'from-teal-50',
+      saved: auzone.saved,
+      badge: auzone.saved ? { label: 'Prêt', color: 'text-teal-700 bg-teal-50 border-teal-200' } : null,
     },
     {
       id: 'notifications',
@@ -579,92 +593,195 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             </button>
             {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
           </div>
+        </div>
+      </Modal>
 
-          {/* Sync statuts from Ozone */}
-          {auzone.saved && (
-            <div className="border-t border-orange-200 pt-4 mt-4">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">Synchroniser les statuts Ozone</h4>
-              <p className="text-xs text-gray-500 mb-3">Récupère les statuts de tous les colis validés depuis l'API Ozone Express et met à jour automatiquement.</p>
-              <button
-                onClick={async () => {
-                  if (!auzone.customerId || !auzone.apiKey) return;
-                  setOzoneSyncState({ status: 'loading', message: 'Synchronisation en cours...', count: 0 });
-                  try {
-                    const base = `https://api.ozonexpress.ma/customers/${auzone.customerId}/${auzone.apiKey}`;
-                    const validatedOrders = orders.filter(o => o.validated);
-                    let updated = 0;
-                    const statusMap = {
-                      'En attente de ramassage': 'att_ramassage',
-                      'Ramassé': 'ramasse',
-                      'Ramasse': 'ramasse',
-                      'Expédié': 'expedier',
-                      'Expedie': 'expedier',
-                      'Reçu par le livreur': 'recu_livreur',
-                      'Recu par le livreur': 'recu_livreur',
-                      'Livré': 'livre',
-                      'Livre': 'livre',
-                      'Refusé': 'refuse',
-                      'Refuse': 'refuse',
-                      'Annulé': 'annule',
-                      'Annule': 'annule',
-                      'Échange': 'change',
-                      'Echange': 'change',
-                      'En cours de livraison': 'expedier',
-                      'Prêt pour retour': 'pret_retour',
-                      'Pret pour retour': 'pret_retour',
-                      'Pas de réponse': 'pas_rep_lv',
-                      'Pas de reponse': 'pas_rep_lv',
-                      'Injoignable': 'injoignable',
-                    };
-                    for (let i = 0; i < validatedOrders.length; i++) {
-                      const o = validatedOrders[i];
-                      const tn = o.ozoneTracking || o.trackingNumber || o.id;
-                      setOzoneSyncState(p => ({ ...p, message: `${i + 1}/${validatedOrders.length}: ${tn}` }));
+      {/* ── Sync statuts depuis Ozone Modal ── */}
+      <Modal open={openModal === 'ozonesync'} onClose={() => { setOpenModal(null); setOzoneTrackResult(null); setOzoneTrackInput(''); }}
+        title="Sync statuts depuis Ozone" icon={<ArrowDownCircle size={18} className="text-teal-600" />}
+        iconBg="bg-gradient-to-r from-teal-50 to-white">
+        <div className="space-y-5">
+          {!auzone.saved ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-3 text-xs text-amber-700 flex gap-2">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>Veuillez d'abord configurer vos identifiants Ozone Express dans la section <strong>Ozon Express</strong>.</span>
+            </div>
+          ) : (
+            <>
+              {/* Single tracking lookup */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-2">Rechercher un colis par tracking</label>
+                <div className="flex gap-2">
+                  <input
+                    value={ozoneTrackInput}
+                    onChange={e => setOzoneTrackInput(e.target.value)}
+                    placeholder="Numéro de tracking Ozone..."
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                    onKeyDown={e => { if (e.key === 'Enter') document.getElementById('btn-ozone-track')?.click(); }}
+                  />
+                  <button
+                    id="btn-ozone-track"
+                    disabled={!ozoneTrackInput.trim() || ozoneTrackLoading}
+                    onClick={async () => {
+                      setOzoneTrackLoading(true);
+                      setOzoneTrackResult(null);
+                      const base = `https://api.ozonexpress.ma/customers/${auzone.customerId}/${auzone.apiKey}`;
                       try {
                         const body = new FormData();
-                        body.append('tracking-number', tn);
-                        const res = await fetch(`${base}/parcel-info`, { method: 'POST', body });
-                        if (!res.ok) continue;
-                        const json = await res.json();
-                        const parcel = json['PARCEL-INFO'] || json;
-                        const result = (parcel['RESULT'] || '').toUpperCase();
-                        if (result === 'ERROR') continue;
-                        const ozStatus = parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || '';
-                        const ozTracking = parcel['TRACKING-NUMBER'] || parcel['TRACKING'] || tn;
-                        const mapped = statusMap[ozStatus] || statusMap[ozStatus.trim()];
-                        if (mapped && mapped !== o.status) {
-                          setOrders(prev => prev.map(ord =>
-                            ord.id === o.id ? { ...ord, status: mapped, ozoneTracking: ozTracking } : ord
-                          ));
-                          updated++;
-                        } else if (!o.ozoneTracking && ozTracking !== tn) {
-                          setOrders(prev => prev.map(ord =>
-                            ord.id === o.id ? { ...ord, ozoneTracking: ozTracking } : ord
-                          ));
-                        }
-                      } catch {}
+                        body.append('tracking-number', ozoneTrackInput.trim());
+                        const [trackRes, infoRes] = await Promise.all([
+                          fetch(`${base}/tracking`, { method: 'POST', body }),
+                          fetch(`${base}/parcel-info`, { method: 'POST', body: (() => { const f = new FormData(); f.append('tracking-number', ozoneTrackInput.trim()); return f; })() }),
+                        ]);
+                        const trackJson = trackRes.ok ? await trackRes.json() : null;
+                        const infoJson = infoRes.ok ? await infoRes.json() : null;
+                        const parcel = infoJson?.['PARCEL-INFO'] || infoJson || {};
+                        const historyData = trackJson?.history || trackJson?.TRACKING || trackJson || {};
+                        const histList = Array.isArray(historyData) ? historyData : (Array.isArray(historyData.history) ? historyData.history : []);
+                        setOzoneTrackResult({
+                          status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || 'Inconnu',
+                          tracking: parcel['TRACKING-NUMBER'] || parcel['TRACKING'] || ozoneTrackInput.trim(),
+                          recipient: parcel['RECIPIENT-NAME'] || parcel['NOM'] || '',
+                          city: parcel['RECIPIENT-CITY'] || parcel['VILLE'] || '',
+                          phone: parcel['RECIPIENT-PHONE'] || parcel['TELEPHONE'] || '',
+                          price: parcel['COD'] || parcel['PRIX'] || '',
+                          history: histList,
+                          raw: { parcel, trackJson },
+                          error: (parcel['RESULT'] || '').toUpperCase() === 'ERROR' ? (parcel['MESSAGE'] || 'Colis introuvable') : null,
+                        });
+                      } catch (err) {
+                        setOzoneTrackResult({ error: err.message, history: [] });
+                      }
+                      setOzoneTrackLoading(false);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-40 transition"
+                  >
+                    {ozoneTrackLoading ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                    Chercher
+                  </button>
+                </div>
+              </div>
+
+              {/* Track result */}
+              {ozoneTrackResult && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  {ozoneTrackResult.error ? (
+                    <div className="px-4 py-3 bg-red-50 text-red-600 text-xs flex items-center gap-2">
+                      <XCircle size={14} /> {ozoneTrackResult.error}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="px-4 py-3 bg-teal-50 border-b border-teal-100">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-gray-500">Tracking: {ozoneTrackResult.tracking}</span>
+                          <span className="text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">{ozoneTrackResult.status}</span>
+                        </div>
+                        {ozoneTrackResult.recipient && <p className="text-sm font-semibold text-gray-800">{ozoneTrackResult.recipient}</p>}
+                        <div className="flex gap-3 mt-1 text-xs text-gray-500">
+                          {ozoneTrackResult.city && <span>{ozoneTrackResult.city}</span>}
+                          {ozoneTrackResult.phone && <span>{ozoneTrackResult.phone}</span>}
+                          {ozoneTrackResult.price && <span className="font-semibold text-gray-700">{ozoneTrackResult.price} DH</span>}
+                        </div>
+                      </div>
+                      {ozoneTrackResult.history.length > 0 && (
+                        <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
+                          {ozoneTrackResult.history.map((h, i) => (
+                            <div key={i} className="px-4 py-2 flex items-start gap-3 text-xs">
+                              <span className="mt-1 w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                              <div>
+                                <span className="font-semibold text-gray-700">{h.status || h.STATUS || h.label || ''}</span>
+                                {(h.date || h.DATE || h.created_at) && (
+                                  <span className="ml-2 text-gray-400">{h.date || h.DATE || h.created_at}</span>
+                                )}
+                                {(h.location || h.LOCATION || h.city) && (
+                                  <span className="ml-2 text-gray-400">— {h.location || h.LOCATION || h.city}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Separator */}
+              <div className="border-t border-gray-200 pt-4">
+                <h4 className="text-sm font-bold text-gray-700 mb-1">Sync tous les colis validés</h4>
+                <p className="text-xs text-gray-500 mb-3">Met à jour automatiquement les statuts de tous vos colis validés depuis Ozone Express.</p>
+                <button
+                  onClick={async () => {
+                    if (!auzone.customerId || !auzone.apiKey) return;
+                    setOzoneSyncState({ status: 'loading', message: 'Synchronisation en cours...', count: 0 });
+                    try {
+                      const base = `https://api.ozonexpress.ma/customers/${auzone.customerId}/${auzone.apiKey}`;
+                      const validatedOrders = orders.filter(o => o.validated);
+                      let updated = 0;
+                      const statusMap = {
+                        'En attente de ramassage': 'att_ramassage',
+                        'Ramassé': 'ramasse', 'Ramasse': 'ramasse',
+                        'Expédié': 'expedier', 'Expedie': 'expedier',
+                        'Reçu par le livreur': 'recu_livreur', 'Recu par le livreur': 'recu_livreur',
+                        'Livré': 'livre', 'Livre': 'livre',
+                        'Refusé': 'refuse', 'Refuse': 'refuse',
+                        'Annulé': 'annule', 'Annule': 'annule',
+                        'Échange': 'change', 'Echange': 'change',
+                        'En cours de livraison': 'expedier',
+                        'Prêt pour retour': 'pret_retour', 'Pret pour retour': 'pret_retour',
+                        'Pas de réponse': 'pas_rep_lv', 'Pas de reponse': 'pas_rep_lv',
+                        'Injoignable': 'injoignable',
+                      };
+                      for (let i = 0; i < validatedOrders.length; i++) {
+                        const o = validatedOrders[i];
+                        const tn = o.ozoneTracking || o.trackingNumber || o.id;
+                        setOzoneSyncState(p => ({ ...p, message: `${i + 1}/${validatedOrders.length}: ${tn}` }));
+                        try {
+                          const body = new FormData();
+                          body.append('tracking-number', tn);
+                          const res = await fetch(`${base}/parcel-info`, { method: 'POST', body });
+                          if (!res.ok) continue;
+                          const json = await res.json();
+                          const parcel = json['PARCEL-INFO'] || json;
+                          const result = (parcel['RESULT'] || '').toUpperCase();
+                          if (result === 'ERROR') continue;
+                          const ozStatus = parcel['PARCEL-STATUS'] || parcel['STATUS'] || parcel['LAST-STATUS'] || '';
+                          const ozTracking = parcel['TRACKING-NUMBER'] || parcel['TRACKING'] || tn;
+                          const mapped = statusMap[ozStatus] || statusMap[ozStatus.trim()];
+                          if (mapped && mapped !== o.status) {
+                            setOrders(prev => prev.map(ord =>
+                              ord.id === o.id ? { ...ord, status: mapped, ozoneTracking: ozTracking } : ord
+                            ));
+                            updated++;
+                          } else if (!o.ozoneTracking && ozTracking !== tn) {
+                            setOrders(prev => prev.map(ord =>
+                              ord.id === o.id ? { ...ord, ozoneTracking: ozTracking } : ord
+                            ));
+                          }
+                        } catch {}
+                      }
+                      setOzoneSyncState({ status: 'done', message: `${updated} commande(s) mise(s) à jour`, count: updated });
+                    } catch (err) {
+                      setOzoneSyncState({ status: 'error', message: err.message, count: 0 });
                     }
-                    setOzoneSyncState({ status: 'done', message: `${updated} commande(s) mise(s) à jour`, count: updated });
-                  } catch (err) {
-                    setOzoneSyncState({ status: 'error', message: err.message, count: 0 });
-                  }
-                }}
-                disabled={ozoneSyncState.status === 'loading'}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 disabled:opacity-60 transition w-full justify-center"
-              >
-                {ozoneSyncState.status === 'loading' ? (
-                  <><Loader2 size={13} className="animate-spin" /> {ozoneSyncState.message}</>
-                ) : (
-                  <><RefreshCw size={13} /> Sync statuts depuis Ozone</>
+                  }}
+                  disabled={ozoneSyncState.status === 'loading'}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-medium hover:bg-teal-700 disabled:opacity-60 transition w-full justify-center"
+                >
+                  {ozoneSyncState.status === 'loading' ? (
+                    <><Loader2 size={13} className="animate-spin" /> {ozoneSyncState.message}</>
+                  ) : (
+                    <><RefreshCw size={13} /> Synchroniser tout</>
+                  )}
+                </button>
+                {ozoneSyncState.status === 'done' && (
+                  <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><CheckCircle2 size={12} /> {ozoneSyncState.message}</p>
                 )}
-              </button>
-              {ozoneSyncState.status === 'done' && (
-                <p className="text-xs text-green-600 mt-2 flex items-center gap-1"><CheckCircle2 size={12} /> {ozoneSyncState.message}</p>
-              )}
-              {ozoneSyncState.status === 'error' && (
-                <p className="text-xs text-red-500 mt-2">{ozoneSyncState.message}</p>
-              )}
-            </div>
+                {ozoneSyncState.status === 'error' && (
+                  <p className="text-xs text-red-500 mt-2">{ozoneSyncState.message}</p>
+                )}
+              </div>
+            </>
           )}
         </div>
       </Modal>
