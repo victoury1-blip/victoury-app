@@ -835,7 +835,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
             const order = orders.find(o => o.id === orderId);
-            const newTrackingNumber = order?.trackingNumber || order?.id || null;
+            let newTrackingNumber = order?.trackingNumber || null;
+            if (!newTrackingNumber) {
+              newTrackingNumber = await generateVictId();
+            }
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
