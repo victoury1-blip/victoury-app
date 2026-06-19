@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { openLabelPage } from './LabelPrint';
