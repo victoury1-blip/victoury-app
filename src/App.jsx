@@ -104,6 +104,7 @@ export default function App() {
         noteLivraison: o.note_livraison || '',
         trackingNumber: o.tracking_number || null,
         ozoneTracking: o.ozone_tracking || null,
+        ozoneLastStatus: o.ozone_last_status || null,
         manuallyModified: o.manually_modified || false,
       })));
       setIsLoading(false);
@@ -272,6 +273,43 @@ export default function App() {
     return () => clearInterval(interval);
   }, [session]);
 
+  /* ── Ozone background sync (every 5 min) ── */
+  useEffect(() => {
+    if (!session) return;
+    async function syncOzoneStatuses() {
+      try {
+        let cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
+        if (!cfg.customerId || !cfg.apiKey) {
+          try { const r = await cloudGet('auzone_config'); if (r?.customerId) cfg = r; } catch {}
+        }
+        if (!cfg.customerId || !cfg.apiKey) return;
+        const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
+        const toSync = orders.filter(o => o.validated && (o.ozoneTracking || o.trackingNumber));
+        for (const o of toSync) {
+          const tn = o.ozoneTracking || o.trackingNumber || o.id;
+          try {
+            const body = new FormData();
+            body.append('tracking-number', tn);
+            const res = await fetch(`${base}/tracking`, { method: 'POST', body });
+            if (!res.ok) continue;
+            const json = await res.json();
+            const track = json?.['TRACKING'] || json || {};
+            if ((track['RESULT'] || '').toUpperCase() === 'ERROR') continue;
+            const last = track['LAST_TRACKING'] || track['LAST-TRACKING'] || {};
+            const status = last['STATUT'] || last['STATUS'] || '';
+            if (status && status !== o.ozoneLastStatus) {
+              setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
+              supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+    const timer = setTimeout(syncOzoneStatuses, 5000);
+    const interval = setInterval(syncOzoneStatuses, 300000);
+    return () => { clearTimeout(timer); clearInterval(interval); };
+  }, [session, orders.length]);
+
   /* ── Show loading / login ── */
   if (session === undefined) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
   if (session === null) return <LoginPage />;
@@ -326,6 +364,7 @@ export default function App() {
       tracking_number: order.trackingNumber || null,
       manually_modified: order.manuallyModified || false,
       ...(order.ozoneTracking ? { ozone_tracking: order.ozoneTracking } : {}),
+      ...(order.ozoneLastStatus ? { ozone_last_status: order.ozoneLastStatus } : {}),
     }, { onConflict: 'id' });
   }
 
