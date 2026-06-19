@@ -96,7 +96,7 @@ function parseCSV(text) {
   return { headers, rows };
 }
 
-function SheetImportSection({ orders = [] }) {
+function SheetImportSection({ orders = [], setOrders }) {
   const [headers, setHeaders] = useState([]);
   const [rows, setRows]       = useState([]);
   const [search, setSearch]   = useState('');
@@ -149,9 +149,57 @@ function SheetImportSection({ orders = [] }) {
   const productCol = headers.find(h => PRODUCT_KEYS.includes(h.toLowerCase()));
 
   const PHONE_KEYS = ['telephone','téléphone','tel','tél','phone','numero','numéro','mobile','gsm','num'];
-  const phoneCol = headers.find(h => PHONE_KEYS.includes(h.toLowerCase()));
+  const NAME_KEYS = ['nom','name','destinataire','client','receiver','prenom','prénom'];
+  const CITY_KEYS = ['ville','city','wilaya','region','région'];
+  const ADDRESS_KEYS = ['adresse','address','rue','quartier'];
+  const PRICE_KEYS = ['prix','price','montant','total','cod','amount'];
+  const CODE_KEYS = ['code','id','ref','reference','référence','code denvoi','code_denvoi','tracking'];
+
+  const findCol = (keys) => headers.find(h => {
+    const low = h.toLowerCase().replace(/[^a-zàâéèêëïîôùûüç0-9]/g, '');
+    return keys.some(k => low === k || low.includes(k));
+  });
+  const phoneCol = findCol(PHONE_KEYS);
+  const nameCol = findCol(NAME_KEYS);
+  const cityCol = findCol(CITY_KEYS);
+  const addressCol = findCol(ADDRESS_KEYS);
+  const priceCol = findCol(PRICE_KEYS);
+  const codeCol = findCol(CODE_KEYS);
 
   const normalizePhone = (p) => (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0').slice(-9);
+
+  function importToColis(rowsToImport) {
+    const existingIds = new Set(orders.map(o => o.id));
+    const newOrders = [];
+    for (const row of rowsToImport) {
+      const code = (codeCol && row[codeCol]) || row._id;
+      if (existingIds.has(code)) continue;
+      const name = (nameCol && row[nameCol]) || '';
+      const phone = (phoneCol && row[phoneCol]) || '';
+      const city = (cityCol && row[cityCol]) || '';
+      const address = (addressCol && row[addressCol]) || '';
+      const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
+      const product = (productCol && row[productCol]) || '';
+      const ts = new Date().toLocaleString('fr-MA');
+      newOrders.push({
+        id: code,
+        recipient: { name, phone, city, address, delivery: null },
+        product: { name: product, size: '', color: '', qty: 1, stock: 0 },
+        products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
+        price,
+        status: 'att_ramassage',
+        note: '',
+        dateAdded: ts,
+        dateUpdated: ts,
+        validated: true,
+        trackingNumber: code,
+      });
+      existingIds.add(code);
+    }
+    if (!newOrders.length) { alert('Tous ces colis existent déjà dans le pipeline.'); return; }
+    setOrders(prev => [...newOrders, ...prev]);
+    alert(`${newOrders.length} colis importé(s) vers Liste des colis.`);
+  }
   const livrePhones = useMemo(() => {
     const set = new Set();
     orders.forEach(o => {
@@ -215,6 +263,10 @@ function SheetImportSection({ orders = [] }) {
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
         </div>
         <div className="flex gap-2 ml-auto">
+          <button onClick={() => importToColis(filtered)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition">
+            <Truck size={13} /> Importer vers Colis ({filtered.length})
+          </button>
           <button onClick={() => fileRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">
             <Upload size={13} /> Nouveau CSV
@@ -948,7 +1000,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         );
       })()}
 
-      {tab === 'sheet' && <SheetImportSection orders={orders} />}
+      {tab === 'sheet' && <SheetImportSection orders={orders} setOrders={setOrders} />}
 
       {/* Table */}
       <div className={`flex-1 overflow-auto ${tab === 'sheet' ? 'hidden' : ''}`}>
