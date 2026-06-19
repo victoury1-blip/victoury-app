@@ -135,10 +135,8 @@ export default function LabelPrint({ orders, onClose }) {
   }, []);
 
   function handlePrint() {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) { alert('Popup bloqué. Autorisez les popups.'); return; }
-    printWindow.document.write(`
-      <html><head><title>Étiquettes VICTOURY</title>
+    const html = `<html><head><title>Étiquettes VICTOURY</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
         @page { size: 100mm 100mm; margin: 0; }
         * { box-sizing: border-box; }
@@ -147,24 +145,30 @@ export default function LabelPrint({ orders, onClose }) {
         .label-page:last-child { page-break-after: avoid; }
         .print-header { text-align: center; margin-bottom: 20px; }
         .print-header h1 { font-size: 18px; color: #1f2937; margin: 0 0 4px; }
-        .print-header p { font-size: 12px; color: #9ca3af; margin: 0; }
-        .print-btn { display: inline-block; margin: 10px auto; padding: 10px 28px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .print-header p { font-size: 12px; color: #9ca3af; margin: 0 0 12px; }
+        .print-btn { display: inline-block; margin: 6px; padding: 12px 32px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; }
         .print-btn:hover { background: #1d4ed8; }
         @media print {
           body { padding: 0; background: #fff; }
-          .print-header, .print-btn { display: none !important; }
+          .print-header { display: none !important; }
         }
       </style>
       </head><body>
         <div class="print-header">
           <h1>Étiquettes (${orders.length})</h1>
-          <p>Utilisez Ctrl+P ou le bouton ci-dessous pour imprimer / enregistrer en PDF</p>
-          <button class="print-btn" onclick="window.print()">Imprimer / PDF</button>
+          <p>Cliquez sur le bouton pour imprimer ou enregistrer en PDF</p>
+          <button class="print-btn" onclick="window.print()">Imprimer / Enregistrer PDF</button>
         </div>
         ${printRef.current.innerHTML}
-      </body></html>
-    `);
-    printWindow.document.close();
+      </body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
   return (
