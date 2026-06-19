@@ -1193,7 +1193,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     <div className="text-base font-bold text-gray-900 max-w-[220px] truncate">{o.recipient.name}</div>
                     <div className="text-sm text-gray-500 mt-0.5">{o.recipient.address}</div>
                     <div className="text-sm font-bold text-gray-800">{o.recipient.city}</div>
-                    <div className="mt-1.5 font-bold text-sm text-gray-900">{o.recipient.phone}</div>
+                    <PhoneChip phone={o.recipient.phone} />
                     {delivery !== '—' && (
                       <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
                         <Truck size={11} />
