@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import OrdersPage from './components/OrdersPage';
@@ -57,6 +57,7 @@ export default function App() {
   const [isWooFetching, setIsWooFetching] = useState(true);
   const [wooError, setWooError] = useState(null);
   const [dbError, setDbError] = useState(null);
+  const modifiedIdsRef = useRef(new Set());
   const navigate = useNavigate();
 
   /* ── Auth ── */
@@ -224,11 +225,12 @@ export default function App() {
               logError('supabase_save', `Failed to save ${fresh.length} orders: ${err.message}`, { count: fresh.length, error: err.message })
             );
           }
-          /* Update price + products of existing WC orders (to apply discounts / multi-product changes) */
+          /* Update price + products of existing WC orders (skip manually modified orders) */
           const priceMap = new Map(mapped.map(m => [m.id, { price: m.price, product: m.product, products: m.products }]));
           const changedWC = [];
           const updated = prev.map(o => {
             if (!o.id.startsWith('WC-')) return o;
+            if (modifiedIdsRef.current.has(o.id)) return o;
             const wc = priceMap.get(o.id);
             if (!wc || (wc.price === o.price && JSON.stringify(wc.products) === JSON.stringify(o.products))) return o;
             const next = { ...o, price: wc.price, product: wc.product, products: wc.products };
@@ -324,7 +326,10 @@ export default function App() {
         const old = prev.find((p) => p.id === o.id);
         return !old || JSON.stringify(old) !== JSON.stringify(o);
       });
-      changed.forEach((o) => updateOrderInSupabase(o));
+      changed.forEach((o) => {
+        modifiedIdsRef.current.add(o.id);
+        updateOrderInSupabase(o);
+      });
       return next;
     });
   };
