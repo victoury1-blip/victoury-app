@@ -319,8 +319,8 @@ export default function App() {
       report_date: order.reportDate || null,
       note_livraison: order.noteLivraison || '',
       tracking_number: order.trackingNumber || null,
-      ozone_tracking: order.ozoneTracking || null,
       manually_modified: order.manuallyModified || false,
+      ...(order.ozoneTracking ? { ozone_tracking: order.ozoneTracking } : {}),
     }, { onConflict: 'id' });
   }
 
