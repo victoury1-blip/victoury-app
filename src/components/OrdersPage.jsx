@@ -369,6 +369,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
   const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);
 
+  const isCasa = (city) => {
+    if (!city) return false;
+    const c = city.toLowerCase().replace(/[\s\-]/g, '');
+    return ['casa','casablanca','كازا','كازابلانكا','الدارالبيضاء','الدار البيضاء','dar el beida','darelbeida'].some(k => c.includes(k.replace(/[\s\-]/g, '')));
+  };
+
   const filtered = useMemo(() => {
     const af = appliedFilter;
     return orders.filter((o) => {
@@ -645,7 +651,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 className={`border-b border-gray-100 transition-colors ${
                   selected.includes(order.id)
                     ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
-                    : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-blue-50/30 border-l-[3px] border-transparent`
+                    : isCasa(order.recipient?.city)
+                      ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60'
+                      : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-blue-50/30 border-l-[3px] border-transparent`
                 }`}
               >
                 {/* Checkbox */}
