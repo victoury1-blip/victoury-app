@@ -75,7 +75,7 @@ function parseCSV(text) {
   return { headers, rows };
 }
 
-function SheetImportSection() {
+function SheetImportSection({ orders = [] }) {
   const [headers, setHeaders] = useState([]);
   const [rows, setRows]       = useState([]);
   const [search, setSearch]   = useState('');
@@ -121,6 +121,24 @@ function SheetImportSection() {
   }
 
   const productCol = headers.find(h => PRODUCT_KEYS.includes(h.toLowerCase()));
+
+  const PHONE_KEYS = ['telephone','téléphone','tel','tél','phone','numero','numéro','mobile','gsm','num'];
+  const phoneCol = headers.find(h => PHONE_KEYS.includes(h.toLowerCase()));
+
+  const normalizePhone = (p) => (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0').slice(-9);
+  const livrePhones = useMemo(() => {
+    const set = new Set();
+    orders.forEach(o => {
+      if (o.status === 'livre' && o.recipient?.phone) set.add(normalizePhone(o.recipient.phone));
+    });
+    return set;
+  }, [orders]);
+
+  function isDelivered(row) {
+    if (!phoneCol) return false;
+    const phone = normalizePhone(row[phoneCol]);
+    return phone.length >= 8 && livrePhones.has(phone);
+  }
 
   const filtered = rows.filter(r => {
     const q = search.toLowerCase();
@@ -199,16 +217,23 @@ function SheetImportSection() {
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
               <tr><td colSpan={headers.length + 3} className="py-12 text-center text-gray-400 text-sm">Aucune ligne trouvée</td></tr>
-            ) : filtered.map((row, idx) => (
-              <tr key={row._id} className={`hover:bg-gray-50 ${row._status === 'livre' ? 'bg-blue-50/30' : row._status === 'confirme' ? 'bg-green-50/30' : row._status === 'annule' || row._status === 'refuse' ? 'bg-red-50/20' : ''}`}>
-                <td className="px-3 py-2.5 text-xs text-gray-400">{idx + 1}</td>
+            ) : filtered.map((row, idx) => {
+              const delivered = isDelivered(row);
+              return (
+              <tr key={row._id} className={`hover:bg-gray-50 ${delivered ? 'bg-green-100 border-l-4 border-green-500' : row._status === 'livre' ? 'bg-blue-50/30' : row._status === 'confirme' ? 'bg-green-50/30' : row._status === 'annule' || row._status === 'refuse' ? 'bg-red-50/20' : ''}`}>
+                <td className="px-3 py-2.5 text-xs text-gray-400">
+                  {delivered ? <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold">✓</span> : idx + 1}
+                </td>
                 {headers.map(h => {
                   const isProduct = PRODUCT_KEYS.includes(h.toLowerCase());
+                  const isPhone = phoneCol && h === phoneCol;
                   const val = row[h] || '—';
                   return (
                     <td key={h} className="px-3 py-2.5 max-w-[180px]">
                       {isProduct
-                        ? <span className="font-bold text-gray-800 text-sm">{val}</span>
+                        ? <span className={`font-bold text-sm ${delivered ? 'text-green-800' : 'text-gray-800'}`}>{val}</span>
+                        : isPhone && delivered
+                        ? <span className="text-xs font-bold text-green-700 bg-green-200 px-1.5 py-0.5 rounded">{val}</span>
                         : <span className="text-xs text-gray-600 line-clamp-2">{val}</span>
                       }
                     </td>
@@ -238,14 +263,15 @@ function SheetImportSection() {
                   }
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Footer */}
       <div className="bg-white border-t px-6 py-2 text-xs text-gray-500 flex justify-between">
-        <span>{filtered.length} / {rows.length} lignes affichées</span>
+        <span>{filtered.length} / {rows.length} lignes affichées {phoneCol && <span className="text-green-600 font-bold ml-2">✓ Livrés: {rows.filter(r => isDelivered(r)).length}</span>}</span>
         <span className="flex gap-3">
           {SHEET_STATUSES.slice(0,4).map(s => counts[s.value] > 0 && (
             <span key={s.value} style={{ color: s.color }} className="font-semibold">{s.label}: {counts[s.value]}</span>
@@ -898,7 +924,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         );
       })()}
 
-      {tab === 'sheet' && <SheetImportSection />}
+      {tab === 'sheet' && <SheetImportSection orders={orders} />}
 
       {/* Table */}
       <div className={`flex-1 overflow-auto ${tab === 'sheet' ? 'hidden' : ''}`}>
