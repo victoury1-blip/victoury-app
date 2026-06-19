@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { X, Printer } from 'lucide-react';
+import { cloudGet } from '../lib/cloudSettings';
 
 function getShopConfig() {
   try { return JSON.parse(localStorage.getItem('victoury_shop_config') || '{}'); } catch { return {}; }
@@ -121,8 +122,17 @@ function LabelContent({ order, config }) {
 }
 
 export default function LabelPrint({ orders, onClose }) {
-  const config = getShopConfig();
+  const [config, setConfig] = useState(getShopConfig);
   const printRef = useRef(null);
+
+  useEffect(() => {
+    cloudGet('victoury_shop_config').then(saved => {
+      if (saved && Object.keys(saved).length > 0) {
+        setConfig(saved);
+        localStorage.setItem('victoury_shop_config', JSON.stringify(saved));
+      }
+    });
+  }, []);
 
   function handlePrint() {
     const printWindow = window.open('', '_blank');

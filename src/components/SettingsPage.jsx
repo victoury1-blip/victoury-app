@@ -121,6 +121,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   function saveShopCfg(cfg) {
     setShopCfg(cfg);
     localStorage.setItem('victoury_shop_config', JSON.stringify(cfg));
+    cloudSet('victoury_shop_config', cfg);
     setShopSaved(true);
     setTimeout(() => setShopSaved(false), 2000);
   }
@@ -174,6 +175,12 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     });
     cloudGet('auzone_config').then(saved => {
       if (saved?.apiKey) setAuzone(p => ({ ...p, customerId: saved.customerId || '', apiKey: saved.apiKey, saved: true }));
+    });
+    cloudGet('victoury_shop_config').then(saved => {
+      if (saved && Object.keys(saved).length > 0) {
+        setShopCfg(saved);
+        localStorage.setItem('victoury_shop_config', JSON.stringify(saved));
+      }
     });
   }, []);
 
