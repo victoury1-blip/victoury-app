@@ -65,29 +65,61 @@ function SheetStatusPicker({ value, onChange }) {
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-  const rows = lines.slice(1).map((line, idx) => {
-    const vals = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|^(?=,)|(?<=,)$)/g) || [];
+
+  function splitCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if ((ch === ',' || ch === ';') && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  const headers = splitCSVLine(lines[0]);
+  const rows = lines.slice(1).filter(l => l.trim()).map((line, idx) => {
+    const vals = splitCSVLine(line);
     const obj = { _id: `gs-${Date.now()}-${idx}`, _status: '' };
-    headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g, '').trim(); });
+    headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
     return obj;
   });
   return { headers, rows };
 }
 
-function SheetImportSection() {
+function SheetImportSection({ orders = [], setOrders }) {
   const [headers, setHeaders] = useState([]);
   const [rows, setRows]       = useState([]);
   const [search, setSearch]   = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [modifiedIds, setModifiedIds] = useState(new Set());
   const fileRef = useRef(null);
+  const [mappingOpen, setMappingOpen] = useState(false);
+  const [pendingData, setPendingData] = useState(null);
+  const [colMap, setColMap] = useState({});
+  const [importStatus, setImportStatus] = useState('att_ramassage');
 
   useEffect(() => {
     const stored = localStorage.getItem('gs_import');
-    if (stored) { const p = JSON.parse(stored); setHeaders(p.headers); setRows(p.rows); }
+    if (stored) {
+      const p = JSON.parse(stored);
+      setHeaders(p.headers); setRows(p.rows);
+      if (p.colMap) setColMap(p.colMap);
+    }
     cloudGet('gs_import').then(remote => {
-      if (remote?.headers?.length) { setHeaders(remote.headers); setRows(remote.rows || []); }
+      if (remote?.headers?.length) {
+        setHeaders(remote.headers); setRows(remote.rows || []);
+        if (remote.colMap) setColMap(remote.colMap);
+      }
     });
   }, []);
 
@@ -96,12 +128,27 @@ function SheetImportSection() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const { headers: h, rows: r } = parseCSV(ev.target.result);
-      setHeaders(h); setRows(r);
-      cloudSet('gs_import', { headers: h, rows: r });
+      let text = ev.target.result;
+      if (text.includes('\t') && !text.includes(',') && !text.includes(';')) {
+        text = text.split('\n').map(l => l.split('\t').map(c => c.includes(',') ? `"${c}"` : c).join(',')).join('\n');
+      }
+      const { headers: h, rows: r } = parseCSV(text);
+      if (!h.length) { alert('Fichier non reconnu.'); return; }
+      setPendingData({ headers: h, rows: r });
+      setMappingOpen(true);
     };
     reader.readAsText(file, 'UTF-8');
     e.target.value = '';
+  }
+
+  function applyMapping(mapping) {
+    if (!pendingData) return;
+    setColMap(mapping);
+    setHeaders(pendingData.headers);
+    setRows(pendingData.rows);
+    cloudSet('gs_import', { headers: pendingData.headers, rows: pendingData.rows, colMap: mapping });
+    setPendingData(null);
+    setMappingOpen(false);
   }
 
   function updateRow(id, patch) {
@@ -120,7 +167,76 @@ function SheetImportSection() {
     cloudSet('gs_import', { headers: [], rows: [] });
   }
 
-  const productCol = headers.find(h => PRODUCT_KEYS.includes(h.toLowerCase()));
+  const productCol = colMap['product'] || headers.find(h => PRODUCT_KEYS.includes(h.toLowerCase()));
+
+  const PHONE_KEYS = ['telephone','téléphone','tel','tél','phone','numero','numéro','mobile','gsm','num'];
+  const NAME_KEYS = ['nom','name','destinataire','client','receiver','prenom','prénom'];
+  const CITY_KEYS = ['ville','city','wilaya','region','région'];
+  const ADDRESS_KEYS = ['adresse','address','rue','quartier'];
+  const PRICE_KEYS = ['prix','price','montant','total','cod','amount'];
+  const CODE_KEYS = ['code','id','ref','reference','référence','code denvoi','code_denvoi','tracking'];
+
+  const findCol = (field, keys) => {
+    if (colMap[field]) return colMap[field];
+    return headers.find(h => {
+      const low = h.toLowerCase().replace(/[^a-zàâéèêëïîôùûüç0-9]/g, '');
+      return keys.some(k => low === k || low.includes(k));
+    });
+  };
+  const phoneCol = findCol('phone', PHONE_KEYS);
+  const nameCol = findCol('name', NAME_KEYS);
+  const cityCol = findCol('city', CITY_KEYS);
+  const addressCol = findCol('address', ADDRESS_KEYS);
+  const priceCol = findCol('price', PRICE_KEYS);
+  const codeCol = findCol('code', CODE_KEYS);
+
+  const normalizePhone = (p) => (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0').slice(-9);
+
+  function importToColis(rowsToImport) {
+    const existingIds = new Set(orders.map(o => o.id));
+    const newOrders = [];
+    for (const row of rowsToImport) {
+      const code = (codeCol && row[codeCol]) || row._id;
+      if (existingIds.has(code)) continue;
+      const name = (nameCol && row[nameCol]) || '';
+      const phone = (phoneCol && row[phoneCol]) || '';
+      const city = (cityCol && row[cityCol]) || '';
+      const address = (addressCol && row[addressCol]) || '';
+      const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
+      const product = (productCol && row[productCol]) || '';
+      const ts = new Date().toLocaleString('fr-MA');
+      newOrders.push({
+        id: code,
+        recipient: { name, phone, city, address, delivery: null },
+        product: { name: product, size: '', color: '', qty: 1, stock: 0 },
+        products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
+        price,
+        status: importStatus,
+        note: '',
+        dateAdded: ts,
+        dateUpdated: ts,
+        validated: true,
+        trackingNumber: code,
+      });
+      existingIds.add(code);
+    }
+    if (!newOrders.length) { alert('Tous ces colis existent déjà dans le pipeline.'); return; }
+    setOrders(prev => [...newOrders, ...prev]);
+    alert(`${newOrders.length} colis importé(s) vers Liste des colis.`);
+  }
+  const livrePhones = useMemo(() => {
+    const set = new Set();
+    orders.forEach(o => {
+      if (o.status === 'livre' && o.recipient?.phone) set.add(normalizePhone(o.recipient.phone));
+    });
+    return set;
+  }, [orders]);
+
+  function isDelivered(row) {
+    if (!phoneCol) return false;
+    const phone = normalizePhone(row[phoneCol]);
+    return phone.length >= 8 && livrePhones.has(phone);
+  }
 
   const filtered = rows.filter(r => {
     const q = search.toLowerCase();
@@ -134,24 +250,101 @@ function SheetImportSection() {
     return acc;
   }, {});
 
+  const MAPPING_FIELDS = [
+    { key: 'code',    label: 'Code / ID',    icon: '#' },
+    { key: 'name',    label: 'Nom client',   icon: '👤' },
+    { key: 'phone',   label: 'Téléphone',    icon: '📞' },
+    { key: 'address', label: 'Adresse',      icon: '📍' },
+    { key: 'city',    label: 'Ville',        icon: '🏙️' },
+    { key: 'price',   label: 'Prix',         icon: '💰' },
+    { key: 'product', label: 'Produit',      icon: '📦' },
+  ];
+
+  const IMPORT_STATUSES = [
+    { value: 'att_ramassage', label: 'En attente ramassage', color: '#f59e0b' },
+    { value: 'livre',         label: 'Livré',               color: '#16a34a' },
+    { value: 'refuse',        label: 'Refusé',              color: '#ef4444' },
+    { value: 'annule',        label: 'Annulé',              color: '#dc2626' },
+    { value: 'retour',        label: 'Retour',              color: '#7c3aed' },
+    { value: 'expedier',      label: 'Expédié',             color: '#3b82f6' },
+    { value: 'ramasse',       label: 'Ramassé',             color: '#6366f1' },
+  ];
+
+  const mappingModal = mappingOpen && pendingData && (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-green-50">
+          <h3 className="font-bold text-green-800 text-sm">Mapping des colonnes</h3>
+          <p className="text-xs text-green-600 mt-0.5">Associez chaque champ à la bonne colonne du CSV</p>
+        </div>
+        <div className="p-4 space-y-2.5">
+          <div className="bg-gray-50 rounded-lg p-2 text-[10px] text-gray-500 mb-2">
+            Aperçu: <span className="font-mono font-semibold">{pendingData.headers.join(' | ')}</span>
+          </div>
+          {MAPPING_FIELDS.map(f => (
+            <div key={f.key} className="flex items-center gap-3">
+              <span className="w-24 text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                <span>{f.icon}</span> {f.label}
+              </span>
+              <select
+                value={colMap[f.key] || ''}
+                onChange={e => setColMap(p => ({ ...p, [f.key]: e.target.value || undefined }))}
+                className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-300"
+              >
+                <option value="">— Auto —</option>
+                {pendingData.headers.map(h => (
+                  <option key={h} value={h}>{h}{pendingData.rows[0] ? ` (ex: ${String(pendingData.rows[0][h] || '').slice(0, 20)})` : ''}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <div className="px-4 pb-3">
+          <p className="text-xs font-semibold text-gray-700 mb-1.5">Statut à l'import :</p>
+          <div className="flex flex-wrap gap-1.5">
+            {IMPORT_STATUSES.map(s => (
+              <button key={s.value} onClick={() => setImportStatus(s.value)}
+                className="px-2.5 py-1 rounded-full text-xs font-semibold border transition"
+                style={importStatus === s.value
+                  ? { background: s.color, color: '#fff', borderColor: s.color }
+                  : { background: '#f9fafb', color: s.color, borderColor: s.color + '44' }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+          <button onClick={() => { setMappingOpen(false); setPendingData(null); }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Annuler</button>
+          <button onClick={() => applyMapping(colMap)}
+            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700">Confirmer</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (!headers.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-        <FileSpreadsheet size={48} className="text-green-400 mb-4" />
-        <p className="text-gray-600 font-semibold text-lg mb-2">Importer depuis Google Sheets</p>
-        <p className="text-gray-400 text-sm mb-6">Exportez votre feuille en CSV puis importez-la ici</p>
-        <button onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
-          <Upload size={15} /> Importer fichier CSV
-        </button>
-        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
-        <p className="text-gray-400 text-xs mt-4">Dans Google Sheets : Fichier → Télécharger → CSV</p>
-      </div>
+      <>
+        {mappingModal}
+        <div className="flex flex-col items-center justify-center h-full py-20 text-center">
+          <FileSpreadsheet size={48} className="text-green-400 mb-4" />
+          <p className="text-gray-600 font-semibold text-lg mb-2">Importer depuis Google Sheets</p>
+          <p className="text-gray-400 text-sm mb-6">Exportez votre feuille en CSV puis importez-la ici</p>
+          <button onClick={() => fileRef.current?.click()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+            <Upload size={15} /> Importer fichier CSV
+          </button>
+          <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
+          <p className="text-gray-400 text-xs mt-4">Dans Google Sheets : Fichier → Télécharger → CSV</p>
+        </div>
+      </>
     );
   }
 
   return (
     <div className="flex flex-col h-full">
+      {mappingModal}
       {/* Subheader */}
       <div className="bg-white border-b px-4 py-2 flex flex-wrap items-center gap-2">
         <div className="flex gap-1.5 flex-wrap">
@@ -171,6 +364,10 @@ function SheetImportSection() {
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
         </div>
         <div className="flex gap-2 ml-auto">
+          <button onClick={() => importToColis(filtered)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition">
+            <Truck size={13} /> Importer vers Colis ({filtered.length})
+          </button>
           <button onClick={() => fileRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">
             <Upload size={13} /> Nouveau CSV
@@ -180,7 +377,7 @@ function SheetImportSection() {
             <Trash2 size={13} /> Effacer
           </button>
         </div>
-        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
       </div>
 
       {/* Table */}
@@ -199,15 +396,20 @@ function SheetImportSection() {
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
               <tr><td colSpan={headers.length + 3} className="py-12 text-center text-gray-400 text-sm">Aucune ligne trouvée</td></tr>
-            ) : filtered.map((row, idx) => (
+            ) : filtered.map((row, idx) => {
+              const delivered = isDelivered(row);
+              return (
               <tr key={row._id} className={`hover:bg-gray-50 ${row._status === 'livre' ? 'bg-blue-50/30' : row._status === 'confirme' ? 'bg-green-50/30' : row._status === 'annule' || row._status === 'refuse' ? 'bg-red-50/20' : ''}`}>
                 <td className="px-3 py-2.5 text-xs text-gray-400">{idx + 1}</td>
                 {headers.map(h => {
                   const isProduct = PRODUCT_KEYS.includes(h.toLowerCase());
+                  const isPhone = phoneCol && h === phoneCol;
                   const val = row[h] || '—';
                   return (
                     <td key={h} className="px-3 py-2.5 max-w-[180px]">
-                      {isProduct
+                      {isPhone && delivered
+                        ? <span className="text-xs font-bold text-green-700 bg-green-200 px-1.5 py-0.5 rounded">{val} ✓</span>
+                        : isProduct
                         ? <span className="font-bold text-gray-800 text-sm">{val}</span>
                         : <span className="text-xs text-gray-600 line-clamp-2">{val}</span>
                       }
@@ -238,14 +440,15 @@ function SheetImportSection() {
                   }
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Footer */}
       <div className="bg-white border-t px-6 py-2 text-xs text-gray-500 flex justify-between">
-        <span>{filtered.length} / {rows.length} lignes affichées</span>
+        <span>{filtered.length} / {rows.length} lignes affichées {phoneCol && <span className="text-green-600 font-bold ml-2">✓ Livrés: {rows.filter(r => isDelivered(r)).length}</span>}</span>
         <span className="flex gap-3">
           {SHEET_STATUSES.slice(0,4).map(s => counts[s.value] > 0 && (
             <span key={s.value} style={{ color: s.color }} className="font-semibold">{s.label}: {counts[s.value]}</span>
@@ -401,53 +604,86 @@ const DELIVERY_STATUSES = [
 ];
 
 function DeliveryStatusModal({ order, onClose, onSave }) {
-  const [tab, setTab] = useState(order.trackingNumber ? 'history' : 'manual');
+  const ozTn = order.ozoneTracking || order.trackingNumber;
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState('');
-  const [historyState, setHistoryState] = useState('idle'); /* idle | loading | ok | error */
-  const [historyData, setHistoryData] = useState(null);
+  const [ozoneState, setOzoneState] = useState('idle');
+  const [ozoneData, setOzoneData] = useState(null);
+  const [manualTn, setManualTn] = useState('');
   const current = DELIVERY_STATUSES.find(s => s.value === status);
+  const localStatus = DELIVERY_STATUSES.find(s => s.value === order.status);
 
-  async function fetchOzoneHistory() {
-    setHistoryState('loading');
-    setHistoryData(null);
+  useEffect(() => { fetchOzone(); }, []);
+
+  async function fetchOzone(customTn) {
+    setOzoneState('loading');
     try {
-      const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
-      if (!cfg.customerId || !cfg.apiKey) { setHistoryState('error'); return; }
-      const tn = order.trackingNumber;
-      /* Try multiple endpoint patterns */
-      const endpoints = [
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${tn}`,
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcels-history?tracking-number=${tn}`,
-        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/parcel-history/${tn}`,
-      ];
-      let raw = null;
-      for (const url of endpoints) {
+      let cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
+      if (!cfg.customerId || !cfg.apiKey) {
         try {
-          const res = await fetch(url);
-          if (res.ok) { raw = await res.json(); break; }
+          const remote = await cloudGet('auzone_config');
+          if (remote?.customerId && remote?.apiKey) {
+            cfg = remote;
+            localStorage.setItem('auzone_config', JSON.stringify(remote));
+          }
         } catch {}
       }
-      if (!raw) { setHistoryState('error'); return; }
-      /* Parse response — Ozone wraps in GET-PARCEL or GET-PARCELS-HISTORY */
-      const parcel = raw['GET-PARCEL'] || raw['PARCEL'] || raw;
-      const histArr = parcel['PARCEL-HISTORY'] || parcel['history'] || parcel['HISTORY'] || parcel['events'] || [];
-      const info = {
-        tracking: tn,
-        receiver: parcel['PARCEL-RECEIVER'] || parcel['RECEIVER'] || order.recipient?.name,
-        phone: parcel['PARCEL-PHONE'] || parcel['PHONE'] || order.recipient?.phone,
-        city: parcel['CITY_NAME'] || parcel['CITY'] || order.recipient?.city,
-        status: parcel['PARCEL-STATUS'] || parcel['STATUS'] || '',
-        history: histArr,
-      };
-      setHistoryData(info);
-      setHistoryState('ok');
-    } catch { setHistoryState('error'); }
-  }
+      if (!cfg.customerId || !cfg.apiKey) { setOzoneState('no_config'); return; }
+      const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
+      const tns = customTn
+        ? [customTn]
+        : [...new Set([ozTn, order.trackingNumber, order.id].filter(Boolean))];
 
-  useEffect(() => {
-    if (tab === 'history' && order.trackingNumber && historyState === 'idle') fetchOzoneHistory();
-  }, [tab]);
+      for (const tn of tns) {
+        try {
+          const body = new FormData();
+          body.append('tracking-number', tn);
+          const [trackRes, infoRes] = await Promise.all([
+            fetch(`${base}/tracking`, { method: 'POST', body }),
+            fetch(`${base}/parcel-info`, { method: 'POST', body: (() => { const f = new FormData(); f.append('tracking-number', tn); return f; })() }),
+          ]);
+          const trackJson = trackRes.ok ? await trackRes.json() : null;
+          const infoJson = infoRes.ok ? await infoRes.json() : null;
+          const track = trackJson ? (trackJson['TRACKING'] || trackJson) : {};
+          const parcel = infoJson ? (infoJson['PARCEL-INFO'] || infoJson) : {};
+          if ((track['RESULT'] || '').toUpperCase() === 'ERROR' && (parcel['RESULT'] || '').toUpperCase() === 'ERROR') continue;
+
+          const pick = (...keys) => {
+            for (const src of [parcel, track]) {
+              for (const k of keys) { if (src[k]) return src[k]; }
+            }
+            return '';
+          };
+          const parcelInfos = parcel['INFOS'] || parcel;
+          const lastTrack = track['LAST_TRACKING'] || track['LAST-TRACKING'] || {};
+          const ozStatus = lastTrack['STATUT'] || lastTrack['STATUS'] || parcelInfos['PARCEL-STATUS'] || parcelInfos['STATUS'] || track['STATUT'] || '';
+          const histRaw = track['HISTORY'] || track['PARCEL-HISTORY'] || track['history'] || {};
+          const histList = Array.isArray(histRaw) ? histRaw : Object.values(histRaw);
+
+          if (!ozStatus && histList.length === 0) continue;
+
+          const realTn = parcelInfos['TRACKING-NUMBER'] || track['TRACKING-NUMBER'] || tn;
+          if (realTn && realTn !== order.ozoneTracking) {
+            onSave(order.id, order.status, '', realTn);
+          }
+
+          setOzoneData({
+            tracking: realTn,
+            status: ozStatus,
+            receiver: parcelInfos['RECEIVER'] || parcelInfos['RECIPIENT-NAME'] || '',
+            phone: parcelInfos['PHONE'] || parcelInfos['RECIPIENT-PHONE'] || '',
+            city: parcelInfos['CITY_NAME'] || parcelInfos['CITY'] || '',
+            cod: parcelInfos['PRICE'] || parcelInfos['COD'] || '',
+            history: histList,
+          });
+          if (ozStatus) onSave(order.id, order.status, '', realTn, ozStatus);
+          setOzoneState('ok');
+          return;
+        } catch {}
+      }
+      setOzoneState('not_found');
+    } catch { setOzoneState('error'); }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -457,96 +693,115 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
           <div className="flex items-center gap-2">
             <span className="p-1.5 rounded-lg bg-amber-100"><Truck size={15} className="text-amber-600" /></span>
             <div>
-              <h3 className="font-bold text-gray-800 text-sm">Livraison — {order.trackingNumber || order.id}</h3>
-              <p className="text-xs text-gray-400">{order.recipient?.name}</p>
+              <h3 className="font-bold text-gray-800 text-sm">Livraison — {order.id}</h3>
+              <p className="text-xs text-gray-400">{order.recipient?.name} — {order.recipient?.city}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
         </div>
 
-        {/* Tabs */}
-        {order.trackingNumber && (
-          <div className="flex border-b border-gray-100">
-            {[{ k:'history', l:'📦 Historique Ozone' }, { k:'manual', l:'✏️ Statut manuel' }].map(t => (
-              <button key={t.k} onClick={() => setTab(t.k)}
-                className={`flex-1 py-2 text-xs font-semibold transition-colors ${tab === t.k ? 'text-amber-600 border-b-2 border-amber-500' : 'text-gray-400 hover:text-gray-600'}`}>
-                {t.l}
-              </button>
-            ))}
+        <div className="p-4 max-h-[70vh] overflow-y-auto space-y-3">
+          {/* Local status - always visible, instant */}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-[10px] text-gray-400 uppercase font-semibold mb-1.5">Statut actuel</p>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: localStatus?.color || '#f59e0b' }} />
+              <span className="text-sm font-bold" style={{ color: localStatus?.color || '#f59e0b' }}>{localStatus?.label || order.status}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">{order.dateUpdated || order.dateAdded}</p>
           </div>
-        )}
 
-        <div className="p-4 max-h-[70vh] overflow-y-auto">
-          {/* History tab */}
-          {tab === 'history' && (
-            <div>
-              {historyState === 'loading' && (
-                <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
-                  <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs">Récupération de l'historique Ozone Express...</p>
+          {/* Ozone section */}
+          <div className="border border-amber-200 rounded-lg overflow-hidden">
+            <div className="bg-amber-50 px-3 py-2 flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-700">Ozone Express</span>
+              {ozoneState === 'idle' && (
+                <div className="flex items-center gap-1 text-xs text-amber-600">
+                  <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
-              {historyState === 'error' && (
-                <div className="py-6 text-center">
-                  <p className="text-xs text-red-500 mb-2">Impossible de récupérer l'historique.</p>
-                  <p className="text-xs text-gray-400 mb-3">Vérifiez la config API dans Paramètres.</p>
-                  <button onClick={fetchOzoneHistory} className="text-xs text-amber-600 underline">Réessayer</button>
+              {ozoneState === 'loading' && (
+                <div className="flex items-center gap-1 text-xs text-amber-600">
+                  <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  Chargement...
                 </div>
               )}
-              {historyState === 'ok' && historyData && (
-                <div>
-                  {/* Parcel info */}
-                  <div className="bg-gray-50 rounded-lg p-3 mb-3 text-xs space-y-0.5">
-                    <p><span className="font-semibold text-gray-600">N° suivi:</span> <span className="font-mono text-amber-700">{historyData.tracking}</span></p>
-                    <p><span className="font-semibold text-gray-600">Client:</span> {historyData.receiver}</p>
-                    <p><span className="font-semibold text-gray-600">Téléphone:</span> {historyData.phone}</p>
-                    <p><span className="font-semibold text-gray-600">Ville:</span> {historyData.city}</p>
-                    {historyData.status && <p><span className="font-semibold text-gray-600">Statut actuel:</span> <span className="text-amber-700 font-semibold">{historyData.status}</span></p>}
+              {ozoneState === 'ok' && (
+                <button onClick={() => fetchOzone()} className="text-[10px] text-amber-600 hover:underline">Actualiser</button>
+              )}
+            </div>
+
+            <div className="px-3 py-2">
+              {ozoneState === 'idle' && (
+                <p className="text-xs text-gray-400 text-center py-2">Chargement...</p>
+              )}
+
+              {ozoneState === 'no_config' && (
+                <p className="text-xs text-amber-600 text-center py-2">API non configurée. Allez dans Réglages → Ozon Express.</p>
+              )}
+
+              {(ozoneState === 'error' || ozoneState === 'not_found') && (
+                <div className="py-2">
+                  <p className="text-xs text-red-500 mb-2 text-center">Introuvable avec: {[ozTn, order.trackingNumber, order.id].filter(Boolean).join(', ')}</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={manualTn}
+                      onChange={e => setManualTn(e.target.value)}
+                      placeholder="Entrez le N° Ozone..."
+                      className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300"
+                      onKeyDown={e => { if (e.key === 'Enter' && manualTn.trim()) fetchOzone(manualTn.trim()); }}
+                    />
+                    <button
+                      onClick={() => manualTn.trim() && fetchOzone(manualTn.trim())}
+                      disabled={!manualTn.trim()}
+                      className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition"
+                    >
+                      OK
+                    </button>
                   </div>
-                  {/* Timeline */}
-                  {(() => {
-                    /* Build events: API history + always show local status as fallback */
-                    const localEvent = {
-                      label: DELIVERY_STATUSES.find(s => s.value === order.status)?.label || order.status,
-                      date: order.dateUpdated || order.dateAdded || '',
-                      color: DELIVERY_STATUSES.find(s => s.value === order.status)?.color || '#f59e0b',
-                      local: true,
-                    };
-                    const apiEvents = historyData.history.map(h => ({
-                      label: h['STATUS'] || h['LABEL'] || h['status'] || h['label'] || h['event'] || JSON.stringify(h),
-                      date: h['DATE'] || h['date'] || h['DATE_TIME'] || '',
-                      color: '#f59e0b',
-                      local: false,
-                    }));
-                    const events = apiEvents.length > 0 ? apiEvents : [localEvent];
-                    return (
-                      <div className="relative pl-4">
-                        <div className="absolute left-1.5 top-0 bottom-0 w-px bg-gray-200" />
-                        {events.map((ev, i) => (
-                          <div key={i} className="relative mb-3 last:mb-0">
-                            <span className="absolute -left-[11px] w-3 h-3 rounded-full border-2 border-white"
-                              style={{ backgroundColor: i === 0 ? ev.color : '#d1d5db' }} />
-                            <p className={`text-xs font-semibold ${i === 0 ? 'text-amber-700' : 'text-gray-700'}`}>{ev.label}</p>
-                            {ev.date && <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">🕐 {ev.date}</p>}
-                            {ev.local && <p className="text-[10px] text-blue-400 mt-0.5">📍 Statut local (non Ozone)</p>}
+                </div>
+              )}
+
+              {ozoneState === 'ok' && ozoneData && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-sm font-bold text-green-700">{ozoneData.status}</span>
+                  </div>
+                  {ozoneData.tracking && <p className="text-[10px] text-gray-500">N° suivi: <span className="font-mono text-amber-700">{ozoneData.tracking}</span></p>}
+                  {ozoneData.cod && <p className="text-[10px] text-gray-500">COD: <span className="font-semibold text-gray-700">{ozoneData.cod} DH</span></p>}
+                  {ozoneData.history.length > 0 && (
+                    <div className="mt-2 border-t border-gray-100 pt-2">
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold mb-1">Historique</p>
+                      <div className="relative pl-3 space-y-1.5">
+                        <div className="absolute left-1 top-0 bottom-0 w-px bg-gray-200" />
+                        {ozoneData.history.map((h, i) => (
+                          <div key={i} className="relative">
+                            <span className="absolute -left-[7px] w-2 h-2 rounded-full border border-white"
+                              style={{ backgroundColor: i === 0 ? '#f59e0b' : '#d1d5db' }} />
+                            <p className="text-[11px] font-semibold text-gray-700 pl-1">{h['STATUT'] || h['STATUS'] || h['status'] || ''}</p>
+                            {(h['TIME_STR'] || h['DATE'] || h['date']) && <p className="text-[10px] text-gray-400 pl-1">{h['TIME_STR'] || h['DATE'] || h['date']}</p>}
+                            {h['COMMENT'] && <p className="text-[10px] text-gray-400 pl-1">{h['COMMENT']}</p>}
                           </div>
                         ))}
                       </div>
-                    );
-                  })()}
-                  <button onClick={fetchOzoneHistory} className="mt-3 w-full text-xs text-amber-600 border border-amber-200 rounded-lg py-1.5 hover:bg-amber-50 transition">🔄 Actualiser</button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Manual tab */}
-          {tab === 'manual' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-1.5 max-h-52 overflow-y-auto pr-1">
+          {/* Manual status change */}
+          <details className="border border-gray-200 rounded-lg overflow-hidden">
+            <summary className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-600 cursor-pointer hover:bg-gray-100 select-none">
+              Changer le statut manuellement
+            </summary>
+            <div className="p-3 space-y-2">
+              <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto pr-1">
                 {DELIVERY_STATUSES.map(s => (
                   <button key={s.value} onClick={() => setStatus(s.value)}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-left transition-all border ${
+                    className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-left transition-all border ${
                       status === s.value ? 'text-white font-semibold border-transparent' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     }`}
                     style={status === s.value ? { backgroundColor: s.color, borderColor: s.color } : {}}>
@@ -567,7 +822,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
                 </button>
               </div>
             </div>
-          )}
+          </details>
         </div>
       </div>
     </div>
@@ -575,7 +830,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
 }
 
 /* ── Main page ── */
-const COLIS_PIPELINE = ['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi'];
+const COLIS_PIPELINE = ['ramasse','att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi'];
 
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
@@ -583,6 +838,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
+  const [whatsappPopup, setWhatsappPopup] = useState(null);
   const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
   const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
@@ -688,12 +944,29 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
   function handleStatusSave(orderId, newStatus, note) {
     const ts = getTs();
+    const order = orders.find(o => o.id === orderId);
     setOrders((prev) => prev.map((o) => {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';
       const addedNote = note ? `\nNote interne: ${note}` : '';
       return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
     }));
+    const WA_STATUSES = ['ramasse', 'expedier', 'recu_livreur'];
+    if (order && WA_STATUSES.includes(newStatus) && order.recipient?.phone) {
+      const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
+      const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
+      const statusLabels = { ramasse: 'Ramassé', expedier: 'Expédié', recu_livreur: 'Reçu par le livreur' };
+      const phone = order.recipient.phone.replace(/\s+/g, '').replace(/^0/, '212');
+      const tn = order.ozoneTracking || order.trackingNumber || order.id;
+      let msg = `✅ سلام ${order.recipient.name}، الطلب ديالك رقم ${tn} `;
+      if (livreur) {
+        msg += `خداه الليفرور ${livreur.nom}`;
+        if (livreur.telephone) msg += ` — ${livreur.telephone}`;
+        msg += `. `;
+      }
+      msg += `الحالة: ${statusLabels[newStatus] || newStatus}. غادي يتواصل معاك للتوصيل إن شاء الله.`;
+      setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id });
+    }
   }
 
   function saveOrderFull(updated) {
@@ -828,7 +1101,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         );
       })()}
 
-      {tab === 'sheet' && <SheetImportSection />}
+      {tab === 'sheet' && <SheetImportSection orders={orders} setOrders={setOrders} />}
 
       {/* Table */}
       <div className={`flex-1 overflow-auto ${tab === 'sheet' ? 'hidden' : ''}`}>
@@ -931,14 +1204,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   </td>
 
                   {/* Note */}
-                  <td className="px-4 py-3 max-w-[180px]">
-                    {note && <span className="text-xs text-gray-600 line-clamp-2">Note interne: {note}</span>}
+                  <td className="px-4 py-3 max-w-[250px]">
+                    {note && <span className="text-sm text-gray-700 font-medium whitespace-pre-wrap">Note interne:<br/>{note}</span>}
                   </td>
 
                   {/* LIV */}
                   <td className="px-4 py-3">
                     {delivery !== '—' ? (
-                      <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700">{delivery}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700">{delivery}</span>
+                        {o.ozoneLastStatus && <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 text-teal-700">{o.ozoneLastStatus}</span>}
+                      </div>
                     ) : <span className="text-gray-300 text-xs">—</span>}
                   </td>
 
@@ -1013,8 +1289,58 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         <DeliveryStatusModal
           order={deliveryOrder}
           onClose={() => setDeliveryOrder(null)}
-          onSave={(id, status, note) => { handleStatusSave(id, status, note); setDeliveryOrder(null); }}
+          onSave={(id, newStatus, newNote, newOzTn, ozoneLastStatus) => {
+            if (newOzTn || ozoneLastStatus) {
+              setOrders(prev => prev.map(o => o.id === id ? { ...o, ...(newOzTn ? { ozoneTracking: newOzTn } : {}), ...(ozoneLastStatus ? { ozoneLastStatus } : {}), ...(newNote !== '' || newStatus !== o.status ? { status: newStatus } : {}) } : o));
+            }
+            if (newNote !== '' || newStatus !== deliveryOrder?.status) {
+              handleStatusSave(id, newStatus, newNote);
+            }
+            if (!newOzTn) setDeliveryOrder(null);
+          }}
         />
+      )}
+
+      {/* WhatsApp Notification Popup */}
+      {whatsappPopup && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-green-50">
+              <div className="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-green-600 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.61.61l4.458-1.495A11.952 11.952 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.37 0-4.567-.816-6.3-2.183l-.44-.348-2.865.96.96-2.865-.348-.44A9.965 9.965 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                <span className="font-bold text-green-800 text-sm">Envoyer WhatsApp</span>
+              </div>
+              <button onClick={() => setWhatsappPopup(null)} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-gray-500">Client: <span className="font-bold text-gray-800">{whatsappPopup.name}</span> — {whatsappPopup.orderId}</p>
+              <textarea
+                value={whatsappPopup.msg}
+                onChange={e => setWhatsappPopup(p => ({ ...p, msg: e.target.value }))}
+                rows={4}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setWhatsappPopup(null)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Ignorer
+                </button>
+                <button
+                  onClick={() => {
+                    window.open(`https://wa.me/${whatsappPopup.phone}?text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
+                    setWhatsappPopup(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                  Envoyer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
