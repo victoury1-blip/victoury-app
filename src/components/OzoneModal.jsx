@@ -180,8 +180,14 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     body.append('parcel-open', form.open);
     body.append('parcel-fragile', form.fragile);
     body.append('parcel-replace', form.replace);
-    if (form.nature) body.append('parcel-designation', form.nature);
-    if (form.note) body.append('parcel-note', form.note);
+    if (form.nature) {
+      body.append('parcel-designation', form.nature);
+      body.append('parcel-nature', form.nature);
+    }
+    if (form.note) {
+      body.append('parcel-note', form.note);
+      body.append('parcel-comment', form.note);
+    }
     body.append('tracking-number', order.id);
 
     try {
