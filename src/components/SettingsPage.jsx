@@ -112,6 +112,20 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     }
   }
 
+  /* ── App customization state ── */
+  const [appCfg, setAppCfg] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('victoury_app_config') || '{}'); } catch { return {}; }
+  });
+  const [appSaved, setAppSaved] = useState(false);
+
+  function saveAppCfg(cfg) {
+    setAppCfg(cfg);
+    localStorage.setItem('victoury_app_config', JSON.stringify(cfg));
+    supabase.from('settings').upsert({ key: 'victoury_app_config', value: cfg, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {}).catch?.(() => {});
+    setAppSaved(true);
+    setTimeout(() => setAppSaved(false), 2000);
+  }
+
   /* ── Shop / Label config state ── */
   const [shopCfg, setShopCfg] = useState(() => {
     try { return JSON.parse(localStorage.getItem('victoury_shop_config') || '{}'); } catch { return {}; }
@@ -177,6 +191,12 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     });
     cloudGet('auzone_config').then(saved => {
       if (saved?.apiKey) setAuzone(p => ({ ...p, customerId: saved.customerId || '', apiKey: saved.apiKey, saved: true }));
+    });
+    supabase.from('settings').select('value').eq('key', 'victoury_app_config').single().then(({ data }) => {
+      if (data?.value && Object.keys(data.value).length > 0) {
+        setAppCfg(data.value);
+        localStorage.setItem('victoury_app_config', JSON.stringify(data.value));
+      }
     });
     supabase.from('settings').select('value').eq('key', 'victoury_shop_config').single().then(({ data }) => {
       if (data?.value && Object.keys(data.value).length > 0) {
@@ -396,6 +416,79 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           </div>
         </div>
       )}
+
+      {/* Personnalisation de l'application */}
+      <div className="mb-5 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-50 to-white px-6 pt-5 pb-4 border-b border-gray-100">
+          <h3 className="font-bold text-gray-800 text-lg">Personnalisation de l'application</h3>
+          <div className="mt-1 inline-block bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded">Personnalisation de l'interface</div>
+        </div>
+        <div className="px-6 py-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Left column */}
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nom de l'application</label>
+                <input
+                  value={appCfg.appName || ''}
+                  onChange={e => setAppCfg(p => ({ ...p, appName: e.target.value }))}
+                  placeholder="VICTOURY"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                <p className="text-xs text-gray-400 mt-1">Ce nom sera affiché dans l'en-tête et sur les pages de connexion.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Fuseau horaire</label>
+                <select
+                  value={timezone}
+                  onChange={e => { setTimezone(e.target.value); setTzSaved(false); }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                >
+                  {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Définit le fuseau horaire pour l'affichage des dates et heures dans l'application.</p>
+              </div>
+            </div>
+            {/* Right column - Logo */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Logo de l'application</label>
+              <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center min-h-[160px] bg-gray-50">
+                {appCfg.appLogo ? (
+                  <img src={appCfg.appLogo} alt="Logo" className="max-h-[100px] object-contain mb-3" />
+                ) : (
+                  <div className="text-3xl font-black text-gray-800 mb-3">{appCfg.appName || 'VICTOURY'}</div>
+                )}
+                <p className="text-xs text-gray-400 mb-2">Logo actuel</p>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition">
+                    <Upload size={12} /> Choisir le fichier
+                    <input type="file" accept="image/*" className="hidden" onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setAppCfg(p => ({ ...p, appLogo: ev.target.result }));
+                      reader.readAsDataURL(file);
+                    }} />
+                  </label>
+                  {appCfg.appLogo && (
+                    <button onClick={() => setAppCfg(p => ({ ...p, appLogo: null }))} className="text-xs text-red-500 hover:underline">Supprimer</button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Format recommandé : PNG ou SVG avec fond transparent. Taille recommandée : 200x60 pixels.</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
+            <button
+              onClick={() => { saveAppCfg(appCfg); saveTz(timezone); }}
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900 transition"
+            >
+              <Save size={13} /> Enregistrer les modifications
+            </button>
+            {appSaved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
+          </div>
+        </div>
+      </div>
 
       {/* Cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -59,7 +59,13 @@ export default function Sidebar({ orders = [] }) {
     <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 flex flex-col transition-all duration-200 shrink-0 h-screen`}>
       {/* Logo */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-        {!collapsed && <span className="text-xl font-black tracking-widest text-gray-900 uppercase">VICTOURY</span>}
+        {!collapsed && (() => {
+          try {
+            const cfg = JSON.parse(localStorage.getItem('victoury_app_config') || '{}');
+            if (cfg.appLogo) return <img src={cfg.appLogo} alt="" className="h-8 object-contain" />;
+            return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">{cfg.appName || 'VICTOURY'}</span>;
+          } catch { return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">VICTOURY</span>; }
+        })()}
         <button onClick={() => setCollapsed(!collapsed)} className="p-1 rounded hover:bg-gray-100 text-gray-500">
           <Menu size={18} />
         </button>

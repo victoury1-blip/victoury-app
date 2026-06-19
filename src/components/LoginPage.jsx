@@ -36,10 +36,18 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <span className="text-white font-black text-xl">V</span>
-          </div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight">VICTOURY</h1>
+          {(() => {
+            try {
+              const cfg = JSON.parse(localStorage.getItem('victoury_app_config') || '{}');
+              if (cfg.appLogo) return <img src={cfg.appLogo} alt="" className="h-16 object-contain mx-auto mb-4" />;
+            } catch {}
+            return (
+              <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4 shadow-lg">
+                <span className="text-white font-black text-xl">V</span>
+              </div>
+            );
+          })()}
+          <h1 className="text-2xl font-black text-gray-800 tracking-tight">{(() => { try { return JSON.parse(localStorage.getItem('victoury_app_config') || '{}').appName || 'VICTOURY'; } catch { return 'VICTOURY'; } })()}</h1>
           <p className="text-gray-500 text-sm mt-1">Système de Gestion</p>
         </div>
 
