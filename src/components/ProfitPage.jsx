@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign } from 'lucide-react';
+import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download } from 'lucide-react';
+import { loadProducts } from '../data/products';
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function pct(val, total) { return total ? ((val / total) * 100).toFixed(1) : '0.0'; }
@@ -47,9 +48,25 @@ export default function ProfitPage({ orders = [] }) {
   }), [orders, applied]);
 
   const livres = inPeriod.filter(o => o.status === 'livre');
+  const stockProducts = useMemo(() => loadProducts(), []);
+
+  function getProductCost(order) {
+    const prods = order.products?.length ? order.products : [order.product];
+    let cost = 0;
+    for (const p of prods) {
+      if (!p?.name) continue;
+      const sp = stockProducts.find(s => s.name === p.name);
+      if (sp && sp.prixAchat) {
+        cost += (parseFloat(sp.prixAchat) || 0) * (p.qty || 1);
+      } else {
+        cost += (order.price || 0) * (applied.coutPct / 100) * ((p.qty || 1) / (prods.reduce((s, x) => s + (x?.qty || 1), 0) || 1));
+      }
+    }
+    return cost;
+  }
 
   const ca          = livres.reduce((s, o) => s + (o.price || 0), 0);
-  const coutAchat   = ca * (applied.coutPct / 100);
+  const coutAchat   = livres.reduce((s, o) => s + getProductCost(o), 0);
   const margeB      = ca - coutAchat;
   const fraisLiv    = inPeriod.reduce((s, o) => s + (o.fraisLivraison || 0), 0);
   const fraisTotaux = fraisLiv + applied.fraisPub;
@@ -90,6 +107,18 @@ export default function ProfitPage({ orders = [] }) {
           <button onClick={apply} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900">Filtrer</button>
           <button onClick={reset} className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
             <RefreshCw size={13} /> Réinitialiser
+          </button>
+          <button onClick={() => {
+            const rows = [['ID','Client','Date','Produit','Prix Vente','Prix Achat','Frais Livraison','Marge'].join(',')];
+            livres.forEach(o => {
+              const pa = getProductCost(o); const m = (o.price||0) - pa - (o.fraisLivraison||0);
+              rows.push([o.id, o.recipient?.name||'', o.dateAdded||'', o.product?.name||'', o.price||0, pa.toFixed(2), o.fraisLivraison||0, m.toFixed(2)].join(','));
+            });
+            const blob = new Blob(['﻿'+rows.join('\n')], {type:'text/csv;charset=utf-8'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `profit_${applied.dateFrom}_${applied.dateTo}.csv`; a.click();
+          }} className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">
+            <Download size={13} /> Exporter
           </button>
         </div>
       </div>
@@ -165,7 +194,7 @@ export default function ProfitPage({ orders = [] }) {
                 )}
                 {livres.map(o => {
                   const prixVente = o.price || 0;
-                  const prixAchat = prixVente * (applied.coutPct / 100);
+                  const prixAchat = getProductCost(o);
                   const fraisL    = o.fraisLivraison || 0;
                   const marge     = prixVente - prixAchat - fraisL;
                   return (

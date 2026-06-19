@@ -135,13 +135,17 @@ function ProductModal({ initial, onClose, onSave }) {
           </div>
 
           {/* Prix */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className={lc}>Prix (MAD)</label>
+              <label className={lc}>Prix vente (MAD)</label>
               <input type="number" value={form.prix} onChange={e => u('prix', e.target.value)} className={ic} />
             </div>
             <div>
-              <label className={lc}>Compare-At Prix (MAD)</label>
+              <label className={lc}>Prix d'achat (MAD)</label>
+              <input type="number" value={form.prixAchat || ''} onChange={e => u('prixAchat', e.target.value)} className={ic} placeholder="Coût réel" />
+            </div>
+            <div>
+              <label className={lc}>Compare-At (MAD)</label>
               <input type="number" value={form.compareAt} onChange={e => u('compareAt', e.target.value)} className={ic} />
             </div>
           </div>
