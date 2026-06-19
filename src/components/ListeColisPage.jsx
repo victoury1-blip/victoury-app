@@ -443,13 +443,19 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
           const parcel = infoJson ? (infoJson['PARCEL-INFO'] || infoJson) : {};
           if ((track['RESULT'] || '').toUpperCase() === 'ERROR' && (parcel['RESULT'] || '').toUpperCase() === 'ERROR') continue;
 
-          const ozStatus = parcel['PARCEL-STATUS'] || parcel['STATUS'] || track['PARCEL-STATUS'] || track['STATUS'] || track['LAST-STATUS'] || '';
-          const histArr = track['PARCEL-HISTORY'] || track['history'] || track['HISTORY'] || [];
+          const pick = (...keys) => {
+            for (const src of [parcel, track]) {
+              for (const k of keys) { if (src[k]) return src[k]; }
+            }
+            return '';
+          };
+          const ozStatus = pick('PARCEL-STATUS','STATUS','LAST-STATUS','STATUT','ETAT','last_status');
+          const histArr = track['PARCEL-HISTORY'] || track['history'] || track['HISTORY'] || track['EVENTS'] || track['events'] || parcel['PARCEL-HISTORY'] || [];
           const histList = Array.isArray(histArr) ? histArr : [];
 
           if (!ozStatus && histList.length === 0) continue;
 
-          const realTn = parcel['TRACKING-NUMBER'] || track['TRACKING-NUMBER'] || tn;
+          const realTn = pick('TRACKING-NUMBER','TRACKING','tracking_number') || tn;
           if (realTn && realTn !== order.ozoneTracking) {
             onSave(order.id, order.status, '', realTn);
           }
@@ -457,10 +463,10 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
           setOzoneData({
             tracking: realTn,
             status: ozStatus,
-            receiver: parcel['RECIPIENT-NAME'] || parcel['PARCEL-RECEIVER'] || track['RECEIVER'] || '',
-            phone: parcel['RECIPIENT-PHONE'] || parcel['PARCEL-PHONE'] || '',
-            city: parcel['RECIPIENT-CITY'] || parcel['CITY_NAME'] || parcel['CITY'] || '',
-            cod: parcel['COD'] || parcel['PRIX'] || '',
+            receiver: pick('RECIPIENT-NAME','PARCEL-RECEIVER','RECEIVER','RECEIVER-NAME','NOM','DESTINATAIRE'),
+            phone: pick('RECIPIENT-PHONE','PARCEL-PHONE','PHONE','TELEPHONE'),
+            city: pick('RECIPIENT-CITY','CITY_NAME','CITY','VILLE'),
+            cod: pick('COD','PRIX','PRICE','MONTANT'),
             history: histList,
           });
           setOzoneState('ok');

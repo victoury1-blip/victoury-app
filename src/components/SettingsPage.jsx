@@ -648,14 +648,21 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                         if (trackError && parcelError) {
                           setOzoneTrackResult({ error: parcelData['MESSAGE'] || trackData['MESSAGE'] || 'Colis introuvable', history: [], raw: { trackJson, infoJson } });
                         } else {
-                          const histArr = trackData['PARCEL-HISTORY'] || trackData['history'] || trackData['HISTORY'] || [];
+                          const pick = (...keys) => {
+                            for (const src of [parcelData, trackData]) {
+                              for (const k of keys) { if (src[k]) return src[k]; }
+                            }
+                            return '';
+                          };
+                          const histArr = trackData['PARCEL-HISTORY'] || trackData['history'] || trackData['HISTORY']
+                            || trackData['EVENTS'] || trackData['events'] || parcelData['PARCEL-HISTORY'] || [];
                           setOzoneTrackResult({
-                            status: parcelData['PARCEL-STATUS'] || parcelData['STATUS'] || trackData['PARCEL-STATUS'] || trackData['STATUS'] || trackData['LAST-STATUS'] || '',
-                            tracking: parcelData['TRACKING-NUMBER'] || trackData['TRACKING-NUMBER'] || tn,
-                            recipient: parcelData['RECIPIENT-NAME'] || parcelData['PARCEL-RECEIVER'] || trackData['RECEIVER'] || '',
-                            city: parcelData['RECIPIENT-CITY'] || parcelData['CITY_NAME'] || trackData['CITY'] || '',
-                            phone: parcelData['RECIPIENT-PHONE'] || parcelData['PARCEL-PHONE'] || '',
-                            price: parcelData['COD'] || parcelData['PRIX'] || parcelData['PRICE'] || '',
+                            status: pick('PARCEL-STATUS','STATUS','LAST-STATUS','STATUT','statut','last_status','ETAT','etat'),
+                            tracking: pick('TRACKING-NUMBER','TRACKING','tracking_number','tracking-number') || tn,
+                            recipient: pick('RECIPIENT-NAME','PARCEL-RECEIVER','RECEIVER','RECEIVER-NAME','NOM','DESTINATAIRE','receiver_name'),
+                            city: pick('RECIPIENT-CITY','CITY_NAME','CITY','VILLE','city','ville','receiver_city'),
+                            phone: pick('RECIPIENT-PHONE','PARCEL-PHONE','PHONE','TELEPHONE','phone','receiver_phone'),
+                            price: pick('COD','PRIX','PRICE','cod','price','MONTANT'),
                             history: Array.isArray(histArr) ? histArr : [],
                             raw: { trackJson, infoJson },
                             error: null,
