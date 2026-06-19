@@ -410,6 +410,8 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
   const current = DELIVERY_STATUSES.find(s => s.value === status);
   const localStatus = DELIVERY_STATUSES.find(s => s.value === order.status);
 
+  useEffect(() => { fetchOzone(); }, []);
+
   async function fetchOzone(customTn) {
     setOzoneState('loading');
     try {
@@ -471,6 +473,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
             cod: parcelInfos['PRICE'] || parcelInfos['COD'] || '',
             history: histList,
           });
+          if (ozStatus) onSave(order.id, order.status, '', realTn, ozStatus);
           setOzoneState('ok');
           return;
         } catch {}
@@ -510,9 +513,9 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
             <div className="bg-amber-50 px-3 py-2 flex items-center justify-between">
               <span className="text-xs font-bold text-amber-700">Ozone Express</span>
               {ozoneState === 'idle' && (
-                <button onClick={() => fetchOzone()} className="text-xs bg-amber-500 text-white px-3 py-1 rounded-lg font-semibold hover:bg-amber-600 transition">
-                  Chercher statut
-                </button>
+                <div className="flex items-center gap-1 text-xs text-amber-600">
+                  <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                </div>
               )}
               {ozoneState === 'loading' && (
                 <div className="flex items-center gap-1 text-xs text-amber-600">
@@ -527,7 +530,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
 
             <div className="px-3 py-2">
               {ozoneState === 'idle' && (
-                <p className="text-xs text-gray-400 text-center py-2">Cliquez pour récupérer le statut depuis Ozone</p>
+                <p className="text-xs text-gray-400 text-center py-2">Chargement...</p>
               )}
 
               {ozoneState === 'no_config' && (
@@ -987,7 +990,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   {/* LIV */}
                   <td className="px-4 py-3">
                     {delivery !== '—' ? (
-                      <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700">{delivery}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700">{delivery}</span>
+                        {o.ozoneLastStatus && <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 text-teal-700">{o.ozoneLastStatus}</span>}
+                      </div>
                     ) : <span className="text-gray-300 text-xs">—</span>}
                   </td>
 
@@ -1062,9 +1068,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         <DeliveryStatusModal
           order={deliveryOrder}
           onClose={() => setDeliveryOrder(null)}
-          onSave={(id, newStatus, newNote, newOzTn) => {
-            if (newOzTn) {
-              setOrders(prev => prev.map(o => o.id === id ? { ...o, ozoneTracking: newOzTn, ...(newNote !== '' || newStatus !== o.status ? { status: newStatus } : {}) } : o));
+          onSave={(id, newStatus, newNote, newOzTn, ozoneLastStatus) => {
+            if (newOzTn || ozoneLastStatus) {
+              setOrders(prev => prev.map(o => o.id === id ? { ...o, ...(newOzTn ? { ozoneTracking: newOzTn } : {}), ...(ozoneLastStatus ? { ozoneLastStatus } : {}), ...(newNote !== '' || newStatus !== o.status ? { status: newStatus } : {}) } : o));
             }
             if (newNote !== '' || newStatus !== deliveryOrder?.status) {
               handleStatusSave(id, newStatus, newNote);
