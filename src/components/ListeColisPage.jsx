@@ -645,7 +645,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
 }
 
 /* ── Main page ── */
-const COLIS_PIPELINE = ['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi'];
+const COLIS_PIPELINE = ['ramasse','att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi'];
 
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
