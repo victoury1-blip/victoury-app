@@ -75,17 +75,22 @@ export default function OrderModal({ order, onClose, onSave }) {
   }
 
   function handleSave() {
-    const updated = {
-      ...form,
-      product: form.products[0] || form.product,
-      note: form.noteInterne,
-    };
-    onSave(updated);
+    try {
+      const updated = {
+        ...form,
+        product: form.products[0] || form.product,
+        note: form.noteInterne,
+      };
+      onSave(updated);
+    } catch (err) {
+      console.error('Save failed:', err);
+      alert('Erreur: ' + err.message);
+    }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
-      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] sm:max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] sm:max-h-[92vh] flex flex-col">
 
         {/* ── Header ── */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 shrink-0">
