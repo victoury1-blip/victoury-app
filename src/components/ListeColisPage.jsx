@@ -416,17 +416,24 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
       const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
       if (!cfg.customerId || !cfg.apiKey) { setHistoryState('error'); return; }
       const tn = ozTn;
-      /* Try multiple endpoint patterns */
       const endpoints = [
         `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${tn}`,
         `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcels-history?tracking-number=${tn}`,
         `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/parcel-history/${tn}`,
+        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${order.trackingNumber}`,
+        `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${order.id}`,
       ];
       let raw = null;
-      for (const url of endpoints) {
+      for (const url of [...new Set(endpoints)]) {
         try {
           const res = await fetch(url);
-          if (res.ok) { raw = await res.json(); break; }
+          if (res.ok) {
+            const json = await res.json();
+            const result = json['GET-PARCEL']?.['RESULT'] || json['RESULT'] || '';
+            if (result.toUpperCase() === 'ERROR') continue;
+            raw = json;
+            break;
+          }
         } catch {}
       }
       if (!raw) { setHistoryState('error'); return; }
