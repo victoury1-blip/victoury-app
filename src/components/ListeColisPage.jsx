@@ -401,10 +401,11 @@ const DELIVERY_STATUSES = [
 ];
 
 function DeliveryStatusModal({ order, onClose, onSave }) {
-  const [tab, setTab] = useState(order.trackingNumber ? 'history' : 'manual');
+  const ozTn = order.ozoneTracking || order.trackingNumber;
+  const [tab, setTab] = useState(ozTn ? 'history' : 'manual');
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState('');
-  const [historyState, setHistoryState] = useState('idle'); /* idle | loading | ok | error */
+  const [historyState, setHistoryState] = useState('idle');
   const [historyData, setHistoryData] = useState(null);
   const current = DELIVERY_STATUSES.find(s => s.value === status);
 
@@ -414,7 +415,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
     try {
       const cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
       if (!cfg.customerId || !cfg.apiKey) { setHistoryState('error'); return; }
-      const tn = order.trackingNumber;
+      const tn = ozTn;
       /* Try multiple endpoint patterns */
       const endpoints = [
         `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}/get-parcel?tracking-number=${tn}`,
@@ -446,7 +447,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
   }
 
   useEffect(() => {
-    if (tab === 'history' && order.trackingNumber && historyState === 'idle') fetchOzoneHistory();
+    if (tab === 'history' && ozTn && historyState === 'idle') fetchOzoneHistory();
   }, [tab]);
 
   return (
@@ -457,7 +458,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
           <div className="flex items-center gap-2">
             <span className="p-1.5 rounded-lg bg-amber-100"><Truck size={15} className="text-amber-600" /></span>
             <div>
-              <h3 className="font-bold text-gray-800 text-sm">Livraison — {order.trackingNumber || order.id}</h3>
+              <h3 className="font-bold text-gray-800 text-sm">Livraison — {ozTn || order.id}</h3>
               <p className="text-xs text-gray-400">{order.recipient?.name}</p>
             </div>
           </div>
@@ -465,7 +466,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
         </div>
 
         {/* Tabs */}
-        {order.trackingNumber && (
+        {ozTn && (
           <div className="flex border-b border-gray-100">
             {[{ k:'history', l:'📦 Historique Ozone' }, { k:'manual', l:'✏️ Statut manuel' }].map(t => (
               <button key={t.k} onClick={() => setTab(t.k)}

@@ -98,6 +98,7 @@ export default function App() {
         reportDate: o.report_date || null,
         noteLivraison: o.note_livraison || '',
         trackingNumber: o.tracking_number || null,
+        ozoneTracking: o.ozone_tracking || null,
         manuallyModified: o.manually_modified || false,
       })));
       setIsLoading(false);
@@ -318,6 +319,7 @@ export default function App() {
       report_date: order.reportDate || null,
       note_livraison: order.noteLivraison || '',
       tracking_number: order.trackingNumber || null,
+      ozone_tracking: order.ozoneTracking || null,
       manually_modified: order.manuallyModified || false,
     }, { onConflict: 'id' });
   }

@@ -425,7 +425,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   function handleOzoneSuccess(orderId, ozoneTracking) {
     setOrders((prev) =>
       prev.map((o) =>
-        o.id === orderId ? { ...o, validated: true, trackingNumber: o.trackingNumber || ozoneTracking, status: 'att_ramassage' } : o
+        o.id === orderId ? { ...o, validated: true, trackingNumber: o.trackingNumber || ozoneTracking, ozoneTracking: ozoneTracking, status: 'att_ramassage' } : o
       )
     );
     addToast('success', `Colis créé — ${trackingNumber}`, 'Commande déplacée vers En suivi');
