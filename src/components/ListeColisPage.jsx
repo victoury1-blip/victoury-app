@@ -220,20 +220,18 @@ function SheetImportSection({ orders = [] }) {
             ) : filtered.map((row, idx) => {
               const delivered = isDelivered(row);
               return (
-              <tr key={row._id} className={`hover:bg-gray-50 ${delivered ? 'bg-green-100 border-l-4 border-green-500' : row._status === 'livre' ? 'bg-blue-50/30' : row._status === 'confirme' ? 'bg-green-50/30' : row._status === 'annule' || row._status === 'refuse' ? 'bg-red-50/20' : ''}`}>
-                <td className="px-3 py-2.5 text-xs text-gray-400">
-                  {delivered ? <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold">✓</span> : idx + 1}
-                </td>
+              <tr key={row._id} className={`hover:bg-gray-50 ${row._status === 'livre' ? 'bg-blue-50/30' : row._status === 'confirme' ? 'bg-green-50/30' : row._status === 'annule' || row._status === 'refuse' ? 'bg-red-50/20' : ''}`}>
+                <td className="px-3 py-2.5 text-xs text-gray-400">{idx + 1}</td>
                 {headers.map(h => {
                   const isProduct = PRODUCT_KEYS.includes(h.toLowerCase());
                   const isPhone = phoneCol && h === phoneCol;
                   const val = row[h] || '—';
                   return (
                     <td key={h} className="px-3 py-2.5 max-w-[180px]">
-                      {isProduct
-                        ? <span className={`font-bold text-sm ${delivered ? 'text-green-800' : 'text-gray-800'}`}>{val}</span>
-                        : isPhone && delivered
-                        ? <span className="text-xs font-bold text-green-700 bg-green-200 px-1.5 py-0.5 rounded">{val}</span>
+                      {isPhone && delivered
+                        ? <span className="text-xs font-bold text-green-700 bg-green-200 px-1.5 py-0.5 rounded">{val} ✓</span>
+                        : isProduct
+                        ? <span className="font-bold text-gray-800 text-sm">{val}</span>
                         : <span className="text-xs text-gray-600 line-clamp-2">{val}</span>
                       }
                     </td>
