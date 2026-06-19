@@ -62,8 +62,7 @@ function LabelContent({ order, config }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '2px solid #000' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {config.logo && <img src={config.logo} alt="" style={{ height: '50px', objectFit: 'contain' }} />}
-          <span style={{ fontWeight: 900, fontSize: '22px', letterSpacing: '1px' }}>{shopName}</span>
+          {config.logo ? <img src={config.logo} alt="" style={{ height: '50px', objectFit: 'contain' }} /> : <span style={{ fontWeight: 900, fontSize: '22px', letterSpacing: '1px' }}>{shopName}</span>}
         </div>
         {shopPhone && <span style={{ fontSize: '13px', color: '#333' }}>Sav: {shopPhone}</span>}
       </div>
@@ -111,6 +110,11 @@ function LabelContent({ order, config }) {
         <div style={{ fontWeight: 900, fontSize: '28px', whiteSpace: 'nowrap' }}>
           Prix: {Number(order.price || 0).toLocaleString('fr-MA')}
         </div>
+      </div>
+
+      {/* Thank you note */}
+      <div style={{ borderTop: '1px solid #000', padding: '6px 12px', textAlign: 'center', fontSize: '11px', color: '#555', fontStyle: 'italic', lineHeight: '1.4' }}>
+        Merci pour votre confiance ! Nous sommes ravis de vous compter parmi nos clients.
       </div>
     </div>
   );
