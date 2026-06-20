@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 function getShopConfig() {
   try { return JSON.parse(localStorage.getItem('victoury_shop_config') || '{}'); } catch { return {}; }
@@ -65,7 +67,7 @@ function buildLabelHTML(order, config) {
     `<div style="font-size:13px;color:#333">- ${p.name || ''}${p.color ? ' ' + p.color : ''}${p.size ? ' - ' + p.size : ''} (x${p.qty || 1})</div>`
   ).join('');
 
-  return `<div class="label-page" style="width:100mm;min-height:100mm;border:2px solid #000;font-family:'Poppins',sans-serif;padding:0;margin:0 auto;background:#fff;page-break-after:always">
+  return `<div class="label-page" style="width:378px;border:2px solid #000;font-family:'Poppins',sans-serif;padding:0;background:#fff">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #000">
       <div style="display:flex;align-items:center;gap:8px">${logoHtml}</div>
       ${shopPhone ? `<div style="text-align:right;line-height:1.3"><span style="font-size:11px;font-weight:bold;color:#333">Service après-vente</span><br><span style="font-size:13px;color:#333">${shopPhone}</span></div>` : ''}
@@ -108,40 +110,43 @@ export async function openLabelPage(orders) {
     }
   } catch {}
 
-  const labelsHtml = orders.map(o => buildLabelHTML(o, config)).join('\n');
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;';
+  document.body.appendChild(container);
 
-  const html = `<!DOCTYPE html>
-<html><head><title>Étiquettes VICTOURY</title>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  @page { size: 100mm 100mm; margin: 0; }
-  * { box-sizing: border-box; }
-  body { margin: 0; padding: 20px; background: #f3f4f6; font-family: 'Poppins', sans-serif; }
-  .label-page { page-break-after: always; margin: 0 auto 20px; }
-  .label-page:last-child { page-break-after: avoid; }
-  .print-header { text-align: center; margin-bottom: 24px; padding: 16px; background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-  .print-header h1 { font-size: 20px; color: #1f2937; margin: 0 0 6px; }
-  .print-header p { font-size: 13px; color: #9ca3af; margin: 0 0 14px; }
-  .print-btn { display: inline-block; padding: 14px 40px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
-  .print-btn:hover { background: #1d4ed8; }
-  @media print {
-    body { padding: 0; background: #fff; }
-    .print-header { display: none !important; }
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap';
+  document.head.appendChild(link);
+  await new Promise(r => setTimeout(r, 500));
+
+  const labelEls = [];
+  for (const order of orders) {
+    const div = document.createElement('div');
+    div.innerHTML = buildLabelHTML(order, config);
+    div.style.cssText = 'margin-bottom:10px;';
+    container.appendChild(div);
+    labelEls.push(div.firstElementChild);
   }
-</style>
-</head><body>
-  <div class="print-header">
-    <h1>Étiquettes (${orders.length})</h1>
-    <p>Cliquez pour imprimer ou enregistrer en PDF</p>
-    <button class="print-btn" onclick="window.print()">Imprimer / Enregistrer PDF</button>
-  </div>
-  ${labelsHtml}
-</body></html>`;
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  await new Promise(r => setTimeout(r, 300));
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [100, 100] });
+
+  for (let i = 0; i < labelEls.length; i++) {
+    if (i > 0) pdf.addPage([100, 100]);
+    const canvas = await html2canvas(labelEls[i], { scale: 2, useCORS: true, backgroundColor: '#fff' });
+    const imgData = canvas.toDataURL('image/png');
+    const ratio = canvas.height / canvas.width;
+    const w = 96;
+    const h = w * ratio;
+    pdf.addImage(imgData, 'PNG', 2, 2, w, Math.min(h, 96));
+  }
+
+  document.body.removeChild(container);
+  link.remove();
+
+  const now = new Date();
+  const ts = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  pdf.save(`etiquettes_commandes_${ts}.pdf`);
 }
