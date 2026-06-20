@@ -368,7 +368,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           <button
             onClick={async () => {
               if (!window.confirm('⚠️ Réinitialiser TOUT le cache local ? (les suppressions seront sync depuis Supabase)')) return;
-              const keepsafe = ['auzone_config','woo_config','livreurs','system_timezone','user_profiles','frais_1','victoury_factures','victoury_manual_facture','victoury_recu_ids','notification_sound','victoury_shop_config','victoury_app_config','victoury_statuses'];
+              const keepsafe = ['auzone_config','woo_config','livreurs','system_timezone','user_profiles','frais_1','victoury_factures','victoury_manual_facture','victoury_recu_ids','notification_sound','victoury_shop_config','victoury_app_config','victoury_statuses','ad_transfers'];
               const saved = {};
               keepsafe.forEach(k => { const v = localStorage.getItem(k); if (v) saved[k] = v; });
               localStorage.clear();

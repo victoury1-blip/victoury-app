@@ -41,7 +41,9 @@ export default function ProfitPage({ orders = [] }) {
   const [dateTo,   setDateTo]   = useState(lastDay);
   const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay });
 
-  const [adTransfers, setAdTransfers] = useState([]);
+  const [adTransfers, setAdTransfers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ad_transfers') || '[]'); } catch { return []; }
+  });
   const [newTransfer, setNewTransfer] = useState({ label: '', amount: '', category: 'facebook' });
   const [showAdModal, setShowAdModal] = useState(false);
 
@@ -49,7 +51,10 @@ export default function ProfitPage({ orders = [] }) {
 
   useEffect(() => {
     supabase.from('settings').select('value').eq('key', 'ad_transfers').single().then(({ data }) => {
-      if (Array.isArray(data?.value)) setAdTransfers(data.value);
+      if (Array.isArray(data?.value) && data.value.length) {
+        setAdTransfers(data.value);
+        localStorage.setItem('ad_transfers', JSON.stringify(data.value));
+      }
     });
     supabase.from('settings').select('value').eq('key', 'victoury_factures').single().then(({ data }) => {
       if (Array.isArray(data?.value)) setFactures(data.value);
@@ -58,10 +63,11 @@ export default function ProfitPage({ orders = [] }) {
 
   function saveAdTransfers(list) {
     setAdTransfers(list);
+    localStorage.setItem('ad_transfers', JSON.stringify(list));
     supabase.from('settings').upsert(
       { key: 'ad_transfers', value: list, updated_at: new Date().toISOString() },
       { onConflict: 'key' }
-    ).then(() => {});
+    ).then(() => {}).catch(e => console.error('Save ad_transfers failed:', e));
   }
 
   function addTransfer() {
