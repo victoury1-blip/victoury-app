@@ -121,7 +121,7 @@ export default function Sidebar({ orders = [] }) {
                 {openMenus[item.path] && showLabel && (
                   <div className="pl-8">
                     {item.children.map((child) => {
-                      const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi']);
+                      const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi','retour_recu','echange_recu']);
                       const count = orders.filter(o => {
                         if (COLIS_PIPE.has(o.status) || (o.trackingNumber && o.validated)) return false;
                         return o.status === child.statusKey;
