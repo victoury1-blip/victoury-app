@@ -331,7 +331,7 @@ function getLivreurFrais(livreurName, city, status, fraisCache, livreursList) {
 /* ─── New Facture Modal ─── */
 function NewFactureModal({ orders, onClose, onCreated }) {
   const [livreur, setLivreur] = useState('');
-  const [fraisDefault, setFraisDefault] = useState(25);
+  const [fraisDefault, setFraisDefault] = useState(0);
   const [selected, setSelected] = useState({});
   const [fraisCache, setFraisCache] = useState({});
 
@@ -596,7 +596,7 @@ export default function FacturesPage({ orders }) {
 
     pending.forEach(o => autoGenRef.current.add(o.id));
 
-    const fraisDefault = 25;
+    const fraisDefault = 0;
     const byLivreur = {};
     pending.forEach(o => {
       const lv = o.recipient?.delivery || 'Manuel';
@@ -712,7 +712,7 @@ export default function FacturesPage({ orders }) {
       if (!byLivreur[lv]) byLivreur[lv] = [];
       byLivreur[lv].push(o);
     });
-    const fraisDefault = 25;
+    const fraisDefault = 0;
     let list = [...factures];
     for (const [lv, cols] of Object.entries(byLivreur)) {
       const ref = await nextRef();
