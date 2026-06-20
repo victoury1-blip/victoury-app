@@ -52,8 +52,19 @@ export default function ProfitPage({ orders = [] }) {
   useEffect(() => {
     supabase.from('settings').select('value').eq('key', 'ad_transfers').single().then(({ data }) => {
       if (Array.isArray(data?.value) && data.value.length) {
-        setAdTransfers(data.value);
-        localStorage.setItem('ad_transfers', JSON.stringify(data.value));
+        setAdTransfers(prev => {
+          const remoteIds = new Set(data.value.map(t => t.id));
+          const localOnly = prev.filter(t => !remoteIds.has(t.id));
+          const merged = [...data.value, ...localOnly];
+          localStorage.setItem('ad_transfers', JSON.stringify(merged));
+          if (localOnly.length) {
+            supabase.from('settings').upsert(
+              { key: 'ad_transfers', value: merged, updated_at: new Date().toISOString() },
+              { onConflict: 'key' }
+            ).then(() => {});
+          }
+          return merged;
+        });
       }
     });
     supabase.from('settings').select('value').eq('key', 'victoury_factures').single().then(({ data }) => {
