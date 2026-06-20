@@ -1291,7 +1291,16 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     {delivery !== '—' ? (
                       <div className="flex flex-col gap-1">
                         <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700">{delivery}</span>
-                        {o.ozoneLastStatus && <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 text-teal-700">{o.ozoneLastStatus}</span>}
+                        {o.ozoneLastStatus && (() => {
+                          const ls = (o.ozoneLastStatus || '').toLowerCase();
+                          const ozColor = ls.includes('livr') ? 'bg-green-100 text-green-700'
+                            : ls.includes('refus') ? 'bg-red-100 text-red-700'
+                            : ls.includes('ramassage') || ls.includes('attente') ? 'bg-amber-100 text-amber-700'
+                            : ls.includes('expédi') || ls.includes('recu') || ls.includes('reçu') ? 'bg-blue-100 text-blue-700'
+                            : ls.includes('retour') ? 'bg-gray-200 text-gray-700'
+                            : 'bg-teal-100 text-teal-700';
+                          return <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${ozColor}`}>{o.ozoneLastStatus}</span>;
+                        })()}
                       </div>
                     ) : <span className="text-gray-300 text-xs">—</span>}
                   </td>
