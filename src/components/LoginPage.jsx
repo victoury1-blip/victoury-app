@@ -14,9 +14,17 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (err) setError('Email ou mot de passe incorrect');
+    try {
+      const result = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+      ]);
+      setLoading(false);
+      if (result.error) setError('Email ou mot de passe incorrect');
+    } catch (err) {
+      setLoading(false);
+      setError(err.message === 'timeout' ? 'Connexion lente — vérifiez votre réseau et réessayez' : 'Erreur de connexion');
+    }
   }
 
   async function handleReset(e) {
