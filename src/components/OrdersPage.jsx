@@ -58,7 +58,7 @@ function now() {
 }
 
 const tabs = [
-  { id: 'a_confirmer', label: 'À confirmer', status: ['nouveau', 'attente', 'en_attente', 'pas_rep'] },
+  { id: 'a_confirmer', label: 'À confirmer', status: ['nouveau', 'attente', 'en_attente', 'pas_rep', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste'] },
   { id: 'en_suivi', label: 'En suivi', status: 'en_suivi' },
   { id: 'reporter', label: 'Reporter', status: 'reporter' },
   { id: 'confirme', label: 'Confirmé', status: 'confirme' },
