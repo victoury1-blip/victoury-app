@@ -34,7 +34,7 @@ function SectionTitle({ icon, label }) {
   return (
     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
       <span>{icon}</span>
-      <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">{label}</span>
+      <span className="text-sm font-bold text-gray-900 uppercase tracking-wide">{label}</span>
     </div>
   );
 }

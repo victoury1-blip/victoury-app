@@ -1015,7 +1015,7 @@ function NewOrderModal({ onClose, onSave }) {
 
           <div>
             <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-              <span>📋</span><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Client</span>
+              <span>📋</span><span className="text-sm font-bold text-gray-900 uppercase tracking-wide">Client</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={lc}>Nom client <span className="text-red-400">*</span></label><input value={form.nom} onChange={(e) => u('nom', e.target.value)} className={ic} placeholder="Nom complet" /></div>
@@ -1032,7 +1032,7 @@ function NewOrderModal({ onClose, onSave }) {
 
           <div>
             <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-              <span>🛍</span><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Produits</span>
+              <span>🛍</span><span className="text-sm font-bold text-gray-900 uppercase tracking-wide">Produits</span>
             </div>
             <div className="space-y-2">
               {form.products.map((prod, idx) => {
@@ -1074,7 +1074,7 @@ function NewOrderModal({ onClose, onSave }) {
 
           <div>
             <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-              <span>💰</span><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Paiement</span>
+              <span>💰</span><span className="text-sm font-bold text-gray-900 uppercase tracking-wide">Paiement</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={lc}>💵 Prix total (DH) <span className="text-red-400">*</span></label>
