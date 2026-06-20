@@ -922,10 +922,22 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
   useEffect(() => {
     supabase.from('settings').select('value').eq('key', 'victoury_recu_ids').single().then(({ data }) => {
-      if (Array.isArray(data?.value)) { setRecuIds(new Set(data.value)); localStorage.setItem('victoury_recu_ids', JSON.stringify(data.value)); }
+      if (Array.isArray(data?.value)) {
+        setRecuIds(prev => {
+          const merged = new Set([...prev, ...data.value]);
+          localStorage.setItem('victoury_recu_ids', JSON.stringify([...merged]));
+          return merged;
+        });
+      }
     });
     supabase.from('settings').select('value').eq('key', 'victoury_manual_facture').single().then(({ data }) => {
-      if (Array.isArray(data?.value)) { setManualFacture(new Set(data.value)); localStorage.setItem('victoury_manual_facture', JSON.stringify(data.value)); }
+      if (Array.isArray(data?.value)) {
+        setManualFacture(prev => {
+          const merged = new Set([...prev, ...data.value]);
+          localStorage.setItem('victoury_manual_facture', JSON.stringify([...merged]));
+          return merged;
+        });
+      }
     });
   }, []);
 
