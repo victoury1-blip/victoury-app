@@ -67,7 +67,7 @@ function buildLabelHTML(order, config) {
     `<div style="font-size:13px;color:#333">- ${p.name || ''}${p.color ? ' ' + p.color : ''}${p.size ? ' - ' + p.size : ''} (x${p.qty || 1})</div>`
   ).join('');
 
-  return `<div class="label-page" style="width:378px;border:2px solid #000;font-family:'Inter',sans-serif;padding:0;background:#fff">
+  return `<div class="label-page" style="width:378px;border:2px solid #000;font-family:'Times New Roman',Times,serif,sans-serif;padding:0;background:#fff">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #000">
       <div style="display:flex;align-items:center;gap:8px">${logoHtml}</div>
       ${shopPhone ? `<div style="text-align:right;line-height:1.3"><span style="font-size:11px;font-weight:bold;color:#333">Service après-vente</span><br><span style="font-size:13px;color:#333">${shopPhone}</span></div>` : ''}
@@ -116,7 +116,7 @@ export async function openLabelPage(orders) {
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap';
+  link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&display=swap';
   document.head.appendChild(link);
   await new Promise(r => setTimeout(r, 500));
 
