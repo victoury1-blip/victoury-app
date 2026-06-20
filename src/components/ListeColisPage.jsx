@@ -675,9 +675,9 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
           let deliveryPerson = '';
           let deliveryPhone = '';
           for (const h of histList) {
-            const c = h['COMMENT'] || '';
-            const nameM = c.match(/Livreur[:\s]*<?\/?b?>?\s*([^<\n]+)/i);
-            const phoneM = c.match(/T[ée]l[ée]phone[:\s]*<?\/?b?>?\s*([0-9]+)/i);
+            const c = (h['COMMENT'] || '').replace(/<[^>]*>/g, ' ').replace(/&lt;[^&]*&gt;/g, ' ').replace(/\s+/g, ' ');
+            const nameM = c.match(/Livreur\s*:?\s*([A-Za-zÀ-ÿ\s]+)/i);
+            const phoneM = c.match(/T[ée]l[ée]phone\s*:?\s*(0[0-9]{9})/i);
             if (nameM) deliveryPerson = nameM[1].trim();
             if (phoneM) deliveryPhone = phoneM[1].trim();
           }
@@ -996,17 +996,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       const phone = order.recipient.phone.replace(/\s+/g, '').replace(/^0/, '212');
       const tn = order.ozoneTracking || order.trackingNumber || order.id;
       const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
-      let msg = `✅ سلام ${order.recipient.name}، الطلب ديالك رقم ${tn} `;
-      if (livreur) {
-        msg += `خداه الليفرور ${livreur.nom}`;
-        msg += `.\n`;
-      }
+      let msg = `✅ سلام ${order.recipient.name} ،\n الطلب ديالك رقم ${tn}`;
+      if (livreur) msg += ` خداه الليفرور ${livreur.nom}.`;
+      msg += `\n\n`;
       if (dp.name) msg += `🚚 الليفرور: ${dp.name}\n`;
-      if (dp.phone) msg += `📞 رقم الليفرور: ${dp.phone}\n`;
-      else if (livreur?.telephone) msg += `📞 رقم الليفرور: ${livreur.telephone}\n`;
-      msg += `📦 الحالة: ${statusLabels[newStatus] || newStatus}.`;
-      if (order.ozoneTracking) msg += `\n🔗 تتبع الطلب: https://ozonexpress.ma/suivi/${order.ozoneTracking}`;
-      msg += `\nغادي يتواصل معاك للتوصيل إن شاء الله.`;
+      if (dp.phone) msg += `رقم هاتف ليفرور: ${dp.phone}\n`;
+      else if (livreur?.telephone) msg += `رقم هاتف ليفرور: ${livreur.telephone}\n`;
+      msg += `📦 الحالة: ${statusLabels[newStatus] || newStatus}.\n`;
+      if (order.ozoneTracking) msg += `🔗 تتبع الطلب: https://ozonexpress.ma/suivi/${order.ozoneTracking}\n`;
+      msg += `غادي يتواصل معاك للتوصيل إن شاء الله.`;
       setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id });
     }
   }
