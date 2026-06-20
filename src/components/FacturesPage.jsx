@@ -49,6 +49,46 @@ const STATUT_LABEL = { en_attente: 'Ouvert', paye: 'Versé', cloture: 'Clôturé
 
 /* ─── Facture Detail View ─── */
 function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
+  const [recalculating, setRecalculating] = useState(false);
+
+  async function recalculerFrais() {
+    setRecalculating(true);
+    try {
+      let livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+      if (!livreursList.length) {
+        const remote = await cloudGet('livreurs');
+        if (Array.isArray(remote) && remote.length) {
+          livreursList = remote;
+          localStorage.setItem('livreurs', JSON.stringify(remote));
+        }
+      }
+      const fraisCache = {};
+      await Promise.all(livreursList.map(async (l) => {
+        const remote = await cloudGet(`frais_${l.id}`);
+        if (Array.isArray(remote) && remote.length) {
+          localStorage.setItem(`frais_${l.id}`, JSON.stringify(remote));
+          fraisCache[l.id] = remote;
+        } else {
+          const local = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
+          if (local.length) { fraisCache[l.id] = local; return; }
+          if (l.isOzone) {
+            const oz = await fetchOzoneFrais(l.id);
+            if (oz.length) { fraisCache[l.id] = oz; return; }
+          }
+          fraisCache[l.id] = [];
+        }
+      }));
+      const updatedColis = facture.colis.map(c => {
+        const auto = getLivreurFrais(facture.livreur, c.city, c.status, fraisCache, livreursList);
+        return { ...c, fraisLivraison: auto !== null ? auto : c.fraisLivraison };
+      });
+      const totalLivre = updatedColis.filter(c => c.status === 'livre').reduce((s, c) => s + (c.prix || 0), 0);
+      const totalFrais = updatedColis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
+      onUpdate({ ...facture, colis: updatedColis, totalLivre, totalFrais, totalNet: totalLivre - totalFrais });
+    } catch (e) { console.error('Recalcul failed:', e); }
+    setRecalculating(false);
+  }
+
   function toggleCloture() {
     const updated = { ...facture, locked: !facture.locked, statut: !facture.locked ? 'cloture' : 'en_attente' };
     onUpdate(updated);
@@ -142,6 +182,10 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
               </div>
             </div>
             <div className="flex gap-2 mt-5">
+              <button onClick={recalculerFrais} disabled={recalculating}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-blue-500 text-white text-xs font-semibold hover:bg-blue-600 disabled:opacity-50">
+                <RefreshCw size={12} className={recalculating ? 'animate-spin' : ''} /> {recalculating ? '...' : 'Recalculer frais'}
+              </button>
               <button onClick={toggleCloture} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${facture.locked ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-amber-500 text-white hover:bg-amber-600'}`}>
                 {facture.locked ? 'Rouvrir' : 'Clôturer la facture'}
               </button>
