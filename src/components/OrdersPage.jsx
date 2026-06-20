@@ -36,7 +36,7 @@ import { loadProducts, loadProductsRemote } from '../data/products';
 
 let _victCounter = null;
 
-async function initVictCounter(orders) {
+function initVictCounter(orders) {
   if (_victCounter !== null) return;
   let max = 0;
   for (const o of orders) {
@@ -44,8 +44,11 @@ async function initVictCounter(orders) {
     if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
   }
   const stored = parseInt(localStorage.getItem('vict_counter') || '0', 10);
-  const remote = parseInt(await cloudGet('vict_counter') || '0', 10);
-  _victCounter = Math.max(max, stored, remote);
+  _victCounter = Math.max(max, stored);
+  cloudGet('vict_counter').then(remote => {
+    const r = parseInt(remote || '0', 10);
+    if (r > _victCounter) _victCounter = r;
+  }).catch(() => {});
 }
 
 function generateVictId() {
