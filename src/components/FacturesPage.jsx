@@ -504,7 +504,18 @@ export default function FacturesPage({ orders }) {
   const [autoGenerating, setAutoGenerating] = useState(false);
 
   useEffect(() => {
-    loadFacturesRemote().then(remote => { if (remote && remote.length >= loadFactures().length) setFactures(remote); });
+    loadFacturesRemote().then(remote => { if (remote && remote.length) setFactures(remote); });
+    // Sync livreurs + frais from cloud for cross-device support
+    cloudGet('livreurs').then(remote => {
+      if (Array.isArray(remote) && remote.length) {
+        localStorage.setItem('livreurs', JSON.stringify(remote));
+        remote.forEach(l => {
+          cloudGet(`frais_${l.id}`).then(frais => {
+            if (Array.isArray(frais) && frais.length) localStorage.setItem(`frais_${l.id}`, JSON.stringify(frais));
+          });
+        });
+      }
+    });
 
     const channel = supabase
       .channel('settings-factures')
