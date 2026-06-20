@@ -29,22 +29,44 @@ function ScannerPage({ orders, setOrders }) {
     } catch {}
   }
 
+  function playError() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(300, ctx.currentTime);
+      osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
+      osc.frequency.setValueAtTime(150, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.6, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch {}
+  }
+
   function showMessage(text, type = 'success') {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
   }
 
   const processScannedCode = useCallback((code) => {
-    if (scannedIdsRef.current.has(code)) return;
-    scannedIdsRef.current.add(code);
+    if (scannedIdsRef.current.has(code)) {
+      playError();
+      showMessage(`⚠️ Code ${code} déjà scanné !`, 'error');
+      return;
+    }
 
     const order = orders.find(o => o.id === code || o.trackingNumber === code);
     if (!order) {
-      playBeep();
+      playError();
       showMessage(`Code ${code} non trouvé`, 'error');
       return;
     }
 
+    scannedIdsRef.current.add(code);
     const livreur = order.recipient?.delivery || 'Sans livreur';
     playBeep();
 
