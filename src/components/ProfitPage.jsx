@@ -105,6 +105,8 @@ export default function ProfitPage({ orders = [] }) {
   }, [factures, applied]);
 
   const livresColis = allFactureColis.filter(c => c.status === 'livre');
+  const refuseColis = allFactureColis.filter(c => c.status === 'refuse');
+  const tableColis = allFactureColis.filter(c => c.status === 'livre' || c.status === 'refuse');
 
   // Match each colis to its order for product cost calculation
   const orderMap = useMemo(() => new Map(orders.map(o => [o.id, o])), [orders]);
@@ -167,9 +169,11 @@ export default function ProfitPage({ orders = [] }) {
           </button>
           <button onClick={() => {
             const rows = [['Facture','ID Colis','Client','Ville','Statut','Prix Vente','Coût Achat','Frais Liv.','Marge'].join(',')];
-            livresColis.forEach(c => {
-              const pa = getProductCost(c); const m = (c.prix||0) - pa - (c.fraisLivraison||0);
-              rows.push([c.factureRef, c.orderId, c.recipient||'', c.city||'', c.status, c.prix||0, pa.toFixed(2), c.fraisLivraison||0, m.toFixed(2)].join(','));
+            tableColis.forEach(c => {
+              const isR = c.status === 'refuse';
+              const pa = isR ? 0 : getProductCost(c); const fl = c.fraisLivraison||0;
+              const m = isR ? -fl : (c.prix||0) - pa - fl;
+              rows.push([c.factureRef, c.orderId, c.recipient||'', c.city||'', isR?'Refusé':'Livré', isR?0:c.prix||0, pa.toFixed(2), fl, m.toFixed(2)].join(','));
             });
             rows.push('');
             EXPENSE_CATS.forEach(cat => {
@@ -268,61 +272,67 @@ export default function ProfitPage({ orders = [] }) {
         {/* Orders table from factures */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-3 border-b bg-gray-50 flex items-center justify-between">
-            <h2 className="font-bold text-gray-700 text-sm">Commandes des factures ({livresColis.length} livrées)</h2>
+            <h2 className="font-bold text-gray-700 text-sm">Commandes des factures ({livresColis.length} livrées · {refuseColis.length} refusées)</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  {['Facture','ID Colis','Client','Ville','Produit','Prix Vente','Coût Achat','Frais Liv.','Marge'].map(h => (
+                  {['Facture','ID Colis','Client','Ville','Statut','Produit','Prix Vente','Coût Achat','Frais Liv.','Marge'].map(h => (
                     <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {livresColis.length === 0 && (
-                  <tr><td colSpan={9} className="py-10 text-center text-gray-400 text-sm">Aucune commande livrée dans les factures de cette période</td></tr>
+                {tableColis.length === 0 && (
+                  <tr><td colSpan={10} className="py-10 text-center text-gray-400 text-sm">Aucune commande dans les factures de cette période</td></tr>
                 )}
-                {livresColis.map((c, i) => {
+                {tableColis.map((c, i) => {
+                  const isRefuse = c.status === 'refuse';
                   const pv = c.prix || 0;
-                  const pa = getProductCost(c);
+                  const pa = isRefuse ? 0 : getProductCost(c);
                   const fl = c.fraisLivraison || 0;
-                  const marge = pv - pa - fl;
+                  const marge = isRefuse ? -(fl) : pv - pa - fl;
                   const order = orderMap.get(c.orderId);
                   const prodName = c.product || order?.product?.name || '—';
                   return (
-                    <tr key={`${c.orderId}-${i}`} className="hover:bg-gray-50">
+                    <tr key={`${c.orderId}-${i}`} className={`hover:bg-gray-50 ${isRefuse ? 'bg-red-50/50' : ''}`}>
                       <td className="px-4 py-2.5 text-xs text-gray-500">{c.factureRef}</td>
                       <td className="px-4 py-2.5 font-mono text-xs font-bold text-blue-600">{c.orderId}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-700">{c.recipient || '—'}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-500">{c.city || order?.recipient?.city || '—'}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isRefuse ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                          {isRefuse ? 'Refusé' : 'Livré'}
+                        </span>
+                      </td>
                       <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[150px] truncate">
                         {prodName}
                         {order?.products?.length > 1 && <span className="text-[10px] text-gray-400 ml-1">(+{order.products.length - 1})</span>}
                       </td>
-                      <td className="px-4 py-2.5 font-semibold text-gray-800">{fmt(pv)}</td>
-                      <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{fmt(pa)}</td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-800">{isRefuse ? '—' : fmt(pv)}</td>
+                      <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{isRefuse ? '—' : fmt(pa)}</td>
                       <td className="px-4 py-2.5 text-orange-500 text-xs font-semibold">{fmt(fl)}</td>
                       <td className={`px-4 py-2.5 font-bold text-xs ${marge >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(marge)}</td>
                     </tr>
                   );
                 })}
               </tbody>
-              {livresColis.length > 0 && (
+              {tableColis.length > 0 && (
                 <tfoot className="border-t-2 border-gray-200 bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-4 py-3 text-xs font-bold text-gray-600">TOTAL ({livresColis.length} livrées)</td>
+                    <td colSpan={6} className="px-4 py-3 text-xs font-bold text-gray-600">TOTAL ({livresColis.length} livrées · {refuseColis.length} refusées)</td>
                     <td className="px-4 py-3 font-black text-gray-800">{fmt(ca)}</td>
                     <td className="px-4 py-3 font-bold text-red-500">{fmt(coutAchat)}</td>
                     <td className="px-4 py-3 font-bold text-orange-500">{fmt(fraisLiv)}</td>
                     <td className={`px-4 py-3 font-black ${sousTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(sousTotal)}</td>
                   </tr>
                   <tr className="border-t border-gray-300">
-                    <td colSpan={8} className="px-4 py-2 text-xs font-bold text-gray-500 text-right">Dépenses :</td>
+                    <td colSpan={9} className="px-4 py-2 text-xs font-bold text-gray-500 text-right">Dépenses :</td>
                     <td className="px-4 py-2 font-bold text-purple-600 text-xs">−{fmt(totalPub)}</td>
                   </tr>
                   <tr className="bg-teal-50">
-                    <td colSpan={8} className="px-4 py-3 text-sm font-black text-gray-700 text-right">PROFIT NET :</td>
+                    <td colSpan={9} className="px-4 py-3 text-sm font-black text-gray-700 text-right">PROFIT NET :</td>
                     <td className={`px-4 py-3 font-black text-sm ${profitNet >= 0 ? 'text-teal-700' : 'text-red-600'}`}>{fmt(profitNet)}</td>
                   </tr>
                 </tfoot>
