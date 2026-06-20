@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package } from 'lucide-react';
-import { loadProducts } from '../data/products';
+import { loadProducts, loadProductsRemote } from '../data/products';
 import { loadFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet } from '../lib/cloudSettings';
@@ -101,7 +101,12 @@ export default function ProfitPage({ orders = [] }) {
     setApplied({ dateFrom: firstDay, dateTo: lastDay });
   }
 
-  const stockProducts = useMemo(() => loadProducts(), []);
+  const [stockProducts, setStockProducts] = useState(() => loadProducts());
+  useEffect(() => {
+    loadProductsRemote().then(remote => {
+      if (remote) { setStockProducts(remote); localStorage.setItem('victoury_products', JSON.stringify(remote)); }
+    });
+  }, []);
 
   // Get all colis from factures, within the period
   const allFactureColis = useMemo(() => {
@@ -136,8 +141,15 @@ export default function ProfitPage({ orders = [] }) {
     for (const p of prods) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
+      const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
       const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
-        || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn));
+        || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn))
+        || stockProducts.find(s => {
+          const sn = (s.name || '').trim().toLowerCase();
+          const snWords = sn.split(/\s+/).filter(w => w.length > 2);
+          const common = pnWords.filter(w => snWords.some(sw => sw.includes(w) || w.includes(sw)));
+          return common.length >= 2;
+        });
       if (sp && sp.prixAchat) {
         cost += (parseFloat(sp.prixAchat) || 0) * (p.qty || 1);
       }
