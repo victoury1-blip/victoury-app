@@ -31,28 +31,25 @@ import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
 import { supabase } from '../lib/supabase';
-import { loadProducts } from '../data/products';
+import { loadProducts, loadProductsRemote } from '../data/products';
 
-async function generateVictId() {
-  try {
-    const { data, error } = await supabase.rpc('next_vict_id');
-    if (!error && data) return data;
-  } catch {}
-  const last = parseInt(localStorage.getItem('vict_counter') || '0', 10);
-  const next = last + 1;
-  localStorage.setItem('vict_counter', String(next));
-  return 'VICT' + String(next).padStart(4, '0');
+let _victCounter = null;
+
+function initVictCounter(orders) {
+  if (_victCounter !== null) return;
+  let max = 0;
+  for (const o of orders) {
+    const m = (o.id || '').match(/^VICT(\d+)$/i);
+    if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
+  }
+  const stored = parseInt(localStorage.getItem('vict_counter') || '0', 10);
+  _victCounter = Math.max(max, stored);
 }
 
-async function generateTrackingNumber() {
-  try {
-    const { data, error } = await supabase.rpc('next_vict_id');
-    if (!error && data) return data;
-  } catch {}
-  const last = parseInt(localStorage.getItem('tracking_counter') || '0', 10);
-  const next = last + 1;
-  localStorage.setItem('tracking_counter', String(next));
-  return 'VICT' + String(next).padStart(4, '0');
+function generateVictId() {
+  _victCounter = (_victCounter || 0) + 1;
+  localStorage.setItem('vict_counter', String(_victCounter));
+  return 'VICT' + String(_victCounter).padStart(4, '0');
 }
 
 function getSysTz() { try { const raw = localStorage.getItem('system_timezone'); return raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { return localStorage.getItem('system_timezone') || 'Africa/Casablanca'; } }
@@ -359,6 +356,7 @@ function StatusChangeModal({ order, onClose, onSave }) {
 
 export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading, onDeleteOrder, currentUser }) {
   const orders = externalOrders;
+  useEffect(() => { if (orders.length) initVictCounter(orders); }, [orders]);
   function setOrders(updater) {
     setExternalOrders(updater);
   }
@@ -939,7 +937,15 @@ function NewOrderModal({ onClose, onSave }) {
   const ic = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300';
   const icSm = 'border border-gray-200 rounded-md px-1.5 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white';
   const lc = 'block text-xs font-semibold text-gray-600 mb-1';
-  const stockProducts = loadProducts();
+  const [stockProducts, setStockProducts] = useState(loadProducts());
+  useEffect(() => {
+    loadProductsRemote().then(remote => {
+      if (remote && remote.length > 0) {
+        localStorage.setItem('victoury_products', JSON.stringify(remote));
+        setStockProducts(remote);
+      }
+    });
+  }, []);
   const { statuses } = useStatuses();
   const [form, setForm] = useState({
     nom: '', telephone: '', ville: '', adresse: '', prix: '',
