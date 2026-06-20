@@ -2,7 +2,36 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw, Zap } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
-import { cloudGet } from '../lib/cloudSettings';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
+
+/* ─── Auto-fetch Ozone cities frais ─── */
+async function fetchOzoneFrais(livreurId) {
+  try {
+    const res = await fetch('https://api.ozonexpress.ma/cities');
+    const raw = await res.json();
+    let arr;
+    if (raw.CITIES && typeof raw.CITIES === 'object' && !Array.isArray(raw.CITIES)) arr = Object.values(raw.CITIES);
+    else if (Array.isArray(raw)) arr = raw;
+    else if (Array.isArray(raw.cities)) arr = raw.cities;
+    else if (Array.isArray(raw.data)) arr = raw.data;
+    else { const nested = Object.values(raw).find(v => typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 3); arr = nested ? Object.values(nested) : []; }
+    if (!arr?.length) return [];
+    const mapped = arr.map((c, i) => ({
+      id: String(c.ID || c.id || c.city_id || i + 1),
+      ville: c.NAME || c.name || c.city_name || c.CITY_NAME || '?',
+      livre: parseFloat(c['DELIVERED-PRICE'] || c.delivered_price || c.tarif_livre || c.price || 35) || 35,
+      annule: parseFloat(c['RETURNED-PRICE'] || c.returned_price || c.tarif_annule || 0) || 0,
+      refuse: parseFloat(c['REFUSED-PRICE'] || c.refused_price || c.tarif_refuse || 0) || 0,
+      change: parseFloat(c['CHANGED-PRICE'] || c.changed_price || c['DELIVERED-PRICE'] || c.price || 35) || 35,
+    })).filter(c => c.ville !== '?');
+    if (mapped.length) {
+      const key = `frais_${livreurId}`;
+      localStorage.setItem(key, JSON.stringify(mapped));
+      cloudSet(key, mapped);
+    }
+    return mapped;
+  } catch { return []; }
+}
 
 /* ─── helpers ─── */
 function fmt(n) { return Number(n || 0).toFixed(2); }
@@ -274,7 +303,12 @@ function NewFactureModal({ orders, onClose, onCreated }) {
           return [l.id, remote];
         }
         const local = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
-        return [l.id, local];
+        if (local.length) return [l.id, local];
+        if (l.isOzone) {
+          const ozoneFrais = await fetchOzoneFrais(l.id);
+          if (ozoneFrais.length) return [l.id, ozoneFrais];
+        }
+        return [l.id, []];
       })
     ).then(entries => {
       const cache = Object.fromEntries(entries);
@@ -516,7 +550,13 @@ export default function FacturesPage({ orders }) {
           localStorage.setItem(`frais_${l.id}`, JSON.stringify(remote));
           fraisCache[l.id] = remote;
         } else {
-          fraisCache[l.id] = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
+          const local = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
+          if (local.length) { fraisCache[l.id] = local; return; }
+          if (l.isOzone) {
+            const oz = await fetchOzoneFrais(l.id);
+            if (oz.length) { fraisCache[l.id] = oz; return; }
+          }
+          fraisCache[l.id] = [];
         }
       }));
 
