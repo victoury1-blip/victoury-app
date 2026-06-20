@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, Check, Phone, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useStatuses } from '../contexts/StatusContext';
 import { loadProducts, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
+
+function getCitiesForLivreur(livreurName) {
+  try {
+    const livreurs = JSON.parse(localStorage.getItem('livreurs') || '[]');
+    const liv = livreurs.find(l => l.nom === livreurName);
+    if (!liv) return [];
+    const frais = JSON.parse(localStorage.getItem(`frais_${liv.id}`) || '[]');
+    return frais.map(f => f.ville).filter(Boolean).sort();
+  } catch { return []; }
+}
 
 function getLivreurs() {
   try {
@@ -40,6 +50,51 @@ function Field({ label, children }) {
 
 const inputCls =
   'w-full border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white';
+
+function CityAutocomplete({ value, onChange, livreur }) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const ref = useRef(null);
+  const cities = useMemo(() => getCitiesForLivreur(livreur), [livreur]);
+
+  useEffect(() => {
+    function handleClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filtered = cities.filter(c => {
+    const q = (filter || value || '').toLowerCase();
+    return !q || c.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="relative" ref={ref}>
+      <input
+        value={value || ''}
+        onChange={(e) => { onChange(e.target.value); setFilter(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        className={inputCls}
+        placeholder="Ville"
+      />
+      {open && cities.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filtered.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">Aucune ville trouvée</div>}
+          {filtered.slice(0, 50).map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => { onChange(c); setOpen(false); setFilter(''); }}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors ${c.toLowerCase() === (value || '').toLowerCase() ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function OrderModal({ order, onClose, onSave }) {
   const { statuses } = useStatuses();
@@ -181,11 +236,10 @@ export default function OrderModal({ order, onClose, onSave }) {
               </Field>
 
               <Field label="Ville">
-                <input
+                <CityAutocomplete
                   value={form.recipient.city}
-                  onChange={(e) => updateRecipient('city', e.target.value)}
-                  className={inputCls}
-                  placeholder="Ville"
+                  onChange={(v) => updateRecipient('city', v)}
+                  livreur={form.recipient.delivery}
                 />
               </Field>
             </div>
