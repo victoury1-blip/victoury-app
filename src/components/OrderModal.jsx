@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { X, Check, Phone, MapPin, Plus, Trash2 } from 'lucide-react';
+import { X, Check, Plus, Trash2 } from 'lucide-react';
 import { useStatuses } from '../contexts/StatusContext';
 import { loadProducts, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
 
@@ -32,24 +32,26 @@ function getLivreurs() {
 
 function SectionTitle({ icon, label }) {
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <span className="text-gray-400">{icon}</span>
-      <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{label}</span>
+    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
+      <span>{icon}</span>
+      <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">{label}</span>
     </div>
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, icon, children }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-blue-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-gray-500 mb-1.5">
+        {icon && <span className="mr-1">{icon}</span>}{label}
+      </label>
       {children}
     </div>
   );
 }
 
 const inputCls =
-  'w-full border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white';
+  'w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 bg-white transition';
 
 function CityAutocomplete({ value, onChange, livreur }) {
   const [open, setOpen] = useState(false);
@@ -85,7 +87,7 @@ function CityAutocomplete({ value, onChange, livreur }) {
               key={c}
               type="button"
               onClick={() => { onChange(c); setOpen(false); setFilter(''); }}
-              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors ${c.toLowerCase() === (value || '').toLowerCase() ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700'}`}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${c.toLowerCase() === (value || '').toLowerCase() ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700'}`}
             >
               {c}
             </button>
@@ -144,29 +146,29 @@ export default function OrderModal({ order, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
-      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] sm:max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] sm:max-h-[92vh] flex flex-col">
 
-        {/* ── Header ── */}
-        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-base font-bold text-gray-900">
-              Modifier la commande {order.id}
+              Modifier la commande #{order.id}
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Mettre à jour les informations</p>
+            <p className="text-xs text-gray-400 mt-0.5">Mettez à jour les informations</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-            <X size={16} />
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 transition">
+            <X size={18} />
           </button>
         </div>
 
-        {/* ── Body ── */}
+        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
           {/* INFORMATIONS PRINCIPALES */}
           <div>
             <SectionTitle icon="📋" label="Informations principales" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <Field label="Statut">
                 <select
                   value={form.status}
@@ -177,6 +179,15 @@ export default function OrderModal({ order, onClose, onSave }) {
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
+              </Field>
+
+              <Field label="Nom du client">
+                <input
+                  value={form.recipient.name}
+                  onChange={(e) => updateRecipient('name', e.target.value)}
+                  className={inputCls}
+                  placeholder="Nom complet"
+                />
               </Field>
 
               {form.status === 'reporter' && (
@@ -190,40 +201,25 @@ export default function OrderModal({ order, onClose, onSave }) {
                 </Field>
               )}
 
-              <Field label="Nom du client">
+              <Field label="Téléphone" icon="📞">
                 <input
-                  value={form.recipient.name}
-                  onChange={(e) => updateRecipient('name', e.target.value)}
+                  value={form.recipient.phone}
+                  onChange={(e) => updateRecipient('phone', e.target.value)}
                   className={inputCls}
-                  placeholder="Nom complet"
+                  placeholder="+212..."
                 />
               </Field>
 
-              <Field label="Téléphone">
-                <div className="relative">
-                  <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={form.recipient.phone}
-                    onChange={(e) => updateRecipient('phone', e.target.value)}
-                    className={`${inputCls} pl-8`}
-                    placeholder="+212..."
-                  />
-                </div>
+              <Field label="Adresse" icon="📍">
+                <input
+                  value={form.recipient.address}
+                  onChange={(e) => updateRecipient('address', e.target.value)}
+                  className={inputCls}
+                  placeholder="Adresse"
+                />
               </Field>
 
-              <Field label="Adresse">
-                <div className="relative">
-                  <MapPin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={form.recipient.address}
-                    onChange={(e) => updateRecipient('address', e.target.value)}
-                    className={`${inputCls} pl-8`}
-                    placeholder="Adresse complète"
-                  />
-                </div>
-              </Field>
-
-              <Field label="Livreur">
+              <Field label="Livreur" icon="🚚">
                 <select
                   value={form.recipient.delivery || ''}
                   onChange={(e) => updateRecipient('delivery', e.target.value)}
@@ -235,7 +231,7 @@ export default function OrderModal({ order, onClose, onSave }) {
                 </select>
               </Field>
 
-              <Field label="Ville">
+              <Field label="Ville" icon="🏙">
                 <CityAutocomplete
                   value={form.recipient.city}
                   onChange={(v) => updateRecipient('city', v)}
@@ -247,7 +243,7 @@ export default function OrderModal({ order, onClose, onSave }) {
 
           {/* PRODUITS */}
           <div>
-            <SectionTitle icon="📦" label="Produits" />
+            <SectionTitle icon="🛍" label="Produits" />
             <div className="space-y-2">
               {form.products.map((prod, idx) => {
                 const stockProducts = loadProducts();
@@ -255,17 +251,15 @@ export default function OrderModal({ order, onClose, onSave }) {
                 const sizes = selProd
                   ? selProd.variations.map(v => v.taille)
                   : (prod.size && isNaN(prod.size) ? SIZE_OPTIONS : NUMERIC_SIZES);
-                /* Include current WC size in options even if not in stock */
                 const sizeOptions = sizes.includes(prod.size || '') || !prod.size ? sizes : [prod.size, ...sizes];
                 return (
-                  <div key={idx} className="flex items-center gap-1.5 border border-gray-100 rounded-lg p-1.5 bg-gray-50">
+                  <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2 border border-gray-100">
                     <select
                       value={prod.name}
                       onChange={(e) => { updateProduct(idx, 'name', e.target.value); updateProduct(idx, 'size', ''); }}
-                      className={`${inputCls} flex-1 min-w-0 py-1.5 text-xs`}
+                      className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                     >
                       <option value="">-- Choisir un produit --</option>
-                      {/* Show WC product name even if not in local stock */}
                       {prod.name && !stockProducts.find(p => p.name === prod.name) && (
                         <option value={prod.name}>{prod.name}</option>
                       )}
@@ -276,7 +270,7 @@ export default function OrderModal({ order, onClose, onSave }) {
                     <select
                       value={prod.size || ''}
                       onChange={(e) => updateProduct(idx, 'size', e.target.value)}
-                      className="border border-gray-200 rounded-md px-1.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-24 shrink-0"
+                      className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-20 shrink-0"
                     >
                       <option value="">Taille</option>
                       {sizeOptions.map(s => <option key={s} value={s}>{s}</option>)}
@@ -284,18 +278,18 @@ export default function OrderModal({ order, onClose, onSave }) {
                     <input
                       type="number" min={1} value={prod.qty}
                       onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
-                      className="border border-gray-200 rounded-md px-1 py-1.5 text-xs text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white w-9 shrink-0"
+                      className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-12 shrink-0"
                     />
                     <button onClick={() => removeProduct(idx)}
-                      className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
-                      <Trash2 size={12} />
+                      className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0 transition">
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 );
               })}
               <button
                 onClick={addProduct}
-                className="w-full border-2 border-dashed border-gray-300 rounded-md py-2 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-500 flex items-center justify-center gap-1.5 transition-colors mt-1"
+                className="w-full border-2 border-dashed border-gray-200 rounded-lg py-2.5 text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Plus size={14} /> Ajouter un produit
               </button>
@@ -304,9 +298,9 @@ export default function OrderModal({ order, onClose, onSave }) {
 
           {/* PAIEMENT & OPTIONS */}
           <div>
-            <SectionTitle icon="💳" label="Paiement & Options" />
-            <div className="grid grid-cols-2 gap-3 items-end">
-              <Field label="Prix total">
+            <SectionTitle icon="💰" label="Paiement & Options" />
+            <div className="grid grid-cols-2 gap-4 items-end">
+              <Field label="Prix total" icon="💵">
                 <input
                   type="number"
                   value={form.price}
@@ -315,13 +309,13 @@ export default function OrderModal({ order, onClose, onSave }) {
                   placeholder="0.00"
                 />
               </Field>
-              <Field label="Échange">
+              <Field label="Échange" icon="🔄">
                 <button
                   onClick={() => update('echange', !form.echange)}
-                  className={`w-full py-2 rounded-md text-sm font-bold transition-colors ${
+                  className={`w-full py-2.5 rounded-lg text-sm font-bold transition-colors ${
                     form.echange
-                      ? 'bg-green-500 text-white'
-                      : 'bg-red-500 text-white'
+                      ? 'bg-green-500 text-white hover:bg-green-600'
+                      : 'bg-red-500 text-white hover:bg-red-600'
                   }`}
                 >
                   {form.echange ? 'OUI' : 'NON'}
@@ -333,8 +327,8 @@ export default function OrderModal({ order, onClose, onSave }) {
           {/* NOTES */}
           <div>
             <SectionTitle icon="📝" label="Notes" />
-            <div className="space-y-3">
-              <Field label="Note interne">
+            <div className="space-y-4">
+              <Field label="Note interne" icon="🔒">
                 <textarea
                   value={form.noteInterne}
                   onChange={(e) => update('noteInterne', e.target.value)}
@@ -343,7 +337,7 @@ export default function OrderModal({ order, onClose, onSave }) {
                   placeholder="Note interne..."
                 />
               </Field>
-              <Field label="Note Livraison">
+              <Field label="Note Livraison" icon="🚛">
                 <textarea
                   value={form.noteLivraison}
                   onChange={(e) => update('noteLivraison', e.target.value)}
@@ -357,19 +351,19 @@ export default function OrderModal({ order, onClose, onSave }) {
 
         </div>
 
-        {/* ── Footer ── */}
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl shrink-0 pb-[env(safe-area-inset-bottom,16px)]">
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/80 rounded-b-2xl shrink-0 pb-[env(safe-area-inset-bottom,16px)]">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-3 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+            className="px-5 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
           >
             Annuler
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="px-5 py-3 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors flex items-center gap-2 active:bg-gray-700"
+            className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             <Check size={14} />
             Enregistrer

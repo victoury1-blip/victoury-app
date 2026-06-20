@@ -940,9 +940,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
 /* ─── Mini new-order form ─── */
 function NewOrderModal({ onClose, onSave }) {
-  const ic = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300';
-  const icSm = 'border border-gray-200 rounded-md px-1.5 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white';
-  const lc = 'block text-xs font-semibold text-gray-600 mb-1';
+  const ic = 'w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 bg-white transition';
+  const lc = 'block text-xs font-medium text-gray-500 mb-1.5';
   const [stockProducts, setStockProducts] = useState(loadProducts());
   useEffect(() => {
     loadProductsRemote().then(remote => {
@@ -1003,103 +1002,102 @@ function NewOrderModal({ onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-5">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] sm:max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <div>
-            <h3 className="font-bold text-gray-800">Nouvelle commande</h3>
-            <p className="text-xs text-indigo-600 font-mono mt-0.5">ID : auto-généré</p>
+            <h3 className="font-bold text-gray-900">Nouvelle commande</h3>
+            <p className="text-xs text-gray-400 mt-0.5">ID : auto-généré</p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><XCircle size={16} className="text-gray-400" /></button>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 transition"><X size={18} /></button>
         </div>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={lc}>Nom client <span className="text-red-500">*</span></label><input value={form.nom} onChange={(e) => u('nom', e.target.value)} className={ic} /></div>
-            <div><label className={lc}>Téléphone <span className="text-red-500">*</span></label><input value={form.telephone} onChange={(e) => u('telephone', e.target.value)} className={ic} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={lc}>Ville</label><input value={form.ville} onChange={(e) => u('ville', e.target.value)} className={ic} /></div>
-            <div><label className={lc}>Adresse</label><input value={form.adresse} onChange={(e) => u('adresse', e.target.value)} className={ic} /></div>
-          </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
           <div>
-            <label className={lc}>Livreur</label>
-            <select value={form.livreur} onChange={(e) => u('livreur', e.target.value)} className={ic}>
-              {livreurOptions.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
+            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
+              <span>📋</span><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Client</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={lc}>Nom client <span className="text-red-400">*</span></label><input value={form.nom} onChange={(e) => u('nom', e.target.value)} className={ic} placeholder="Nom complet" /></div>
+              <div><label className={lc}>📞 Téléphone <span className="text-red-400">*</span></label><input value={form.telephone} onChange={(e) => u('telephone', e.target.value)} className={ic} placeholder="+212..." /></div>
+              <div><label className={lc}>🏙 Ville</label><input value={form.ville} onChange={(e) => u('ville', e.target.value)} className={ic} placeholder="Ville" /></div>
+              <div><label className={lc}>📍 Adresse</label><input value={form.adresse} onChange={(e) => u('adresse', e.target.value)} className={ic} placeholder="Adresse" /></div>
+              <div className="col-span-2"><label className={lc}>🚚 Livreur</label>
+                <select value={form.livreur} onChange={(e) => u('livreur', e.target.value)} className={ic}>
+                  {livreurOptions.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
 
           <div>
-            <label className={lc}>Produits</label>
-            <div className="space-y-1.5">
+            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
+              <span>🛍</span><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Produits</span>
+            </div>
+            <div className="space-y-2">
               {form.products.map((prod, idx) => {
                 const selProd = stockProducts.find(p => p.name === prod.name);
                 const sizes = selProd ? selProd.variations.map(v => v.taille) : [];
                 return (
-                  <div key={idx} className="flex flex-col gap-1 border border-gray-100 rounded-lg p-1.5 bg-gray-50">
-                    <div className="flex items-center gap-1.5">
-                      <select
-                        value={prod.name}
-                        onChange={(e) => updateProduct(idx, 'name', e.target.value)}
-                        className={`${ic} flex-1 min-w-0 py-1.5 text-xs`}
-                      >
+                  <div key={idx} className="flex flex-col gap-1.5 bg-gray-50 rounded-lg p-2 border border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <select value={prod.name} onChange={(e) => updateProduct(idx, 'name', e.target.value)}
+                        className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white">
                         <option value="">-- Produit --</option>
                         {stockProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                       </select>
                       <button onClick={() => removeProduct(idx)}
-                        className="p-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 shrink-0">
+                        className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0 transition">
                         <X size={12} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        value={prod.color || ''}
-                        onChange={(e) => updateProduct(idx, 'color', e.target.value)}
-                        placeholder="Couleur"
-                        className={`${icSm} flex-1 min-w-0`}
-                      />
-                      <select
-                        value={prod.size || ''}
-                        onChange={(e) => updateProduct(idx, 'size', e.target.value)}
-                        className={`${icSm} w-16 shrink-0`}
-                      >
+                    <div className="flex items-center gap-2">
+                      <input value={prod.color || ''} onChange={(e) => updateProduct(idx, 'color', e.target.value)}
+                        placeholder="Couleur" className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white" />
+                      <select value={prod.size || ''} onChange={(e) => updateProduct(idx, 'size', e.target.value)}
+                        className="border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-16 shrink-0">
                         <option value="">T.</option>
                         {sizes.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <input
-                        type="number" min={1} value={prod.qty}
-                        onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
-                        className={`${icSm} w-12 text-center shrink-0`}
-                      />
+                      <input type="number" min={1} value={prod.qty} onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
+                        className="border border-gray-200 rounded-lg px-2 py-2 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-12 shrink-0" />
                     </div>
                   </div>
                 );
               })}
               <button onClick={addProduct}
-                className="w-full border-2 border-dashed border-gray-300 rounded-md py-1.5 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-500 flex items-center justify-center gap-1">
-                <Plus size={12} /> Ajouter un produit
+                className="w-full border-2 border-dashed border-gray-200 rounded-lg py-2.5 text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 flex items-center justify-center gap-1.5 transition-colors">
+                <Plus size={14} /> Ajouter un produit
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={lc}>Prix total (DH) <span className="text-red-500">*</span></label>
-            <input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={ic} /></div>
-            <div><label className={lc}>Nombre de commandes</label>
-            <input type="number" min={1} max={500} value={form.qty} onChange={(e) => u('qty', Math.max(1, Number(e.target.value)))} className={ic} /></div>
-          </div>
           <div>
-            <label className={lc}>Statut</label>
-            <select value={form.status} onChange={(e) => u('status', e.target.value)} className={ic}>
-              {statuses.filter(s => s.showInCommandes !== false).map(s => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
+              <span>💰</span><span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Paiement</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={lc}>💵 Prix total (DH) <span className="text-red-400">*</span></label>
+                <input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={ic} placeholder="0.00" /></div>
+              <div><label className={lc}>Nombre de commandes</label>
+                <input type="number" min={1} max={500} value={form.qty} onChange={(e) => u('qty', Math.max(1, Number(e.target.value)))} className={ic} /></div>
+            </div>
+            <div className="mt-4">
+              <label className={lc}>Statut</label>
+              <select value={form.status} onChange={(e) => u('status', e.target.value)} className={ic}>
+                {statuses.filter(s => s.showInCommandes !== false).map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
+
         </div>
-        <div className="flex justify-end gap-3 mt-5">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700">Annuler</button>
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/80 rounded-b-2xl shrink-0 pb-[env(safe-area-inset-bottom,16px)]">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-100 transition">Annuler</button>
           <button onClick={handleSave} disabled={!form.nom || !form.telephone || !form.prix}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2">
+            <Check size={14} />
             {form.qty > 1 ? `Créer ${form.qty} commandes` : 'Créer la commande'}
           </button>
         </div>
