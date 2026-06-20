@@ -1412,7 +1412,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                 </button>
                 <button
                   onClick={() => {
-                    window.open(`https://api.whatsapp.com/send?phone=${whatsappPopup.phone}&text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
+                    const isAndroid = /android/i.test(navigator.userAgent);
+                    if (isAndroid) {
+                      window.location.href = `intent://send/${whatsappPopup.phone}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.text=${encodeURIComponent(whatsappPopup.msg)};end`;
+                    } else {
+                      window.open(`https://api.whatsapp.com/send?phone=${whatsappPopup.phone}&text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
+                    }
                     setWhatsappPopup(null);
                   }}
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2"

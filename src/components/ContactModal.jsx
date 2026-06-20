@@ -11,7 +11,12 @@ export default function ContactModal({ phone, onClose }) {
 
   function openWhatsApp() {
     const num = clean.startsWith('+') ? clean.slice(1) : clean.startsWith('0') ? '212' + clean.slice(1) : clean;
-    window.open(`https://api.whatsapp.com/send?phone=${num}`, '_blank');
+    const isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      window.location.href = `intent://send/${num}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end`;
+    } else {
+      window.open(`https://api.whatsapp.com/send?phone=${num}`, '_blank');
+    }
     onClose();
   }
 
