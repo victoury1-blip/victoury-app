@@ -937,7 +937,6 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     if (dp.phone) msg += `‏رقم هاتف ليفرور: ${dp.phone}\n`;
     else if (livreur?.telephone) msg += `‏رقم هاتف ليفرور: ${livreur.telephone}\n`;
     msg += `‏📦 الحالة: Expédié\n`;
-    if (order.ozoneTracking) msg += `‏🔗 تتبع الطلب: https://ozonexpress.ma/suivi/${order.ozoneTracking}\n`;
     msg += `‏غادي يتواصل معاك للتوصيل اليوم إن شاء الله.`;
     setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id, markSent: true });
   }
@@ -1034,8 +1033,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       if (dp.phone) msg += `‏رقم هاتف ليفرور: ${dp.phone}\n`;
       else if (livreur?.telephone) msg += `‏رقم هاتف ليفرور: ${livreur.telephone}\n`;
       msg += `‏📦 الحالة: ${statusLabels[newStatus] || newStatus}\n`;
-      if (order.ozoneTracking) msg += `‏🔗 تتبع الطلب: https://ozonexpress.ma/suivi/${order.ozoneTracking}\n`;
-      msg += `‏غادي يتواصل معاك للتوصيل اليوم إن شاء الله.`;
+        msg += `‏غادي يتواصل معاك للتوصيل اليوم إن شاء الله.`;
       setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id });
     }
   }
