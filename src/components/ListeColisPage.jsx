@@ -675,11 +675,12 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
           let deliveryPerson = '';
           let deliveryPhone = '';
           for (const h of histList) {
-            const c = (h['COMMENT'] || '').replace(/<[^>]*>/g, ' ').replace(/&lt;[^&]*&gt;/g, ' ').replace(/\s+/g, ' ');
-            const nameM = c.match(/Livreur\s*:?\s*([A-Za-zÀ-ÿ\s]+)/i);
+            const raw = h['COMMENT'] || '';
+            const c = raw.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
             const phoneM = c.match(/T[ée]l[ée]phone\s*:?\s*(0[0-9]{9})/i);
-            if (nameM) deliveryPerson = nameM[1].trim();
             if (phoneM) deliveryPhone = phoneM[1].trim();
+            const nameM = c.match(/Livreur\s*:?\s*([A-Z][A-Za-zÀ-ÿ]+(?:\s+[A-Z][A-Za-zÀ-ÿ]+)*)/);
+            if (nameM) deliveryPerson = nameM[1].trim();
           }
 
           setOzoneData({
