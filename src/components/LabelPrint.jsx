@@ -68,7 +68,7 @@ function buildLabelHTML(order, config) {
   return `<div class="label-page" style="width:100mm;min-height:100mm;border:2px solid #000;font-family:Arial,sans-serif;padding:0;margin:0 auto;background:#fff;page-break-after:always">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #000">
       <div style="display:flex;align-items:center;gap:8px">${logoHtml}</div>
-      ${shopPhone ? `<span style="font-size:13px;color:#333">Sav: ${shopPhone}</span>` : ''}
+      ${shopPhone ? `<span style="font-size:13px;color:#333">Service après-vente: ${shopPhone}</span>` : ''}
     </div>
     ${noteHtml}
     <div style="display:flex;border-bottom:1px solid #000">
