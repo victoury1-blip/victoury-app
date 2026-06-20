@@ -31,11 +31,12 @@ import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
 import ContactModal from './ContactModal';
 import { supabase } from '../lib/supabase';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { loadProducts, loadProductsRemote } from '../data/products';
 
 let _victCounter = null;
 
-function initVictCounter(orders) {
+async function initVictCounter(orders) {
   if (_victCounter !== null) return;
   let max = 0;
   for (const o of orders) {
@@ -43,12 +44,14 @@ function initVictCounter(orders) {
     if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
   }
   const stored = parseInt(localStorage.getItem('vict_counter') || '0', 10);
-  _victCounter = Math.max(max, stored);
+  const remote = parseInt(await cloudGet('vict_counter') || '0', 10);
+  _victCounter = Math.max(max, stored, remote);
 }
 
 function generateVictId() {
   _victCounter = (_victCounter || 0) + 1;
   localStorage.setItem('vict_counter', String(_victCounter));
+  cloudSet('vict_counter', _victCounter);
   return 'VICT' + String(_victCounter).padStart(4, '0');
 }
 

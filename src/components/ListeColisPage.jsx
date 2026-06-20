@@ -870,6 +870,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [sentLivreurInfo, setSentLivreurInfo] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('victoury_sent_livreur') || '[]')); } catch { return new Set(); }
   });
+  useEffect(() => {
+    cloudGet('victoury_sent_livreur').then(remote => {
+      if (Array.isArray(remote) && remote.length) {
+        setSentLivreurInfo(prev => {
+          const merged = new Set([...prev, ...remote]);
+          localStorage.setItem('victoury_sent_livreur', JSON.stringify([...merged]));
+          return merged;
+        });
+      }
+    });
+  }, []);
   const { statuses } = useStatuses();
   const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '', status: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
@@ -946,6 +957,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       const next = new Set(prev);
       next.add(orderId);
       localStorage.setItem('victoury_sent_livreur', JSON.stringify([...next]));
+      cloudSet('victoury_sent_livreur', [...next]);
       return next;
     });
   }
