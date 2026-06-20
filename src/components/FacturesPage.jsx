@@ -274,12 +274,11 @@ function getLivreurFraisFromList(fraisList, city, status) {
   return row.livre ?? null;
 }
 
-function getLivreurFrais(livreurName, city, status, fraisCache) {
+function getLivreurFrais(livreurName, city, status, fraisCache, livreursList) {
   try {
-    const livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
-    const liv = livreursList.find(l => l.nom === livreurName);
+    const list = livreursList || JSON.parse(localStorage.getItem('livreurs') || '[]');
+    const liv = list.find(l => l.nom === livreurName);
     if (!liv) return null;
-    /* Use pre-loaded cache if available, else fall back to localStorage */
     const fraisList = fraisCache?.[liv.id] || JSON.parse(localStorage.getItem(`frais_${liv.id}`) || '[]');
     return getLivreurFraisFromList(fraisList, city, status);
   } catch { return null; }
@@ -294,7 +293,15 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 
   /* Load frais from cloud for all livreurs so city matching works even without localStorage */
   useEffect(() => {
-    const livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+    (async () => {
+    let livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+    if (!livreursList.length) {
+      const remote = await cloudGet('livreurs');
+      if (Array.isArray(remote) && remote.length) {
+        livreursList = remote;
+        localStorage.setItem('livreurs', JSON.stringify(remote));
+      }
+    }
     Promise.all(
       livreursList.map(async (l) => {
         const remote = await cloudGet(`frais_${l.id}`);
@@ -327,6 +334,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
         return updated;
       });
     });
+    })();
   }, []);
 
   const eligible = useMemo(() => orders.filter(o =>
@@ -553,7 +561,14 @@ export default function FacturesPage({ orders }) {
     });
 
     (async () => {
-      const livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+      let livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
+      if (!livreursList.length) {
+        const remote = await cloudGet('livreurs');
+        if (Array.isArray(remote) && remote.length) {
+          livreursList = remote;
+          localStorage.setItem('livreurs', JSON.stringify(remote));
+        }
+      }
       const fraisCache = {};
       await Promise.all(livreursList.map(async (l) => {
         const remote = await cloudGet(`frais_${l.id}`);
@@ -577,7 +592,7 @@ export default function FacturesPage({ orders }) {
         const livres = cols.filter(o => o.status === 'livre');
         const totalLivre = livres.reduce((s, o) => s + (o.price || 0), 0);
         const totalFrais = cols.reduce((s, o) => {
-          const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache);
+          const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache, livreursList);
           return s + (auto !== null ? auto : fraisDefault);
         }, 0);
         const totalNet = totalLivre - totalFrais;
@@ -588,7 +603,7 @@ export default function FacturesPage({ orders }) {
           statut: 'en_attente',
           livreur: lv,
           colis: cols.map(o => {
-            const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache);
+            const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache, livreursList);
             return {
               orderId: o.id,
               status: o.status,
