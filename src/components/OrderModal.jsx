@@ -150,14 +150,14 @@ export default function OrderModal({ order, onClose, onSave }) {
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] sm:max-h-[92vh] flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0 bg-gray-900 rounded-t-2xl">
           <div>
-            <h2 className="text-base font-bold text-gray-900">
+            <h2 className="text-base font-bold text-white">
               Modifier la commande #{order.id}
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Mettez à jour les informations</p>
+            <p className="text-xs text-gray-300 mt-0.5">Mettez à jour les informations</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 transition">
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 text-gray-300 transition">
             <X size={18} />
           </button>
         </div>

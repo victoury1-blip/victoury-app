@@ -1004,12 +1004,12 @@ function NewOrderModal({ onClose, onSave }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] sm:max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0 bg-gray-900 rounded-t-2xl">
           <div>
-            <h3 className="font-bold text-gray-900">Nouvelle commande</h3>
-            <p className="text-xs text-gray-400 mt-0.5">ID : auto-généré</p>
+            <h3 className="font-bold text-white">Nouvelle commande</h3>
+            <p className="text-xs text-gray-300 mt-0.5">ID : auto-généré</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 transition"><X size={18} /></button>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 text-gray-300 transition"><X size={18} /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
