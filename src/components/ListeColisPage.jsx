@@ -15,8 +15,8 @@ const SHEET_STATUSES = [
   { value: 'annule',     label: 'Annulé',       color: '#dc2626' },
   { value: 'refuse',     label: 'Refusé',       color: '#ea580c' },
   { value: 'retour',     label: 'Retour',       color: '#7c3aed' },
-  { value: 'attente',    label: 'En attente',   color: '#d97706' },
-  { value: 'pas_rep',    label: 'Pas répondu',  color: '#6b7280' },
+  { value: 'attente',    label: 'En Attente',   color: '#d97706' },
+  { value: 'pas_rep',    label: 'Pas Répondu',  color: '#6b7280' },
 ];
 
 const PRODUCT_KEYS = ['produit','product','article','designation','désignation','nom produit','libelle','libellé'];
@@ -595,17 +595,17 @@ function StatusModal({ order, onClose, onSave }) {
 
 /* ── Delivery status modal ── */
 const DELIVERY_STATUSES = [
-  { value: 'att_ramassage', label: 'En attente ramassage', color: '#f59e0b' },
+  { value: 'att_ramassage', label: 'En Attente Ramassage', color: '#f59e0b' },
   { value: 'expedier',      label: 'Expédié',              color: '#3b82f6' },
-  { value: 'recu_livreur',  label: 'Reçu par livreur',     color: '#6366f1' },
+  { value: 'recu_livreur',  label: 'Reçu Par Livreur',     color: '#6366f1' },
   { value: 'livre',         label: 'Livré',                color: '#16a34a' },
   { value: 'change',        label: 'Échange',              color: '#0891b2' },
   { value: 'refuse',        label: 'Refusé',               color: '#ef4444' },
-  { value: 'pas_rep_lv',    label: 'Pas répondu (liv.)',   color: '#9ca3af' },
-  { value: 'pret_retour',   label: 'Prêt retour',          color: '#7c3aed' },
-  { value: 'dem_suivi',     label: 'Dem. de suivi',        color: '#d97706' },
+  { value: 'pas_rep_lv',    label: 'Pas Répondu (Liv.)',   color: '#9ca3af' },
+  { value: 'pret_retour',   label: 'Prêt Retour',          color: '#7c3aed' },
+  { value: 'dem_suivi',     label: 'Demande de Suivi',     color: '#d97706' },
   { value: 'injoignable',   label: 'Injoignable',          color: '#dc2626' },
-  { value: 'manque_stock',  label: 'Manque de stock',      color: '#b45309' },
+  { value: 'manque_stock',  label: 'Manque de Stock',      color: '#b45309' },
 ];
 
 function DeliveryStatusModal({ order, onClose, onSave }) {

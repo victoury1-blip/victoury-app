@@ -15,13 +15,13 @@ const NAV_ITEMS = [
     label: 'Commandes',
     icon: ShoppingCart,
     children: [
-      { path: '/commandes/a-confirmer', label: 'À confirmer', statusKey: 'nouveau' },
-      { path: '/commandes/en-suivi',    label: 'En suivi',    statusKey: 'en_suivi' },
-      { path: '/commandes/reporter',    label: 'Reporter',    statusKey: 'reporter' },
+      { path: '/commandes/a-confirmer', label: 'À Confirmer', statusKey: 'nouveau' },
+      { path: '/commandes/en-suivi',    label: 'En Suivi',    statusKey: 'en_suivi' },
+      { path: '/commandes/reporter',    label: 'Reporté',     statusKey: 'reporter' },
       { path: '/commandes/confirme',    label: 'Confirmé',    statusKey: 'confirme' },
     ],
   },
-  { path: '/liste-colis', label: 'Liste des colis', icon: Package },
+  { path: '/liste-colis', label: 'Liste des Colis', icon: Package },
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
   {
     path: '/ramassage',
