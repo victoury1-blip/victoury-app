@@ -83,14 +83,28 @@ export default function App() {
   /* ── Load orders from Supabase ── */
   useEffect(() => {
     if (!session) return;
-    async function load() {
+    async function load(attempt = 0) {
       /* Load only non-deleted orders */
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .neq('is_deleted', true)
-        .order('created_at', { ascending: false });
-      if (error || !data) { setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes')); setIsLoading(false); return; }
+      let data, error;
+      try {
+        const res = await supabase
+          .from('orders')
+          .select('*')
+          .neq('is_deleted', true)
+          .order('created_at', { ascending: false });
+        data = res.data; error = res.error;
+      } catch (e) {
+        error = e;
+      }
+      if (error || !data) {
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+          return load(attempt + 1);
+        }
+        setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes'));
+        setIsLoading(false);
+        return;
+      }
       /* Build blacklist from soft-deleted rows — survives cache resets */
       const { data: delRows } = await supabase.from('orders').select('id').eq('is_deleted', true);
       const deletedIds = (delRows || []).map(r => r.id);
@@ -416,7 +430,8 @@ export default function App() {
         {(wooError || dbError) && (
           <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center justify-between text-xs text-red-700 shrink-0">
             <span>🔴 {dbError || wooError}</span>
-            <button onClick={() => { setWooError(null); setDbError(null); }} className="ml-4 text-red-400 hover:text-red-600 font-bold">✕</button>
+            <button onClick={() => { setDbError(null); setWooError(null); setIsLoading(true); window.location.reload(); }} className="ml-2 px-2 py-0.5 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700">Réessayer</button>
+            <button onClick={() => { setWooError(null); setDbError(null); }} className="ml-2 text-red-400 hover:text-red-600 font-bold">✕</button>
           </div>
         )}
         <div className="flex-1 overflow-auto">
