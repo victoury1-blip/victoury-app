@@ -48,8 +48,8 @@ function ScannerPage({ orders, setOrders }) {
     const livreur = order.recipient?.delivery || 'Sans livreur';
     playBeep();
 
-    if (order.status !== 'ramasse') {
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'ramasse' } : o));
+    if (order.status !== 'expedier') {
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'expedier' } : o));
     }
 
     setBonsSession(prev => {
