@@ -193,16 +193,22 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       if (saved?.apiKey) setAuzone(p => ({ ...p, customerId: saved.customerId || '', apiKey: saved.apiKey, saved: true }));
     });
     cloudGet('victoury_app_config').then(saved => {
-      if (saved && Object.keys(saved).length > 0) setAppCfg(saved);
+      if (saved && Object.keys(saved).length > 0) {
+        setAppCfg(saved);
+        localStorage.setItem('victoury_app_config', JSON.stringify(saved));
+      }
     });
     cloudGet('notification_sound').then(saved => {
       if (saved && typeof saved === 'object') { setNotifCfg(saved); localStorage.setItem('notification_sound', JSON.stringify(saved)); }
     });
     cloudGet('system_timezone').then(saved => {
-      if (saved) { setTimezone(saved); localStorage.setItem('system_timezone', saved); setTzSaved(true); }
+      if (saved) { setTimezone(saved); localStorage.setItem('system_timezone', JSON.stringify(saved)); setTzSaved(true); }
     });
     cloudGet('victoury_shop_config').then(saved => {
-      if (saved && Object.keys(saved).length > 0) setShopCfg(saved);
+      if (saved && Object.keys(saved).length > 0) {
+        setShopCfg(saved);
+        localStorage.setItem('victoury_shop_config', JSON.stringify(saved));
+      }
     });
   }, []);
 
