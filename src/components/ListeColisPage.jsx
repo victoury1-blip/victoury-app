@@ -983,10 +983,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       let msg = `✅ سلام ${order.recipient.name}، الطلب ديالك رقم ${tn} `;
       if (livreur) {
         msg += `خداه الليفرور ${livreur.nom}`;
-        if (livreur.telephone) msg += ` — ${livreur.telephone}`;
-        msg += `. `;
+        if (livreur.telephone) msg += `\n📞 رقم الليفرور: ${livreur.telephone}`;
+        msg += `.\n`;
       }
-      msg += `الحالة: ${statusLabels[newStatus] || newStatus}. غادي يتواصل معاك للتوصيل إن شاء الله.`;
+      msg += `📦 الحالة: ${statusLabels[newStatus] || newStatus}.`;
+      if (order.ozoneTracking) msg += `\n🔗 تتبع الطلب: https://ozonexpress.ma/suivi/${order.ozoneTracking}`;
+      msg += `\nغادي يتواصل معاك للتوصيل إن شاء الله.`;
       setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id });
     }
   }
