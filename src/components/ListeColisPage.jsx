@@ -866,6 +866,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
   const [whatsappPopup, setWhatsappPopup] = useState(null);
+  const [sentLivreurInfo, setSentLivreurInfo] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('victoury_sent_livreur') || '[]')); } catch { return new Set(); }
+  });
   const { statuses } = useStatuses();
   const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '', status: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
@@ -916,6 +919,33 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       if (next.has(orderId)) { next.delete(orderId); } else { next.add(orderId); }
       localStorage.setItem('victoury_recu_ids', JSON.stringify([...next]));
       supabase.from('settings').upsert({ key: 'victoury_recu_ids', value: [...next], updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {});
+      return next;
+    });
+  }
+
+  function sendLivreurInfo(order) {
+    const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
+    const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
+    const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
+    const tn = order.ozoneTracking || order.trackingNumber || order.id;
+    const phone = order.recipient.phone.replace(/\s+/g, '').replace(/^0/, '212');
+    let msg = `✅ سلام ${order.recipient.name} ،\n الطلب ديالك رقم ${tn}`;
+    if (livreur) msg += ` خداه الليفرور ${livreur.nom}.`;
+    msg += `\n\n`;
+    if (dp.name) msg += `🚚 الليفرور: ${dp.name}\n`;
+    if (dp.phone) msg += `رقم هاتف ليفرور: ${dp.phone}\n`;
+    else if (livreur?.telephone) msg += `رقم هاتف ليفرور: ${livreur.telephone}\n`;
+    msg += `📦 الحالة: Expédié.\n`;
+    if (order.ozoneTracking) msg += `🔗 تتبع الطلب: https://ozonexpress.ma/suivi/${order.ozoneTracking}\n`;
+    msg += `غادي يتواصل معاك للتوصيل إن شاء الله.`;
+    setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id, markSent: true });
+  }
+
+  function markLivreurSent(orderId) {
+    setSentLivreurInfo(prev => {
+      const next = new Set(prev);
+      next.add(orderId);
+      localStorage.setItem('victoury_sent_livreur', JSON.stringify([...next]));
       return next;
     });
   }
@@ -1272,6 +1302,20 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                       <ChevronDown size={10} className="text-gray-400 group-hover:text-gray-600" />
                     </button>
 
+                    {/* Send livreur info button */}
+                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (
+                      <button
+                        onClick={() => sendLivreurInfo(o)}
+                        className={`mt-1 text-xs px-2 py-0.5 rounded-full border font-semibold transition-colors ${
+                          sentLivreurInfo.has(o.id)
+                            ? 'bg-green-100 text-green-700 border-green-300'
+                            : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                        }`}
+                      >
+                        {sentLivreurInfo.has(o.id) ? '✓ Envoyé' : '📩 Envoyer info'}
+                      </button>
+                    )}
+
                     {/* Sub-status: facture toggle (persisted in localStorage) */}
                     {o.status === 'livre' && (
                       <button
@@ -1436,6 +1480,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     } else {
                       window.open(`https://api.whatsapp.com/send?phone=${whatsappPopup.phone}&text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
                     }
+                    if (whatsappPopup.markSent) markLivreurSent(whatsappPopup.orderId);
                     setWhatsappPopup(null);
                   }}
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2"
