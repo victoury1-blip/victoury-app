@@ -947,8 +947,16 @@ function NewOrderModal({ onClose, onSave }) {
     });
   }, []);
   const { statuses } = useStatuses();
+  const livreurOptions = (() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('livreurs') || '[]');
+      if (Array.isArray(stored) && stored.length > 0)
+        return [{ value: '', label: 'Sélectionner un livreur' }, ...stored.filter(l => l.statut !== false).map(l => ({ value: l.nom, label: l.nom }))];
+    } catch {}
+    return [{ value: '', label: 'Sélectionner un livreur' }];
+  })();
   const [form, setForm] = useState({
-    nom: '', telephone: '', ville: '', adresse: '', prix: '',
+    nom: '', telephone: '', ville: '', adresse: '', prix: '', livreur: '',
     products: [{ name: '', size: '', qty: 1 }],
     status: 'nouveau',
     qty: 1,
@@ -974,7 +982,7 @@ function NewOrderModal({ onClose, onSave }) {
       const id = await generateVictId();
       createdOrders.push({
         id,
-        recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: null },
+        recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: form.livreur || null },
         product: { name: firstProd.name, size: firstProd.size, qty: firstProd.qty || 1, stock: 0 },
         products: form.products,
         price: parseFloat(form.prix) || 0,
@@ -1006,6 +1014,12 @@ function NewOrderModal({ onClose, onSave }) {
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lc}>Ville</label><input value={form.ville} onChange={(e) => u('ville', e.target.value)} className={ic} /></div>
             <div><label className={lc}>Adresse</label><input value={form.adresse} onChange={(e) => u('adresse', e.target.value)} className={ic} /></div>
+          </div>
+          <div>
+            <label className={lc}>Livreur</label>
+            <select value={form.livreur} onChange={(e) => u('livreur', e.target.value)} className={ic}>
+              {livreurOptions.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+            </select>
           </div>
 
           <div>
