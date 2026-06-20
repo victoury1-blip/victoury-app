@@ -1001,8 +1001,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         msg += `خداه الليفرور ${livreur.nom}`;
         msg += `.\n`;
       }
-      if (dp.name) msg += `🚚 الموزع: ${dp.name}\n`;
-      if (dp.phone) msg += `📞 رقم الموزع: ${dp.phone}\n`;
+      if (dp.name) msg += `🚚 الليفرور: ${dp.name}\n`;
+      if (dp.phone) msg += `📞 رقم الليفرور: ${dp.phone}\n`;
       else if (livreur?.telephone) msg += `📞 رقم الليفرور: ${livreur.telephone}\n`;
       msg += `📦 الحالة: ${statusLabels[newStatus] || newStatus}.`;
       if (order.ozoneTracking) msg += `\n🔗 تتبع الطلب: https://ozonexpress.ma/suivi/${order.ozoneTracking}`;
