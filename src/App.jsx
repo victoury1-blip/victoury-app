@@ -237,7 +237,7 @@ export default function App() {
           if (fresh.length) {
             /* Play notification sound */
             try {
-              if (!notifConfigRef.current) notifConfigRef.current = JSON.parse(localStorage.getItem('notification_sound') || '{}');
+              notifConfigRef.current = JSON.parse(localStorage.getItem('notification_sound') || '{}');
               const nc = notifConfigRef.current;
               if (nc.enabled !== false) {
                 const vol = (nc.volume ?? 80) / 100;
