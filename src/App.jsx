@@ -16,6 +16,7 @@ import LoginPage from './components/LoginPage';
 import ModeratorsPage from './components/ModeratorsPage';
 import { supabase } from './lib/supabase';
 import { cloudGet } from './lib/cloudSettings';
+import useAutoSync from './hooks/useAutoSync';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 
@@ -72,6 +73,8 @@ export default function App() {
   const wooConfigRef = useRef(null);
   const notifConfigRef = useRef(null);
   const navigate = useNavigate();
+
+  useAutoSync(session);
 
   /* ── Auth ── */
   useEffect(() => {

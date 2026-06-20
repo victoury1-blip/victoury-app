@@ -2,12 +2,13 @@ import React, { useState, useMemo } from 'react';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
+  Star, AlertTriangle, Users, ArrowRight,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 /* ── date helpers ── */
 function parseDate(str) {
   if (!str) return null;
-  // "DD/MM/YYYY HH:MM"
   const [d, m, y, hm] = str.split(/[/ ]/);
   const [h, min] = (hm || '00:00').split(':');
   return new Date(y, m - 1, d, h, min);
@@ -20,14 +21,6 @@ function startOf(date, unit) {
   if (unit === 'month'){ d.setHours(0,0,0,0); d.setDate(1); return d; }
   return d;
 }
-
-const PERIODS = [
-  { id: 'today',     label: "Aujourd'hui" },
-  { id: 'yesterday', label: 'Hier' },
-  { id: 'week',      label: 'Cette semaine' },
-  { id: 'month',     label: 'Ce mois' },
-  { id: 'all',       label: 'Total' },
-];
 
 function filterByPeriod(orders, period) {
   const now = new Date();
@@ -44,23 +37,32 @@ function filterByPeriod(orders, period) {
     if (period === 'yesterday') return d >= yesterdayStart && d < yesterdayEnd;
     if (period === 'week')      return d >= weekStart;
     if (period === 'month')     return d >= monthStart;
-    return true; // all
+    return true;
   });
 }
 
+const STATUS_LABELS = {
+  nouveau: 'Nouveau', confirme: 'Confirmé', livre: 'Livré', refuse: 'Refusé',
+  annule: 'Annulé', reporter: 'Reporté', en_suivi: 'En suivi',
+  att_ramassage: 'Att. ramassage', expedier: 'Expédié', recu_livreur: 'Reçu livreur',
+  pret_retour: 'Prêt retour', retour_recu: 'Retour reçu',
+};
+
+const STATUS_COLORS = {
+  nouveau: 'bg-blue-100 text-blue-700', confirme: 'bg-green-100 text-green-700',
+  livre: 'bg-emerald-100 text-emerald-700', refuse: 'bg-red-100 text-red-700',
+  annule: 'bg-gray-100 text-gray-600', reporter: 'bg-orange-100 text-orange-700',
+  en_suivi: 'bg-purple-100 text-purple-700', att_ramassage: 'bg-amber-100 text-amber-700',
+};
+
 /* ── KPI card ── */
-function KpiCard({ icon: Icon, label, value, sub, iconBg, trend }) {
+function KpiCard({ icon: Icon, label, value, sub, iconBg }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between">
         <div className={`${iconBg} p-3 rounded-xl`}>
           <Icon size={20} className="text-white" />
         </div>
-        {trend !== undefined && (
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${trend >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
-            {trend >= 0 ? '▲' : '▼'} {Math.abs(trend)}
-          </span>
-        )}
       </div>
       <div>
         <p className="text-2xl font-black text-gray-900 leading-tight">{value}</p>
@@ -71,7 +73,34 @@ function KpiCard({ icon: Icon, label, value, sub, iconBg, trend }) {
   );
 }
 
-/* ── Status row in summary table ── */
+/* ── Period summary card ── */
+function PeriodCard({ label, dateHint, orders, bgClass }) {
+  const ca = orders.reduce((s, o) => s + (o.price || 0), 0);
+  const total = orders.length;
+  return (
+    <div className={`${bgClass} rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden select-none`}>
+      <ShoppingCart size={72} className="absolute right-3 bottom-2 opacity-10 text-white" />
+      <div className="flex items-center justify-between">
+        <span className="text-white font-bold text-sm">{label}</span>
+        {dateHint && <span className="text-white/70 text-xs font-medium">{dateHint}</span>}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <DollarSign size={18} className="text-white/80 shrink-0" />
+        <span className="text-white font-black text-2xl leading-none">
+          {Math.floor(ca).toLocaleString('fr-MA')}
+          <span className="text-base font-bold">.{String(Math.round((ca % 1) * 100)).padStart(2,'0')}</span>
+          <span className="text-sm font-semibold ml-1 opacity-80">DH</span>
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <ShoppingCart size={18} className="text-white/80 shrink-0" />
+        <span className="text-white font-black text-2xl leading-none">{total.toLocaleString('fr-MA')}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Status row ── */
 function StatusRow({ label, count, amount, color }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
@@ -89,112 +118,151 @@ function StatusRow({ label, count, amount, color }) {
   );
 }
 
-/* ── Compact period summary card (like the reference image) ── */
-function PeriodCard({ label, dateHint, orders, bgClass, icon }) {
-  const ca   = orders.reduce((s, o) => s + (o.price || 0), 0);
-  const total = orders.length;
-  return (
-    <div className={`${bgClass} rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden select-none`}>
-      {/* watermark */}
-      <ShoppingCart size={72} className="absolute right-3 bottom-2 opacity-10 text-white" />
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <span className="text-white font-bold text-sm">{label}</span>
-        {dateHint && <span className="text-white/70 text-xs font-medium">{dateHint}</span>}
-      </div>
-      {/* CA */}
-      <div className="flex items-center gap-1.5">
-        <DollarSign size={18} className="text-white/80 shrink-0" />
-        <span className="text-white font-black text-2xl leading-none">
-          {Math.floor(ca).toLocaleString('fr-MA')}
-          <span className="text-base font-bold">.{String(Math.round((ca % 1) * 100)).padStart(2,'0')}</span>
-          <span className="text-sm font-semibold ml-1 opacity-80">DH</span>
-        </span>
-      </div>
-      {/* Orders */}
-      <div className="flex items-center gap-1.5">
-        <ShoppingCart size={18} className="text-white/80 shrink-0" />
-        <span className="text-white font-black text-2xl leading-none">{total.toLocaleString('fr-MA')}</span>
-      </div>
-    </div>
-  );
-}
-
 export default function Dashboard({ orders = [] }) {
-  const [period, setPeriod] = useState('today');
-
-  const slice = useMemo(() => filterByPeriod(orders, period), [orders, period]);
-
-  const ca = slice.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
-  const livreCA = slice.filter(o => o.status === 'livre').reduce((s, o) => s + (o.price || 0), 0);
-
-  const counts = {
-    total:     slice.length,
-    nouveau:   slice.filter(o => o.status === 'nouveau').length,
-    confirme:  slice.filter(o => o.status === 'confirme').length,
-    livre:     slice.filter(o => o.status === 'livre').length,
-    refuse:    slice.filter(o => o.status === 'refuse').length,
-    annule:    slice.filter(o => o.status === 'annule').length,
-    reporter:  slice.filter(o => o.status === 'reporter').length,
-    en_suivi:  slice.filter(o => o.status === 'en_suivi').length,
-    att_ram:   slice.filter(o => o.status === 'att_ramassage').length,
-  };
-
-  const retourCA = slice.filter(o => ['refuse','annule','retour','pret_retour'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
-  const tauxRetour = counts.total > 0 ? Math.round(((counts.refuse + counts.annule) / counts.total) * 100) : 0;
-  const taux = counts.total > 0 ? Math.round((counts.livre / counts.total) * 100) : 0;
-
-  /* ── period summary cards data ── */
+  const navigate = useNavigate();
   const now = new Date();
   const weekStart = startOf(now, 'week');
   const MONTH_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   function fmtDate(d) { return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; }
 
+  const todayOrders = useMemo(() => filterByPeriod(orders, 'today'), [orders]);
+
+  const ca = todayOrders.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
+  const livreCA = todayOrders.filter(o => o.status === 'livre').reduce((s, o) => s + (o.price || 0), 0);
+
+  const counts = {
+    total: todayOrders.length,
+    nouveau: todayOrders.filter(o => o.status === 'nouveau').length,
+    confirme: todayOrders.filter(o => o.status === 'confirme').length,
+    livre: todayOrders.filter(o => o.status === 'livre').length,
+    refuse: todayOrders.filter(o => o.status === 'refuse').length,
+    annule: todayOrders.filter(o => o.status === 'annule').length,
+    reporter: todayOrders.filter(o => o.status === 'reporter').length,
+    en_suivi: todayOrders.filter(o => o.status === 'en_suivi').length,
+    att_ram: todayOrders.filter(o => o.status === 'att_ramassage').length,
+  };
+
+  const retourCA = todayOrders.filter(o => ['refuse','annule','retour','pret_retour'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
+  const tauxRetour = counts.total > 0 ? Math.round(((counts.refuse + counts.annule) / counts.total) * 100) : 0;
+  const taux = counts.total > 0 ? Math.round((counts.livre / counts.total) * 100) : 0;
+
   const periodSummaries = useMemo(() => [
-    { label: "Aujourd'hui",   dateHint: fmtDate(now),       orders: filterByPeriod(orders, 'today'),     bgClass: 'bg-gradient-to-br from-blue-500 to-blue-600' },
-    { label: 'Hier',          dateHint: fmtDate(new Date(now.getTime()-86400000)), orders: filterByPeriod(orders, 'yesterday'), bgClass: 'bg-gradient-to-br from-slate-500 to-slate-600' },
+    { label: "Aujourd'hui", dateHint: fmtDate(now), orders: filterByPeriod(orders, 'today'), bgClass: 'bg-gradient-to-br from-blue-500 to-blue-600' },
+    { label: 'Hier', dateHint: fmtDate(new Date(now.getTime()-86400000)), orders: filterByPeriod(orders, 'yesterday'), bgClass: 'bg-gradient-to-br from-slate-500 to-slate-600' },
     { label: 'Cette semaine', dateHint: `depuis ${fmtDate(weekStart)}`, orders: filterByPeriod(orders, 'week'), bgClass: 'bg-gradient-to-br from-cyan-500 to-sky-600' },
-    { label: 'Ce mois',       dateHint: MONTH_FR[now.getMonth()], orders: filterByPeriod(orders, 'month'), bgClass: 'bg-gradient-to-br from-teal-500 to-emerald-600' },
-    { label: 'Total',         dateHint: null,                orders,       bgClass: 'bg-gradient-to-br from-orange-500 to-orange-600' },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    { label: 'Ce mois', dateHint: MONTH_FR[now.getMonth()], orders: filterByPeriod(orders, 'month'), bgClass: 'bg-gradient-to-br from-teal-500 to-emerald-600' },
+    { label: 'Total', dateHint: null, orders, bgClass: 'bg-gradient-to-br from-orange-500 to-orange-600' },
   ], [orders]);
 
   const kpis = [
-    { icon: ShoppingCart, label: 'Total commandes',  value: counts.total,   iconBg: 'bg-blue-500',    sub: `${counts.nouveau} nouvelles` },
-    { icon: CheckCircle,  label: 'Confirmées',        value: counts.confirme, iconBg: 'bg-green-500',  sub: `${counts.en_suivi} en suivi` },
-    { icon: Truck,        label: 'Livrées',           value: counts.livre,   iconBg: 'bg-emerald-500', sub: `Taux: ${taux}%` },
-    { icon: XCircle,      label: 'Refusées / Annulées', value: counts.refuse + counts.annule, iconBg: 'bg-red-500', sub: `${counts.refuse} refusées, ${counts.annule} annulées` },
-    { icon: RotateCcw,    label: 'Reportées',         value: counts.reporter, iconBg: 'bg-orange-500', sub: `${counts.att_ram} att. ramassage` },
-    { icon: DollarSign,   label: 'Chiffre d\'affaires', value: `${ca.toLocaleString('fr-MA', { minimumFractionDigits: 2 })} DH`, iconBg: 'bg-purple-500', sub: `Livré: ${livreCA.toLocaleString('fr-MA', {minimumFractionDigits:2})} DH` },
+    { icon: ShoppingCart, label: 'Total commandes', value: counts.total, iconBg: 'bg-blue-500', sub: `${counts.nouveau} nouvelles` },
+    { icon: CheckCircle, label: 'Confirmées', value: counts.confirme, iconBg: 'bg-green-500', sub: `${counts.en_suivi} en suivi` },
+    { icon: Truck, label: 'Livrées', value: counts.livre, iconBg: 'bg-emerald-500', sub: `Taux: ${taux}%` },
+    { icon: XCircle, label: 'Refusées / Annulées', value: counts.refuse + counts.annule, iconBg: 'bg-red-500', sub: `${counts.refuse} ref, ${counts.annule} ann` },
+    { icon: RotateCcw, label: 'Reportées', value: counts.reporter, iconBg: 'bg-orange-500', sub: `${counts.att_ram} att. ramassage` },
+    { icon: DollarSign, label: "Chiffre d'affaires", value: `${ca.toLocaleString('fr-MA', { minimumFractionDigits: 2 })} DH`, iconBg: 'bg-purple-500', sub: `Livré: ${livreCA.toLocaleString('fr-MA',{minimumFractionDigits:2})} DH` },
   ];
 
   const statusRows = [
-    { label: 'Nouveau (À confirmer)',    count: counts.nouveau,  amount: slice.filter(o=>o.status==='nouveau').reduce((s,o)=>s+(o.price||0),0),  color: 'bg-blue-400' },
-    { label: 'Confirmé',                 count: counts.confirme, amount: slice.filter(o=>o.status==='confirme').reduce((s,o)=>s+(o.price||0),0), color: 'bg-green-500' },
-    { label: 'En attente ramassage',     count: counts.att_ram,  amount: undefined, color: 'bg-amber-400' },
-    { label: 'En suivi',                 count: counts.en_suivi, amount: undefined, color: 'bg-purple-400' },
-    { label: 'Livré',                    count: counts.livre,    amount: livreCA,   color: 'bg-emerald-500' },
-    { label: 'Refusé',                   count: counts.refuse,   amount: undefined, color: 'bg-red-500' },
-    { label: 'Annulé',                   count: counts.annule,   amount: undefined, color: 'bg-gray-400' },
-    { label: 'Reporté',                  count: counts.reporter, amount: undefined, color: 'bg-orange-400' },
+    { label: 'Nouveau (À confirmer)', count: counts.nouveau, amount: todayOrders.filter(o=>o.status==='nouveau').reduce((s,o)=>s+(o.price||0),0), color: 'bg-blue-400' },
+    { label: 'Confirmé', count: counts.confirme, amount: todayOrders.filter(o=>o.status==='confirme').reduce((s,o)=>s+(o.price||0),0), color: 'bg-green-500' },
+    { label: 'En attente ramassage', count: counts.att_ram, amount: undefined, color: 'bg-amber-400' },
+    { label: 'En suivi', count: counts.en_suivi, amount: undefined, color: 'bg-purple-400' },
+    { label: 'Livré', count: counts.livre, amount: livreCA, color: 'bg-emerald-500' },
+    { label: 'Refusé', count: counts.refuse, amount: undefined, color: 'bg-red-500' },
+    { label: 'Annulé', count: counts.annule, amount: undefined, color: 'bg-gray-400' },
+    { label: 'Reporté', count: counts.reporter, amount: undefined, color: 'bg-orange-400' },
   ].filter(r => r.count > 0);
 
-  return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Vue d'ensemble de votre activité</p>
-        </div>
+  /* ── Top Products ── */
+  const topProducts = useMemo(() => {
+    const map = new Map();
+    const monthOrders = filterByPeriod(orders, 'month');
+    monthOrders.forEach(o => {
+      const prods = o.products || [o.product];
+      (prods || []).forEach(p => {
+        if (!p?.name) return;
+        const key = p.name;
+        const prev = map.get(key) || { name: key, qty: 0, revenue: 0 };
+        prev.qty += (p.qty || 1);
+        prev.revenue += (o.price || 0);
+        map.set(key, prev);
+      });
+    });
+    return [...map.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
+  }, [orders]);
 
+  /* ── Livreur Performance ── */
+  const livreurStats = useMemo(() => {
+    const map = new Map();
+    orders.forEach(o => {
+      const liv = o.recipient?.delivery;
+      if (!liv) return;
+      const prev = map.get(liv) || { name: liv, total: 0, livre: 0, refuse: 0, revenue: 0 };
+      prev.total++;
+      if (o.status === 'livre') { prev.livre++; prev.revenue += (o.price || 0); }
+      if (['refuse','annule','retour','pret_retour'].includes(o.status)) prev.refuse++;
+      map.set(liv, prev);
+    });
+    return [...map.values()].filter(l => l.total >= 5).sort((a, b) => b.total - a.total).slice(0, 5);
+  }, [orders]);
+
+  /* ── Recent Orders ── */
+  const recentOrders = useMemo(() => {
+    return [...orders]
+      .sort((a, b) => {
+        const da = parseDate(a.dateAdded);
+        const db = parseDate(b.dateAdded);
+        return (db?.getTime() || 0) - (da?.getTime() || 0);
+      })
+      .slice(0, 8);
+  }, [orders]);
+
+  /* ── Alerts ── */
+  const alerts = useMemo(() => {
+    const list = [];
+    const pending = orders.filter(o => o.status === 'nouveau');
+    if (pending.length > 10) list.push({ text: `${pending.length} commandes en attente de confirmation`, type: 'warning', action: '/commandes/a-confirmer' });
+    const reported = orders.filter(o => o.status === 'reporter');
+    if (reported.length > 0) {
+      const overdue = reported.filter(o => {
+        if (!o.reportDate) return false;
+        return new Date(o.reportDate) <= new Date();
+      });
+      if (overdue.length) list.push({ text: `${overdue.length} commandes reportées à rappeler aujourd'hui`, type: 'urgent', action: '/commandes/reporter' });
+    }
+    const noLivreur = orders.filter(o => o.status === 'confirme' && !o.recipient?.delivery);
+    if (noLivreur.length) list.push({ text: `${noLivreur.length} commandes confirmées sans livreur`, type: 'warning', action: '/commandes/confirme' });
+    return list;
+  }, [orders]);
+
+  return (
+    <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Vue d'ensemble de votre activité</p>
       </div>
 
-      {/* ── Period summary cards (Shopify-style) ── */}
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((a, i) => (
+            <button key={i} onClick={() => navigate(a.action)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors text-left ${
+                a.type === 'urgent' ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+              }`}>
+              <AlertTriangle size={16} className="shrink-0" />
+              <span className="flex-1">{a.text}</span>
+              <ArrowRight size={14} className="shrink-0 opacity-50" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Period summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {periodSummaries.map(p => (
-          <PeriodCard key={p.label} {...p} />
-        ))}
+        {periodSummaries.map(p => <PeriodCard key={p.label} {...p} />)}
       </div>
 
       {/* KPI cards */}
@@ -202,20 +270,17 @@ export default function Dashboard({ orders = [] }) {
         {kpis.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
 
-      {/* Bottom row */}
+      {/* Bottom section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Status breakdown */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
             <Package size={16} className="text-blue-500" />
             Répartition par état
-            <span className="ml-auto text-xs font-normal text-gray-400">Tous</span>
           </h2>
           {statusRows.length === 0 ? (
-            <div className="py-8 text-center text-gray-300 text-sm">Aucune commande sur cette période</div>
-          ) : (
-            statusRows.map(r => <StatusRow key={r.label} {...r} />)
-          )}
+            <div className="py-8 text-center text-gray-300 text-sm">Aucune commande</div>
+          ) : statusRows.map(r => <StatusRow key={r.label} {...r} />)}
         </div>
 
         {/* CA summary */}
@@ -226,10 +291,10 @@ export default function Dashboard({ orders = [] }) {
           </h2>
           <div className="flex flex-col gap-3 flex-1">
             {[
-              { label: 'Total confirmées', val: slice.filter(o=>['confirme','livre'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-green-700', bg: 'bg-green-50' },
+              { label: 'Total confirmées', val: todayOrders.filter(o=>['confirme','livre'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-green-700', bg: 'bg-green-50' },
               { label: 'Total livrées', val: livreCA, color: 'text-emerald-700', bg: 'bg-emerald-50' },
               { label: 'Retours / Refusés', val: retourCA, color: 'text-red-700', bg: 'bg-red-50' },
-              { label: 'En attente', val: slice.filter(o=>['nouveau','reporter','en_suivi','att_ramassage'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-amber-700', bg: 'bg-amber-50' },
+              { label: 'En attente', val: todayOrders.filter(o=>['nouveau','reporter','en_suivi','att_ramassage'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-amber-700', bg: 'bg-amber-50' },
             ].map(item => (
               <div key={item.label} className={`${item.bg} rounded-xl px-4 py-3`}>
                 <p className="text-xs text-gray-500 mb-0.5">{item.label}</p>
@@ -259,6 +324,111 @@ export default function Dashboard({ orders = [] }) {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Top Products */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Star size={16} className="text-amber-500" />
+            Top produits du mois
+          </h2>
+          {topProducts.length === 0 ? (
+            <div className="py-8 text-center text-gray-300 text-sm">Aucune donnée</div>
+          ) : (
+            <div className="space-y-3">
+              {topProducts.map((p, i) => (
+                <div key={p.name} className="flex items-center gap-3">
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
+                    i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-orange-400' : 'bg-gray-300'
+                  }`}>{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                    <p className="text-xs text-gray-400">{p.qty} vendus</p>
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">{p.revenue.toLocaleString('fr-MA')} DH</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Second bottom row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Recent orders */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-gray-800 flex items-center gap-2">
+              <Clock size={16} className="text-blue-500" />
+              Dernières commandes
+            </h2>
+            <button onClick={() => navigate('/commandes/a-confirmer')} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+              Voir tout <ArrowRight size={12} />
+            </button>
+          </div>
+          {recentOrders.length === 0 ? (
+            <div className="py-8 text-center text-gray-300 text-sm">Aucune commande</div>
+          ) : (
+            <div className="space-y-2">
+              {recentOrders.map(o => (
+                <div key={o.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-gray-800">#{o.id}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[o.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {STATUS_LABELS[o.status] || o.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {o.recipient?.name || '—'} • {o.recipient?.city || '—'}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-gray-800">{(o.price || 0).toLocaleString('fr-MA')} DH</p>
+                    <p className="text-[10px] text-gray-400">{o.dateAdded?.split(' ')[0] || ''}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Livreur Performance */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Users size={16} className="text-indigo-500" />
+            Performance livreurs
+          </h2>
+          {livreurStats.length === 0 ? (
+            <div className="py-8 text-center text-gray-300 text-sm">Aucune donnée</div>
+          ) : (
+            <div className="space-y-4">
+              {livreurStats.map(l => {
+                const tauxLiv = l.total > 0 ? Math.round((l.livre / l.total) * 100) : 0;
+                const tauxRef = l.total > 0 ? Math.round((l.refuse / l.total) * 100) : 0;
+                return (
+                  <div key={l.name}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-800">{l.name}</span>
+                      <span className="text-xs text-gray-500">{l.total} colis</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden flex">
+                        <div className="bg-emerald-500 h-full transition-all" style={{ width: `${tauxLiv}%` }} />
+                        <div className="bg-red-400 h-full transition-all" style={{ width: `${tauxRef}%` }} />
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 w-10 text-right">{tauxLiv}%</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400">
+                      <span>{l.livre} livrés</span>
+                      <span>{l.refuse} retours</span>
+                      <span className="ml-auto font-medium text-gray-600">{l.revenue.toLocaleString('fr-MA')} DH</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
