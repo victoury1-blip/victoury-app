@@ -394,9 +394,10 @@ export default function App() {
     setOrders((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       const prevMap = new Map(prev.map(o => [o.id, o]));
+      const brandNew = next.filter(o => !prevMap.has(o.id));
       const changed = next.filter((o) => {
         const old = prevMap.get(o.id);
-        if (!old) return true;
+        if (!old) return false;
         return o.status !== old.status || o.note !== old.note || o.validated !== old.validated
           || o.price !== old.price || o.trackingNumber !== old.trackingNumber
           || o.ozoneTracking !== old.ozoneTracking || o.recipient !== old.recipient
@@ -404,6 +405,7 @@ export default function App() {
           || o.reportDate !== old.reportDate || o.noteLivraison !== old.noteLivraison
           || o.ozoneLastStatus !== old.ozoneLastStatus;
       });
+      if (brandNew.length) saveOrdersToSupabase(brandNew).catch(e => console.error('save new orders:', e));
       changed.forEach((o) => {
         modifiedIdsRef.current.add(o.id);
         updateOrderInSupabase({ ...o, manuallyModified: true });
