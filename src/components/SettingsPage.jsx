@@ -219,7 +219,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   }
 
   function saveWoo() {
-    cloudSet('woo_config', { siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret });
+    const cfg = { siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret };
+    localStorage.setItem('woo_config', JSON.stringify(cfg));
+    cloudSet('woo_config', cfg);
     setWoo((p) => ({ ...p, saved: true }));
   }
 
@@ -257,7 +259,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   function updateAuzone(field, val) { setAuzone((p) => ({ ...p, [field]: val, saved: false })); }
 
   function saveAuzone() {
-    cloudSet('auzone_config', { customerId: auzone.customerId, apiKey: auzone.apiKey });
+    const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
+    localStorage.setItem('auzone_config', JSON.stringify(cfg));
+    cloudSet('auzone_config', cfg);
     setAuzone((p) => ({ ...p, saved: true }));
   }
 

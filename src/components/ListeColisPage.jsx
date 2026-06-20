@@ -149,7 +149,9 @@ function SheetImportSection({ orders = [], setOrders }) {
     setColMap(mapping);
     setHeaders(pendingData.headers);
     setRows(pendingData.rows);
-    cloudSet('gs_import', { headers: pendingData.headers, rows: pendingData.rows, colMap: mapping });
+    const gsData = { headers: pendingData.headers, rows: pendingData.rows, colMap: mapping };
+    localStorage.setItem('gs_import', JSON.stringify(gsData));
+    cloudSet('gs_import', gsData);
     setPendingData(null);
     setMappingOpen(false);
   }
@@ -158,7 +160,9 @@ function SheetImportSection({ orders = [], setOrders }) {
     setModifiedIds(prev => new Set([...prev, id]));
     setRows(prev => {
       const next = prev.map(r => r._id === id ? { ...r, ...patch } : r);
-      cloudSet('gs_import', { headers, rows: next });
+      const gsData = { headers, rows: next };
+      localStorage.setItem('gs_import', JSON.stringify(gsData));
+      cloudSet('gs_import', gsData);
       return next;
     });
   }

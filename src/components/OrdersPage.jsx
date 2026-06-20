@@ -492,7 +492,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       recordHistory(updated.id, updated.status, currentUser);
     }
     if (!updated.trackingNumber) {
-      updated.trackingNumber = generateTrackingNumber();
+      updated.trackingNumber = updated.id;
     }
     setModifiedIds(prev => new Set([...prev, updated.id]));
     setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
