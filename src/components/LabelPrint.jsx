@@ -65,7 +65,7 @@ function buildLabelHTML(order, config) {
     `<div style="font-size:13px;color:#333">- ${p.name || ''}${p.color ? ' ' + p.color : ''}${p.size ? ' - ' + p.size : ''} (x${p.qty || 1})</div>`
   ).join('');
 
-  return `<div class="label-page" style="width:100mm;min-height:100mm;border:2px solid #000;font-family:'Tajawal',sans-serif;padding:0;margin:0 auto;background:#fff;page-break-after:always">
+  return `<div class="label-page" style="width:100mm;min-height:100mm;border:2px solid #000;font-family:'Poppins',sans-serif;padding:0;margin:0 auto;background:#fff;page-break-after:always">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #000">
       <div style="display:flex;align-items:center;gap:8px">${logoHtml}</div>
       ${shopPhone ? `<div style="text-align:right;line-height:1.3"><span style="font-size:11px;font-weight:bold;color:#333">Service après-vente</span><br><span style="font-size:13px;color:#333">${shopPhone}</span></div>` : ''}
@@ -114,11 +114,11 @@ export async function openLabelPage(orders) {
 <html><head><title>Étiquettes VICTOURY</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   @page { size: 100mm 100mm; margin: 0; }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 20px; background: #f3f4f6; font-family: 'Tajawal', sans-serif; }
+  body { margin: 0; padding: 20px; background: #f3f4f6; font-family: 'Poppins', sans-serif; }
   .label-page { page-break-after: always; margin: 0 auto 20px; }
   .label-page:last-child { page-break-after: avoid; }
   .print-header { text-align: center; margin-bottom: 24px; padding: 16px; background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
