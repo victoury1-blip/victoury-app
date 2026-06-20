@@ -1412,7 +1412,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                 </button>
                 <button
                   onClick={() => {
-                    window.open(`https://wa.me/${whatsappPopup.phone}?text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
+                    window.open(`https://api.whatsapp.com/send?phone=${whatsappPopup.phone}&text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
                     setWhatsappPopup(null);
                   }}
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2"
