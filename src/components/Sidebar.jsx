@@ -91,11 +91,16 @@ function ProfileModal({ onClose, session }) {
 
   async function changePassword() {
     setPwMsg(null);
-    if (!pw.next || pw.next.length < 6) { setPwMsg({ type: 'error', text: 'Le mot de passe doit contenir au moins 6 caractères' }); return; }
+    if (!pw.current) { setPwMsg({ type: 'error', text: 'Entrez votre mot de passe actuel' }); return; }
+    if (!pw.next || pw.next.length < 6) { setPwMsg({ type: 'error', text: 'Le nouveau mot de passe doit contenir au moins 6 caractères' }); return; }
     if (pw.next !== pw.confirm) { setPwMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas' }); return; }
+    const email = session?.user?.email;
+    if (!email) { setPwMsg({ type: 'error', text: 'Session invalide' }); return; }
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: pw.current });
+    if (signInErr) { setPwMsg({ type: 'error', text: 'Mot de passe actuel incorrect' }); return; }
     const { error } = await supabase.auth.updateUser({ password: pw.next });
     if (error) { setPwMsg({ type: 'error', text: error.message }); return; }
-    setPwMsg({ type: 'success', text: 'Mot de passe modifié avec succès' });
+    setPwMsg({ type: 'success', text: 'Mot de passe modifié ! Utilisez le nouveau mot de passe sur vos autres appareils.' });
     setPw({ current: '', next: '', confirm: '' });
   }
 
@@ -164,20 +169,25 @@ function ProfileModal({ onClose, session }) {
 
             {showPw && (
               <div className="mt-3 space-y-3">
-                <div className="relative">
-                  <input
-                    type="password"
-                    value={pw.next}
-                    onChange={e => setPw({ ...pw, next: e.target.value })}
-                    placeholder="Nouveau mot de passe"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
-                </div>
+                <input
+                  type="password"
+                  value={pw.current}
+                  onChange={e => setPw({ ...pw, current: e.target.value })}
+                  placeholder="Mot de passe actuel"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                <input
+                  type="password"
+                  value={pw.next}
+                  onChange={e => setPw({ ...pw, next: e.target.value })}
+                  placeholder="Nouveau mot de passe"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
                 <input
                   type="password"
                   value={pw.confirm}
                   onChange={e => setPw({ ...pw, confirm: e.target.value })}
-                  placeholder="Confirmer le mot de passe"
+                  placeholder="Confirmer le nouveau mot de passe"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
                 {pwMsg && (
