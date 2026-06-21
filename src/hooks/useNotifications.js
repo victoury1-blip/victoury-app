@@ -81,6 +81,16 @@ export default function useNotifications(orders) {
   useEffect(() => {
     if (!orders || !orders.length) return;
 
+    // Update PWA badge with new orders count
+    const nouveauCount = orders.filter(o => o.status === 'nouveau').length;
+    if ('setAppBadge' in navigator) {
+      if (nouveauCount > 0) {
+        navigator.setAppBadge(nouveauCount).catch(() => {});
+      } else {
+        navigator.clearAppBadge().catch(() => {});
+      }
+    }
+
     if (prevCountRef.current !== null) {
       const newCount = orders.length - prevCountRef.current;
       if (newCount > 0) {

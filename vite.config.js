@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Victoury - Gestion des Commandes',
-        short_name: 'Victoury',
+        name: 'VICTOURY - Gestion des Commandes',
+        short_name: 'VICTOURY',
         description: 'Gestion des commandes et livraisons',
         theme_color: '#1E3A5F',
         background_color: '#F9FAFB',
