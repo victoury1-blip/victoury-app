@@ -585,7 +585,13 @@ export default function FacturesPage({ orders }) {
         filter: 'key=eq.victoury_factures',
       }, (payload) => {
         const val = payload.new?.value;
-        if (Array.isArray(val)) setFactures(val);
+        if (Array.isArray(val)) {
+          setFactures(prev => {
+            const remoteMap = new Map(val.map(f => [f.id, f]));
+            const localOnly = prev.filter(f => !remoteMap.has(f.id));
+            return [...val, ...localOnly];
+          });
+        }
       })
       .subscribe();
 
@@ -696,8 +702,11 @@ export default function FacturesPage({ orders }) {
   }), [factures, filterLivreur, filterStatut]);
 
   function updateFacture(updated) {
-    const list = factures.map(f => f.id === updated.id ? updated : f);
-    setFactures(list); saveFactures(list);
+    setFactures(prev => {
+      const list = prev.map(f => f.id === updated.id ? updated : f);
+      saveFactures(list);
+      return list;
+    });
     if (detail?.id === updated.id) setDetail(updated);
   }
 
@@ -709,8 +718,11 @@ export default function FacturesPage({ orders }) {
   }
   function del(id) {
     if (!window.confirm('Supprimer cette facture ?')) return;
-    const list = factures.filter(f => f.id !== id);
-    setFactures(list); saveFactures(list);
+    setFactures(prev => {
+      const list = prev.filter(f => f.id !== id);
+      saveFactures(list);
+      return list;
+    });
     if (detail?.id === id) setDetail(null);
   }
   function reset() { setFilterLivreur(''); setFilterStatut(''); }
