@@ -46,6 +46,23 @@ export async function sendNotification(title, options = {}) {
 export default function useNotifications(orders) {
   const prevCountRef = useRef(null);
   const prevAlertsRef = useRef(new Set());
+  const permAskedRef = useRef(false);
+
+  // Auto-request permission on first load
+  useEffect(() => {
+    if (permAskedRef.current) return;
+    permAskedRef.current = true;
+    if ('Notification' in window && Notification.permission === 'default') {
+      const timer = setTimeout(() => {
+        Notification.requestPermission().then(p => {
+          if (p === 'granted') {
+            localStorage.setItem('push_notifications', JSON.stringify({ enabled: true }));
+          }
+        });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const checkAlerts = useCallback((list) => {
     if (!isEnabled()) return;
