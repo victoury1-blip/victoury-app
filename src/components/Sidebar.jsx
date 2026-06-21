@@ -195,6 +195,16 @@ function ProfileModal({ onClose, session }) {
               <CheckCircle2 size={14} /> Profil enregistré et synchronisé
             </div>
           )}
+
+          {/* Déconnexion */}
+          <div className="border-t border-gray-100 pt-4">
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-100 transition border border-red-200"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -342,11 +352,6 @@ export default function Sidebar({ orders = [], session }) {
             </div>
           )}
         </button>
-        {(isMobile || !collapsed) && (
-          <button onClick={() => supabase.auth.signOut()} className="text-xs text-red-400 hover:text-red-600 transition shrink-0">
-            Déconnexion
-          </button>
-        )}
       </div>
     </>
   );
