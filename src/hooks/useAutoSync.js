@@ -19,6 +19,7 @@ const SYNC_KEYS = [
   'user_profiles',
   'auzone_config',
   'woo_config',
+  'push_notifications',
 ];
 
 const SYNC_INTERVAL = 30_000;

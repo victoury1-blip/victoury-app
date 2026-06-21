@@ -5,8 +5,9 @@ import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
   ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
-  Search, ArrowDownCircle, Tag, Upload,
+  Search, ArrowDownCircle, Tag, Upload, Bell,
 } from 'lucide-react';
+import { requestPermission } from '../hooks/useNotifications';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -85,6 +86,28 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   const [notifCfg, setNotifCfg] = useState(() => {
     try { return JSON.parse(localStorage.getItem('notification_sound') || '{}'); } catch { return {}; }
   });
+
+  /* ── Push notifications state ── */
+  const [pushCfg, setPushCfg] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('push_notifications') || '{}'); } catch { return {}; }
+  });
+  const [pushPermission, setPushPermission] = useState(() => 'Notification' in window ? Notification.permission : 'denied');
+
+  function savePushCfg(cfg) {
+    setPushCfg(cfg);
+    localStorage.setItem('push_notifications', JSON.stringify(cfg));
+    cloudSet('push_notifications', cfg);
+  }
+
+  async function togglePush() {
+    if (pushCfg.enabled) {
+      savePushCfg({ ...pushCfg, enabled: false });
+    } else {
+      const perm = await requestPermission();
+      setPushPermission(perm);
+      if (perm === 'granted') savePushCfg({ ...pushCfg, enabled: true });
+    }
+  }
 
   function saveNotifCfg(cfg) {
     setNotifCfg(cfg);
@@ -336,7 +359,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     {
       id: 'notifications',
       title: 'Notifications',
-      desc: 'Configurez les sons de notification pour les nouvelles commandes (upload son, volume).',
+      desc: 'Sons de notification, notifications push pour nouvelles commandes et alertes.',
       icon: <Volume2 size={22} className="text-green-600" />,
       iconBg: 'bg-green-100',
       cardBg: 'from-green-50',
@@ -630,6 +653,44 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition">
             <Play size={12} /> Tester le son
           </button>
+
+          {/* Push Notifications */}
+          <div className="border-t border-gray-200 pt-4 mt-2">
+            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+              <Bell size={14} className="text-blue-600" /> Notifications Push
+            </h3>
+            <div className="flex items-center justify-between bg-blue-50 rounded-xl px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Activer les notifications push</p>
+                <p className="text-xs text-gray-500">Recevoir des alertes même quand l'app est en arrière-plan</p>
+              </div>
+              <button onClick={togglePush}
+                className={`relative w-11 h-6 rounded-full transition-colors ${pushCfg.enabled ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${pushCfg.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            {pushPermission === 'denied' && (
+              <p className="text-xs text-red-500 mt-2">Les notifications sont bloquées par le navigateur. Activez-les dans les paramètres du site.</p>
+            )}
+            {pushCfg.enabled && (
+              <div className="mt-3 space-y-2">
+                {[
+                  { key: 'newOrders', label: 'Nouvelles commandes', defaultOn: true },
+                  { key: 'pendingAlerts', label: 'Commandes en attente (+10)', defaultOn: true },
+                  { key: 'overdueAlerts', label: 'Commandes reportées à rappeler', defaultOn: true },
+                  { key: 'noLivreurAlerts', label: 'Commandes sans livreur', defaultOn: true },
+                ].map(item => (
+                  <label key={item.key} className="flex items-center gap-3 text-xs text-gray-700 cursor-pointer">
+                    <input type="checkbox"
+                      checked={pushCfg[item.key] !== false}
+                      onChange={() => savePushCfg({ ...pushCfg, [item.key]: pushCfg[item.key] === false })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </Modal>
 

@@ -17,6 +17,7 @@ import ModeratorsPage from './components/ModeratorsPage';
 import { supabase } from './lib/supabase';
 import { cloudGet } from './lib/cloudSettings';
 import useAutoSync from './hooks/useAutoSync';
+import useNotifications from './hooks/useNotifications';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 
@@ -75,6 +76,7 @@ export default function App() {
   const navigate = useNavigate();
 
   useAutoSync(session);
+  useNotifications(orders);
 
   /* ── Auth ── */
   useEffect(() => {
