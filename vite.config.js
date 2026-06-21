@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'apple-touch-icon.png', 'apple-touch-icon-512.png'],
       manifest: {
         name: 'VICTOURY - Gestion des Commandes',
         short_name: 'VICTOURY',

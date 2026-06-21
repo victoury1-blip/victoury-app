@@ -19,6 +19,7 @@ import { cloudGet } from './lib/cloudSettings';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
 import ErrorBoundary from './components/ErrorBoundary';
+import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 
 const TAB_FROM_PARAM = {
@@ -470,6 +471,7 @@ export default function App() {
         </ErrorBoundary>
         </div>
       </main>
+      <IOSInstallPrompt />
     </div>
     </PermissionsProvider>
   );
