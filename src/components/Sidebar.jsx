@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { usePermissions } from '../lib/permissions';
 import {
   LayoutDashboard, ShoppingCart, Package, Archive,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
+  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -51,10 +53,171 @@ const NAV_ITEMS = [
   { path: '/reglage',     label: 'Paramètres',      icon: Settings, perm: 'reglages' },
 ];
 
-export default function Sidebar({ orders = [] }) {
+function ProfileModal({ onClose, session }) {
+  const [profile, setProfile] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('victoury_profile') || '{}'); } catch { return {}; }
+  });
+  const [saved, setSaved] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [pwMsg, setPwMsg] = useState(null);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    cloudGet('victoury_profile').then(data => {
+      if (data && typeof data === 'object') {
+        setProfile(data);
+        localStorage.setItem('victoury_profile', JSON.stringify(data));
+      }
+    });
+  }, []);
+
+  function saveProfile(p) {
+    setProfile(p);
+    localStorage.setItem('victoury_profile', JSON.stringify(p));
+    cloudSet('victoury_profile', p);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  function handleAvatar(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 500_000) { alert('Image trop grande (max 500 KB)'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => saveProfile({ ...profile, avatar: ev.target.result });
+    reader.readAsDataURL(file);
+  }
+
+  async function changePassword() {
+    setPwMsg(null);
+    if (!pw.next || pw.next.length < 6) { setPwMsg({ type: 'error', text: 'Le mot de passe doit contenir au moins 6 caractères' }); return; }
+    if (pw.next !== pw.confirm) { setPwMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas' }); return; }
+    const { error } = await supabase.auth.updateUser({ password: pw.next });
+    if (error) { setPwMsg({ type: 'error', text: error.message }); return; }
+    setPwMsg({ type: 'success', text: 'Mot de passe modifié avec succès' });
+    setPw({ current: '', next: '', confirm: '' });
+  }
+
+  const email = session?.user?.email || '';
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><User size={18} className="text-blue-600" /> Mon Profil</h2>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={16} className="text-gray-400" /></button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Avatar */}
+          <div className="flex flex-col items-center">
+            <div className="relative group">
+              {profile.avatar ? (
+                <img src={profile.avatar} alt="avatar" className="w-24 h-24 rounded-full object-cover border-4 border-blue-100" />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 text-white flex items-center justify-center text-3xl font-bold border-4 border-blue-100">
+                  {(profile.name || email || 'V')[0].toUpperCase()}
+                </div>
+              )}
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 transition"
+              >
+                <Camera size={14} />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatar} />
+            </div>
+            {profile.avatar && (
+              <button onClick={() => saveProfile({ ...profile, avatar: null })} className="text-xs text-red-500 mt-2 hover:underline">Supprimer la photo</button>
+            )}
+          </div>
+
+          {/* Name */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nom complet</label>
+            <input
+              type="text"
+              value={profile.name || ''}
+              onChange={e => saveProfile({ ...profile, name: e.target.value })}
+              placeholder="Votre nom"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          {/* Email (read-only) */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+              <Mail size={14} className="text-gray-400" />
+              {email}
+            </div>
+          </div>
+
+          {/* Password change */}
+          <div className="border-t border-gray-100 pt-4">
+            <button onClick={() => setShowPw(!showPw)} className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-blue-600 transition">
+              <Lock size={14} />
+              Changer le mot de passe
+              <ChevronDown size={14} className={`transition-transform ${showPw ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showPw && (
+              <div className="mt-3 space-y-3">
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={pw.next}
+                    onChange={e => setPw({ ...pw, next: e.target.value })}
+                    placeholder="Nouveau mot de passe"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+                <input
+                  type="password"
+                  value={pw.confirm}
+                  onChange={e => setPw({ ...pw, confirm: e.target.value })}
+                  placeholder="Confirmer le mot de passe"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                {pwMsg && (
+                  <p className={`text-xs font-medium ${pwMsg.type === 'error' ? 'text-red-500' : 'text-green-600'}`}>{pwMsg.text}</p>
+                )}
+                <button onClick={changePassword} className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition">
+                  Enregistrer le mot de passe
+                </button>
+              </div>
+            )}
+          </div>
+
+          {saved && (
+            <div className="flex items-center gap-2 text-green-600 text-xs font-medium bg-green-50 px-3 py-2 rounded-lg">
+              <CheckCircle2 size={14} /> Profil enregistré et synchronisé
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Sidebar({ orders = [], session }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMenus, setOpenMenus] = useState({ '/commandes': true });
+  const [showProfile, setShowProfile] = useState(false);
+  const [profile, setProfile] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('victoury_profile') || '{}'); } catch { return {}; }
+  });
+
+  useEffect(() => {
+    const handler = () => {
+      try { setProfile(JSON.parse(localStorage.getItem('victoury_profile') || '{}')); } catch {}
+    };
+    window.addEventListener('storage', handler);
+    const interval = setInterval(handler, 5000);
+    return () => { window.removeEventListener('storage', handler); clearInterval(interval); };
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermission, isAdmin, currentModerator } = usePermissions();
@@ -164,16 +327,25 @@ export default function Sidebar({ orders = [] }) {
 
       {/* Footer */}
       <div className={`px-3 py-3 border-t border-gray-100 flex items-center ${!isMobile && collapsed ? 'justify-center' : 'gap-2'}`}>
-        <div className="w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-          {currentModerator?.name?.[0]?.toUpperCase() || 'V'}
-        </div>
+        <button onClick={() => setShowProfile(true)} className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80 transition">
+          {profile.avatar ? (
+            <img src={profile.avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+              {(profile.name || currentModerator?.name || 'V')[0]?.toUpperCase()}
+            </div>
+          )}
+          {(isMobile || !collapsed) && (
+            <div className="flex-1 min-w-0 text-left">
+              <span className="text-sm text-gray-700 font-medium block truncate">{profile.name || currentModerator?.name || 'Admin'}</span>
+              <span className="text-[10px] text-gray-400 block truncate">{session?.user?.email || ''}</span>
+            </div>
+          )}
+        </button>
         {(isMobile || !collapsed) && (
-          <div className="flex-1 min-w-0">
-            <span className="text-sm text-gray-700 font-medium block truncate">{currentModerator?.name || 'Admin'}</span>
-            <button onClick={() => supabase.auth.signOut()} className="text-xs text-red-400 hover:text-red-600 transition">
-              Déconnexion
-            </button>
-          </div>
+          <button onClick={() => supabase.auth.signOut()} className="text-xs text-red-400 hover:text-red-600 transition shrink-0">
+            Déconnexion
+          </button>
         )}
       </div>
     </>
@@ -203,6 +375,8 @@ export default function Sidebar({ orders = [] }) {
       <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 flex-col transition-all duration-200 shrink-0 h-screen hidden sm:flex`}>
         {sidebarContent(false)}
       </aside>
+
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} session={session} />}
     </>
   );
 }

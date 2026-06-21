@@ -433,7 +433,7 @@ export default function App() {
   return (
     <PermissionsProvider session={session}>
     <div className="flex h-screen bg-gray-100 overflow-hidden">
-      <Sidebar orders={orders} />
+      <Sidebar orders={orders} session={session} />
       <main className="flex-1 overflow-auto flex flex-col">
         {(wooError || dbError) && (
           <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center justify-between text-xs text-red-700 shrink-0">

@@ -20,6 +20,7 @@ const SYNC_KEYS = [
   'auzone_config',
   'woo_config',
   'push_notifications',
+  'victoury_profile',
 ];
 
 const SYNC_INTERVAL = 30_000;
