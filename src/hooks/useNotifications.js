@@ -1,13 +1,18 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 const NOTIF_KEY = 'push_notifications';
+const NOTIFIED_KEY = 'victoury_notified_ids';
 
-function getConfig() {
-  try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || '{}'); } catch { return {}; }
+function getNotifiedIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '[]')); } catch { return new Set(); }
+}
+
+function saveNotifiedIds(ids) {
+  localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...ids]));
 }
 
 function isEnabled() {
-  return getConfig().enabled !== false && 'Notification' in window && Notification.permission === 'granted';
+  return 'Notification' in window && Notification.permission === 'granted';
 }
 
 export function requestPermission() {
@@ -16,7 +21,7 @@ export function requestPermission() {
   return Notification.requestPermission();
 }
 
-export async function sendNotification(title, options = {}) {
+async function sendSWNotification(title, options = {}) {
   if (!isEnabled()) return;
   try {
     const reg = await navigator.serviceWorker?.ready;
@@ -24,29 +29,31 @@ export async function sendNotification(title, options = {}) {
       reg.showNotification(title, {
         icon: '/pwa-192x192.png',
         badge: '/pwa-192x192.png',
-        tag: options.tag || 'victoury',
         renotify: true,
         vibrate: [200, 100, 200],
         ...options,
       });
-    } else {
-      const n = new Notification(title, {
-        icon: '/pwa-192x192.png',
-        badge: '/pwa-192x192.png',
-        tag: options.tag || 'victoury',
-        renotify: true,
-        ...options,
-      });
-      if (options.onclick) n.onclick = options.onclick;
-      setTimeout(() => n.close(), 8000);
+    }
+  } catch {}
+}
+
+async function closeStaleSWNotifications(nouveauIds) {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (!reg) return;
+    const existing = await reg.getNotifications();
+    for (const n of existing) {
+      if (n.tag?.startsWith('nouveau-') && !nouveauIds.has(n.tag.replace('nouveau-', ''))) {
+        n.close();
+      }
     }
   } catch {}
 }
 
 export default function useNotifications(orders) {
-  const prevCountRef = useRef(null);
   const prevAlertsRef = useRef(new Set());
   const permAskedRef = useRef(false);
+  const initRef = useRef(false);
 
   // Auto-request permission on first load
   useEffect(() => {
@@ -56,7 +63,7 @@ export default function useNotifications(orders) {
       const timer = setTimeout(() => {
         Notification.requestPermission().then(p => {
           if (p === 'granted') {
-            localStorage.setItem('push_notifications', JSON.stringify({ enabled: true }));
+            localStorage.setItem(NOTIF_KEY, JSON.stringify({ enabled: true }));
           }
         });
       }, 5000);
@@ -66,19 +73,6 @@ export default function useNotifications(orders) {
 
   const checkAlerts = useCallback((list) => {
     if (!isEnabled()) return;
-
-    const pending = list.filter(o => o.status === 'nouveau');
-    if (pending.length > 10) {
-      const key = `pending-${pending.length}`;
-      if (!prevAlertsRef.current.has(key)) {
-        prevAlertsRef.current.add(key);
-        sendNotification(`${pending.length} commandes en attente`, {
-          body: 'Des commandes attendent la confirmation',
-          tag: 'alert-pending',
-        });
-      }
-    }
-
     const reported = list.filter(o => o.status === 'reporter');
     const today = new Date().toISOString().slice(0, 10);
     const overdue = reported.filter(o => o.reportDate && o.reportDate <= today);
@@ -87,21 +81,9 @@ export default function useNotifications(orders) {
       if (!prevAlertsRef.current.has(key)) {
         prevAlertsRef.current.add(key);
         const names = overdue.slice(0, 3).map(o => o.recipient?.name || o.id).join(', ');
-        sendNotification(`${overdue.length} client${overdue.length > 1 ? 's' : ''} à rappeler aujourd'hui`, {
+        sendSWNotification(`${overdue.length} client${overdue.length > 1 ? 's' : ''} à rappeler`, {
           body: names + (overdue.length > 3 ? '…' : ''),
           tag: 'alert-overdue',
-        });
-      }
-    }
-
-    const noLivreur = list.filter(o => o.status === 'confirme' && !o.recipient?.delivery);
-    if (noLivreur.length) {
-      const key = `nolivreur-${noLivreur.length}`;
-      if (!prevAlertsRef.current.has(key)) {
-        prevAlertsRef.current.add(key);
-        sendNotification(`${noLivreur.length} commandes sans livreur`, {
-          body: 'Commandes confirmées non assignées',
-          tag: 'alert-nolivreur',
         });
       }
     }
@@ -110,77 +92,67 @@ export default function useNotifications(orders) {
   useEffect(() => {
     if (!orders || !orders.length) return;
 
-    const nouveauCount = orders.filter(o => o.status === 'nouveau').length;
+    const nouveauOrders = orders.filter(o => o.status === 'nouveau');
+    const nouveauIds = new Set(nouveauOrders.map(o => o.id));
 
     // Update PWA badge
     if ('setAppBadge' in navigator) {
-      if (nouveauCount > 0) {
-        navigator.setAppBadge(nouveauCount).catch(() => {});
-      } else {
-        navigator.clearAppBadge().catch(() => {});
-      }
+      if (nouveauIds.size > 0) navigator.setAppBadge(nouveauIds.size).catch(() => {});
+      else navigator.clearAppBadge().catch(() => {});
     }
 
-    // Send one persistent notification per nouveau order (Samsung counts each = badge number)
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const nouveauOrders = orders.filter(o => o.status === 'nouveau');
-      const nouveauIds = new Set(nouveauOrders.map(o => o.id));
+    if (!isEnabled()) { initRef.current = true; return; }
 
+    // First load: remember existing nouveau IDs without sending notifications
+    if (!initRef.current) {
+      initRef.current = true;
+      const notified = getNotifiedIds();
+      for (const id of nouveauIds) notified.add(id);
+      saveNotifiedIds(notified);
+      closeStaleSWNotifications(nouveauIds);
+      checkAlerts(orders);
+      return;
+    }
+
+    const notified = getNotifiedIds();
+    const brandNew = nouveauOrders.filter(o => !notified.has(o.id));
+
+    // Notify only brand-new orders
+    if (brandNew.length > 0) {
       (async () => {
         try {
           const reg = await navigator.serviceWorker?.ready;
           if (!reg) return;
-
-          // Close notifications for orders no longer nouveau
-          const existing = await reg.getNotifications();
-          for (const n of existing) {
-            if (n.tag?.startsWith('nouveau-') && !nouveauIds.has(n.tag.replace('nouveau-', ''))) {
-              n.close();
-            }
+          for (const order of brandNew) {
+            const name = order.recipient?.name || order.id;
+            reg.showNotification(`Commande ${order.id}`, {
+              body: `${name} — ${order.price || 0} DH`,
+              icon: '/pwa-192x192.png',
+              badge: '/pwa-192x192.png',
+              tag: `nouveau-${order.id}`,
+              vibrate: [200, 100, 200],
+              data: { orderId: order.id },
+              requireInteraction: true,
+            });
+            notified.add(order.id);
           }
-
-          // Get existing notification tags
-          const existingTags = new Set((await reg.getNotifications()).map(n => n.tag));
-
-          // Send notification for each nouveau order that doesn't have one yet
-          let isFirst = true;
-          for (const order of nouveauOrders) {
-            const tag = `nouveau-${order.id}`;
-            if (!existingTags.has(tag)) {
-              const name = order.recipient?.name || order.id;
-              reg.showNotification(`Commande ${order.id}`, {
-                body: `${name} — ${order.price || 0} DH`,
-                icon: '/pwa-192x192.png',
-                badge: '/pwa-192x192.png',
-                tag,
-                renotify: isFirst,
-                vibrate: isFirst ? [200, 100, 200] : undefined,
-                silent: !isFirst,
-                data: { orderId: order.id },
-                requireInteraction: true,
-              });
-              isFirst = false;
-            }
-          }
+          saveNotifiedIds(notified);
         } catch {}
       })();
     }
 
-    if (prevCountRef.current !== null) {
-      const newCount = orders.length - prevCountRef.current;
-      if (newCount > 0) {
-        // Sound/vibrate handled by the per-order notifications above
-      }
-    }
-    prevCountRef.current = orders.length;
+    // Clean: keep only IDs still nouveau
+    const cleaned = new Set([...notified].filter(id => nouveauIds.has(id)));
+    saveNotifiedIds(cleaned);
+
+    // Close SW notifications for orders no longer nouveau
+    closeStaleSWNotifications(nouveauIds);
 
     checkAlerts(orders);
   }, [orders, checkAlerts]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      prevAlertsRef.current.clear();
-    }, 30 * 60 * 1000);
+    const interval = setInterval(() => prevAlertsRef.current.clear(), 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 }
