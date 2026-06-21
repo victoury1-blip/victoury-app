@@ -557,6 +557,7 @@ function StatusPicker({ value, onChange }) {
 function StatusModal({ order, onClose, onSave }) {
   const [newStatus, setNewStatus] = useState(order.status);
   const [note, setNote] = useState('');
+  const [reportDate, setReportDate] = useState(order.reportDate || '');
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -572,6 +573,18 @@ function StatusModal({ order, onClose, onSave }) {
             <StatusPicker value={newStatus} onChange={setNewStatus} />
           </div>
 
+          {newStatus === 'reporter' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date de rappel</label>
+              <input
+                type="datetime-local"
+                value={reportDate}
+                onChange={e => setReportDate(e.target.value)}
+                className="w-full px-4 py-3 bg-white text-gray-800 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Note interne</label>
             <textarea
@@ -586,7 +599,7 @@ function StatusModal({ order, onClose, onSave }) {
         <div className="flex justify-end gap-3 mt-5">
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Annuler</button>
           <button
-            onClick={() => { onSave(order.id, newStatus, note); onClose(); }}
+            onClick={() => { onSave(order.id, newStatus, note, newStatus === 'reporter' ? reportDate : null); onClose(); }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700"
           >
             Enregistrer
@@ -1221,14 +1234,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     return new Date().toLocaleString('fr-FR', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
   }
 
-  function handleStatusSave(orderId, newStatus, note) {
+  function handleStatusSave(orderId, newStatus, note, reportDate) {
     const ts = getTs();
     const order = orders.find(o => o.id === orderId);
     setOrders((prev) => prev.map((o) => {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';
       const addedNote = note ? `\nNote interne: ${note}` : '';
-      return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
+      return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: reportDate || o.reportDate };
     }));
     const WA_STATUSES = ['ramasse', 'expedier', 'recu_livreur'];
     if (order && WA_STATUSES.includes(newStatus) && order.recipient?.phone) {
@@ -1639,7 +1652,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         <StatusModal
           order={editOrder}
           onClose={() => setEditOrder(null)}
-          onSave={(id, status, note) => { handleStatusSave(id, status, note); setEditOrder(null); }}
+          onSave={(id, status, note, reportDate) => { handleStatusSave(id, status, note, reportDate); setEditOrder(null); }}
         />
       )}
 

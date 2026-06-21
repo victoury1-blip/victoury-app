@@ -317,6 +317,7 @@ function StatusChangeModal({ order, onClose, onSave }) {
   const sorted = [...statuses].filter(s => s.showInCommandes !== false).sort((a, b) => a.order - b.order);
   const [newStatus, setNewStatus] = useState(order.status);
   const [note, setNote] = useState('');
+  const [reportDate, setReportDate] = useState(order.reportDate || '');
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
@@ -337,6 +338,17 @@ function StatusChangeModal({ order, onClose, onSave }) {
               ))}
             </select>
           </div>
+          {newStatus === 'reporter' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date de rappel</label>
+              <input
+                type="datetime-local"
+                value={reportDate}
+                onChange={e => setReportDate(e.target.value)}
+                className="w-full px-4 py-3 bg-white text-gray-800 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Note interne</label>
             <textarea
@@ -351,7 +363,7 @@ function StatusChangeModal({ order, onClose, onSave }) {
           <button type="button" onClick={onClose} className="px-5 py-3 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-200">Annuler</button>
           <button
             type="button"
-            onClick={() => onSave(order.id, newStatus, note)}
+            onClick={() => onSave(order.id, newStatus, note, newStatus === 'reporter' ? reportDate : null)}
             className="px-5 py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 active:bg-blue-800"
           >Enregistrer</button>
         </div>
@@ -1089,7 +1101,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         <StatusChangeModal
           order={statusDropdown.order}
           onClose={() => setStatusDropdown(null)}
-          onSave={(orderId, newStatus, note) => {
+          onSave={(orderId, newStatus, note, reportDate) => {
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
@@ -1097,7 +1109,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote };
+              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: reportDate || o.reportDate };
             }));
             setStatusDropdown(null);
           }}
