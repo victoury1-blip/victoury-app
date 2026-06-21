@@ -143,6 +143,7 @@ export default function useNotifications(orders) {
           const existingTags = new Set((await reg.getNotifications()).map(n => n.tag));
 
           // Send notification for each nouveau order that doesn't have one yet
+          let isFirst = true;
           for (const order of nouveauOrders) {
             const tag = `nouveau-${order.id}`;
             if (!existingTags.has(tag)) {
@@ -152,11 +153,13 @@ export default function useNotifications(orders) {
                 icon: '/pwa-192x192.png',
                 badge: '/pwa-192x192.png',
                 tag,
-                renotify: false,
-                silent: true,
+                renotify: isFirst,
+                vibrate: isFirst ? [200, 100, 200] : undefined,
+                silent: !isFirst,
                 data: { orderId: order.id },
                 requireInteraction: true,
               });
+              isFirst = false;
             }
           }
         } catch {}
@@ -166,10 +169,7 @@ export default function useNotifications(orders) {
     if (prevCountRef.current !== null) {
       const newCount = orders.length - prevCountRef.current;
       if (newCount > 0) {
-        sendNotification(`${newCount} nouvelle${newCount > 1 ? 's' : ''} commande${newCount > 1 ? 's' : ''}`, {
-          body: 'Cliquez pour voir les détails',
-          tag: 'new-orders',
-        });
+        // Sound/vibrate handled by the per-order notifications above
       }
     }
     prevCountRef.current = orders.length;
