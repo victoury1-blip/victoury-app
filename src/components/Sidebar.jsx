@@ -92,13 +92,8 @@ function ProfileModal({ onClose, session }) {
 
   async function changePassword() {
     setPwMsg(null);
-    if (!pw.current) { setPwMsg({ type: 'error', text: 'Entrez votre mot de passe actuel' }); return; }
-    if (!pw.next || pw.next.length < 6) { setPwMsg({ type: 'error', text: 'Le nouveau mot de passe doit contenir au moins 6 caractères' }); return; }
+    if (!pw.next || pw.next.length < 6) { setPwMsg({ type: 'error', text: 'Le mot de passe doit contenir au moins 6 caractères' }); return; }
     if (pw.next !== pw.confirm) { setPwMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas' }); return; }
-    const email = session?.user?.email;
-    if (!email) { setPwMsg({ type: 'error', text: 'Session invalide' }); return; }
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: pw.current });
-    if (signInErr) { setPwMsg({ type: 'error', text: 'Mot de passe actuel incorrect' }); return; }
     const { error } = await supabase.auth.updateUser({ password: pw.next });
     if (error) { setPwMsg({ type: 'error', text: error.message }); return; }
     setPwMsg({ type: 'success', text: 'Mot de passe modifié ! Utilisez le nouveau mot de passe sur vos autres appareils.' });
@@ -170,18 +165,6 @@ function ProfileModal({ onClose, session }) {
 
             {showPw && (
               <div className="mt-3 space-y-3">
-                <div className="relative">
-                  <input
-                    type={showPwField.current ? 'text' : 'password'}
-                    value={pw.current}
-                    onChange={e => setPw({ ...pw, current: e.target.value })}
-                    placeholder="Mot de passe actuel"
-                    className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
-                  <button type="button" onClick={() => setShowPwField(p => ({ ...p, current: !p.current }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showPwField.current ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
                 <div className="relative">
                   <input
                     type={showPwField.next ? 'text' : 'password'}
