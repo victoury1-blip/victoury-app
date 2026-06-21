@@ -1241,7 +1241,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';
       const addedNote = note ? `\nNote interne: ${note}` : '';
-      return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: reportDate || o.reportDate };
+      return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
     }));
     const WA_STATUSES = ['ramasse', 'expedier', 'recu_livreur'];
     if (order && WA_STATUSES.includes(newStatus) && order.recipient?.phone) {

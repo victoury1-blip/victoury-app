@@ -179,7 +179,7 @@ function StatusBadge({ status, reportDate }) {
       >
         {live.label || status}
       </span>
-      {reportDate && (
+      {reportDate && status === 'reporter' && (
         <span className="text-xs text-gray-500 flex items-center gap-1">
           <Clock size={10} /> {reportDate}
         </span>
@@ -1109,7 +1109,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: reportDate || o.reportDate };
+              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
             }));
             setStatusDropdown(null);
           }}
