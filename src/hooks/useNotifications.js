@@ -121,37 +121,43 @@ export default function useNotifications(orders) {
       }
     }
 
-    // Send persistent notification with nouveau count (for Samsung badge)
-    if (nouveauCount > 0 && 'Notification' in window && Notification.permission === 'granted') {
+    // Send one persistent notification per nouveau order (Samsung counts each = badge number)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const nouveauOrders = orders.filter(o => o.status === 'nouveau');
+      const nouveauIds = new Set(nouveauOrders.map(o => o.id));
+
       (async () => {
         try {
           const reg = await navigator.serviceWorker?.ready;
-          if (reg) {
-            const existing = await reg.getNotifications({ tag: 'nouveau-count' });
-            const prevBadge = existing.length ? Number(existing[0].data?.count || 0) : 0;
-            if (prevBadge !== nouveauCount) {
-              reg.showNotification(`${nouveauCount} commande${nouveauCount > 1 ? 's' : ''} en attente`, {
-                body: 'Commandes à confirmer',
+          if (!reg) return;
+
+          // Close notifications for orders no longer nouveau
+          const existing = await reg.getNotifications();
+          for (const n of existing) {
+            if (n.tag?.startsWith('nouveau-') && !nouveauIds.has(n.tag.replace('nouveau-', ''))) {
+              n.close();
+            }
+          }
+
+          // Get existing notification tags
+          const existingTags = new Set((await reg.getNotifications()).map(n => n.tag));
+
+          // Send notification for each nouveau order that doesn't have one yet
+          for (const order of nouveauOrders) {
+            const tag = `nouveau-${order.id}`;
+            if (!existingTags.has(tag)) {
+              const name = order.recipient?.name || order.id;
+              reg.showNotification(`Commande ${order.id}`, {
+                body: `${name} — ${order.price || 0} DH`,
                 icon: '/pwa-192x192.png',
                 badge: '/pwa-192x192.png',
-                tag: 'nouveau-count',
-                renotify: true,
-                vibrate: [200, 100, 200],
-                silent: prevBadge > 0,
-                data: { count: nouveauCount },
+                tag,
+                renotify: false,
+                silent: true,
+                data: { orderId: order.id },
                 requireInteraction: true,
               });
             }
-          }
-        } catch {}
-      })();
-    } else if (nouveauCount === 0) {
-      (async () => {
-        try {
-          const reg = await navigator.serviceWorker?.ready;
-          if (reg) {
-            const existing = await reg.getNotifications({ tag: 'nouveau-count' });
-            existing.forEach(n => n.close());
           }
         } catch {}
       })();
