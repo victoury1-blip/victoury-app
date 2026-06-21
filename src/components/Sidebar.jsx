@@ -60,6 +60,7 @@ function ProfileModal({ onClose, session }) {
   const [saved, setSaved] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [showPwField, setShowPwField] = useState({ current: false, next: false, confirm: false });
   const [pwMsg, setPwMsg] = useState(null);
   const fileRef = useRef(null);
 
@@ -169,27 +170,42 @@ function ProfileModal({ onClose, session }) {
 
             {showPw && (
               <div className="mt-3 space-y-3">
-                <input
-                  type="password"
-                  value={pw.current}
-                  onChange={e => setPw({ ...pw, current: e.target.value })}
-                  placeholder="Mot de passe actuel"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-                <input
-                  type="password"
-                  value={pw.next}
-                  onChange={e => setPw({ ...pw, next: e.target.value })}
-                  placeholder="Nouveau mot de passe"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-                <input
-                  type="password"
-                  value={pw.confirm}
-                  onChange={e => setPw({ ...pw, confirm: e.target.value })}
-                  placeholder="Confirmer le nouveau mot de passe"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
+                <div className="relative">
+                  <input
+                    type={showPwField.current ? 'text' : 'password'}
+                    value={pw.current}
+                    onChange={e => setPw({ ...pw, current: e.target.value })}
+                    placeholder="Mot de passe actuel"
+                    className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                  <button type="button" onClick={() => setShowPwField(p => ({ ...p, current: !p.current }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPwField.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPwField.next ? 'text' : 'password'}
+                    value={pw.next}
+                    onChange={e => setPw({ ...pw, next: e.target.value })}
+                    placeholder="Nouveau mot de passe"
+                    className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                  <button type="button" onClick={() => setShowPwField(p => ({ ...p, next: !p.next }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPwField.next ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPwField.confirm ? 'text' : 'password'}
+                    value={pw.confirm}
+                    onChange={e => setPw({ ...pw, confirm: e.target.value })}
+                    placeholder="Confirmer le nouveau mot de passe"
+                    className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                  <button type="button" onClick={() => setShowPwField(p => ({ ...p, confirm: !p.confirm }))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPwField.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {pwMsg && (
                   <p className={`text-xs font-medium ${pwMsg.type === 'error' ? 'text-red-500' : 'text-green-600'}`}>{pwMsg.text}</p>
                 )}
