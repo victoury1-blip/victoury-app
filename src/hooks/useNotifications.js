@@ -110,14 +110,51 @@ export default function useNotifications(orders) {
   useEffect(() => {
     if (!orders || !orders.length) return;
 
-    // Update PWA badge with new orders count
     const nouveauCount = orders.filter(o => o.status === 'nouveau').length;
+
+    // Update PWA badge
     if ('setAppBadge' in navigator) {
       if (nouveauCount > 0) {
         navigator.setAppBadge(nouveauCount).catch(() => {});
       } else {
         navigator.clearAppBadge().catch(() => {});
       }
+    }
+
+    // Send persistent notification with nouveau count (for Samsung badge)
+    if (nouveauCount > 0 && 'Notification' in window && Notification.permission === 'granted') {
+      (async () => {
+        try {
+          const reg = await navigator.serviceWorker?.ready;
+          if (reg) {
+            const existing = await reg.getNotifications({ tag: 'nouveau-count' });
+            const prevBadge = existing.length ? Number(existing[0].data?.count || 0) : 0;
+            if (prevBadge !== nouveauCount) {
+              reg.showNotification(`${nouveauCount} commande${nouveauCount > 1 ? 's' : ''} en attente`, {
+                body: 'Commandes à confirmer',
+                icon: '/pwa-192x192.png',
+                badge: '/pwa-192x192.png',
+                tag: 'nouveau-count',
+                renotify: true,
+                vibrate: [200, 100, 200],
+                silent: prevBadge > 0,
+                data: { count: nouveauCount },
+                requireInteraction: true,
+              });
+            }
+          }
+        } catch {}
+      })();
+    } else if (nouveauCount === 0) {
+      (async () => {
+        try {
+          const reg = await navigator.serviceWorker?.ready;
+          if (reg) {
+            const existing = await reg.getNotifications({ tag: 'nouveau-count' });
+            existing.forEach(n => n.close());
+          }
+        } catch {}
+      })();
     }
 
     if (prevCountRef.current !== null) {
