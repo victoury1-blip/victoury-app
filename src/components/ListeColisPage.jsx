@@ -854,6 +854,194 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
   );
 }
 
+/* ── Bulk Action Bar for Colis ── */
+function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis }) {
+  const { statuses } = useStatuses();
+  const [showStatus, setShowStatus] = useState(false);
+  const [showLivreur, setShowLivreur] = useState(false);
+  const statusRef = useRef(null);
+  const livreurRef2 = useRef(null);
+
+  const livreursList = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('livreurs') || '[]').filter(l => l.statut !== false); } catch { return []; }
+  }, []);
+
+  useEffect(() => {
+    function handler(e) {
+      if (statusRef.current && !statusRef.current.contains(e.target)) setShowStatus(false);
+      if (livreurRef2.current && !livreurRef2.current.contains(e.target)) setShowLivreur(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selectedOrders = orders.filter(o => selected.includes(o.id));
+
+  function getTs() {
+    let tz; try { const raw = localStorage.getItem('system_timezone'); tz = raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
+    return new Date().toLocaleString('fr-FR', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
+  }
+
+  function bulkChangeStatus(newStatus) {
+    const ts = getTs();
+    setOrders(prev => prev.map(o => {
+      if (!selected.includes(o.id)) return o;
+      return { ...o, status: newStatus, dateUpdated: ts };
+    }));
+    setShowStatus(false);
+    setSelected([]);
+  }
+
+  function bulkAssignLivreur(livreurName) {
+    setOrders(prev => prev.map(o => {
+      if (!selected.includes(o.id)) return o;
+      return { ...o, recipient: { ...o.recipient, delivery: livreurName } };
+    }));
+    setShowLivreur(false);
+    setSelected([]);
+  }
+
+  function bulkExport() {
+    const data = selectedOrders;
+    const header = ['ID','Tracking','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
+    const csvRows = [header.join(',')];
+    data.forEach(o => {
+      const st = statuses.find(s => s.value === o.status);
+      csvRows.push([
+        o.id, o.trackingNumber || '', o.recipient?.name || '', o.recipient?.phone || '',
+        o.recipient?.city || '', `"${(o.recipient?.address || '').replace(/"/g, '""')}"`,
+        o.recipient?.delivery || '', (o.products?.[0]?.name || o.product?.name || ''),
+        o.price || 0, st?.label || o.status, o.dateAdded || ''
+      ].join(','));
+    });
+    const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `colis_selection_${selected.length}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function bulkPrintBordereau() {
+    const data = selectedOrders;
+    const rows = data.map(o => `
+      <tr>
+        <td style="font-weight:bold;color:#1e3a8a">${o.trackingNumber || o.id}</td>
+        <td>${o.recipient?.name || '—'}</td>
+        <td>${o.recipient?.phone || '—'}</td>
+        <td>${o.recipient?.city || '—'}</td>
+        <td>${o.recipient?.address || '—'}</td>
+        <td>${(o.products?.[0]?.name || o.product?.name || '—')}</td>
+        <td style="font-weight:bold">${Number(o.price || 0).toFixed(2)} DH</td>
+        <td>${o.recipient?.delivery || '—'}</td>
+      </tr>`).join('');
+    const totalPrice = data.reduce((s, o) => s + (o.price || 0), 0);
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+    <title>Bordereau - ${data.length} colis</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 24px; font-size: 12px; }
+      h1 { font-size: 20px; color: #1e3a8a; margin-bottom: 4px; }
+      .meta { color:#555; margin-bottom: 16px; font-size: 11px; }
+      table { width:100%; border-collapse:collapse; margin-top:12px; }
+      th { background:#1e3a8a; color:#fff; padding:6px 8px; text-align:left; font-size:10px; }
+      td { padding:5px 8px; border-bottom:1px solid #e5e7eb; font-size:11px; }
+      tr:nth-child(even) td { background:#f8fafc; }
+      .total { margin-top:16px; text-align:right; font-size:14px; font-weight:bold; }
+      @media print { button { display:none; } body { padding: 12px; } }
+    </style></head><body>
+    <h1>Bordereau de livraison</h1>
+    <div class="meta">Date: <strong>${new Date().toLocaleDateString('fr-MA')}</strong> | Nombre de colis: <strong>${data.length}</strong></div>
+    <table>
+      <thead><tr><th>Tracking</th><th>Client</th><th>Tél</th><th>Ville</th><th>Adresse</th><th>Produit</th><th>Prix</th><th>Livreur</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="total">Total: ${totalPrice.toFixed(2)} DH</div>
+    <script>window.onload=()=>window.print();</script>
+    </body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+  }
+
+  function bulkPrintLabels() {
+    const toPrint = colis.filter(o => selected.includes(o.id));
+    if (toPrint.length) openLabelPage(toPrint);
+  }
+
+  return (
+    <div className="bg-gray-900 border-t border-gray-700 px-6 py-3 flex items-center gap-3">
+      <div className="flex items-center gap-2 mr-3">
+        <span className="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-full">{selected.length}</span>
+        <span className="text-sm font-semibold text-white">sélectionnée{selected.length > 1 ? 's' : ''}</span>
+      </div>
+
+      <div className="h-6 w-px bg-gray-600 mx-1" />
+
+      {/* Change Status */}
+      <div className="relative" ref={statusRef}>
+        <button onClick={() => { setShowStatus(o => !o); setShowLivreur(false); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors">
+          <Check size={13} /> Changer statut <ChevronDown size={11} />
+        </button>
+        {showStatus && (
+          <div className="absolute bottom-full mb-2 left-0 bg-white border border-gray-200 rounded-xl shadow-2xl w-56 max-h-64 overflow-y-auto z-50">
+            {DELIVERY_STATUSES.map(s => (
+              <button key={s.value} onClick={() => bulkChangeStatus(s.value)}
+                className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700 border-b border-gray-50 last:border-0 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Assign Livreur */}
+      <div className="relative" ref={livreurRef2}>
+        <button onClick={() => { setShowLivreur(o => !o); setShowStatus(false); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors">
+          <Truck size={13} /> Livreur <ChevronDown size={11} />
+        </button>
+        {showLivreur && (
+          <div className="absolute bottom-full mb-2 left-0 bg-white border border-gray-200 rounded-xl shadow-2xl w-56 max-h-64 overflow-y-auto z-50">
+            {livreursList.length === 0 && <div className="px-4 py-3 text-xs text-gray-400">Aucun livreur</div>}
+            {livreursList.map(l => (
+              <button key={l.id} onClick={() => bulkAssignLivreur(l.nom)}
+                className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700 border-b border-gray-50 last:border-0">
+                {l.nom}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Print Bordereau */}
+      <button onClick={bulkPrintBordereau}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition-colors">
+        <Printer size={13} /> Bordereau
+      </button>
+
+      {/* Print Labels */}
+      <button onClick={bulkPrintLabels}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition-colors">
+        <Printer size={13} /> Étiquettes
+      </button>
+
+      {/* Export CSV */}
+      <button onClick={bulkExport}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-xs font-semibold transition-colors">
+        <Download size={13} /> Exporter
+      </button>
+
+      <div className="ml-auto">
+        <button onClick={() => setSelected([])}
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-500 text-gray-300 hover:bg-gray-700 rounded-lg text-xs font-semibold transition-colors">
+          <X size={13} /> Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main page ── */
 const COLIS_PIPELINE = ['ramasse','att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi','retour_recu','echange_recu','a_voir','interesse','black_liste'];
 const isCasa = (city) => {
@@ -1439,6 +1627,16 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
       {tab === 'colis' && (
         <Pagination total={colis.length} page={pgPage} perPage={pgPer} onPageChange={setPgPage} onPerPageChange={setPgPer} />
+      )}
+
+      {tab === 'colis' && selected.length > 0 && (
+        <ColisBulkActionBar
+          selected={selected}
+          setSelected={setSelected}
+          orders={orders}
+          setOrders={setOrders}
+          colis={colis}
+        />
       )}
 
       {editOrder && (
