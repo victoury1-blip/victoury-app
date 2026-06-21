@@ -21,6 +21,10 @@ const SYNC_KEYS = [
   'woo_config',
   'push_notifications',
   'victoury_profile',
+  'deleted_order_ids',
+  'victoury_sent_livreur',
+  'vict_counter',
+  'frais_1',
 ];
 
 const SYNC_INTERVAL = 30_000;
@@ -77,7 +81,7 @@ export default function useAutoSync(session) {
       } catch {}
     }
 
-    pullFromCloud();
+    pullFromCloud().then(() => pushToCloud());
 
     const interval = setInterval(pullFromCloud, SYNC_INTERVAL);
 
