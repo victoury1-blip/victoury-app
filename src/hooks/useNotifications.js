@@ -51,13 +51,15 @@ export default function useNotifications(orders) {
     }
 
     const reported = list.filter(o => o.status === 'reporter');
-    const overdue = reported.filter(o => o.reportDate && new Date(o.reportDate) <= new Date());
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = reported.filter(o => o.reportDate && o.reportDate <= today);
     if (overdue.length) {
       const key = `overdue-${overdue.length}`;
       if (!prevAlertsRef.current.has(key)) {
         prevAlertsRef.current.add(key);
-        sendNotification(`${overdue.length} commandes à rappeler`, {
-          body: 'Commandes reportées arrivées à échéance',
+        const names = overdue.slice(0, 3).map(o => o.recipient?.name || o.id).join(', ');
+        sendNotification(`${overdue.length} client${overdue.length > 1 ? 's' : ''} à rappeler aujourd'hui`, {
+          body: names + (overdue.length > 3 ? '…' : ''),
           tag: 'alert-overdue',
         });
       }

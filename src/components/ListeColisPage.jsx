@@ -577,7 +577,7 @@ function StatusModal({ order, onClose, onSave }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Date de rappel</label>
               <input
-                type="datetime-local"
+                type="date"
                 value={reportDate}
                 onChange={e => setReportDate(e.target.value)}
                 className="w-full px-4 py-3 bg-white text-gray-800 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
