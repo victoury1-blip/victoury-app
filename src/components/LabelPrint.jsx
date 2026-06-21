@@ -55,8 +55,8 @@ function buildLabelHTML(order, config) {
     ? `<img src="${config.logo}" alt="" style="height:80px;object-fit:contain" />`
     : `<span style="font-weight:900;font-size:22px;letter-spacing:1px">${shopName}</span>`;
 
-  const noteHtml = (order.noteLivraison || order.note || shopNote)
-    ? `<div style="padding:4px 12px;border-bottom:1px solid #000"><span style="color:#dc2626;font-weight:700;font-size:13px">Note: </span><span style="font-size:12px;color:#333">${order.noteLivraison || order.note || ''}</span></div>`
+  const noteHtml = (order.noteLivraison || shopNote)
+    ? `<div style="padding:4px 12px;border-bottom:1px solid #000"><span style="color:#dc2626;font-weight:700;font-size:13px">Note: </span><span style="font-size:12px;color:#333">${order.noteLivraison || ''}</span></div>`
     : '';
 
   const shopNoteHtml = shopNote
