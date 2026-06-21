@@ -16,18 +16,30 @@ export function requestPermission() {
   return Notification.requestPermission();
 }
 
-export function sendNotification(title, options = {}) {
+export async function sendNotification(title, options = {}) {
   if (!isEnabled()) return;
   try {
-    const n = new Notification(title, {
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
-      tag: options.tag || 'victoury',
-      renotify: true,
-      ...options,
-    });
-    if (options.onclick) n.onclick = options.onclick;
-    setTimeout(() => n.close(), 8000);
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg) {
+      reg.showNotification(title, {
+        icon: '/pwa-192x192.png',
+        badge: '/pwa-192x192.png',
+        tag: options.tag || 'victoury',
+        renotify: true,
+        vibrate: [200, 100, 200],
+        ...options,
+      });
+    } else {
+      const n = new Notification(title, {
+        icon: '/pwa-192x192.png',
+        badge: '/pwa-192x192.png',
+        tag: options.tag || 'victoury',
+        renotify: true,
+        ...options,
+      });
+      if (options.onclick) n.onclick = options.onclick;
+      setTimeout(() => n.close(), 8000);
+    }
   } catch {}
 }
 
