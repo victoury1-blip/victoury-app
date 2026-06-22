@@ -34,6 +34,7 @@ import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { loadProducts, loadProductsRemote } from '../data/products';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
+import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 
 let _victCounter = null;
 
@@ -648,6 +649,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [ozoneOpen, setOzoneOpen] = useState(false);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [statusDropdown, setStatusDropdown] = useState(null); /* { order, anchor } */
+  const [whatsappPopup, setWhatsappPopup] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [modifiedIds, setModifiedIds] = useState(new Set());
   const [historyOrder, setHistoryOrder] = useState(null);
@@ -1221,6 +1223,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
             }));
             setStatusDropdown(null);
+            const changedOrder = orders.find(o => o.id === orderId);
+            if (changedOrder) {
+              const wa = buildWhatsappMessage({ ...changedOrder, status: newStatus }, newStatus);
+              if (wa) setWhatsappPopup(wa);
+            }
           }}
         />
       )}
@@ -1249,6 +1256,42 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             addToast('success', `${ordersList.length} commande(s) créée(s)`, ordersList[0]?.recipient.name);
           }}
         />
+      )}
+
+      {/* WhatsApp auto popup */}
+      {whatsappPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setWhatsappPopup(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-5 w-[95vw] max-w-md mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">💬</span>
+                <span className="font-bold text-green-800 text-sm">Envoyer WhatsApp</span>
+              </div>
+              <button onClick={() => setWhatsappPopup(null)} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
+            </div>
+            <p className="text-xs text-gray-500 mb-2">Client: <span className="font-bold text-gray-800">{whatsappPopup.name}</span> — {whatsappPopup.orderId}</p>
+            <textarea
+              className="w-full border border-gray-200 rounded-lg p-3 text-sm text-right leading-relaxed resize-none focus:ring-2 focus:ring-green-200 focus:border-green-300"
+              rows={7} dir="rtl"
+              value={whatsappPopup.msg}
+              onChange={e => setWhatsappPopup(p => ({ ...p, msg: e.target.value }))}
+            />
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => setWhatsappPopup(null)} className="flex-1 py-2.5 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200">Ignorer</button>
+              <button
+                className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-green-500 hover:bg-green-600 flex items-center justify-center gap-2"
+                onClick={() => {
+                  if (/android/i.test(navigator.userAgent)) {
+                    window.location.href = `intent://send/${whatsappPopup.phone}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.text=${encodeURIComponent(whatsappPopup.msg)};end`;
+                  } else {
+                    window.open(`https://api.whatsapp.com/send?phone=${whatsappPopup.phone}&text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
+                  }
+                  setWhatsappPopup(null);
+                }}
+              >📤 Envoyer</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <Toast toasts={toasts} onDismiss={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />

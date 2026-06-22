@@ -5,9 +5,10 @@ import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
   ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
-  Search, ArrowDownCircle, Tag, Upload, Bell, Phone,
+  Search, ArrowDownCircle, Tag, Upload, Bell, Phone, MessageCircle,
 } from 'lucide-react';
 import { requestPermission } from '../hooks/useNotifications';
+import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -93,6 +94,15 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     setPhoneColors(merged);
     localStorage.setItem('phone_colors', JSON.stringify(merged));
     cloudSet('phone_colors', merged);
+  }
+
+  /* ── WhatsApp templates state ── */
+  const [waTemplates, setWaTemplates] = useState(() => getWaTemplates());
+  function saveWaTemplate(status, changes) {
+    const next = { ...waTemplates, [status]: { ...waTemplates[status], ...changes } };
+    setWaTemplates(next);
+    saveWaTemplates(next);
+    cloudSet('victoury_wa_templates', next);
   }
 
   /* ── Notification sound state ── */
@@ -386,6 +396,15 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       icon: <Phone size={22} className="text-purple-600" />,
       iconBg: 'bg-purple-100',
       cardBg: 'from-purple-50',
+      saved: true,
+    },
+    {
+      id: 'wa_templates',
+      title: 'رسائل WhatsApp',
+      desc: 'تخصيص الرسائل التلقائية اللي كتمشي للكليان.',
+      icon: <MessageCircle size={22} className="text-green-600" />,
+      iconBg: 'bg-green-100',
+      cardBg: 'from-green-50',
       saved: true,
     },
   ];
@@ -1116,6 +1135,45 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
           <button onClick={() => { savePhoneColors({ livreBg: '#047857', livreText: '#ffffff', knownBg: '#fbbf24', knownText: '#111827' }); }}
             className="text-xs text-blue-600 hover:underline">إرجاع الألوان الافتراضية</button>
+        </div>
+      </Modal>
+
+      {/* ── WhatsApp Templates Modal ── */}
+      <Modal open={openModal === 'wa_templates'} onClose={() => setOpenModal(null)}
+        title="رسائل WhatsApp" icon={<MessageCircle size={18} className="text-green-600" />}
+        iconBg="bg-gradient-to-r from-green-50 to-white">
+        <div className="space-y-4" dir="rtl">
+          <p className="text-xs text-gray-500">تخصيص الرسائل التلقائية اللي كتمشي للكليان ملي كتبدل الحالة. تقدر تستعمل المتغيرات هادي:</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {TEMPLATE_VARS.map(v => (
+              <span key={v.var} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded font-mono">{v.var} = {v.label}</span>
+            ))}
+          </div>
+
+          {Object.entries(waTemplates).map(([status, tpl]) => (
+            <div key={status} className="bg-gray-50 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-gray-700">{STATUS_LABELS_AR[status] || status}</h3>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-xs text-gray-500">{tpl.enabled ? 'مفعل' : 'معطل'}</span>
+                  <button
+                    onClick={() => saveWaTemplate(status, { enabled: !tpl.enabled })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${tpl.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                  >
+                    <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform" style={{ transform: tpl.enabled ? 'translateX(18px)' : 'translateX(2px)' }} />
+                  </button>
+                </label>
+              </div>
+              {tpl.enabled && (
+                <textarea
+                  className="w-full border border-gray-200 rounded-lg p-3 text-sm leading-relaxed resize-none focus:ring-2 focus:ring-green-200 focus:border-green-300"
+                  rows={5}
+                  value={tpl.message}
+                  onChange={e => saveWaTemplate(status, { message: e.target.value })}
+                />
+              )}
+            </div>
+          ))}
         </div>
       </Modal>
     </div>

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
 import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer } from 'lucide-react';
 import OrderModal from './OrderModal';
+import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { openLabelPage } from './LabelPrint';
 import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -1134,18 +1135,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   }
 
   function sendLivreurInfo(order) {
-    const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
-    const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
-    const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
-    const tn = order.ozoneTracking || order.trackingNumber || order.id;
-    const phone = order.recipient.phone.replace(/\s+/g, '').replace(/^0/, '212');
-    let msg = `‏✅ سلام ${order.recipient.name} ،\n‏الطلب ديالك رقم ${tn}`;
-    if (livreur) msg += `\n‏🛵 خداه ليفرور ${livreur.nom}.`;
-    const dpPhone = dp.phone || livreur?.telephone;
-    if (dpPhone) msg += `\n*‏📲 رقم هاتف ليفرور: ${dpPhone}*`;
-    if (order.price) msg += `\n‏💰 الثمن : ${order.price} درهم التوصيل فابور`;
-    msg += `\n*‏غادي يتواصل معاك اليوم إن شاء الله.*`;
-    setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id, markSent: true });
+    const wa = buildWhatsappMessage(order, 'expedier');
+    if (wa) setWhatsappPopup({ ...wa, markSent: true });
   }
 
   function markLivreurSent(orderId) {
@@ -1226,21 +1217,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       const addedNote = note ? `\nNote interne: ${note}` : '';
       return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
     }));
-    const WA_STATUSES = ['ramasse', 'expedier', 'recu_livreur'];
-    if (order && WA_STATUSES.includes(newStatus) && order.recipient?.phone) {
-      const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
-      const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
-      const statusLabels = { ramasse: 'Ramassé', expedier: 'Expédié', recu_livreur: 'Reçu par le livreur' };
-      const phone = order.recipient.phone.replace(/\s+/g, '').replace(/^0/, '212');
-      const tn = order.ozoneTracking || order.trackingNumber || order.id;
-      const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
-      let msg = `‏✅ سلام ${order.recipient.name} ،\n‏الطلب ديالك رقم ${tn}`;
-      if (livreur) msg += `\n‏🛵 خداه ليفرور ${livreur.nom}.`;
-      const dpPhone = dp.phone || livreur?.telephone;
-      if (dpPhone) msg += `\n*‏📲 رقم هاتف ليفرور: ${dpPhone}*`;
-      if (order.price) msg += `\n‏💰 الثمن : ${order.price} درهم التوصيل فابور`;
-      msg += `\n*‏غادي يتواصل معاك اليوم إن شاء الله.*`;
-      setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id });
+    if (order && order.recipient?.phone) {
+      const wa = buildWhatsappMessage(order, newStatus);
+      if (wa) setWhatsappPopup({ ...wa });
     }
   }
 
