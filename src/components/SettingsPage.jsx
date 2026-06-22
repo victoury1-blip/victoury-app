@@ -468,7 +468,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               <p className="text-xs text-gray-400 mt-0.5">{syncLogs.length} entrée{syncLogs.length > 1 ? 's' : ''} (100 max)</p>
             </div>
             <button onClick={() => {
-              supabase.from('settings').upsert({ key: 'wc_sync_logs', value: [], updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => setSyncLogs([]));
+              cloudSet('wc_sync_logs', []).then(() => setSyncLogs([]));
             }} className="text-xs text-red-500 hover:text-red-700 font-medium">Effacer</button>
           </div>
           <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">

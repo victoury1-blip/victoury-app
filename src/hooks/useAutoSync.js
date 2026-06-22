@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { cloudGet } from '../lib/cloudSettings';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
 const SYNC_KEYS = [
   'victoury_products',
@@ -81,21 +81,12 @@ export default function useAutoSync(session) {
 
     async function pushToCloud() {
       try {
-        const rows = [];
         for (const key of SYNC_KEYS) {
           const raw = localStorage.getItem(key);
           if (!raw) continue;
           try {
-            rows.push({
-              key,
-              value: JSON.parse(raw),
-              user_id: null,
-              updated_at: new Date().toISOString(),
-            });
+            await cloudSet(key, JSON.parse(raw));
           } catch { /* invalid JSON in localStorage — skip key */ }
-        }
-        if (rows.length) {
-          await supabase.from('settings').upsert(rows, { onConflict: 'key' });
         }
       } catch (e) { console.warn('[sync] push failed:', e?.message); }
     }

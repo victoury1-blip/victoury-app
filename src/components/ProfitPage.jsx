@@ -3,7 +3,7 @@ import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Downloa
 import { loadProducts, loadProductsRemote } from '../data/products';
 import { loadFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
-import { cloudGet } from '../lib/cloudSettings';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function pct(val, total) { return total ? ((val / total) * 100).toFixed(1) : '0.0'; }
@@ -50,19 +50,14 @@ export default function ProfitPage({ orders = [] }) {
   const [factures, setFactures] = useState(() => loadFactures());
 
   useEffect(() => {
-    supabase.from('settings').select('value').eq('key', 'ad_transfers').single().then(({ data }) => {
-      if (Array.isArray(data?.value) && data.value.length) {
+    cloudGet('ad_transfers').then(remote => {
+      if (Array.isArray(remote) && remote.length) {
         setAdTransfers(prev => {
-          const remoteIds = new Set(data.value.map(t => t.id));
+          const remoteIds = new Set(remote.map(t => t.id));
           const localOnly = prev.filter(t => !remoteIds.has(t.id));
-          const merged = [...data.value, ...localOnly];
+          const merged = [...remote, ...localOnly];
           localStorage.setItem('ad_transfers', JSON.stringify(merged));
-          if (localOnly.length) {
-            supabase.from('settings').upsert(
-              { key: 'ad_transfers', value: merged, updated_at: new Date().toISOString() },
-              { onConflict: 'key' }
-            ).then(() => {});
-          }
+          if (localOnly.length) cloudSet('ad_transfers', merged);
           return merged;
         });
       }
@@ -75,10 +70,7 @@ export default function ProfitPage({ orders = [] }) {
   function saveAdTransfers(list) {
     setAdTransfers(list);
     localStorage.setItem('ad_transfers', JSON.stringify(list));
-    supabase.from('settings').upsert(
-      { key: 'ad_transfers', value: list, updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
-    ).then(() => {}).catch(e => console.error('Save ad_transfers failed:', e));
+    cloudSet('ad_transfers', list);
   }
 
   function addTransfer() {

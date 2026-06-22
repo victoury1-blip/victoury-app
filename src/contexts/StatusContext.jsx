@@ -1,18 +1,14 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { loadStatuses, saveStatuses } from '../data/statuses';
-import { supabase } from '../lib/supabase';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
 const SETTINGS_KEY = 'victoury_statuses';
 
 async function loadFromSupabase() {
   try {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', SETTINGS_KEY)
-      .single();
-    if (!error && data?.value && Array.isArray(data.value) && data.value.length > 0) {
-      return data.value.map(s => ({ showInCommandes: true, showInColis: true, ...s }));
+    const remote = await cloudGet(SETTINGS_KEY);
+    if (Array.isArray(remote) && remote.length > 0) {
+      return remote.map(s => ({ showInCommandes: true, showInColis: true, ...s }));
     }
   } catch {}
   return null;
@@ -20,7 +16,7 @@ async function loadFromSupabase() {
 
 async function saveToSupabase(list) {
   try {
-    await supabase.from('settings').upsert({ key: SETTINGS_KEY, value: list, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    await cloudSet(SETTINGS_KEY, list);
   } catch {}
 }
 
