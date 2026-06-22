@@ -1526,8 +1526,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                       <ChevronDown size={10} className="text-gray-400 group-hover:text-gray-600" />
                     </button>
 
-                    {/* Send livreur info button */}
-                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (
+                    {/* Send livreur info button — only when dispatch person info is available */}
+                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (() => {
+                      try { const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}'); return !!(dp.name || dp.phone); } catch { return false; }
+                    })() && (
                       <button
                         onClick={() => sendLivreurInfo(o)}
                         className={`mt-1 text-xs px-2 py-0.5 rounded-full border font-semibold transition-colors ${
