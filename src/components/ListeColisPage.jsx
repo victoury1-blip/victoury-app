@@ -1168,13 +1168,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     const tn = order.ozoneTracking || order.trackingNumber || order.id;
     const phone = order.recipient.phone.replace(/\s+/g, '').replace(/^0/, '212');
     let msg = `‏✅ سلام ${order.recipient.name} ،\n‏الطلب ديالك رقم ${tn}`;
-    if (livreur) msg += `\n‏خداه الليفرور ${livreur.nom}.`;
-    msg += `\n`;
-    if (dp.name) msg += `‏🚚 اسم ليفرور: ${dp.name}\n`;
-    if (dp.phone) msg += `‏رقم هاتف ليفرور: ${dp.phone}\n`;
-    else if (livreur?.telephone) msg += `‏رقم هاتف ليفرور: ${livreur.telephone}\n`;
-    msg += `‏📦 الحالة: Expédié\n`;
-    msg += `‏غادي يتواصل معاك للتوصيل اليوم إن شاء الله.`;
+    if (livreur) msg += `\n‏🛵 خداه ليفرور ${livreur.nom}.`;
+    const dpPhone = dp.phone || livreur?.telephone;
+    if (dpPhone) msg += `\n*‏📲 رقم هاتف ليفرور: ${dpPhone}*`;
+    if (order.price) msg += `\n‏💰 الثمن : ${order.price} درهم التوصيل فابور`;
+    msg += `\n*‏غادي يتواصل معاك اليوم إن شاء الله.*`;
     setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id, markSent: true });
   }
 
@@ -1265,13 +1263,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       const tn = order.ozoneTracking || order.trackingNumber || order.id;
       const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
       let msg = `‏✅ سلام ${order.recipient.name} ،\n‏الطلب ديالك رقم ${tn}`;
-      if (livreur) msg += `\n‏خداه الليفرور ${livreur.nom}.`;
-      msg += `\n`;
-      if (dp.name) msg += `‏🚚 اسم ليفرور: ${dp.name}\n`;
-      if (dp.phone) msg += `‏رقم هاتف ليفرور: ${dp.phone}\n`;
-      else if (livreur?.telephone) msg += `‏رقم هاتف ليفرور: ${livreur.telephone}\n`;
-      msg += `‏📦 الحالة: ${statusLabels[newStatus] || newStatus}\n`;
-        msg += `‏غادي يتواصل معاك للتوصيل اليوم إن شاء الله.`;
+      if (livreur) msg += `\n‏🛵 خداه ليفرور ${livreur.nom}.`;
+      const dpPhone = dp.phone || livreur?.telephone;
+      if (dpPhone) msg += `\n*‏📲 رقم هاتف ليفرور: ${dpPhone}*`;
+      if (order.price) msg += `\n‏💰 الثمن : ${order.price} درهم التوصيل فابور`;
+      msg += `\n*‏غادي يتواصل معاك اليوم إن شاء الله.*`;
       setWhatsappPopup({ phone, msg, name: order.recipient.name, orderId: order.id });
     }
   }
