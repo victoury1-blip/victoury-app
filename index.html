@@ -16,12 +16,34 @@
   <body>
     <div id="root"></div>
     <script>
+      // Force unregister all service workers and clear caches on ?clear-cache
       if (location.search.includes('clear-cache')) {
-        caches.keys().then(k => Promise.all(k.map(c => caches.delete(c)))).then(() => {
-          navigator.serviceWorker.getRegistrations().then(r => Promise.all(r.map(s => s.unregister()))).then(() => {
-            location.replace(location.pathname);
+        (async () => {
+          try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+          } catch(e) {}
+          try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+          } catch(e) {}
+          location.replace(location.pathname);
+        })();
+      } else {
+        // Auto-update: skip waiting on new SW
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) {
+              reg.addEventListener('updatefound', () => {
+                const newSW = reg.installing;
+                if (newSW) newSW.addEventListener('statechange', () => {
+                  if (newSW.state === 'activated') location.reload();
+                });
+              });
+              reg.update();
+            }
           });
-        });
+        }
       }
     </script>
     <script type="module" src="/src/main.jsx"></script>
