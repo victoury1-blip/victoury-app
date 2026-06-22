@@ -61,6 +61,30 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
       });
     }
   }, []);
+  const [status, setStatus] = useState('idle'); // idle | loading | success | error
+  const [tracking, setTracking] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const [form, setForm] = useState({
+    customerId: cfg.customerId || '',
+    apiKey: cfg.apiKey || '',
+    receiver: order.recipient.name || '',
+    phone: order.recipient.phone || '',
+    cityId: '',
+    address: `${order.recipient.address || ''} ${order.recipient.city || ''}`.trim(),
+    price: String(order.price || ''),
+    note: order.noteLivraison || order.note || '',
+    open: '1',
+    fragile: '0',
+    replace: order.echange ? '1' : '0',
+    stock: '0',
+    nature: (() => {
+      const prods = order.products?.length ? order.products : (order.product ? [order.product] : []);
+      return prods.map(p => `${p.name || ''}${p.size ? ' - ' + p.size : ''}${p.qty && p.qty > 1 ? ' (x' + p.qty + ')' : ''}`).join(' | ').trim();
+    })(),
+  });
+
   const [phoneHistory, setPhoneHistory] = useState(null);
   const [phoneHistoryLoading, setPhoneHistoryLoading] = useState(false);
 
@@ -94,30 +118,6 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     })();
     return () => ctrl.abort();
   }, [form.phone, form.customerId, form.apiKey]);
-
-  const [status, setStatus] = useState('idle'); // idle | loading | success | error
-  const [tracking, setTracking] = useState(null);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [copied, setCopied] = useState(false);
-
-  const [form, setForm] = useState({
-    customerId: cfg.customerId || '',
-    apiKey: cfg.apiKey || '',
-    receiver: order.recipient.name || '',
-    phone: order.recipient.phone || '',
-    cityId: '',
-    address: `${order.recipient.address || ''} ${order.recipient.city || ''}`.trim(),
-    price: String(order.price || ''),
-    note: order.noteLivraison || order.note || '',
-    open: '1',
-    fragile: '0',
-    replace: order.echange ? '1' : '0',
-    stock: '0',
-    nature: (() => {
-      const prods = order.products?.length ? order.products : (order.product ? [order.product] : []);
-      return prods.map(p => `${p.name || ''}${p.size ? ' - ' + p.size : ''}${p.qty && p.qty > 1 ? ' (x' + p.qty + ')' : ''}`).join(' | ').trim();
-    })(),
-  });
 
   function parseCities(data) {
     if (!data) return [];
