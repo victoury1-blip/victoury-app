@@ -37,6 +37,28 @@ async function sendSWNotification(title, options = {}) {
   } catch {}
 }
 
+async function updateBadgeNotification(count, ids) {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (!reg) return;
+    if (count > 0) {
+      const idList = [...ids].slice(0, 5).join(', ');
+      reg.showNotification(`${count} commande${count > 1 ? 's' : ''} à confirmer`, {
+        body: idList + (ids.size > 5 ? '…' : ''),
+        icon: '/pwa-192x192.png',
+        badge: '/pwa-192x192.png',
+        tag: 'badge-summary',
+        silent: true,
+        renotify: true,
+        requireInteraction: true,
+      });
+    } else {
+      const existing = await reg.getNotifications({ tag: 'badge-summary' });
+      for (const n of existing) n.close();
+    }
+  } catch {}
+}
+
 async function closeStaleSWNotifications(nouveauIds) {
   try {
     const reg = await navigator.serviceWorker?.ready;
@@ -103,13 +125,14 @@ export default function useNotifications(orders) {
 
     if (!isEnabled()) { initRef.current = true; return; }
 
-    // First load: remember existing nouveau IDs without sending notifications
+    // First load: remember existing nouveau IDs without sending individual notifications
     if (!initRef.current) {
       initRef.current = true;
       const notified = getNotifiedIds();
       for (const id of nouveauIds) notified.add(id);
       saveNotifiedIds(notified);
       closeStaleSWNotifications(nouveauIds);
+      updateBadgeNotification(nouveauIds.size, nouveauIds);
       checkAlerts(orders);
       return;
     }
@@ -147,6 +170,9 @@ export default function useNotifications(orders) {
 
     // Close SW notifications for orders no longer nouveau
     closeStaleSWNotifications(nouveauIds);
+
+    // Update persistent badge notification with current nouveau count
+    updateBadgeNotification(nouveauIds.size, nouveauIds);
 
     checkAlerts(orders);
   }, [orders, checkAlerts]);
