@@ -61,6 +61,40 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
       });
     }
   }, []);
+  const [phoneHistory, setPhoneHistory] = useState(null);
+  const [phoneHistoryLoading, setPhoneHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    const phone = (form.phone || '').replace(/\s+/g, '');
+    const cid = form.customerId || cfg.customerId;
+    const key = form.apiKey || cfg.apiKey;
+    if (!phone || !cid || !key) return;
+    setPhoneHistoryLoading(true);
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://api.ozonexpress.ma/customers/${cid}/${key}/check-phone/${phone}`,
+          { signal: ctrl.signal }
+        );
+        const raw = await res.json();
+        const data = raw['CHECK-PHONE'] || raw;
+        setPhoneHistory({
+          exists: data['RESULT'] === 'FOUND' || data['RESULT'] === 'EXISTS' || (data['DELIVERED'] !== undefined),
+          delivered: parseInt(data['DELIVERED'] || data['delivered'] || '0', 10),
+          returned: parseInt(data['RETURNED'] || data['returned'] || '0', 10),
+          total: parseInt(data['TOTAL'] || data['total'] || '0', 10),
+          raw: data,
+        });
+      } catch (e) {
+        if (e.name !== 'AbortError') setPhoneHistory(null);
+      } finally {
+        setPhoneHistoryLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [form.phone, form.customerId, form.apiKey]);
+
   const [status, setStatus] = useState('idle'); // idle | loading | success | error
   const [tracking, setTracking] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -344,6 +378,35 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                     className={inputCls} />
                 </div>
               </div>
+
+              {/* Phone history from Ozone */}
+              {phoneHistoryLoading && (
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <Loader2 size={12} className="animate-spin" />
+                  <span>Vérification du numéro...</span>
+                </div>
+              )}
+              {phoneHistory && !phoneHistoryLoading && (
+                <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
+                  phoneHistory.delivered > 0 || phoneHistory.returned > 0
+                    ? 'bg-amber-50 border border-amber-200 text-amber-800'
+                    : 'bg-green-50 border border-green-100 text-green-700'
+                }`}>
+                  {phoneHistory.delivered > 0 || phoneHistory.returned > 0 ? (
+                    <>
+                      <p>Ce numéro existe déjà. ( Livré : <strong>{phoneHistory.delivered}</strong> ) ( Retourné : <strong>{phoneHistory.returned}</strong> ) fois.</p>
+                      {phoneHistory.returned > 0 && phoneHistory.delivered === 0 && (
+                        <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                          <AlertTriangle size={12} />
+                          Attention : aucun colis livré, {phoneHistory.returned} retour(s) !
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p>Nouveau numéro — aucun historique trouvé.</p>
+                  )}
+                </div>
+              )}
 
               <div ref={cityRef} className="relative">
                 <label className={labelCls}>
