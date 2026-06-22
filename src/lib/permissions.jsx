@@ -26,7 +26,7 @@ export function PermissionsProvider({ children, session }) {
 
   useEffect(() => {
     if (!session) return;
-    supabase.from('settings').select('value').eq('key', 'moderators').single().then(({ data }) => {
+    supabase.from('settings').select('value').eq('key', 'moderators').is('user_id', null).single().then(({ data }) => {
       if (Array.isArray(data?.value)) {
         setModeratorsState(data.value);
         localStorage.setItem('moderators', JSON.stringify(data.value));
@@ -49,7 +49,7 @@ export function PermissionsProvider({ children, session }) {
     setModeratorsState(list);
     localStorage.setItem('moderators', JSON.stringify(list));
     supabase.from('settings').upsert(
-      { key: 'moderators', value: list, updated_at: new Date().toISOString() },
+      { key: 'moderators', value: list, user_id: null, updated_at: new Date().toISOString() },
       { onConflict: 'key' }
     ).then(() => {});
   }
