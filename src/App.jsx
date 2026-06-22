@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import OrdersPage from './components/OrdersPage';
-import Dashboard from './components/Dashboard';
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
 import SettingsPage from './components/SettingsPage';
 import EtatsPage from './components/EtatsPage';
 import LivraisonPage from './components/LivraisonPage';
@@ -536,7 +536,7 @@ export default function App() {
         <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard orders={orders} />} />
+          <Route path="/dashboard" element={<React.Suspense fallback={<div className="p-8 text-center text-gray-400">Chargement...</div>}><Dashboard orders={orders} /></React.Suspense>} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading || isWooFetching} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />

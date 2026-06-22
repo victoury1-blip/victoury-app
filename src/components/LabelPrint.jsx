@@ -1,6 +1,4 @@
 import { supabase } from '../lib/supabase';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { esc } from '../lib/htmlUtils';
 
 function getShopConfig() {
@@ -132,6 +130,8 @@ export async function openLabelPage(orders) {
 
   await new Promise(r => setTimeout(r, 300));
 
+  const { default: jsPDF } = await import('jspdf');
+  const { default: html2canvas } = await import('html2canvas');
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [100, 100] });
 
   for (let i = 0; i < labelEls.length; i++) {

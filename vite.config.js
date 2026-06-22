@@ -63,15 +63,7 @@ export default defineConfig({
     }),
   ],
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          recharts: ['recharts'],
-          xlsx: ['xlsx'],
-          pdf: ['jspdf', 'html2canvas'],
-        },
-      },
-    },
+    chunkSizeWarningLimit: 600,
   },
   server: {
     proxy: {
