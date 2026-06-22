@@ -6,7 +6,7 @@ import OrderModal from './OrderModal';
 import { openLabelPage } from './LabelPrint';
 import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
-import PhoneChip from './PhoneChip';
+import PhoneChip, { normalizePhone } from './PhoneChip';
 
 /* ── Google Sheets status config ── */
 const SHEET_STATUSES = [
@@ -197,7 +197,6 @@ function SheetImportSection({ orders = [], setOrders }) {
   const priceCol = findCol('price', PRICE_KEYS);
   const codeCol = findCol('code', CODE_KEYS);
 
-  const normalizePhone = (p) => (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0').slice(-9);
 
   function importToColis(rowsToImport) {
     const existingIds = new Set(orders.map(o => o.id));

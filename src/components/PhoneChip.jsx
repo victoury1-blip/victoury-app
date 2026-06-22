@@ -8,7 +8,7 @@ export function getPhoneColors() {
 }
 
 export function normalizePhone(p) {
-  return (p || '').replace(/[\s\-\+]/g, '').replace(/^00212/, '0').replace(/^212/, '0');
+  return (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0');
 }
 
 export default function PhoneChip({ phone, allOrders }) {
