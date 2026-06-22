@@ -56,11 +56,30 @@ export default function useNotifications(orders) {
 
     const known = getKnownIds();
 
-    // First load: save existing nouveau IDs without sending notifications
+    // First load: send silent notifications for existing nouveau (for Samsung badge)
     if (!initRef.current) {
       initRef.current = true;
-      for (const id of nouveauIds) known.add(id);
-      saveKnownIds(known);
+      const unseen = nouveauOrders.filter(o => !known.has(o.id));
+      if (unseen.length > 0 || nouveauOrders.length > 0) {
+        (async () => {
+          try {
+            const reg = await navigator.serviceWorker?.ready;
+            if (!reg) return;
+            // Ensure all nouveau orders have a notification for badge count
+            for (const order of nouveauOrders) {
+              reg.showNotification(`${order.recipient?.name || order.id} — ${order.price || 0} DH`, {
+                tag: `badge-${order.id}`,
+                icon: '/pwa-192x192.png',
+                badge: '/pwa-192x192.png',
+                silent: true,
+                requireInteraction: true,
+              });
+              known.add(order.id);
+            }
+            saveKnownIds(known);
+          } catch {}
+        })();
+      }
       return;
     }
 
