@@ -92,24 +92,82 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     const phone = (form.phone || '').replace(/\s+/g, '');
     const cid = form.customerId || cfg.customerId;
     const key = form.apiKey || cfg.apiKey;
-    if (!phone || !cid || !key) return;
+    if (!phone || phone.length < 10 || !cid || !key) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
     const ctrl = new AbortController();
     (async () => {
       try {
-        const res = await fetch(
+        const endpoints = [
           `https://api.ozonexpress.ma/customers/${cid}/${key}/check-phone/${phone}`,
-          { signal: ctrl.signal }
-        );
-        const raw = await res.json();
-        const data = raw['CHECK-PHONE'] || raw;
-        setPhoneHistory({
-          exists: data['RESULT'] === 'FOUND' || data['RESULT'] === 'EXISTS' || (data['DELIVERED'] !== undefined),
-          delivered: parseInt(data['DELIVERED'] || data['delivered'] || '0', 10),
-          returned: parseInt(data['RETURNED'] || data['returned'] || '0', 10),
-          total: parseInt(data['TOTAL'] || data['total'] || '0', 10),
-          raw: data,
-        });
+          `https://api.ozonexpress.ma/customers/${cid}/${key}/check-phone?phone=${phone}`,
+          `https://api.ozonexpress.ma/customers/${cid}/${key}/get-parcels?phone=${phone}`,
+        ];
+        let found = false;
+        for (const url of endpoints) {
+          if (ctrl.signal.aborted) return;
+          try {
+            const res = await fetch(url, { signal: ctrl.signal });
+            if (!res.ok) continue;
+            const raw = await res.json();
+            console.log('[Ozone phone check]', url, JSON.stringify(raw));
+            const data = raw['CHECK-PHONE'] || raw['check-phone'] || raw;
+
+            // Try to extract delivery/return counts from various response shapes
+            let delivered = 0, returned = 0, exists = false;
+
+            if (Array.isArray(data)) {
+              // Response is a list of parcels — count by status
+              exists = data.length > 0;
+              for (const p of data) {
+                const st = (p.status || p.STATUS || p.statut || '').toString().toLowerCase();
+                if (st.includes('livr') || st.includes('deliver')) delivered++;
+                else if (st.includes('retour') || st.includes('return') || st.includes('refus')) returned++;
+              }
+            } else if (typeof data === 'object' && data !== null) {
+              // Check for parcels array nested in response
+              const parcels = data.parcels || data.PARCELS || data.data || data.colis;
+              if (Array.isArray(parcels)) {
+                exists = parcels.length > 0;
+                for (const p of parcels) {
+                  const st = (p.status || p.STATUS || p.statut || '').toString().toLowerCase();
+                  if (st.includes('livr') || st.includes('deliver')) delivered++;
+                  else if (st.includes('retour') || st.includes('return') || st.includes('refus')) returned++;
+                }
+              } else {
+                // Direct count fields
+                delivered = parseInt(data['DELIVERED'] || data['delivered'] || data['livré'] || data['livre'] || '0', 10);
+                returned = parseInt(data['RETURNED'] || data['returned'] || data['retourné'] || data['retourne'] || '0', 10);
+                exists = (data['RESULT'] === 'FOUND' || data['RESULT'] === 'EXISTS' || data['exists'] === true || delivered > 0 || returned > 0);
+                if (!exists && data['message']) {
+                  const msg = data['message'].toLowerCase();
+                  if (msg.includes('existe') || msg.includes('found')) {
+                    exists = true;
+                    const livMatch = msg.match(/livr[ée]*\s*:\s*(\d+)/i);
+                    const retMatch = msg.match(/retourn[ée]*\s*:\s*(\d+)/i);
+                    if (livMatch) delivered = parseInt(livMatch[1], 10);
+                    if (retMatch) returned = parseInt(retMatch[1], 10);
+                  }
+                }
+              }
+            }
+
+            if (exists || delivered > 0 || returned > 0) {
+              setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned, raw: data });
+              found = true;
+              break;
+            }
+            // If this endpoint returned data but no history, check if it's a valid "not found" response
+            if (data && (data['RESULT'] === 'NOT_FOUND' || data['message']?.toLowerCase().includes('nouveau') || data['message']?.toLowerCase().includes('new'))) {
+              setPhoneHistory({ exists: false, delivered: 0, returned: 0, total: 0, raw: data });
+              found = true;
+              break;
+            }
+          } catch (innerErr) {
+            if (innerErr.name === 'AbortError') return;
+            continue;
+          }
+        }
+        if (!found) setPhoneHistory(null);
       } catch (e) {
         if (e.name !== 'AbortError') setPhoneHistory(null);
       } finally {
@@ -388,11 +446,11 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
               )}
               {phoneHistory && !phoneHistoryLoading && (
                 <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
-                  phoneHistory.delivered > 0 || phoneHistory.returned > 0
+                  phoneHistory.exists
                     ? 'bg-amber-50 border border-amber-200 text-amber-800'
                     : 'bg-green-50 border border-green-100 text-green-700'
                 }`}>
-                  {phoneHistory.delivered > 0 || phoneHistory.returned > 0 ? (
+                  {phoneHistory.exists ? (
                     <>
                       <p dir="rtl">هاد الرقم موجود من قبل. ( تم التوصيل : <strong>{phoneHistory.delivered}</strong> ) ( مرجوع : <strong>{phoneHistory.returned}</strong> ) مرة.</p>
                       {phoneHistory.returned > 0 && phoneHistory.delivered === 0 && (
