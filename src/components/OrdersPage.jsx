@@ -154,7 +154,9 @@ function isLight(hex) {
 function PhoneChip({ phone, allOrders }) {
   const [open, setOpen] = useState(false);
   if (!phone) return null;
-  const history = allOrders ? allOrders.filter(o => o.recipient?.phone === phone) : [];
+  const norm = (p) => (p || '').replace(/[\s\-\+]/g, '').replace(/^00212/, '0').replace(/^212/, '0');
+  const np = norm(phone);
+  const history = allOrders ? allOrders.filter(o => norm(o.recipient?.phone) === np) : [];
   const hasLivre = history.some(o => o.status === 'livre');
   const isKnown = history.length > 1;
   const bgClass = hasLivre ? 'bg-emerald-500 text-white' : isKnown ? 'bg-amber-300 text-gray-900' : '';
