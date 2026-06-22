@@ -72,11 +72,12 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
+        const bare = phone.replace(/^0+/, '');
         const { data: rows } = await supabase
           .from('orders')
           .select('id, status, ozone_last_status, phone')
-          .or(`phone.eq.${phone},phone.eq.0${phone},phone.eq.${phone.replace(/^0/, '')}`)
-          .eq('is_deleted', false);
+          .eq('is_deleted', false)
+          .or('phone.ilike.%' + bare);
         if (cancelled) return;
         const matches = (rows || []).filter(r => r.id !== order?.id);
         if (matches.length === 0) {
