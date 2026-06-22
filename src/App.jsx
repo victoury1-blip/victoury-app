@@ -151,13 +151,30 @@ export default function App() {
       'phone_colors', 'notification_sound', 'system_timezone',
       'victoury_sent_livreur', 'victoury_recu_ids', 'victoury_manual_facture',
     ];
-    supabase.from('settings').select('key, value').in('key', PRELOAD_KEYS).is('user_id', null)
-      .then(({ data }) => {
-        if (!data) return;
+    const userId = session?.user?.id;
+    const promises = [];
+    // Load user-scoped settings
+    if (userId) {
+      promises.push(
+        supabase.from('settings').select('key, value').in('key', PRELOAD_KEYS).eq('user_id', userId)
+      );
+    }
+    // Also load null-user settings as fallback
+    promises.push(
+      supabase.from('settings').select('key, value').in('key', PRELOAD_KEYS).is('user_id', null)
+    );
+    Promise.all(promises).then(results => {
+      const found = new Set();
+      for (const { data } of results) {
+        if (!data) continue;
         for (const row of data) {
-          if (row.value != null) localStorage.setItem(row.key, JSON.stringify(row.value));
+          if (row.value != null && !found.has(row.key)) {
+            found.add(row.key);
+            localStorage.setItem(row.key, JSON.stringify(row.value));
+          }
         }
-      });
+      }
+    });
   }, [session]);
 
   /* ── Load orders from Supabase ── */

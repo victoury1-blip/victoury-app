@@ -1,39 +1,59 @@
 import { supabase } from './supabase';
 
-/* Supabase is the source of truth. localStorage is a write-through cache only. */
-/* Single-tenant: no user_id scoping — all settings are shared across devices. */
+async function uid() {
+  const { data } = await supabase.auth.getUser();
+  return data?.user?.id || null;
+}
 
 export async function cloudGet(key) {
   try {
-    const { data, error } = await supabase
+    const userId = await uid();
+
+    // Try with user_id first
+    if (userId) {
+      const { data } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', key)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (data?.value !== undefined && data?.value !== null) {
+        localStorage.setItem(key, JSON.stringify(data.value));
+        return data.value;
+      }
+    }
+
+    // Fallback: try user_id IS NULL
+    const { data: d2 } = await supabase
       .from('settings')
       .select('value')
       .eq('key', key)
       .is('user_id', null)
       .maybeSingle();
-
-    if (!error && data?.value !== undefined && data?.value !== null) {
-      localStorage.setItem(key, JSON.stringify(data.value));
-      return data.value;
+    if (d2?.value !== undefined && d2?.value !== null) {
+      localStorage.setItem(key, JSON.stringify(d2.value));
+      if (userId) {
+        // Migrate to user-scoped row
+        await supabase.from('settings').insert(
+          { key, value: d2.value, user_id: userId, updated_at: new Date().toISOString() }
+        ).then(() => {
+          supabase.from('settings').delete().eq('key', key).is('user_id', null);
+        });
+      }
+      return d2.value;
     }
 
-    // Fallback: try without user_id filter (catches old rows with user_id set)
-    const { data: d2 } = await supabase
+    // Last fallback: any row with this key
+    const { data: d3 } = await supabase
       .from('settings')
       .select('value')
       .eq('key', key)
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-
-    if (d2?.value !== undefined && d2?.value !== null) {
-      localStorage.setItem(key, JSON.stringify(d2.value));
-      // Migrate: re-save without user_id
-      await supabase.from('settings').upsert(
-        { key, value: d2.value, user_id: null, updated_at: new Date().toISOString() },
-        { onConflict: 'key' }
-      );
-      return d2.value;
+    if (d3?.value !== undefined && d3?.value !== null) {
+      localStorage.setItem(key, JSON.stringify(d3.value));
+      return d3.value;
     }
 
     return null;
@@ -47,13 +67,20 @@ export async function cloudGet(key) {
 
 export async function cloudSet(key, value) {
   try {
-    await supabase.from('settings').delete().eq('key', key);
-    const { error } = await supabase.from('settings').insert(
-      { key, value, user_id: null, updated_at: new Date().toISOString() }
-    );
+    const userId = await uid();
+    // Delete all rows for this key owned by this user
+    if (userId) {
+      await supabase.from('settings').delete().eq('key', key).eq('user_id', userId);
+    }
+    // Also clean up null-user rows
+    await supabase.from('settings').delete().eq('key', key).is('user_id', null);
+
+    const row = { key, value, updated_at: new Date().toISOString() };
+    if (userId) row.user_id = userId;
+    const { error } = await supabase.from('settings').insert(row);
     if (error) throw error;
   } catch (e) {
-    console.error('cloudSet failed:', e?.message || e);
+    console.error('cloudSet failed:', key, e?.message || e);
   }
   localStorage.setItem(key, JSON.stringify(value));
 }
