@@ -30,7 +30,6 @@ import OrderModal from './OrderModal';
 import OzoneModal from './OzoneModal';
 import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
-import ContactModal from './ContactModal';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { loadProducts, loadProductsRemote } from '../data/products';
@@ -151,35 +150,7 @@ function isLight(hex) {
   return (r*299+g*587+b*114)/1000 > 155;
 }
 
-const PHONE_COLOR_DEFAULTS = { livreBg: '#047857', livreText: '#ffffff', knownBg: '#fbbf24', knownText: '#111827' };
-function getPhoneColors() {
-  try { return { ...PHONE_COLOR_DEFAULTS, ...JSON.parse(localStorage.getItem('phone_colors') || '{}') }; } catch { return PHONE_COLOR_DEFAULTS; }
-}
-
-function PhoneChip({ phone, allOrders }) {
-  const [open, setOpen] = useState(false);
-  if (!phone) return null;
-  const norm = (p) => (p || '').replace(/[\s\-\+]/g, '').replace(/^00212/, '0').replace(/^212/, '0');
-  const np = norm(phone);
-  const history = allOrders ? allOrders.filter(o => norm(o.recipient?.phone) === np) : [];
-  const hasLivre = history.some(o => o.status === 'livre');
-  const isKnown = history.length > 1;
-  const pc = getPhoneColors();
-  const style = !isKnown ? {} : hasLivre ? { backgroundColor: pc.livreBg, color: pc.livreText } : { backgroundColor: pc.knownBg, color: pc.knownText };
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={`mt-1 text-sm font-bold hover:underline active:opacity-70 ${isKnown ? 'px-2 py-0.5 rounded' : 'text-gray-900'}`}
-        style={style}
-      >
-        {phone}
-      </button>
-      {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
-    </>
-  );
-}
+import PhoneChip from './PhoneChip';
 
 function StatusBadge({ status, reportDate }) {
   const { getLive } = useStatuses();

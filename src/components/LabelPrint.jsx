@@ -42,6 +42,10 @@ function generateQRCodeSVG(text, size = 120) {
   </svg>`;
 }
 
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function buildLabelHTML(order, config) {
   const shopName = config.shopName || 'VICTOURY';
   const shopPhone = config.shopPhone || '';
@@ -52,34 +56,34 @@ function buildLabelHTML(order, config) {
   const date = order.dateAdded?.split(' ')[0] || new Date().toLocaleDateString('fr-MA');
 
   const logoHtml = config.logo
-    ? `<img src="${config.logo}" alt="" style="height:80px;object-fit:contain" />`
-    : `<span style="font-weight:900;font-size:22px;letter-spacing:1px">${shopName}</span>`;
+    ? `<img src="${esc(config.logo)}" alt="" style="height:80px;object-fit:contain" />`
+    : `<span style="font-weight:900;font-size:22px;letter-spacing:1px">${esc(shopName)}</span>`;
 
   const noteHtml = (order.noteLivraison || shopNote)
-    ? `<div style="padding:4px 12px;border-bottom:1px solid #000"><span style="color:#dc2626;font-weight:700;font-size:13px">Note: </span><span style="font-size:12px;color:#333">${order.noteLivraison || ''}</span></div>`
+    ? `<div style="padding:4px 12px;border-bottom:1px solid #000"><span style="color:#dc2626;font-weight:700;font-size:13px">Note: </span><span style="font-size:12px;color:#333">${esc(order.noteLivraison)}</span></div>`
     : '';
 
   const shopNoteHtml = shopNote
-    ? `<div style="padding:6px 12px;border-bottom:1px solid #000;font-size:11px;color:#333;line-height:1.4">${shopNote}</div>`
+    ? `<div style="padding:6px 12px;border-bottom:1px solid #000;font-size:11px;color:#333;line-height:1.4">${esc(shopNote)}</div>`
     : '';
 
   const prodsHtml = prods.filter(Boolean).map(p =>
-    `<div style="font-size:13px;color:#333">- ${p.name || ''}${p.color ? ' ' + p.color : ''}${p.size ? ' - ' + p.size : ''} (x${p.qty || 1})</div>`
+    `<div style="font-size:13px;color:#333">- ${esc(p.name)}${p.color ? ' ' + esc(p.color) : ''}${p.size ? ' - ' + esc(p.size) : ''} (x${p.qty || 1})</div>`
   ).join('');
 
   return `<div class="label-page" style="width:378px;border:2px solid #000;font-family:'Times New Roman',Times,serif,sans-serif;padding:0;background:#fff">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #000">
       <div style="display:flex;align-items:center;gap:8px">${logoHtml}</div>
-      ${shopPhone ? `<div style="text-align:right;line-height:1.3"><span style="font-size:11px;font-weight:bold;color:#333">Service après-vente</span><br><span style="font-size:13px;color:#333">${shopPhone}</span></div>` : ''}
+      ${shopPhone ? `<div style="text-align:right;line-height:1.3"><span style="font-size:11px;font-weight:bold;color:#333">Service après-vente</span><br><span style="font-size:13px;color:#333">${esc(shopPhone)}</span></div>` : ''}
     </div>
     ${noteHtml}
     <div style="display:flex;border-bottom:1px solid #000">
       <div style="flex:1;padding:10px 12px;font-size:13px;line-height:1.7">
-        <div><strong>Code</strong> <span style="margin-left:40px">:${order.trackingNumber || order.id}</span></div>
-        <div><strong>Destinataire</strong> <span style="margin-left:8px">:${echange}${order.recipient?.name || ''}</span></div>
-        <div><strong>Téléphone</strong> <span style="margin-left:18px">:${order.recipient?.phone || ''}</span></div>
-        <div><strong>Adresse</strong> <span style="margin-left:30px">:${order.recipient?.address || ''}</span></div>
-        <div style="margin-top:6px"><strong>Ville</strong> <span style="margin-left:48px">:${order.recipient?.city || ''}</span></div>
+        <div><strong>Code</strong> <span style="margin-left:40px">:${esc(order.trackingNumber || order.id)}</span></div>
+        <div><strong>Destinataire</strong> <span style="margin-left:8px">:${esc(echange)}${esc(order.recipient?.name)}</span></div>
+        <div><strong>Téléphone</strong> <span style="margin-left:18px">:${esc(order.recipient?.phone)}</span></div>
+        <div><strong>Adresse</strong> <span style="margin-left:30px">:${esc(order.recipient?.address)}</span></div>
+        <div style="margin-top:6px"><strong>Ville</strong> <span style="margin-left:48px">:${esc(order.recipient?.city)}</span></div>
         <div><strong>Date d'envoi</strong> <span style="margin-left:4px">:${date}</span></div>
       </div>
       <div style="width:120px;display:flex;align-items:center;justify-content:center;border-left:1px solid #000;padding:8px">
