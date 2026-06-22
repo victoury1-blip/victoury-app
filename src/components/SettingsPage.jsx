@@ -381,8 +381,8 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     },
     {
       id: 'phone_colors',
-      title: 'Couleurs téléphone',
-      desc: 'Personnaliser les couleurs des numéros de téléphone (clients connus / livrés).',
+      title: 'ألوان الهاتف',
+      desc: 'تخصيص ألوان أرقام الهاتف (عملاء معروفين / تم التوصيل).',
       icon: <Phone size={22} className="text-purple-600" />,
       iconBg: 'bg-purple-100',
       cardBg: 'from-purple-50',
@@ -1079,20 +1079,20 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
       {/* ── Phone Colors Modal ── */}
       <Modal open={openModal === 'phone_colors'} onClose={() => setOpenModal(null)}
-        title="Couleurs téléphone" icon={<Phone size={18} className="text-purple-600" />}
+        title="ألوان الهاتف" icon={<Phone size={18} className="text-purple-600" />}
         iconBg="bg-gradient-to-r from-purple-50 to-white">
         <div className="space-y-5">
-          <p className="text-xs text-gray-500">Personnalisez les couleurs des numéros selon l'historique client.</p>
+          <p className="text-xs text-gray-500">تخصيص ألوان أرقام الهاتف حسب تاريخ العميل.</p>
 
           <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-            <h3 className="text-sm font-bold text-gray-700">🟢 Client livré (duplicate + livré)</h3>
+            <h3 className="text-sm font-bold text-gray-700">🟢 عميل تم التوصيل (مكرر + ليفري)</h3>
             <div className="flex items-center gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Fond</label>
+                <label className="block text-xs text-gray-500 mb-1">الخلفية</label>
                 <input type="color" value={pc.livreBg} onChange={e => savePhoneColors({ livreBg: e.target.value })} className="w-10 h-8 rounded cursor-pointer border" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Texte</label>
+                <label className="block text-xs text-gray-500 mb-1">النص</label>
                 <input type="color" value={pc.livreText} onChange={e => savePhoneColors({ livreText: e.target.value })} className="w-10 h-8 rounded cursor-pointer border" />
               </div>
               <div className="ml-auto px-3 py-1 rounded text-sm font-bold" style={{ backgroundColor: pc.livreBg, color: pc.livreText }}>0612345678</div>
@@ -1100,14 +1100,14 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           </div>
 
           <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-            <h3 className="text-sm font-bold text-gray-700">🟡 Client connu (duplicate sans livré)</h3>
+            <h3 className="text-sm font-bold text-gray-700">🟡 عميل معروف (مكرر بلا ليفري)</h3>
             <div className="flex items-center gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Fond</label>
+                <label className="block text-xs text-gray-500 mb-1">الخلفية</label>
                 <input type="color" value={pc.knownBg} onChange={e => savePhoneColors({ knownBg: e.target.value })} className="w-10 h-8 rounded cursor-pointer border" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Texte</label>
+                <label className="block text-xs text-gray-500 mb-1">النص</label>
                 <input type="color" value={pc.knownText} onChange={e => savePhoneColors({ knownText: e.target.value })} className="w-10 h-8 rounded cursor-pointer border" />
               </div>
               <div className="ml-auto px-3 py-1 rounded text-sm font-bold" style={{ backgroundColor: pc.knownBg, color: pc.knownText }}>0612345678</div>
@@ -1115,7 +1115,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           </div>
 
           <button onClick={() => { savePhoneColors({ livreBg: '#047857', livreText: '#ffffff', knownBg: '#fbbf24', knownText: '#111827' }); }}
-            className="text-xs text-blue-600 hover:underline">Réinitialiser les couleurs par défaut</button>
+            className="text-xs text-blue-600 hover:underline">إرجاع الألوان الافتراضية</button>
         </div>
       </Modal>
     </div>
