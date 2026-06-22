@@ -151,17 +151,24 @@ function isLight(hex) {
   return (r*299+g*587+b*114)/1000 > 155;
 }
 
-function PhoneChip({ phone }) {
+function PhoneChip({ phone, allOrders }) {
   const [open, setOpen] = useState(false);
   if (!phone) return null;
+  const history = allOrders ? allOrders.filter(o => o.recipient?.phone === phone) : [];
+  const hasLivre = history.some(o => o.status === 'livre');
+  const hasRefuse = history.some(o => ['refuse', 'annule', 'retour_recu', 'pret_retour'].includes(o.status));
+  const isKnown = history.length > 1;
+  const colorClass = hasLivre ? 'text-emerald-600' : hasRefuse ? 'text-amber-600' : isKnown ? 'text-blue-600' : 'text-gray-900';
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-1 text-sm font-bold text-gray-900 hover:underline active:text-gray-600"
+        className={`mt-1 text-sm font-bold ${colorClass} hover:underline active:opacity-70`}
       >
         {phone}
+        {hasLivre && ' ✓'}
+        {hasRefuse && !hasLivre && ' ⚠'}
       </button>
       {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
     </>
@@ -1051,7 +1058,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <button onClick={() => setCustomerHistory(order.recipient.phone)} className="text-base font-bold text-gray-900 max-w-[220px] truncate hover:text-blue-600 hover:underline cursor-pointer text-left">{order.recipient.name}</button>
                   <div className="text-sm text-gray-500 mt-0.5">{order.recipient.address}</div>
                   <div className="text-sm font-bold text-gray-800">{order.recipient.city}</div>
-                  <PhoneChip phone={order.recipient.phone} />
+                  <PhoneChip phone={order.recipient.phone} allOrders={externalOrders} />
                   {order.recipient.delivery && (
                     <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
                       <Truck size={11} />

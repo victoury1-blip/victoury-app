@@ -489,17 +489,24 @@ function Badge({ statusKey }) {
   );
 }
 
-function PhoneChip({ phone }) {
+function PhoneChip({ phone, allOrders }) {
   const [open, setOpen] = useState(false);
   if (!phone) return null;
+  const history = allOrders ? allOrders.filter(o => o.recipient?.phone === phone) : [];
+  const hasLivre = history.some(o => o.status === 'livre');
+  const hasRefuse = history.some(o => ['refuse', 'annule', 'retour_recu', 'pret_retour'].includes(o.status));
+  const isKnown = history.length > 1;
+  const colorClass = hasLivre ? 'text-emerald-600' : hasRefuse ? 'text-amber-600' : isKnown ? 'text-blue-600' : 'text-gray-900';
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-1 text-sm font-bold text-gray-900 hover:underline active:text-gray-600"
+        className={`mt-1 text-sm font-bold ${colorClass} hover:underline active:opacity-70`}
       >
         {phone}
+        {hasLivre && ' ✓'}
+        {hasRefuse && !hasLivre && ' ⚠'}
       </button>
       {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
     </>
@@ -1484,7 +1491,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     <div className="text-base font-bold text-gray-900 max-w-[220px] truncate">{o.recipient.name}</div>
                     <div className="text-sm text-gray-500 mt-0.5">{o.recipient.address}</div>
                     <div className="text-sm font-bold text-gray-800">{o.recipient.city}</div>
-                    <PhoneChip phone={o.recipient.phone} />
+                    <PhoneChip phone={o.recipient.phone} allOrders={orders} />
                     {delivery !== '—' && (
                       <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
                         <Truck size={11} />
