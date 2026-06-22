@@ -25,6 +25,7 @@ const SYNC_KEYS = [
   'victoury_sent_livreur',
   'vict_counter',
   'frais_1',
+  'phone_colors',
 ];
 
 const MERGE_KEYS = new Set([
