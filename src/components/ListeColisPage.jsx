@@ -1448,6 +1448,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
               ))}
             </tr>
           </thead>
+        </table>
+        <div style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
+        <table className="w-full text-sm border-collapse min-w-[900px]">
           <tbody className="divide-y divide-gray-50">
             {colis.length === 0 ? (
               <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">Aucun colis dans le pipeline</td></tr>
@@ -1619,6 +1622,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {tab === 'colis' && (

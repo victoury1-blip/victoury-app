@@ -998,6 +998,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
             </tr>
           </thead>
+        </table>
+        <div style={paged.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
+        <table className="w-full text-sm border-collapse min-w-[900px]">
           <tbody>
             {filtered.length === 0 && (
               <tr>
@@ -1162,6 +1165,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Pagination total={filtered.length} page={pgPage} perPage={pgPer} onPageChange={setPgPage} onPerPageChange={setPgPer} />

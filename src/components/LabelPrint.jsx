@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { esc } from '../lib/htmlUtils';
 
 function getShopConfig() {
   try { return JSON.parse(localStorage.getItem('victoury_shop_config') || '{}'); } catch { return {}; }
@@ -40,10 +41,6 @@ function generateQRCodeSVG(text, size = 120) {
     <rect width="${size}" height="${size}" fill="white"/>
     ${rects}
   </svg>`;
-}
-
-function esc(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function buildLabelHTML(order, config) {

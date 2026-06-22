@@ -15,6 +15,7 @@ import RetourPage from './components/RetourPage';
 import LoginPage from './components/LoginPage';
 import ModeratorsPage from './components/ModeratorsPage';
 import { supabase } from './lib/supabase';
+import { saveOrdersOffline, loadOrdersOffline, queueSync, getPendingSync, clearSyncQueue, deleteOrderOffline } from './lib/offlineStore';
 import { cloudGet } from './lib/cloudSettings';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
@@ -89,6 +90,44 @@ export default function App() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
+  /* ── Process sync queue when back online ── */
+  useEffect(() => {
+    async function processSyncQueue() {
+      try {
+        const pending = await getPendingSync();
+        if (!pending.length) return;
+        for (const item of pending) {
+          try {
+            if (item.action === 'update') {
+              const o = item.data;
+              await supabase.from('orders').upsert({
+                id: o.id, status: o.status, note: o.note, validated: o.validated,
+                recipient: o.recipient, product: o.product, products: o.products || null,
+                price: o.price, date_added: o.dateAdded,
+                date_updated: new Date().toLocaleString('fr-MA'),
+                echange: o.echange || false, report_date: o.reportDate || null,
+                note_livraison: o.noteLivraison || '', tracking_number: o.trackingNumber || null,
+                manually_modified: o.manuallyModified || false,
+                ...(o.ozoneTracking ? { ozone_tracking: o.ozoneTracking } : {}),
+                ...(o.ozoneLastStatus ? { ozone_last_status: o.ozoneLastStatus } : {}),
+              }, { onConflict: 'id' });
+            } else if (item.action === 'delete') {
+              await supabase.from('orders').update({ is_deleted: true }).eq('id', item.data.id);
+            }
+          } catch (e) {
+            console.error('Sync queue item failed:', e);
+          }
+        }
+        await clearSyncQueue();
+      } catch (e) {
+        console.error('Failed to process sync queue:', e);
+      }
+    }
+    const handler = () => processSyncQueue();
+    window.addEventListener('online', handler);
+    return () => window.removeEventListener('online', handler);
+  }, []);
+
   /* ── Auth ── */
   useEffect(() => {
     const timeout = setTimeout(() => setSession(null), 5000);
@@ -119,6 +158,16 @@ export default function App() {
           return load(attempt + 1);
         }
         setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes'));
+        // Fallback to IndexedDB cached orders
+        try {
+          const cached = await loadOrdersOffline();
+          if (cached.length) {
+            setOrders(cached);
+            setDbError(prev => prev + ' — données hors-ligne chargées');
+          }
+        } catch (offlineErr) {
+          console.error('Failed to load offline orders:', offlineErr);
+        }
         setIsLoading(false);
         return;
       }
@@ -148,6 +197,15 @@ export default function App() {
       })));
       setIsLoading(false);
       initialLoadDoneRef.current = true;
+      // Cache orders to IndexedDB for offline use
+      saveOrdersOffline(data.map((o) => ({
+        id: o.id, recipient: o.recipient, product: o.product, products: o.products || null,
+        price: o.price, status: o.status, note: o.note, dateAdded: o.date_added,
+        dateUpdated: o.date_updated, validated: o.validated, echange: o.echange || false,
+        reportDate: o.report_date || null, noteLivraison: o.note_livraison || '',
+        trackingNumber: o.tracking_number || null, ozoneTracking: o.ozone_tracking || null,
+        ozoneLastStatus: o.ozone_last_status || null, manuallyModified: o.manually_modified || false,
+      }))).catch(e => console.error('Failed to cache orders offline:', e));
     }
     load();
   }, [session]);
@@ -384,12 +442,22 @@ export default function App() {
   }
 
   async function deleteOrderFromSupabase(orderId) {
+    deletedIdsRef.current.add(orderId);
+    if (!navigator.onLine) {
+      await queueSync('delete', { id: orderId });
+      await deleteOrderOffline(orderId);
+      return;
+    }
     /* Soft delete — mark the row instead of removing it so it survives cache resets */
     await supabase.from('orders').update({ is_deleted: true }).eq('id', orderId);
-    deletedIdsRef.current.add(orderId);
   }
 
   async function updateOrderInSupabase(order) {
+    if (!navigator.onLine) {
+      await queueSync('update', order);
+      await saveOrdersOffline([order]);
+      return;
+    }
     await supabase.from('orders').upsert({
       id: order.id,
       status: order.status,
@@ -431,6 +499,8 @@ export default function App() {
         modifiedIdsRef.current.add(o.id);
         updateOrderInSupabase({ ...o, manuallyModified: true });
       });
+      // Cache updated orders to IndexedDB
+      saveOrdersOffline(next).catch(e => console.error('Failed to cache orders offline:', e));
       return next;
     });
   };
