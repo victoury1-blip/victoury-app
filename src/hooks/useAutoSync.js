@@ -27,6 +27,13 @@ const SYNC_KEYS = [
   'frais_1',
 ];
 
+const MERGE_KEYS = new Set([
+  'victoury_sent_livreur',
+  'victoury_recu_ids',
+  'victoury_manual_facture',
+  'deleted_order_ids',
+]);
+
 const SYNC_INTERVAL = 30_000;
 
 export default function useAutoSync(session) {
@@ -51,10 +58,20 @@ export default function useAutoSync(session) {
 
         for (const row of data) {
           if (row.value === null || row.value === undefined) continue;
-          const localRaw = localStorage.getItem(row.key);
-          const remoteJson = JSON.stringify(row.value);
-          if (localRaw !== remoteJson) {
-            localStorage.setItem(row.key, remoteJson);
+          if (MERGE_KEYS.has(row.key) && Array.isArray(row.value)) {
+            try {
+              const local = JSON.parse(localStorage.getItem(row.key) || '[]');
+              const merged = [...new Set([...local, ...row.value])];
+              localStorage.setItem(row.key, JSON.stringify(merged));
+            } catch {
+              localStorage.setItem(row.key, JSON.stringify(row.value));
+            }
+          } else {
+            const localRaw = localStorage.getItem(row.key);
+            const remoteJson = JSON.stringify(row.value);
+            if (localRaw !== remoteJson) {
+              localStorage.setItem(row.key, remoteJson);
+            }
           }
         }
       } catch {}
