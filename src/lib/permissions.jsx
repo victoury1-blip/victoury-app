@@ -27,12 +27,15 @@ export function PermissionsProvider({ children, session }) {
 
   useEffect(() => {
     if (!session) return;
+    // Try localStorage first for instant display
+    try {
+      const local = JSON.parse(localStorage.getItem('moderators') || '[]');
+      if (Array.isArray(local) && local.length) setModeratorsState(local);
+    } catch {}
+    // Then sync from cloud
     cloudGet('moderators').then(val => {
-      if (Array.isArray(val)) {
-        setModeratorsState(val);
-      }
-      setLoading(false);
-    });
+      if (Array.isArray(val)) setModeratorsState(val);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [session]);
 
   const email = session?.user?.email;
@@ -47,6 +50,7 @@ export function PermissionsProvider({ children, session }) {
 
   function setModerators(list) {
     setModeratorsState(list);
+    localStorage.setItem('moderators', JSON.stringify(list));
     cloudSet('moderators', list);
   }
 
