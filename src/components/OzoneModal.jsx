@@ -67,17 +67,17 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
 
   useEffect(() => {
     const phone = (form.phone || '').replace(/\s+/g, '');
-    if (!phone || phone.length < 10) { setPhoneHistory(null); return; }
+    if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const bare = phone.replace(/^0+/, '');
-        const { data: rows } = await supabase
+        const bare = phone.replace(/^(\+212|00212|0)/, '');
+        const { data: rows, error } = await supabase
           .from('orders')
           .select('id, status, ozone_last_status, phone')
-          .eq('is_deleted', false)
-          .or('phone.ilike.%' + bare);
+          .ilike('phone', '%' + bare);
+        console.log('[Phone check]', bare, 'results:', rows?.length, error);
         if (cancelled) return;
         const matches = (rows || []).filter(r => r.id !== order?.id);
         if (matches.length === 0) {
@@ -88,11 +88,12 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
         for (const r of matches) {
           const oz = (r.ozone_last_status || '').toLowerCase();
           const st = (r.status || '').toLowerCase();
-          if (oz.includes('livr') || oz.includes('deliver') || st === 'livré' || st === 'livre') delivered++;
-          else if (oz.includes('retour') || oz.includes('return') || oz.includes('refus') || st === 'retourné' || st === 'refusé') returned++;
+          if (oz.includes('livr') || oz.includes('deliver') || st.includes('livr')) delivered++;
+          else if (oz.includes('retour') || oz.includes('return') || oz.includes('refus') || st.includes('retour') || st.includes('refus')) returned++;
         }
         setPhoneHistory({ exists: true, delivered, returned, total: matches.length });
-      } catch {
+      } catch (e) {
+        console.error('[Phone check error]', e);
         if (!cancelled) setPhoneHistory(null);
       } finally {
         if (!cancelled) setPhoneHistoryLoading(false);
