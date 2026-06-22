@@ -1,6 +1,5 @@
-import * as XLSX from 'xlsx';
-
-export function exportToExcel(orders, filename = 'commandes') {
+export async function exportToExcel(orders, filename = 'commandes') {
+  const XLSX = await import('xlsx');
   const data = orders.map(o => ({
     'ID': o.id,
     'Client': o.recipient?.name || '',
