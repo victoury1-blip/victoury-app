@@ -104,7 +104,6 @@ export default function ModeratorsPage() {
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Nom</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Email</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Téléphone</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Permissions</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Statut</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Actions</th>
             </tr>
@@ -125,32 +124,6 @@ export default function ModeratorsPage() {
                 <td className="px-4 py-3 text-gray-500 text-xs">{mod.email}</td>
                 <td className="px-4 py-3 text-gray-600 text-xs">{mod.phone || '-'}</td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {(mod.permissions || []).map(p => {
-                      const perm = ALL_PERMISSIONS.find(x => x.key === p);
-                      const colors = {
-                        ajout_commandes: 'bg-green-100 text-green-700',
-                        modif_commandes: 'bg-blue-100 text-blue-700',
-                        suppr_commandes: 'bg-red-100 text-red-700',
-                        liste_colis: 'bg-sky-100 text-sky-700',
-                        livraison: 'bg-purple-100 text-purple-700',
-                        factures: 'bg-yellow-100 text-yellow-800',
-                        reglages: 'bg-gray-200 text-gray-700',
-                        stock: 'bg-orange-100 text-orange-700',
-                        ramassage: 'bg-teal-100 text-teal-700',
-                        retour: 'bg-pink-100 text-pink-700',
-                        profit: 'bg-indigo-100 text-indigo-700',
-                        etats: 'bg-cyan-100 text-cyan-700',
-                      };
-                      return (
-                        <span key={p} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${colors[p] || 'bg-gray-100 text-gray-600'}`}>
-                          {perm?.label || p}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
                   <button onClick={() => toggleActive(mod.email)}
                     className={`text-xs font-bold px-2.5 py-1 rounded-full ${mod.active !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                     {mod.active !== false ? 'Actif' : 'Inactif'}
@@ -170,7 +143,7 @@ export default function ModeratorsPage() {
             ))}
             {moderators.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
                   <Shield size={40} className="mx-auto mb-3 text-gray-200" />
                   <p className="font-medium">Aucun modérateur</p>
                   <p className="text-xs mt-1">Ajoutez des membres d'équipe pour gérer les accès</p>
@@ -204,24 +177,6 @@ export default function ModeratorsPage() {
                 <p className="text-xs text-gray-500 truncate">{mod.email}</p>
                 {mod.phone && <p className="text-xs text-gray-400">{mod.phone}</p>}
               </div>
-            </div>
-            <div className="flex flex-wrap gap-1 mb-3">
-              {(mod.permissions || []).map(p => {
-                const perm = ALL_PERMISSIONS.find(x => x.key === p);
-                const colors = {
-                  ajout_commandes: 'bg-green-100 text-green-700',
-                  modif_commandes: 'bg-blue-100 text-blue-700',
-                  suppr_commandes: 'bg-red-100 text-red-700',
-                  livraison: 'bg-purple-100 text-purple-700',
-                  factures: 'bg-yellow-100 text-yellow-800',
-                  reglages: 'bg-gray-200 text-gray-700',
-                };
-                return (
-                  <span key={p} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${colors[p] || 'bg-gray-100 text-gray-600'}`}>
-                    {perm?.label || p}
-                  </span>
-                );
-              })}
             </div>
             <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
               <button onClick={() => openEdit(mod)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100">
