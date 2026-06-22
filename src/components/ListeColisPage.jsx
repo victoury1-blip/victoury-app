@@ -481,7 +481,7 @@ function Badge({ statusKey }) {
   const light = isLight(color);
   return (
     <span
-      className="inline-flex items-center px-3 py-1 rounded-md text-sm font-bold whitespace-nowrap"
+      className="inline-flex items-center px-4 py-1.5 rounded-lg text-base font-bold whitespace-nowrap shadow-sm"
       style={{ backgroundColor: color, color: light ? '#111' : '#fff' }}
     >
       {live.label || statusKey}
