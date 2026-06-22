@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
-  Star, AlertTriangle, Users, ArrowRight,
+  Star, AlertTriangle, Users, ArrowRight, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -149,6 +149,20 @@ export default function Dashboard({ orders = [] }) {
   const retourCA = todayOrders.filter(o => ['refuse','annule','retour','pret_retour'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
   const tauxRetour = counts.total > 0 ? Math.round(((counts.refuse + counts.annule) / counts.total) * 100) : 0;
   const taux = counts.total > 0 ? Math.round((counts.livre / counts.total) * 100) : 0;
+
+  const yesterdayOrders = useMemo(() => filterByPeriod(orders, 'yesterday'), [orders]);
+
+  const daily = useMemo(() => {
+    const todayConfirm = todayOrders.filter(o => ['confirme','livre'].includes(o.status)).length;
+    const yestConfirm = yesterdayOrders.filter(o => ['confirme','livre'].includes(o.status)).length;
+    const todayLivre = counts.livre;
+    const yestLivre = yesterdayOrders.filter(o => o.status === 'livre').length;
+    const todayRefuse = counts.refuse + counts.annule;
+    const yestRefuse = yesterdayOrders.filter(o => ['refuse','annule'].includes(o.status)).length;
+    const todayCA = ca;
+    const yestCA = yesterdayOrders.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
+    return { todayConfirm, yestConfirm, todayLivre, yestLivre, todayRefuse, yestRefuse, todayCA, yestCA };
+  }, [todayOrders, yesterdayOrders, counts, ca]);
 
   const periodSummaries = useMemo(() => [
     { label: "Aujourd'hui", dateHint: fmtDate(now), orders: filterByPeriod(orders, 'today'), bgClass: 'bg-gradient-to-br from-blue-500 to-blue-600' },
@@ -310,6 +324,53 @@ export default function Dashboard({ orders = [] }) {
           ))}
         </div>
       )}
+
+      {/* ── ملخص يومي ── */}
+      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-5 text-white shadow-lg" dir="rtl">
+        <h2 className="text-lg font-black mb-4 flex items-center gap-2">
+          <TrendingUp size={20} />
+          ملخص اليوم
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'الطلبات', value: counts.total, prev: yesterdayOrders.length },
+            { label: 'مؤكدة', value: daily.todayConfirm, prev: daily.yestConfirm },
+            { label: 'تم التوصيل', value: daily.todayLivre, prev: daily.yestLivre },
+            { label: 'مرفوضة', value: daily.todayRefuse, prev: daily.yestRefuse, invert: true },
+          ].map(item => {
+            const diff = item.value - item.prev;
+            const TrendIcon = diff > 0 ? (item.invert ? ArrowUpRight : ArrowUpRight) : diff < 0 ? (item.invert ? ArrowDownRight : ArrowDownRight) : Minus;
+            const trendColor = diff === 0 ? 'text-white/60' : item.invert ? (diff > 0 ? 'text-red-300' : 'text-green-300') : (diff > 0 ? 'text-green-300' : 'text-red-300');
+            return (
+              <div key={item.label} className="bg-white/10 backdrop-blur rounded-xl p-3">
+                <p className="text-white/70 text-xs font-medium mb-1">{item.label}</p>
+                <p className="text-2xl font-black">{item.value}</p>
+                <div className={`flex items-center gap-1 mt-1 text-xs ${trendColor}`}>
+                  <TrendIcon size={14} />
+                  <span>{diff > 0 ? '+' : ''}{diff} من أمس</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+            <p className="text-white/70 text-xs font-medium mb-1">رقم المعاملات</p>
+            <p className="text-xl font-black">{daily.todayCA.toLocaleString('fr-MA', { minimumFractionDigits: 2 })} <span className="text-sm">DH</span></p>
+            {(() => {
+              const diff = daily.todayCA - daily.yestCA;
+              const TrendIcon = diff > 0 ? ArrowUpRight : diff < 0 ? ArrowDownRight : Minus;
+              const color = diff === 0 ? 'text-white/60' : diff > 0 ? 'text-green-300' : 'text-red-300';
+              return <p className={`text-xs mt-1 flex items-center gap-1 ${color}`}><TrendIcon size={14} />{diff > 0 ? '+' : ''}{Math.round(diff).toLocaleString('fr-MA')} DH</p>;
+            })()}
+          </div>
+          <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+            <p className="text-white/70 text-xs font-medium mb-1">نسبة التوصيل</p>
+            <p className="text-xl font-black">{taux}%</p>
+            <p className="text-xs text-white/60 mt-1">نسبة الرجوع: {tauxRetour}%</p>
+          </div>
+        </div>
+      </div>
 
       {/* Period summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
