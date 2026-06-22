@@ -2,18 +2,45 @@ import { useEffect, useRef } from 'react';
 
 const NOTIF_KEY = 'push_notifications';
 
+function isEnabled() {
+  return 'Notification' in window && Notification.permission === 'granted';
+}
+
 export function requestPermission() {
   if (!('Notification' in window)) return Promise.resolve('denied');
   if (Notification.permission === 'granted') return Promise.resolve('granted');
   return Notification.requestPermission();
 }
 
-async function clearAllNotifications() {
+async function syncBadgeNotifications(nouveauOrders) {
   try {
     const reg = await navigator.serviceWorker?.ready;
     if (!reg) return;
+
     const existing = await reg.getNotifications();
-    for (const n of existing) n.close();
+    const existingTags = new Set(existing.map(n => n.tag));
+    const wantedTags = new Set(nouveauOrders.map(o => `badge-${o.id}`));
+
+    // Close notifications for orders no longer nouveau
+    for (const n of existing) {
+      if (n.tag?.startsWith('badge-') && !wantedTags.has(n.tag)) {
+        n.close();
+      }
+    }
+
+    // Add silent notifications for new nouveau orders (for Samsung badge count)
+    for (const order of nouveauOrders) {
+      const tag = `badge-${order.id}`;
+      if (!existingTags.has(tag)) {
+        reg.showNotification(`${order.recipient?.name || order.id} — ${order.price || 0} DH`, {
+          tag,
+          icon: '/pwa-192x192.png',
+          badge: '/pwa-192x192.png',
+          silent: true,
+          requireInteraction: true,
+        });
+      }
+    }
   } catch {}
 }
 
@@ -38,15 +65,17 @@ export default function useNotifications(orders) {
   useEffect(() => {
     if (!orders || !orders.length) return;
 
-    const nouveauCount = orders.filter(o => o.status === 'nouveau').length;
+    const nouveauOrders = orders.filter(o => o.status === 'nouveau');
 
-    // Badge on app icon only — no tray notifications
+    // Badging API (works on some browsers)
     if ('setAppBadge' in navigator) {
-      if (nouveauCount > 0) navigator.setAppBadge(nouveauCount).catch(() => {});
+      if (nouveauOrders.length > 0) navigator.setAppBadge(nouveauOrders.length).catch(() => {});
       else navigator.clearAppBadge().catch(() => {});
     }
 
-    // Clear any leftover tray notifications from before
-    clearAllNotifications();
+    // Samsung badge = notification count in tray
+    if (isEnabled()) {
+      syncBadgeNotifications(nouveauOrders);
+    }
   }, [orders]);
 }
