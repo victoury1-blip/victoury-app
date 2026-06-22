@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
+import { supabase } from '../lib/supabase';
 
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' },
@@ -66,89 +67,38 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
 
   useEffect(() => {
     const phone = (form.phone || '').replace(/\s+/g, '');
-    const cid = form.customerId || cfg.customerId;
-    const key = form.apiKey || cfg.apiKey;
-    if (!phone || phone.length < 10 || !cid || !key) { setPhoneHistory(null); return; }
+    if (!phone || phone.length < 10) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
-    const ctrl = new AbortController();
+    let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const base = `https://api.ozonexpress.ma/customers/${cid}/${key}`;
-        const attempts = [
-          // POST with FormData (like add-parcel)
-          () => { const fd = new FormData(); fd.append('phone', phone); return fetch(`${base}/check-phone`, { method: 'POST', body: fd, signal: ctrl.signal }); },
-          // POST with JSON
-          () => fetch(`${base}/check-phone`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ phone }), signal: ctrl.signal }),
-          // GET with Accept header
-          () => fetch(`${base}/check-phone/${phone}`, { headers: { 'Accept': 'application/json' }, signal: ctrl.signal }),
-          // GET parcels
-          () => fetch(`${base}/parcels?phone=${phone}`, { headers: { 'Accept': 'application/json' }, signal: ctrl.signal }),
-          // POST get-parcels
-          () => { const fd = new FormData(); fd.append('phone', phone); return fetch(`${base}/get-parcels`, { method: 'POST', body: fd, signal: ctrl.signal }); },
-        ];
-
-        let found = false;
-        for (const attempt of attempts) {
-          if (ctrl.signal.aborted) return;
-          try {
-            const res = await attempt();
-            console.log('[Ozone phone]', res.url, res.status);
-            if (!res.ok) continue;
-            const raw = await res.json();
-            console.log('[Ozone phone data]', JSON.stringify(raw).slice(0, 500));
-
-            // Parse response — try every known shape
-            const data = raw['CHECK-PHONE'] || raw['check-phone'] || raw;
-            let delivered = 0, returned = 0, exists = false;
-
-            // Shape 1: array of parcels
-            const arr = Array.isArray(data) ? data : (data?.parcels || data?.PARCELS || data?.data || data?.colis);
-            if (Array.isArray(arr)) {
-              exists = arr.length > 0;
-              for (const p of arr) {
-                const st = (p.status || p.STATUS || p.statut || '').toString().toLowerCase();
-                if (st.includes('livr') || st.includes('deliver')) delivered++;
-                else if (st.includes('retour') || st.includes('return') || st.includes('refus')) returned++;
-              }
-            } else if (typeof data === 'object' && data !== null) {
-              // Shape 2: direct count fields
-              delivered = parseInt(data['DELIVERED'] || data['delivered'] || data['livré'] || data['livre'] || '0', 10);
-              returned = parseInt(data['RETURNED'] || data['returned'] || data['retourné'] || data['retourne'] || '0', 10);
-              exists = data['RESULT'] === 'FOUND' || data['RESULT'] === 'EXISTS' || data['exists'] === true || delivered > 0 || returned > 0;
-              // Shape 3: message string like "Ce numéro existe déjà. (Livré: 1) (Retourné: 0)"
-              const msg = (data['message'] || data['msg'] || data['MESSAGE'] || (typeof data === 'string' ? data : '')).toString();
-              if (!exists && msg) {
-                if (msg.toLowerCase().includes('existe') || msg.toLowerCase().includes('found')) {
-                  exists = true;
-                  const livMatch = msg.match(/livr[ée]*\s*[:\s]*(\d+)/i);
-                  const retMatch = msg.match(/retourn[ée]*\s*[:\s]*(\d+)/i);
-                  if (livMatch) delivered = parseInt(livMatch[1], 10);
-                  if (retMatch) returned = parseInt(retMatch[1], 10);
-                }
-              }
-            }
-
-            if (exists || delivered > 0 || returned > 0) {
-              setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned, raw: data });
-              found = true; break;
-            }
-            if (data && (data['RESULT'] === 'NOT_FOUND' || (data['message'] || '').toLowerCase().includes('nouveau'))) {
-              setPhoneHistory({ exists: false, delivered: 0, returned: 0, total: 0, raw: data });
-              found = true; break;
-            }
-          } catch (e) {
-            if (e.name === 'AbortError') return;
-          }
+        const { data: rows } = await supabase
+          .from('orders')
+          .select('id, status, ozone_last_status, phone')
+          .or(`phone.eq.${phone},phone.eq.0${phone},phone.eq.${phone.replace(/^0/, '')}`)
+          .eq('is_deleted', false);
+        if (cancelled) return;
+        const matches = (rows || []).filter(r => r.id !== order?.id);
+        if (matches.length === 0) {
+          setPhoneHistory({ exists: false, delivered: 0, returned: 0, total: 0 });
+          return;
         }
-        if (!found) setPhoneHistory(null);
-      } catch (e) {
-        if (e.name !== 'AbortError') setPhoneHistory(null);
+        let delivered = 0, returned = 0;
+        for (const r of matches) {
+          const oz = (r.ozone_last_status || '').toLowerCase();
+          const st = (r.status || '').toLowerCase();
+          if (oz.includes('livr') || oz.includes('deliver') || st === 'livré' || st === 'livre') delivered++;
+          else if (oz.includes('retour') || oz.includes('return') || oz.includes('refus') || st === 'retourné' || st === 'refusé') returned++;
+        }
+        setPhoneHistory({ exists: true, delivered, returned, total: matches.length });
+      } catch {
+        if (!cancelled) setPhoneHistory(null);
       } finally {
-        setPhoneHistoryLoading(false);
+        if (!cancelled) setPhoneHistoryLoading(false);
       }
-    }, 600);
-    return () => { clearTimeout(timer); ctrl.abort(); };
-  }, [form.phone, form.customerId, form.apiKey]);
+    }, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [form.phone, order?.id]);
 
   const [status, setStatus] = useState('idle'); // idle | loading | success | error
   const [tracking, setTracking] = useState(null);
