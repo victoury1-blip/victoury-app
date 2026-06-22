@@ -1129,7 +1129,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       const next = new Set(prev);
       if (next.has(orderId)) { next.delete(orderId); } else { next.add(orderId); }
       localStorage.setItem('victoury_recu_ids', JSON.stringify([...next]));
-      supabase.from('settings').upsert({ key: 'victoury_recu_ids', value: [...next], updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {});
+      cloudSet('victoury_recu_ids', [...next]);
       return next;
     });
   }
