@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Truck, CheckCircle2, XCircle, Loader2, Copy } from 'lucide-react';
+import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
 
 const FALLBACK_CITIES = [
@@ -87,8 +87,6 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     })(),
   });
 
-  const [phoneHistory, setPhoneHistory] = useState(null);
-  const [phoneHistoryLoading, setPhoneHistoryLoading] = useState(false);
 
   useEffect(() => {
     const phone = (form.phone || '').replace(/\s+/g, '');
