@@ -159,7 +159,7 @@ function PhoneChip({ phone, allOrders }) {
   const history = allOrders ? allOrders.filter(o => norm(o.recipient?.phone) === np) : [];
   const hasLivre = history.some(o => o.status === 'livre');
   const isKnown = history.length > 1;
-  const bgClass = hasLivre ? 'bg-emerald-500 text-white' : isKnown ? 'bg-amber-300 text-gray-900' : '';
+  const bgClass = !isKnown ? '' : hasLivre ? 'bg-emerald-500 text-white' : 'bg-amber-300 text-gray-900';
   return (
     <>
       <button
