@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
 const KEY = 'victoury_factures';
 const CTR_KEY = 'victoury_fct_counter';
@@ -8,16 +8,14 @@ export function loadFactures() {
 }
 export function saveFactures(list) {
   localStorage.setItem(KEY, JSON.stringify(list));
-  supabase.from('settings')
-    .upsert({ key: KEY, value: list, updated_at: new Date().toISOString() }, { onConflict: 'key' })
-    .then(() => {});
+  cloudSet(KEY, list);
 }
 export async function loadFacturesRemote() {
   try {
-    const { data, error } = await supabase.from('settings').select('value').eq('key', KEY).single();
-    if (!error && data?.value && Array.isArray(data.value)) {
-      localStorage.setItem(KEY, JSON.stringify(data.value));
-      return data.value;
+    const remote = await cloudGet(KEY);
+    if (Array.isArray(remote)) {
+      localStorage.setItem(KEY, JSON.stringify(remote));
+      return remote;
     }
   } catch {}
   return null;

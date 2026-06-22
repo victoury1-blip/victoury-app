@@ -16,7 +16,7 @@ import LoginPage from './components/LoginPage';
 import ModeratorsPage from './components/ModeratorsPage';
 import { supabase } from './lib/supabase';
 import { saveOrdersOffline, loadOrdersOffline, queueSync, getPendingSync, clearSyncQueue, deleteOrderOffline } from './lib/offlineStore';
-import { cloudGet } from './lib/cloudSettings';
+import { cloudGet, cloudSet } from './lib/cloudSettings';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -220,10 +220,10 @@ export default function App() {
   /* ── WC sync logger ── */
   function logWcSync(entry) {
     const MAX = 100;
-    supabase.from('settings').select('value').eq('key', 'wc_sync_logs').single().then(({ data }) => {
-      const logs = Array.isArray(data?.value) ? data.value : [];
-      const next = [{ ...entry, ts: new Date().toISOString() }, ...logs].slice(0, MAX);
-      supabase.from('settings').upsert({ key: 'wc_sync_logs', value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {});
+    cloudGet('wc_sync_logs').then(logs => {
+      const prev = Array.isArray(logs) ? logs : [];
+      const next = [{ ...entry, ts: new Date().toISOString() }, ...prev].slice(0, MAX);
+      cloudSet('wc_sync_logs', next);
     });
   }
 
