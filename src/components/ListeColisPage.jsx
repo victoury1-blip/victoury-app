@@ -494,19 +494,16 @@ function PhoneChip({ phone, allOrders }) {
   if (!phone) return null;
   const history = allOrders ? allOrders.filter(o => o.recipient?.phone === phone) : [];
   const hasLivre = history.some(o => o.status === 'livre');
-  const hasRefuse = history.some(o => ['refuse', 'annule', 'retour_recu', 'pret_retour'].includes(o.status));
   const isKnown = history.length > 1;
-  const colorClass = hasLivre ? 'text-emerald-600' : hasRefuse ? 'text-amber-600' : isKnown ? 'text-blue-600' : 'text-gray-900';
+  const bgClass = hasLivre ? 'bg-emerald-500 text-white' : isKnown ? 'bg-amber-300 text-gray-900' : '';
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`mt-1 text-sm font-bold ${colorClass} hover:underline active:opacity-70`}
+        className={`mt-1 text-sm font-bold hover:underline active:opacity-70 ${bgClass ? `${bgClass} px-2 py-0.5 rounded` : 'text-gray-900'}`}
       >
         {phone}
-        {hasLivre && ' ✓'}
-        {hasRefuse && !hasLivre && ' ⚠'}
       </button>
       {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
     </>
