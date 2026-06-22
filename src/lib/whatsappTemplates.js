@@ -59,6 +59,7 @@ export function getWaTemplates() {
 
 export function saveWaTemplates(templates) {
   localStorage.setItem(WA_CONFIG_KEY, JSON.stringify(templates));
+  import('./cloudSettings').then(({ cloudSet }) => cloudSet(WA_CONFIG_KEY, templates));
 }
 
 export function buildWhatsappMessage(order, status) {
