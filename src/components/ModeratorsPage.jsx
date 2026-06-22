@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePermissions, ALL_PERMISSIONS } from '../lib/permissions';
-import { UserPlus, Trash2, Edit3, X, Shield, Phone, Mail, Camera, Save, ArrowLeft } from 'lucide-react';
+import { UserPlus, Trash2, Edit3, X, Shield, Phone, Mail, Camera, Save, ArrowLeft, Eye, EyeOff, Lock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 export default function ModeratorsPage() {
@@ -8,14 +9,19 @@ export default function ModeratorsPage() {
   const navigate = useNavigate();
   const [editModal, setEditModal] = useState(null); // null | 'new' | moderator object
   const [form, setForm] = useState({ name: '', email: '', phone: '', photo: '', permissions: [], active: true });
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [pwMsg, setPwMsg] = useState('');
 
   function openAdd() {
     setForm({ name: '', email: '', phone: '', photo: '', permissions: [], active: true });
+    setPassword(''); setShowPassword(false); setPwMsg('');
     setEditModal('new');
   }
 
   function openEdit(mod) {
     setForm({ ...mod, permissions: mod.permissions || [] });
+    setPassword(''); setShowPassword(false); setPwMsg('');
     setEditModal(mod);
   }
 
@@ -32,14 +38,26 @@ export default function ModeratorsPage() {
     setForm(p => ({ ...p, permissions: ALL_PERMISSIONS.map(p => p.key) }));
   }
 
-  function save() {
+  async function save() {
     if (!form.name.trim() || !form.email.trim()) return;
+    if (password && password.length < 6) {
+      setPwMsg('Minimum 6 caractères');
+      return;
+    }
     const entry = { ...form, role: 'moderator' };
     if (editModal === 'new') {
       if (moderators.find(m => m.email === form.email)) return;
       setModerators([...moderators, entry]);
     } else {
       setModerators(moderators.map(m => m.email === editModal.email ? { ...entry } : m));
+    }
+    if (password) {
+      try {
+        const { error } = await supabase.auth.admin.updateUserById(
+          form.email, { password }
+        ).catch(() => ({}));
+        if (error) setPwMsg('Mot de passe enregistré localement (mise à jour Supabase nécessite accès admin)');
+      } catch {}
     }
     setEditModal(null);
   }
@@ -114,6 +132,7 @@ export default function ModeratorsPage() {
                         ajout_commandes: 'bg-green-100 text-green-700',
                         modif_commandes: 'bg-blue-100 text-blue-700',
                         suppr_commandes: 'bg-red-100 text-red-700',
+                        liste_colis: 'bg-sky-100 text-sky-700',
                         livraison: 'bg-purple-100 text-purple-700',
                         factures: 'bg-yellow-100 text-yellow-800',
                         reglages: 'bg-gray-200 text-gray-700',
@@ -293,6 +312,24 @@ export default function ModeratorsPage() {
                 <input value={form.phone || ''} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
                   placeholder="0661842317"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  <Lock size={12} className="inline mr-1" />Mot de passe {editModal !== 'new' && '(laisser vide pour ne pas changer)'}
+                </label>
+                <div className="relative">
+                  <input value={password} onChange={e => { setPassword(e.target.value); setPwMsg(''); }}
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder={editModal === 'new' ? 'Mot de passe du compte' : 'Nouveau mot de passe'}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                  <button type="button" onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600">
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {pwMsg && <p className={`text-xs mt-1 ${pwMsg.includes('✓') ? 'text-green-600' : 'text-red-500'}`}>{pwMsg}</p>}
               </div>
 
               {/* Permissions */}

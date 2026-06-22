@@ -23,7 +23,7 @@ const NAV_ITEMS = [
       { path: '/commandes/confirme',    label: 'Confirmé',    statusKey: 'confirme' },
     ],
   },
-  { path: '/liste-colis', label: 'Liste des Colis', icon: Package },
+  { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
   {
     path: '/ramassage',

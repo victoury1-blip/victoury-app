@@ -5,6 +5,7 @@ const ALL_PERMISSIONS = [
   { key: 'ajout_commandes',  label: 'Ajout commandes' },
   { key: 'modif_commandes',  label: 'Modif. commandes' },
   { key: 'suppr_commandes',  label: 'Suppr. commandes' },
+  { key: 'liste_colis',      label: 'Liste des Colis' },
   { key: 'livraison',        label: 'Livraison' },
   { key: 'factures',         label: 'Factures' },
   { key: 'reglages',         label: 'Réglages' },
