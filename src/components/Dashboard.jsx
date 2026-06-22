@@ -5,6 +5,10 @@ import {
   Star, AlertTriangle, Users, ArrowRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 
 /* ── date helpers ── */
 function parseDate(str) {
@@ -236,6 +240,53 @@ export default function Dashboard({ orders = [] }) {
     return list;
   }, [orders]);
 
+  /* ── Chart data: Sales over last 14 days ── */
+  const salesChartData = useMemo(() => {
+    const days = [];
+    const todayD = startOf(new Date(), 'day');
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(todayD);
+      d.setDate(d.getDate() - i);
+      days.push({ date: d, revenue: 0, count: 0 });
+    }
+    orders.forEach(o => {
+      if (!['confirme', 'livre'].includes(o.status)) return;
+      const d = parseDate(o.dateAdded);
+      if (!d) return;
+      const dStart = startOf(d, 'day').getTime();
+      const match = days.find(day => day.date.getTime() === dStart);
+      if (match) {
+        match.revenue += o.price || 0;
+        match.count += 1;
+      }
+    });
+    return days.map(d => ({
+      name: `${String(d.date.getDate()).padStart(2, '0')}/${String(d.date.getMonth() + 1).padStart(2, '0')}`,
+      revenue: Math.round(d.revenue),
+      count: d.count,
+    }));
+  }, [orders]);
+
+  /* ── Chart data: Status distribution this month ── */
+  const STATUS_CHART_COLORS = {
+    nouveau: '#3b82f6', confirme: '#22c55e', livre: '#10b981', refuse: '#ef4444',
+    annule: '#6b7280', reporter: '#f97316', en_suivi: '#a855f7', att_ramassage: '#f59e0b',
+    expedier: '#0ea5e9', recu_livreur: '#06b6d4', pret_retour: '#f43f5e', retour_recu: '#64748b',
+  };
+
+  const statusChartData = useMemo(() => {
+    const monthOrders = filterByPeriod(orders, 'month');
+    const cts = {};
+    monthOrders.forEach(o => { cts[o.status] = (cts[o.status] || 0) + 1; });
+    return Object.entries(cts)
+      .filter(([, v]) => v > 0)
+      .map(([status, count]) => ({
+        name: STATUS_LABELS[status] || status,
+        count,
+        fill: STATUS_CHART_COLORS[status] || '#94a3b8',
+      }));
+  }, [orders]);
+
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full">
       {/* Header */}
@@ -429,6 +480,41 @@ export default function Dashboard({ orders = [] }) {
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── Graphiques ── */}
+      <h2 className="text-lg font-bold text-gray-800 mt-2">Graphiques</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Line chart - Sales over last 14 days */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <h3 className="font-bold text-gray-800 text-sm mb-4">Ventes des 14 derniers jours</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={salesChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Legend />
+              <Line yAxisId="left" type="monotone" dataKey="revenue" name="Revenu (DH)" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+              <Line yAxisId="right" type="monotone" dataKey="count" name="Commandes" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Bar chart - Status distribution this month */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <h3 className="font-bold text-gray-800 text-sm mb-4">Répartition par statut (ce mois)</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={statusChartData} layout="vertical" margin={{ left: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+              <Tooltip />
+              <Bar dataKey="count" name="Commandes" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
