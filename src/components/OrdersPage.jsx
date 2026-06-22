@@ -1140,7 +1140,16 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <Toggle
                     checked={!!order.validated}
                     loading={false}
-                    onChange={() => { if (!order.validated) openOzone(order); }}
+                    onChange={() => {
+                      if (order.validated) return;
+                      const livreur = (order.recipient?.delivery || '').toLowerCase();
+                      if (livreur.includes('ozon')) {
+                        openOzone(order);
+                      } else {
+                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage' } : o));
+                        addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
+                      }
+                    }}
                   />
                   {order.trackingNumber && (
                     <span className="text-xs text-blue-600 font-mono block mt-1 max-w-[70px] truncate" title={order.trackingNumber}>
