@@ -489,6 +489,11 @@ function Badge({ statusKey }) {
   );
 }
 
+const PHONE_COLOR_DEFAULTS = { livreBg: '#047857', livreText: '#ffffff', knownBg: '#fbbf24', knownText: '#111827' };
+function getPhoneColors() {
+  try { return { ...PHONE_COLOR_DEFAULTS, ...JSON.parse(localStorage.getItem('phone_colors') || '{}') }; } catch { return PHONE_COLOR_DEFAULTS; }
+}
+
 function PhoneChip({ phone, allOrders }) {
   const [open, setOpen] = useState(false);
   if (!phone) return null;
@@ -497,13 +502,15 @@ function PhoneChip({ phone, allOrders }) {
   const history = allOrders ? allOrders.filter(o => norm(o.recipient?.phone) === np) : [];
   const hasLivre = history.some(o => o.status === 'livre');
   const isKnown = history.length > 1;
-  const bgClass = !isKnown ? '' : hasLivre ? 'bg-emerald-500 text-white' : 'bg-amber-300 text-gray-900';
+  const pc = getPhoneColors();
+  const style = !isKnown ? {} : hasLivre ? { backgroundColor: pc.livreBg, color: pc.livreText } : { backgroundColor: pc.knownBg, color: pc.knownText };
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`mt-1 text-sm font-bold hover:underline active:opacity-70 ${bgClass ? `${bgClass} px-2 py-0.5 rounded` : 'text-gray-900'}`}
+        className={`mt-1 text-sm font-bold hover:underline active:opacity-70 ${isKnown ? 'px-2 py-0.5 rounded' : 'text-gray-900'}`}
+        style={style}
       >
         {phone}
       </button>
