@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { loadStatuses, saveStatuses } from '../data/statuses';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import { supabase } from '../lib/supabase';
 
 const SETTINGS_KEY = 'victoury_statuses';
 
