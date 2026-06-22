@@ -1,18 +1,33 @@
-const CK = import.meta.env.VITE_WOO_CONSUMER_KEY || 'ck_80002f30dc327e073f38b771ce6484879ff2e0e3';
-const CS = import.meta.env.VITE_WOO_CONSUMER_SECRET || 'cs_df9e68224d3139159b19a803981ef820a4a06ceb';
+function getWooKeys() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('woo_config') || '{}');
+    return {
+      ck: cfg.consumerKey || import.meta.env.VITE_WOO_CONSUMER_KEY || '',
+      cs: cfg.consumerSecret || import.meta.env.VITE_WOO_CONSUMER_SECRET || '',
+    };
+  } catch {
+    return { ck: import.meta.env.VITE_WOO_CONSUMER_KEY || '', cs: import.meta.env.VITE_WOO_CONSUMER_SECRET || '' };
+  }
+}
 
 const WOO_BASE = '/wc-api/wp-json/wc/v3';
 
+function wooHeaders() {
+  const { ck, cs } = getWooKeys();
+  return { Authorization: 'Basic ' + btoa(`${ck}:${cs}`) };
+}
+
 function wooUrl(path, extra = {}) {
-  const params = new URLSearchParams({ consumer_key: CK, consumer_secret: CS, ...extra });
-  return `${WOO_BASE}${path}?${params}`;
+  const params = new URLSearchParams(extra);
+  const qs = params.toString();
+  return `${WOO_BASE}${path}${qs ? '?' + qs : ''}`;
 }
 
 async function fetchAllWooProducts() {
   let all = [];
   let page = 1;
   while (true) {
-    const res = await fetch(wooUrl('/products', { per_page: 100, page, status: 'any' }));
+    const res = await fetch(wooUrl('/products', { per_page: 100, page, status: 'any' }), { headers: wooHeaders() });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.message || `HTTP ${res.status}`);
@@ -27,7 +42,7 @@ async function fetchAllWooProducts() {
 }
 
 async function fetchWooVariations(productId) {
-  const res = await fetch(wooUrl(`/products/${productId}/variations`, { per_page: 100 }));
+  const res = await fetch(wooUrl(`/products/${productId}/variations`, { per_page: 100 }), { headers: wooHeaders() });
   if (!res.ok) return [];
   return res.json();
 }
@@ -67,7 +82,8 @@ function mapWooProduct(wooProduct, variations) {
 }
 
 export async function importProductsFromWooCommerce(onProgress) {
-  if (!CK || !CS) {
+  const { ck, cs } = getWooKeys();
+  if (!ck || !cs) {
     return { success: false, error: 'WooCommerce non configuré' };
   }
 

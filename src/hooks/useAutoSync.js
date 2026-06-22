@@ -75,7 +75,7 @@ export default function useAutoSync(session) {
             }
           }
         }
-      } catch {}
+      } catch (e) { console.warn('[sync] pull failed:', e?.message); }
     }
 
     async function pushToCloud() {
@@ -91,12 +91,12 @@ export default function useAutoSync(session) {
               user_id: null,
               updated_at: new Date().toISOString(),
             });
-          } catch {}
+          } catch { /* invalid JSON in localStorage — skip key */ }
         }
         if (rows.length) {
           await supabase.from('settings').upsert(rows, { onConflict: 'key' });
         }
-      } catch {}
+      } catch (e) { console.warn('[sync] push failed:', e?.message); }
     }
 
     pullFromCloud().then(() => pushToCloud());

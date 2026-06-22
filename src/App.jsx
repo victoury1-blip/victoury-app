@@ -179,8 +179,8 @@ export default function App() {
         let res;
         try {
           res = await fetch(
-            `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&consumer_key=${config.consumerKey}&consumer_secret=${config.consumerSecret}`,
-            { signal: controller.signal }
+            `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50`,
+            { signal: controller.signal, headers: { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) } }
           );
         } finally { clearTimeout(timeout); }
         if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
@@ -275,7 +275,7 @@ export default function App() {
             if (!o.id.startsWith('WC-')) return o;
             if (modifiedIdsRef.current.has(o.id) || o.manuallyModified) return o;
             const wc = priceMap.get(o.id);
-            if (!wc || wc.price === o.price) return o;
+            if (!wc || Math.abs((wc.price || 0) - (o.price || 0)) < 0.01) return o;
             const next = { ...o, price: wc.price, product: wc.product, products: wc.products };
             changedWC.push(next);
             return next;
@@ -321,7 +321,10 @@ export default function App() {
           try {
             const body = new FormData();
             body.append('tracking-number', tn);
-            const res = await fetch(`${base}/tracking`, { method: 'POST', body });
+            const ac = new AbortController();
+            const t = setTimeout(() => ac.abort(), 10000);
+            const res = await fetch(`${base}/tracking`, { method: 'POST', body, signal: ac.signal });
+            clearTimeout(t);
             if (!res.ok) continue;
             const json = await res.json();
             const track = json?.['TRACKING'] || json || {};

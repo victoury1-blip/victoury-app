@@ -44,8 +44,7 @@ export function PermissionsProvider({ children, session }) {
 
   function hasPermission(perm) {
     if (isAdmin) return true;
-    if (!currentModerator) return true;
-    return currentModerator.permissions?.includes(perm) || false;
+    return currentModerator?.permissions?.includes(perm) || false;
   }
 
   function setModerators(list) {

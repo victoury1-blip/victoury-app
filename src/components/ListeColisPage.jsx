@@ -6,6 +6,7 @@ import OrderModal from './OrderModal';
 import { openLabelPage } from './LabelPrint';
 import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import PhoneChip from './PhoneChip';
 
 /* ── Google Sheets status config ── */
 const SHEET_STATUSES = [
@@ -488,8 +489,6 @@ function Badge({ statusKey }) {
   );
 }
 
-import PhoneChip from './PhoneChip';
-
 /* ── Collapsible dark status picker ── */
 function StatusPicker({ value, onChange }) {
   const { statuses } = useStatuses();
@@ -644,10 +643,13 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
         try {
           const body = new FormData();
           body.append('tracking-number', tn);
+          const ozAbort = new AbortController();
+          const ozTimeout = setTimeout(() => ozAbort.abort(), 10000);
           const [trackRes, infoRes] = await Promise.all([
-            fetch(`${base}/tracking`, { method: 'POST', body }),
-            fetch(`${base}/parcel-info`, { method: 'POST', body: (() => { const f = new FormData(); f.append('tracking-number', tn); return f; })() }),
+            fetch(`${base}/tracking`, { method: 'POST', body, signal: ozAbort.signal }),
+            fetch(`${base}/parcel-info`, { method: 'POST', body: (() => { const f = new FormData(); f.append('tracking-number', tn); return f; })(), signal: ozAbort.signal }),
           ]);
+          clearTimeout(ozTimeout);
           const trackJson = trackRes.ok ? await trackRes.json() : null;
           const infoJson = infoRes.ok ? await infoRes.json() : null;
           const track = trackJson ? (trackJson['TRACKING'] || trackJson) : {};
