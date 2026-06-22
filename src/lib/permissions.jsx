@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { cloudSet, cloudGet } from './cloudSettings';
 
 const ALL_PERMISSIONS = [
   { key: 'ajout_commandes',  label: 'Ajout commandes' },
@@ -26,10 +27,9 @@ export function PermissionsProvider({ children, session }) {
 
   useEffect(() => {
     if (!session) return;
-    supabase.from('settings').select('value').eq('key', 'moderators').is('user_id', null).single().then(({ data }) => {
-      if (Array.isArray(data?.value)) {
-        setModeratorsState(data.value);
-        localStorage.setItem('moderators', JSON.stringify(data.value));
+    cloudGet('moderators').then(val => {
+      if (Array.isArray(val)) {
+        setModeratorsState(val);
       }
       setLoading(false);
     });
@@ -47,11 +47,7 @@ export function PermissionsProvider({ children, session }) {
 
   function setModerators(list) {
     setModeratorsState(list);
-    localStorage.setItem('moderators', JSON.stringify(list));
-    supabase.from('settings').upsert(
-      { key: 'moderators', value: list, user_id: null, updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
-    ).then(() => {});
+    cloudSet('moderators', list);
   }
 
   return (
