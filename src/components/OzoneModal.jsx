@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
+import { X, Truck, CheckCircle2, XCircle, Loader2, Copy } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
-import { supabase } from '../lib/supabase';
 
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' },
@@ -62,45 +61,6 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
       });
     }
   }, []);
-  const [phoneHistory, setPhoneHistory] = useState(null);
-  const [phoneHistoryLoading, setPhoneHistoryLoading] = useState(false);
-
-  useEffect(() => {
-    const phone = (form.phone || '').replace(/\s+/g, '');
-    if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
-    setPhoneHistoryLoading(true);
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const bare = phone.replace(/^(\+212|00212|0)/, '');
-        const { data: rows, error } = await supabase
-          .from('orders')
-          .select('id, status, ozone_last_status, phone')
-          .ilike('phone', '%' + bare);
-        console.log('[Phone check]', bare, 'results:', rows?.length, error);
-        if (cancelled) return;
-        const matches = (rows || []).filter(r => r.id !== order?.id);
-        if (matches.length === 0) {
-          setPhoneHistory({ exists: false, delivered: 0, returned: 0, total: 0 });
-          return;
-        }
-        let delivered = 0, returned = 0;
-        for (const r of matches) {
-          const oz = (r.ozone_last_status || '').toLowerCase();
-          const st = (r.status || '').toLowerCase();
-          if (oz.includes('livr') || oz.includes('deliver') || st.includes('livr')) delivered++;
-          else if (oz.includes('retour') || oz.includes('return') || oz.includes('refus') || st.includes('retour') || st.includes('refus')) returned++;
-        }
-        setPhoneHistory({ exists: true, delivered, returned, total: matches.length });
-      } catch (e) {
-        console.error('[Phone check error]', e);
-        if (!cancelled) setPhoneHistory(null);
-      } finally {
-        if (!cancelled) setPhoneHistoryLoading(false);
-      }
-    }, 500);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [form.phone, order?.id]);
 
   const [status, setStatus] = useState('idle'); // idle | loading | success | error
   const [tracking, setTracking] = useState(null);
@@ -386,34 +346,6 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* Phone history from Ozone */}
-              {phoneHistoryLoading && (
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <Loader2 size={12} className="animate-spin" />
-                  <span>جاري التحقق من الرقم...</span>
-                </div>
-              )}
-              {phoneHistory && !phoneHistoryLoading && (
-                <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
-                  phoneHistory.exists
-                    ? 'bg-amber-50 border border-amber-200 text-amber-800'
-                    : 'bg-green-50 border border-green-100 text-green-700'
-                }`}>
-                  {phoneHistory.exists ? (
-                    <>
-                      <p dir="rtl">هاد الرقم موجود من قبل. ( تم التوصيل : <strong>{phoneHistory.delivered}</strong> ) ( مرجوع : <strong>{phoneHistory.returned}</strong> ) مرة.</p>
-                      {phoneHistory.returned > 0 && phoneHistory.delivered === 0 && (
-                        <p dir="rtl" className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                          <AlertTriangle size={12} />
-                          تحذير : ما توصل حتى كوليس، {phoneHistory.returned} مرجوع!
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p dir="rtl">رقم جديد — ما كاين حتى سجل من قبل.</p>
-                  )}
-                </div>
-              )}
 
               <div ref={cityRef} className="relative">
                 <label className={labelCls}>
