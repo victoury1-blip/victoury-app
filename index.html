@@ -15,6 +15,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      if (location.search.includes('clear-cache')) {
+        caches.keys().then(k => Promise.all(k.map(c => caches.delete(c)))).then(() => {
+          navigator.serviceWorker.getRegistrations().then(r => Promise.all(r.map(s => s.unregister()))).then(() => {
+            location.replace(location.pathname);
+          });
+        });
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
