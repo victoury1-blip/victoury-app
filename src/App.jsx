@@ -70,6 +70,7 @@ export default function App() {
   const [isWooFetching, setIsWooFetching] = useState(true);
   const [wooError, setWooError] = useState(null);
   const [dbError, setDbError] = useState(null);
+  const [offline, setOffline] = useState(!navigator.onLine);
   const modifiedIdsRef = useRef(new Set());
   const deletedIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
@@ -79,6 +80,14 @@ export default function App() {
 
   useAutoSync(session);
   useNotifications(orders);
+
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
 
   /* ── Auth ── */
   useEffect(() => {
@@ -441,6 +450,11 @@ export default function App() {
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       <Sidebar orders={orders} session={session} />
       <main className="flex-1 overflow-auto flex flex-col">
+        {offline && (
+          <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 flex items-center gap-2 text-xs text-yellow-800 shrink-0">
+            <span>📡 وضع بدون إنترنت — التغييرات غادي تتزامن ملي ترجع الشبكة</span>
+          </div>
+        )}
         {(wooError || dbError) && (
           <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center justify-between text-xs text-red-700 shrink-0">
             <span>🔴 {dbError || wooError}</span>
