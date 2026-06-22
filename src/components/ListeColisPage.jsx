@@ -1135,18 +1135,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   });
 
   useEffect(() => {
-    supabase.from('settings').select('value').eq('key', 'victoury_recu_ids').single().then(({ data }) => {
-      if (Array.isArray(data?.value)) {
-        const remote = new Set(data.value);
-        localStorage.setItem('victoury_recu_ids', JSON.stringify(data.value));
-        setRecuIds(remote);
+    cloudGet('victoury_recu_ids').then(val => {
+      if (Array.isArray(val)) {
+        const merged = new Set([...recuIds, ...val]);
+        localStorage.setItem('victoury_recu_ids', JSON.stringify([...merged]));
+        setRecuIds(merged);
       }
     });
-    supabase.from('settings').select('value').eq('key', 'victoury_manual_facture').single().then(({ data }) => {
-      if (Array.isArray(data?.value)) {
-        const remote = new Set(data.value);
-        localStorage.setItem('victoury_manual_facture', JSON.stringify(data.value));
-        setManualFacture(remote);
+    cloudGet('victoury_manual_facture').then(val => {
+      if (Array.isArray(val)) {
+        const merged = new Set([...manualFacture, ...val]);
+        localStorage.setItem('victoury_manual_facture', JSON.stringify([...merged]));
+        setManualFacture(merged);
       }
     });
   }, []);
@@ -1195,7 +1195,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       const next = new Set(prev);
       if (next.has(orderId)) { next.delete(orderId); } else { next.add(orderId); }
       localStorage.setItem('victoury_manual_facture', JSON.stringify([...next]));
-      supabase.from('settings').upsert({ key: 'victoury_manual_facture', value: [...next], updated_at: new Date().toISOString() }, { onConflict: 'key' }).then(() => {});
+      cloudSet('victoury_manual_facture', [...next]);
       return next;
     });
   }
