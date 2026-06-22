@@ -1526,9 +1526,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                       <ChevronDown size={10} className="text-gray-400 group-hover:text-gray-600" />
                     </button>
 
-                    {/* Send livreur info button — only when dispatch person info is available */}
+                    {/* Send livreur info button — only when livreur info is available */}
                     {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (() => {
-                      try { const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}'); return !!(dp.name || dp.phone); } catch { return false; }
+                      try {
+                        const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
+                        if (dp.name || dp.phone) return true;
+                        const livs = JSON.parse(localStorage.getItem('livreurs') || '[]');
+                        const lv = livs.find(l => l.nom === o.recipient?.delivery);
+                        return !!(lv?.telephone);
+                      } catch { return false; }
                     })() && (
                       <button
                         onClick={() => sendLivreurInfo(o)}
