@@ -131,22 +131,23 @@ export default function Dashboard({ orders = [] }) {
 
   const todayOrders = useMemo(() => filterByPeriod(orders, 'today'), [orders]);
 
-  const ca = todayOrders.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
-  const livreCA = todayOrders.filter(o => o.status === 'livre').reduce((s, o) => s + (o.price || 0), 0);
+  const ca = orders.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
+  const livreCA = orders.filter(o => o.status === 'livre').reduce((s, o) => s + (o.price || 0), 0);
 
   const counts = {
-    total: todayOrders.length,
-    nouveau: todayOrders.filter(o => o.status === 'nouveau').length,
-    confirme: todayOrders.filter(o => o.status === 'confirme').length,
-    livre: todayOrders.filter(o => o.status === 'livre').length,
-    refuse: todayOrders.filter(o => o.status === 'refuse').length,
-    annule: todayOrders.filter(o => o.status === 'annule').length,
-    reporter: todayOrders.filter(o => o.status === 'reporter').length,
-    en_suivi: todayOrders.filter(o => o.status === 'en_suivi').length,
-    att_ram: todayOrders.filter(o => o.status === 'att_ramassage').length,
+    total: orders.length,
+    nouveau: orders.filter(o => o.status === 'nouveau').length,
+    confirme: orders.filter(o => o.status === 'confirme').length,
+    livre: orders.filter(o => o.status === 'livre').length,
+    refuse: orders.filter(o => o.status === 'refuse').length,
+    annule: orders.filter(o => o.status === 'annule').length,
+    reporter: orders.filter(o => o.status === 'reporter').length,
+    en_suivi: orders.filter(o => o.status === 'en_suivi').length,
+    att_ram: orders.filter(o => o.status === 'att_ramassage').length,
+    expedier: orders.filter(o => o.status === 'expedier').length,
   };
 
-  const retourCA = todayOrders.filter(o => ['refuse','annule','retour','pret_retour'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
+  const retourCA = orders.filter(o => ['refuse','annule','retour','pret_retour'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
   const tauxRetour = counts.total > 0 ? Math.round(((counts.refuse + counts.annule) / counts.total) * 100) : 0;
   const taux = counts.total > 0 ? Math.round((counts.livre / counts.total) * 100) : 0;
 
@@ -177,17 +178,18 @@ export default function Dashboard({ orders = [] }) {
     { icon: CheckCircle, label: 'Confirmées', value: counts.confirme, iconBg: 'bg-green-500', sub: `${counts.en_suivi} en suivi` },
     { icon: Truck, label: 'Livrées', value: counts.livre, iconBg: 'bg-emerald-500', sub: `Taux: ${taux}%` },
     { icon: XCircle, label: 'Refusées / Annulées', value: counts.refuse + counts.annule, iconBg: 'bg-red-500', sub: `${counts.refuse} ref, ${counts.annule} ann` },
-    { icon: RotateCcw, label: 'Reportées', value: counts.reporter, iconBg: 'bg-orange-500', sub: `${counts.att_ram} att. ramassage` },
+    { icon: RotateCcw, label: 'Reportées', value: counts.reporter, iconBg: 'bg-orange-500', sub: `${counts.expedier} expédié, ${counts.att_ram} att. ram.` },
     { icon: DollarSign, label: "Chiffre d'affaires", value: `${ca.toLocaleString('fr-MA', { minimumFractionDigits: 2 })} DH`, iconBg: 'bg-purple-500', sub: `Livré: ${livreCA.toLocaleString('fr-MA',{minimumFractionDigits:2})} DH` },
   ];
 
   const statusRows = [
-    { label: 'Nouveau (À confirmer)', count: counts.nouveau, amount: todayOrders.filter(o=>o.status==='nouveau').reduce((s,o)=>s+(o.price||0),0), color: 'bg-blue-400' },
-    { label: 'Confirmé', count: counts.confirme, amount: todayOrders.filter(o=>o.status==='confirme').reduce((s,o)=>s+(o.price||0),0), color: 'bg-green-500' },
+    { label: 'Nouveau (À confirmer)', count: counts.nouveau, amount: orders.filter(o=>o.status==='nouveau').reduce((s,o)=>s+(o.price||0),0), color: 'bg-blue-400' },
+    { label: 'Confirmé', count: counts.confirme, amount: orders.filter(o=>o.status==='confirme').reduce((s,o)=>s+(o.price||0),0), color: 'bg-green-500' },
+    { label: 'Expédié', count: counts.expedier, amount: orders.filter(o=>o.status==='expedier').reduce((s,o)=>s+(o.price||0),0), color: 'bg-blue-500' },
     { label: 'En attente ramassage', count: counts.att_ram, amount: undefined, color: 'bg-amber-400' },
     { label: 'En suivi', count: counts.en_suivi, amount: undefined, color: 'bg-purple-400' },
     { label: 'Livré', count: counts.livre, amount: livreCA, color: 'bg-emerald-500' },
-    { label: 'Refusé', count: counts.refuse, amount: undefined, color: 'bg-red-500' },
+    { label: 'Refusé', count: counts.refuse, amount: orders.filter(o=>o.status==='refuse').reduce((s,o)=>s+(o.price||0),0), color: 'bg-red-500' },
     { label: 'Annulé', count: counts.annule, amount: undefined, color: 'bg-gray-400' },
     { label: 'Reporté', count: counts.reporter, amount: undefined, color: 'bg-orange-400' },
   ].filter(r => r.count > 0);
@@ -403,10 +405,10 @@ export default function Dashboard({ orders = [] }) {
           </h2>
           <div className="flex flex-col gap-3 flex-1">
             {[
-              { label: 'Total confirmées', val: todayOrders.filter(o=>['confirme','livre'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-green-700', bg: 'bg-green-50' },
+              { label: 'Total confirmées', val: orders.filter(o=>['confirme','livre'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-green-700', bg: 'bg-green-50' },
               { label: 'Total livrées', val: livreCA, color: 'text-emerald-700', bg: 'bg-emerald-50' },
               { label: 'Retours / Refusés', val: retourCA, color: 'text-red-700', bg: 'bg-red-50' },
-              { label: 'En attente', val: todayOrders.filter(o=>['nouveau','reporter','en_suivi','att_ramassage'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-amber-700', bg: 'bg-amber-50' },
+              { label: 'En attente', val: orders.filter(o=>['nouveau','reporter','en_suivi','att_ramassage','expedier'].includes(o.status)).reduce((s,o)=>s+(o.price||0),0), color: 'text-amber-700', bg: 'bg-amber-50' },
             ].map(item => (
               <div key={item.label} className={`${item.bg} rounded-xl px-4 py-3`}>
                 <p className="text-xs text-gray-500 mb-0.5">{item.label}</p>
