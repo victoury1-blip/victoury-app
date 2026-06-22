@@ -72,6 +72,7 @@ export default function App() {
   const [dbError, setDbError] = useState(null);
   const modifiedIdsRef = useRef(new Set());
   const deletedIdsRef = useRef(new Set());
+  const initialLoadDoneRef = useRef(false);
   const wooConfigRef = useRef(null);
   const notifConfigRef = useRef(null);
   const navigate = useNavigate();
@@ -137,6 +138,7 @@ export default function App() {
         manuallyModified: o.manually_modified || false,
       })));
       setIsLoading(false);
+      initialLoadDoneRef.current = true;
     }
     load();
   }, [session]);
@@ -242,8 +244,8 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
-            /* Play notification sound */
-            try {
+            /* Play notification sound — only after initial DB load */
+            if (initialLoadDoneRef.current) try {
               notifConfigRef.current = JSON.parse(localStorage.getItem('notification_sound') || '{}');
               const nc = notifConfigRef.current;
               if (nc.enabled !== false) {
