@@ -68,7 +68,7 @@ export default function App() {
   const [session, setSession] = useState(undefined);
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isWooFetching, setIsWooFetching] = useState(true);
+  const [isWooFetching, setIsWooFetching] = useState(false);
   const [wooError, setWooError] = useState(null);
   const [dbError, setDbError] = useState(null);
   const [offline, setOffline] = useState(!navigator.onLine);
@@ -130,11 +130,29 @@ export default function App() {
 
   /* ── Auth ── */
   useEffect(() => {
-    const timeout = setTimeout(() => setSession(null), 5000);
+    const timeout = setTimeout(() => setSession(null), 2500);
     supabase.auth.getSession().then(({ data }) => { clearTimeout(timeout); setSession(data.session ?? null); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => subscription.unsubscribe();
   }, []);
+
+  /* ── Preload critical settings from Supabase (parallel) ── */
+  useEffect(() => {
+    if (!session) return;
+    const PRELOAD_KEYS = [
+      'victoury_app_config', 'victoury_shop_config', 'victoury_profile',
+      'auzone_config', 'woo_config', 'livreurs', 'victoury_statuses',
+      'phone_colors', 'notification_sound', 'system_timezone',
+      'victoury_sent_livreur', 'victoury_recu_ids', 'victoury_manual_facture',
+    ];
+    supabase.from('settings').select('key, value').in('key', PRELOAD_KEYS).is('user_id', null)
+      .then(({ data }) => {
+        if (!data) return;
+        for (const row of data) {
+          if (row.value != null) localStorage.setItem(row.key, JSON.stringify(row.value));
+        }
+      });
+  }, [session]);
 
   /* ── Load orders from Supabase ── */
   useEffect(() => {
@@ -538,8 +556,8 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<React.Suspense fallback={<div className="p-8 text-center text-gray-400">Chargement...</div>}><Dashboard orders={orders} /></React.Suspense>} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
-          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading || isWooFetching} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
-          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading || isWooFetching} />} />
+          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
+          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
           <Route path="/ramassage/scanner" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
