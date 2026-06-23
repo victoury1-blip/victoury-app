@@ -680,7 +680,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const currentStatusRaw = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
   const currentStatuses = Array.isArray(currentStatusRaw) ? currentStatusRaw : [currentStatusRaw];
 
-  const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi','retour_recu','echange_recu']);
+  const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','dem_suivi','en_suivi','retour_recu','echange_recu']);
 
   const isCasa = (city) => {
     if (!city) return false;
