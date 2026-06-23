@@ -53,6 +53,17 @@ function initVictCounter(orders) {
   }).catch(() => {});
 }
 
+function recalcVictCounter(orders) {
+  let max = 0;
+  for (const o of orders) {
+    const m = (o.id || '').match(/^VICT(\d+)$/i);
+    if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
+  }
+  _victCounter = max;
+  localStorage.setItem('vict_counter', String(_victCounter));
+  cloudSet('vict_counter', _victCounter);
+}
+
 function generateVictId() {
   _victCounter = (_victCounter || 0) + 1;
   localStorage.setItem('vict_counter', String(_victCounter));
@@ -482,10 +493,12 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
 
   function bulkDelete() {
     if (!window.confirm(`Supprimer définitivement ${selected.length} commande${selected.length > 1 ? 's' : ''} ?`)) return;
+    const remaining = orders.filter(o => !selected.includes(o.id));
     for (const id of selected) {
       setOrders(prev => prev.filter(o => o.id !== id));
       onDeleteOrder?.(id);
     }
+    recalcVictCounter(remaining);
     setSelected([]);
   }
 
@@ -1152,7 +1165,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     <button
                       onClick={() => {
                         if (window.confirm(`Supprimer la commande ${order.id} ?`)) {
-                          setOrders(prev => prev.filter(o => o.id !== order.id));
+                          setOrders(prev => {
+                            const next = prev.filter(o => o.id !== order.id);
+                            recalcVictCounter(next);
+                            return next;
+                          });
                           onDeleteOrder?.(order.id);
                         }
                       }}
