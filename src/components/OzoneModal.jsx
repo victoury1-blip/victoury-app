@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
+import { supabase } from '../lib/supabase';
 
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' },
@@ -62,6 +63,24 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     }
   }, []);
 
+
+  const [phoneHistory, setPhoneHistory] = useState(null);
+  const [phoneHistoryLoading, setPhoneHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    const phone = (form.phone || '').replace(/[\s\-\.]/g, '');
+    if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
+    setPhoneHistoryLoading(true);
+    const bare = phone.startsWith('0') ? phone : phone.startsWith('+212') ? '0' + phone.slice(4) : phone;
+    supabase.from('orders').select('id, status, price').ilike('phone', `%${bare.slice(-9)}`)
+      .then(({ data }) => {
+        if (!data || !data.length) { setPhoneHistory({ exists: false }); setPhoneHistoryLoading(false); return; }
+        const delivered = data.filter(o => o.status === 'livre').length;
+        const returned = data.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
+        setPhoneHistory({ exists: true, total: data.length, delivered, returned });
+        setPhoneHistoryLoading(false);
+      }).catch(() => { setPhoneHistory(null); setPhoneHistoryLoading(false); });
+  }, [form.phone]);
 
   const [status, setStatus] = useState('idle'); // idle | loading | success | error
   const [tracking, setTracking] = useState(null);
@@ -349,6 +368,35 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                 </div>
               </div>
 
+              {phoneHistoryLoading && (
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <Loader2 size={12} className="animate-spin" />
+                  <span>جاري التحقق من الرقم...</span>
+                </div>
+              )}
+              {phoneHistory && !phoneHistoryLoading && (
+                <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
+                  phoneHistory.exists
+                    ? phoneHistory.returned > 0 && phoneHistory.delivered === 0
+                      ? 'bg-red-50 border border-red-200 text-red-700'
+                      : 'bg-amber-50 border border-amber-200 text-amber-800'
+                    : 'bg-green-50 border border-green-100 text-green-700'
+                }`}>
+                  {phoneHistory.exists ? (
+                    <>
+                      <p dir="rtl">هاد الرقم موجود عندنا. ( تم التوصيل: <strong>{phoneHistory.delivered}</strong> ) ( مرجوع: <strong>{phoneHistory.returned}</strong> ) من أصل {phoneHistory.total} طلب.</p>
+                      {phoneHistory.returned > 0 && phoneHistory.delivered === 0 && (
+                        <p dir="rtl" className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                          <AlertTriangle size={12} />
+                          تحذير: ما توصل حتى كوليس، {phoneHistory.returned} مرجوع!
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p dir="rtl">✅ رقم جديد — ما كاين حتى سجل من قبل.</p>
+                  )}
+                </div>
+              )}
 
               <div ref={cityRef} className="relative">
                 <label className={labelCls}>
