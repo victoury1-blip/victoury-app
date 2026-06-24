@@ -647,6 +647,7 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
 }
 
 export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading, onDeleteOrder, currentUser }) {
+  const { statuses } = useStatuses();
   const orders = externalOrders;
   useEffect(() => { if (orders.length) initVictCounter(orders); }, [orders]);
   function setOrders(updater) {
