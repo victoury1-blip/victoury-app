@@ -53,8 +53,8 @@ export default async function handler(req, res) {
 
     // Try Method 1: POST form-urlencoded to login?action=login
     const body1 = new URLSearchParams();
-    body1.append('email', EMAIL);
-    body1.append('password', PASS);
+    body1.append('login_customers_email', EMAIL);
+    body1.append('login_customers_password', PASS);
     body1.append('remember', 'on');
     // Add any hidden fields
     for (const inp of allInputs) {
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
         'X-Requested-With': 'XMLHttpRequest',
         'Accept': 'application/json, text/html, */*',
       },
-      body: JSON.stringify({ email: EMAIL, password: PASS, remember: true }),
+      body: JSON.stringify({ login_customers_email: EMAIL, login_customers_password: PASS, remember: true }),
       redirect: 'manual',
     });
     const loginBody2 = await loginRes2.text();
