@@ -100,12 +100,16 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     fetch(`/api/ozone-check?phone=${bare}`, { signal: ctrl.signal })
       .then(r => r.json())
       .then(data => {
+        console.log('ozone-check response:', data);
         if (data.error) { setPhoneHistory(null); }
         else if (data.exists) { setPhoneHistory({ exists: true, delivered: data.delivered, returned: data.returned, total: data.total }); }
         else { setPhoneHistory({ exists: false }); }
         setPhoneHistoryLoading(false);
       })
-      .catch(e => { if (e.name !== 'AbortError') { setPhoneHistory(null); setPhoneHistoryLoading(false); } });
+      .catch(e => {
+        console.log('ozone-check error:', e);
+        if (e.name !== 'AbortError') { setPhoneHistory(null); setPhoneHistoryLoading(false); }
+      });
 
     return () => ctrl.abort();
   }, [form.phone]);
