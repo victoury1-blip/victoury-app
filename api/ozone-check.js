@@ -142,62 +142,63 @@ export default async function handler(req, res) {
 
     if (loggedIn) {
       // Try multiple methods to search blacklist
+      // First: scan parcels page source for AJAX endpoints related to phone/blacklist
+      const parcelsPage = await fetch(`${BASE}/parcels?action=add`, {
+        headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
+      });
+      const parcelsHtml = await parcelsPage.text();
+
+      // Find all ajaxLink calls and URLs mentioning blacklist/phone
+      const ajaxLinks = [];
+      const ajaxPattern = /ajaxLink\s*\(\s*['"]([^'"]+)['"]/g;
+      let m;
+      while ((m = ajaxPattern.exec(parcelsHtml)) !== null) {
+        ajaxLinks.push(m[1]);
+      }
+
+      // Find any URL/endpoint mentioning phone, blacklist, or search
+      const phoneRelated = [];
+      const urlPattern = /['"]([^'"]*(?:phone|blacklist|search|check)[^'"]*)['"]/gi;
+      while ((m = urlPattern.exec(parcelsHtml)) !== null) {
+        if (m[1].length < 200) phoneRelated.push(m[1]);
+      }
+
+      // Find the blackListResult element and surrounding JS
+      const blIdx = parcelsHtml.indexOf('blackListResult');
+      const blacklistContext = blIdx >= 0 ? parcelsHtml.substring(Math.max(0, blIdx - 500), blIdx + 500) : 'not found';
+
+      // Find parcel_phone input and surrounding JS
+      const phIdx = parcelsHtml.indexOf('parcel_phone');
+      const phoneContext = phIdx >= 0 ? parcelsHtml.substring(Math.max(0, phIdx - 300), phIdx + 500) : 'not found';
+
+      // Now try the ajaxLink URLs we found
       const results = [];
-
-      // Method 1: GET with query param
-      // Method 2: POST with form data
-      // Method 3: POST with jaxPhone in URL (how ajaxLink works)
-      // Method 4: GET parcels page and check for phone input behavior
-      const attempts = [
-        { label: 'GET ?jaxPhone', url: `${BASE}/V2/blacklist/search?jaxPhone=${phone}`, method: 'GET' },
-        { label: 'GET index.php route', url: `${BASE}/index.php?route=V2/blacklist/search&jaxPhone=${phone}`, method: 'GET' },
-        { label: 'GET ?route=', url: `${BASE}/?route=V2/blacklist/search&jaxPhone=${phone}`, method: 'GET' },
-        { label: 'POST jaxPhone', url: `${BASE}/V2/blacklist/search`, method: 'POST', body: `jaxPhone=${phone}` },
-        { label: 'GET jax format', url: `${BASE}/V2/blacklist/search%26jaxPhone%3D${phone}`, method: 'GET' },
-        { label: 'GET phone no0', url: `${BASE}/V2/blacklist/search?jaxPhone=${phone.replace(/^0/,'')}`, method: 'GET' },
-        { label: 'GET +212', url: `${BASE}/V2/blacklist/search?jaxPhone=+212${phone.replace(/^0/,'')}`, method: 'GET' },
-        { label: 'GET 212', url: `${BASE}/V2/blacklist/search?jaxPhone=212${phone.replace(/^0/,'')}`, method: 'GET' },
-      ];
-
-      for (const att of attempts) {
+      for (const link of ajaxLinks) {
+        if (!link.includes('blacklist') && !link.includes('phone') && !link.includes('search')) continue;
+        const url = `${BASE}/${link.replace(/&jaxPhone=.*/, '')}?jaxPhone=${phone}`;
         try {
-          const opts = {
-            method: att.method,
+          const r = await fetch(url, {
             headers: {
               'User-Agent': UA,
               'Cookie': allCookies.join('; '),
               'X-Requested-With': 'XMLHttpRequest',
-              'Accept': 'text/html, application/json, */*',
+              'Accept': '*/*',
               'Referer': `${BASE}/parcels?action=add`,
             },
-          };
-          if (att.method === 'POST') {
-            opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-            opts.body = att.body;
-          }
-          const r = await fetch(att.url, opts);
+          });
           const html = await r.text();
-          const trimmed = html.trim();
-          results.push({ label: att.label, status: r.status, len: trimmed.length, body: trimmed.substring(0, 500) });
-
-          if (r.status >= 400 || !trimmed || html.includes('window.location') || html.includes('<!DOCTYPE')) continue;
-
-          const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
-          const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
-
-          if (livMatch || retMatch || html.includes('existe') || html.includes('blackListResult')) {
-            const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
-            const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-            const exists = delivered > 0 || returned > 0 || html.toLowerCase().includes('existe');
-            return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
-          }
+          results.push({ url, status: r.status, len: html.trim().length, body: html.substring(0, 500) });
         } catch {}
       }
 
       return res.json({
-        error: 'logged_in_but_no_blacklist_match',
+        error: 'debug_parcels_page',
         loggedIn: true,
         phone,
+        ajaxLinks,
+        phoneRelated: phoneRelated.slice(0, 20),
+        blacklistContext: blacklistContext.replace(/\s+/g, ' ').substring(0, 1000),
+        phoneContext: phoneContext.replace(/\s+/g, ' ').substring(0, 800),
         results,
       });
     }
