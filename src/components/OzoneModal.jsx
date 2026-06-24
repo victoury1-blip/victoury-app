@@ -159,12 +159,12 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
             }
 
             if (exists || delivered > 0 || returned > 0) {
-              setPhoneHistory({ exists: true, delivered, returned, total });
+              setPhoneHistory({ exists: true, delivered, returned, total, source: 'ozone' });
               setPhoneHistoryLoading(false);
               return;
             }
             if (data && (data['RESULT'] === 'NOT_FOUND' || data['message']?.toLowerCase().includes('nouveau') || data['message']?.toLowerCase().includes('new'))) {
-              setPhoneHistory({ exists: false });
+              setPhoneHistory({ exists: false, source: 'ozone' });
               setPhoneHistoryLoading(false);
               return;
             }
@@ -179,7 +179,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
           const r = ours.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
           setPhoneHistory({ exists: true, total: ours.length, delivered: d, returned: r, source: 'local' });
         } else {
-          setPhoneHistory({ exists: false });
+          setPhoneHistory({ exists: false, source: 'local' });
         }
       } catch (e) {
         if (e.name !== 'AbortError') setPhoneHistory(null);
@@ -460,7 +460,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                         </span>
                       )
                     ) : (
-                      <span className="text-xs text-green-600 mt-1">✓ Nouveau numéro</span>
+                      <span className="text-xs text-green-600 mt-1">✓ Nouveau numéro {phoneHistory.source === 'ozone' ? '(Ozone)' : '(local)'}</span>
                     )
                   )}
                 </div>
@@ -491,7 +491,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                       )}
                     </>
                   ) : (
-                    <p dir="rtl">✅ رقم جديد — ما كاين حتى سجل من قبل.</p>
+                    <p dir="rtl">✅ رقم جديد — ما كاين حتى سجل من قبل. ({phoneHistory.source === 'ozone' ? 'من Ozone' : 'من الداتا المحلية'})</p>
                   )}
                 </div>
               )}
