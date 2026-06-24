@@ -150,13 +150,13 @@ export default async function handler(req, res) {
       // Method 4: GET parcels page and check for phone input behavior
       const attempts = [
         { label: 'GET ?jaxPhone', url: `${BASE}/V2/blacklist/search?jaxPhone=${phone}`, method: 'GET' },
+        { label: 'GET index.php route', url: `${BASE}/index.php?route=V2/blacklist/search&jaxPhone=${phone}`, method: 'GET' },
+        { label: 'GET ?route=', url: `${BASE}/?route=V2/blacklist/search&jaxPhone=${phone}`, method: 'GET' },
         { label: 'POST jaxPhone', url: `${BASE}/V2/blacklist/search`, method: 'POST', body: `jaxPhone=${phone}` },
-        { label: 'POST action+phone', url: `${BASE}/V2/blacklist/search`, method: 'POST', body: `action=search&jaxPhone=${phone}` },
-        { label: 'GET parcels checkPhone', url: `${BASE}/parcels?action=checkPhone&phone=${phone}`, method: 'GET' },
-        { label: 'POST parcels checkPhone', url: `${BASE}/parcels`, method: 'POST', body: `action=checkPhone&phone=${phone}` },
-        { label: 'GET ajax blacklist', url: `${BASE}/ajax/blacklist/search?phone=${phone}`, method: 'GET' },
-        { label: 'GET V2 phone', url: `${BASE}/V2/blacklist/search?phone=${phone}`, method: 'GET' },
-        { label: 'GET V2 tel', url: `${BASE}/V2/blacklist?phone=${phone}`, method: 'GET' },
+        { label: 'GET jax format', url: `${BASE}/V2/blacklist/search%26jaxPhone%3D${phone}`, method: 'GET' },
+        { label: 'GET phone no0', url: `${BASE}/V2/blacklist/search?jaxPhone=${phone.replace(/^0/,'')}`, method: 'GET' },
+        { label: 'GET +212', url: `${BASE}/V2/blacklist/search?jaxPhone=+212${phone.replace(/^0/,'')}`, method: 'GET' },
+        { label: 'GET 212', url: `${BASE}/V2/blacklist/search?jaxPhone=212${phone.replace(/^0/,'')}`, method: 'GET' },
       ];
 
       for (const att of attempts) {
