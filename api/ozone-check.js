@@ -141,17 +141,28 @@ export default async function handler(req, res) {
     const loggedIn = checkHtml.includes('VICTOURY') || checkHtml.includes('Nouveau Colis') || checkHtml.includes('parcel_phone');
 
     if (loggedIn) {
-      // Try multiple blacklist/search URLs
-      const urls = [
-        `${BASE}/V2/blacklist/search?jaxPhone=${phone}`,
-        `${BASE}/blacklist/search?jaxPhone=${phone}`,
-        `${BASE}/V2/blacklist/search&jaxPhone=${phone}`,
+      // Try multiple methods to search blacklist
+      const results = [];
+
+      // Method 1: GET with query param
+      // Method 2: POST with form data
+      // Method 3: POST with jaxPhone in URL (how ajaxLink works)
+      // Method 4: GET parcels page and check for phone input behavior
+      const attempts = [
+        { label: 'GET ?jaxPhone', url: `${BASE}/V2/blacklist/search?jaxPhone=${phone}`, method: 'GET' },
+        { label: 'POST jaxPhone', url: `${BASE}/V2/blacklist/search`, method: 'POST', body: `jaxPhone=${phone}` },
+        { label: 'POST action+phone', url: `${BASE}/V2/blacklist/search`, method: 'POST', body: `action=search&jaxPhone=${phone}` },
+        { label: 'GET parcels checkPhone', url: `${BASE}/parcels?action=checkPhone&phone=${phone}`, method: 'GET' },
+        { label: 'POST parcels checkPhone', url: `${BASE}/parcels`, method: 'POST', body: `action=checkPhone&phone=${phone}` },
+        { label: 'GET ajax blacklist', url: `${BASE}/ajax/blacklist/search?phone=${phone}`, method: 'GET' },
+        { label: 'GET V2 phone', url: `${BASE}/V2/blacklist/search?phone=${phone}`, method: 'GET' },
+        { label: 'GET V2 tel', url: `${BASE}/V2/blacklist?phone=${phone}`, method: 'GET' },
       ];
 
-      const results = [];
-      for (const url of urls) {
+      for (const att of attempts) {
         try {
-          const r = await fetch(url, {
+          const opts = {
+            method: att.method,
             headers: {
               'User-Agent': UA,
               'Cookie': allCookies.join('; '),
@@ -159,11 +170,17 @@ export default async function handler(req, res) {
               'Accept': 'text/html, application/json, */*',
               'Referer': `${BASE}/parcels?action=add`,
             },
-          });
+          };
+          if (att.method === 'POST') {
+            opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+            opts.body = att.body;
+          }
+          const r = await fetch(att.url, opts);
           const html = await r.text();
-          results.push({ url, status: r.status, body: html.substring(0, 600) });
+          const trimmed = html.trim();
+          results.push({ label: att.label, status: r.status, len: trimmed.length, body: trimmed.substring(0, 500) });
 
-          if (r.status >= 400 || html.includes('window.location') || html.includes('<!DOCTYPE')) continue;
+          if (r.status >= 400 || !trimmed || html.includes('window.location') || html.includes('<!DOCTYPE')) continue;
 
           const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
           const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
@@ -177,7 +194,6 @@ export default async function handler(req, res) {
         } catch {}
       }
 
-      // Nothing matched — return all raw responses for debug
       return res.json({
         error: 'logged_in_but_no_blacklist_match',
         loggedIn: true,
