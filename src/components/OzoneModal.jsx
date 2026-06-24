@@ -63,24 +63,110 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     }
   }, []);
 
-
   const [phoneHistory, setPhoneHistory] = useState(null);
   const [phoneHistoryLoading, setPhoneHistoryLoading] = useState(false);
 
   useEffect(() => {
     const phone = (form.phone || '').replace(/[\s\-\.]/g, '');
-    if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
+    const cid = form.customerId || cfg.customerId;
+    const key = form.apiKey || cfg.apiKey;
+    if (!phone || phone.length < 9 || !cid || !key) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
-    const bare = phone.startsWith('0') ? phone : phone.startsWith('+212') ? '0' + phone.slice(4) : phone;
-    supabase.from('orders').select('id, status, price').ilike('phone', `%${bare.slice(-9)}`)
-      .then(({ data }) => {
-        if (!data || !data.length) { setPhoneHistory({ exists: false }); setPhoneHistoryLoading(false); return; }
-        const delivered = data.filter(o => o.status === 'livre').length;
-        const returned = data.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
-        setPhoneHistory({ exists: true, total: data.length, delivered, returned });
+    const ctrl = new AbortController();
+    const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone;
+
+    (async () => {
+      try {
+        // Try Ozone API via Vercel proxy (bypasses CORS)
+        const endpoints = [
+          `/ozone-api/customers/${cid}/${key}/check-phone/${bare}`,
+          `/ozone-api/customers/${cid}/${key}/check-phone?phone=${bare}`,
+          `/ozone-api/customers/${cid}/${key}/get-parcels?phone=${bare}`,
+        ];
+        for (const url of endpoints) {
+          if (ctrl.signal.aborted) return;
+          try {
+            const res = await fetch(url, {
+              signal: ctrl.signal,
+              headers: { 'Accept': 'application/json' },
+            });
+            if (!res.ok) continue;
+            const text = await res.text();
+            let raw;
+            try { raw = JSON.parse(text); } catch { continue; }
+            const data = raw['CHECK-PHONE'] || raw['check-phone'] || raw;
+
+            let delivered = 0, returned = 0, exists = false, total = 0;
+
+            if (Array.isArray(data)) {
+              total = data.length;
+              exists = total > 0;
+              for (const p of data) {
+                const st = (p.status || p.STATUS || p.statut || '').toString().toLowerCase();
+                if (st.includes('livr') || st.includes('deliver')) delivered++;
+                else if (st.includes('retour') || st.includes('return') || st.includes('refus')) returned++;
+              }
+            } else if (typeof data === 'object' && data !== null) {
+              const parcels = data.parcels || data.PARCELS || data.data || data.colis;
+              if (Array.isArray(parcels)) {
+                total = parcels.length;
+                exists = total > 0;
+                for (const p of parcels) {
+                  const st = (p.status || p.STATUS || p.statut || '').toString().toLowerCase();
+                  if (st.includes('livr') || st.includes('deliver')) delivered++;
+                  else if (st.includes('retour') || st.includes('return') || st.includes('refus')) returned++;
+                }
+              } else {
+                delivered = parseInt(data['DELIVERED'] || data['delivered'] || data['livré'] || data['livre'] || '0', 10);
+                returned = parseInt(data['RETURNED'] || data['returned'] || data['retourné'] || data['retourne'] || '0', 10);
+                total = parseInt(data['TOTAL'] || data['total'] || '0', 10) || (delivered + returned);
+                exists = !!(data['RESULT'] === 'FOUND' || data['exists'] === true || delivered > 0 || returned > 0);
+                if (!exists && data['message']) {
+                  const msg = data['message'].toLowerCase();
+                  if (msg.includes('existe') || msg.includes('found') || msg.includes('déjà')) {
+                    exists = true;
+                    const livMatch = msg.match(/livr[ée]*\s*:?\s*(\d+)/i);
+                    const retMatch = msg.match(/retourn[ée]*\s*:?\s*(\d+)/i);
+                    if (livMatch) delivered = parseInt(livMatch[1], 10);
+                    if (retMatch) returned = parseInt(retMatch[1], 10);
+                    total = delivered + returned;
+                  }
+                }
+              }
+            }
+
+            if (exists || delivered > 0 || returned > 0) {
+              setPhoneHistory({ exists: true, delivered, returned, total });
+              setPhoneHistoryLoading(false);
+              return;
+            }
+            if (data && (data['RESULT'] === 'NOT_FOUND' || data['message']?.toLowerCase().includes('nouveau') || data['message']?.toLowerCase().includes('new'))) {
+              setPhoneHistory({ exists: false });
+              setPhoneHistoryLoading(false);
+              return;
+            }
+          } catch (e) {
+            if (e.name === 'AbortError') return;
+            continue;
+          }
+        }
+        // Fallback: check our own Supabase data
+        const { data: ours } = await supabase.from('orders').select('id, status').ilike('phone', `%${bare.slice(-9)}`);
+        if (ours && ours.length > 0) {
+          const d = ours.filter(o => o.status === 'livre').length;
+          const r = ours.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
+          setPhoneHistory({ exists: true, total: ours.length, delivered: d, returned: r, source: 'local' });
+        } else {
+          setPhoneHistory({ exists: false });
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') setPhoneHistory(null);
+      } finally {
         setPhoneHistoryLoading(false);
-      }).catch(() => { setPhoneHistory(null); setPhoneHistoryLoading(false); });
-  }, [form.phone]);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [form.phone, form.customerId, form.apiKey]);
 
   const [status, setStatus] = useState('idle'); // idle | loading | success | error
   const [tracking, setTracking] = useState(null);
@@ -365,6 +451,22 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                   <label className={labelCls}>Téléphone <span className="text-red-500">*</span></label>
                   <input value={form.phone} onChange={(e) => f('phone', e.target.value)}
                     className={inputCls} />
+                  {phoneHistoryLoading && <span className="text-xs text-gray-400 flex items-center gap-1 mt-1"><Loader2 size={10} className="animate-spin" /> Vérification...</span>}
+                  {phoneHistory && !phoneHistoryLoading && (
+                    phoneHistory.exists ? (
+                      phoneHistory.delivered > 0 ? (
+                        <span className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                          <AlertTriangle size={12} /> Existant — {phoneHistory.delivered} livré{phoneHistory.delivered > 1 ? 's' : ''}{phoneHistory.returned > 0 ? `, ${phoneHistory.returned} retour` : ''}{phoneHistory.source === 'local' ? ' (local)' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                          <AlertTriangle size={12} /> ⚠ {phoneHistory.returned} retour{phoneHistory.returned > 1 ? 's' : ''}, 0 livré{phoneHistory.source === 'local' ? ' (local)' : ''}
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-xs text-green-600 mt-1">✓ Nouveau numéro</span>
+                    )
+                  )}
                 </div>
               </div>
 
