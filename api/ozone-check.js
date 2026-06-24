@@ -20,31 +20,60 @@ export default async function handler(req, res) {
     return all;
   }
 
+  function mergeCookies(...arrays) {
+    const map = new Map();
+    for (const arr of arrays) {
+      for (const c of arr) {
+        const eqIdx = c.indexOf('=');
+        if (eqIdx > 0) map.set(c.substring(0, eqIdx), c);
+      }
+    }
+    return [...map.values()];
+  }
+
   try {
     // Step 1: GET login page
     const loginPage = await fetch(`${BASE}/login`, {
-      headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' },
+      headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
       redirect: 'follow',
     });
     const loginHtml = await loginPage.text();
     const cookies1 = extractCookies(loginPage);
 
-    // Try multiple token patterns
-    const tokenMatch = loginHtml.match(/name="_token"[^>]*value="([^"]+)"/)
-      || loginHtml.match(/value="([^"]+)"[^>]*name="_token"/)
-      || loginHtml.match(/name='_token'[^>]*value='([^']+)'/)
-      || loginHtml.match(/csrf[_-]?token['"]\s*(?:content|value)=['"]\s*([^'"]+)/i)
-      || loginHtml.match(/meta\s+name="csrf-token"\s+content="([^"]+)"/);
-    const token = tokenMatch ? tokenMatch[1] : '';
+    // Extract all hidden inputs from the form
+    const hiddenInputs = {};
+    const hiddenPattern = /<input[^>]*type=["']hidden["'][^>]*>/gi;
+    let hMatch;
+    while ((hMatch = hiddenPattern.exec(loginHtml)) !== null) {
+      const nameM = hMatch[0].match(/name=["']([^"']+)["']/);
+      const valM = hMatch[0].match(/value=["']([^"']+)["']/);
+      if (nameM) hiddenInputs[nameM[1]] = valM ? valM[1] : '';
+    }
+
+    // Find the form action URL
+    const formActionMatch = loginHtml.match(/form[^>]*action=["']([^"']+)["']/);
+    const formAction = formActionMatch ? formActionMatch[1] : `${BASE}/login`;
+    const loginUrl = formAction.startsWith('http') ? formAction : `${BASE}/${formAction.replace(/^\//, '')}`;
+
+    // Find input field names for email and password
+    const emailFieldMatch = loginHtml.match(/<input[^>]*type=["'](?:email|text)["'][^>]*name=["']([^"']+)["']/i)
+      || loginHtml.match(/<input[^>]*name=["']([^"']+)["'][^>]*type=["'](?:email|text)["']/i);
+    const passFieldMatch = loginHtml.match(/<input[^>]*type=["']password["'][^>]*name=["']([^"']+)["']/i)
+      || loginHtml.match(/<input[^>]*name=["']([^"']+)["'][^>]*type=["']password["']/i);
+
+    const emailField = emailFieldMatch ? emailFieldMatch[1] : 'email';
+    const passField = passFieldMatch ? passFieldMatch[1] : 'password';
 
     // Step 2: POST login
     const body = new URLSearchParams();
-    body.append('email', EMAIL);
-    body.append('password', PASS);
-    if (token) body.append('_token', token);
+    body.append(emailField, EMAIL);
+    body.append(passField, PASS);
+    for (const [k, v] of Object.entries(hiddenInputs)) {
+      body.append(k, v);
+    }
     body.append('remember', 'on');
 
-    const loginRes = await fetch(`${BASE}/login`, {
+    const loginRes = await fetch(loginUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -52,66 +81,89 @@ export default async function handler(req, res) {
         'Cookie': cookies1.join('; '),
         'Referer': `${BASE}/login`,
         'Origin': BASE,
+        'X-Requested-With': 'XMLHttpRequest',
       },
       body: body.toString(),
       redirect: 'manual',
     });
     const cookies2 = extractCookies(loginRes);
-    const allCookies = [...cookies1, ...cookies2];
+    let allCookies = mergeCookies(cookies1, cookies2);
+    const loginBody = await loginRes.text();
 
-    // Follow redirect if any
-    const redir = loginRes.headers.get('location');
-    let cookies3 = [];
+    // Follow redirect(s)
+    let redir = loginRes.headers.get('location');
     if (redir) {
-      const redirUrl = redir.startsWith('http') ? redir : `${BASE}${redir}`;
+      const redirUrl = redir.startsWith('http') ? redir : `${BASE}${redir.startsWith('/') ? '' : '/'}${redir}`;
       const redirRes = await fetch(redirUrl, {
         headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
         redirect: 'manual',
       });
-      cookies3 = extractCookies(redirRes);
-    }
-    const finalCookies = [...allCookies, ...cookies3];
+      const cookies3 = extractCookies(redirRes);
+      allCookies = mergeCookies(allCookies, cookies3);
 
-    // Step 3: Try blacklist URLs
-    const urls = [
-      `${BASE}/V2/blacklist/search?jaxPhone=${phone}`,
-      `${BASE}/V2/blacklist/search%26jaxPhone%3D${phone}`,
-      `${BASE}/blacklist/search?jaxPhone=${phone}`,
-      `${BASE}/parcels?action=checkPhone&phone=${phone}`,
-    ];
-
-    for (const url of urls) {
-      try {
-        const r = await fetch(url, {
-          headers: {
-            'User-Agent': UA,
-            'Cookie': finalCookies.join('; '),
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'text/html, application/json, */*',
-            'Referer': `${BASE}/parcels?action=add`,
-          },
+      // Follow second redirect if needed
+      const redir2 = redirRes.headers.get('location');
+      if (redir2) {
+        const redir2Url = redir2.startsWith('http') ? redir2 : `${BASE}${redir2.startsWith('/') ? '' : '/'}${redir2}`;
+        const redir2Res = await fetch(redir2Url, {
+          headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
+          redirect: 'manual',
         });
-        const html = await r.text();
-        if (r.status >= 400 || html.includes('ErrorDocument') || html.includes('<!DOCTYPE HTML PUBLIC')) continue;
+        allCookies = mergeCookies(allCookies, extractCookies(redir2Res));
+      }
+    }
 
-        const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
-        const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
-
-        if (livMatch || retMatch || html.includes('existe') || html.includes('blackListResult')) {
-          const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
-          const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-          const exists = delivered > 0 || returned > 0 || html.toLowerCase().includes('existe');
-          return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
-        }
-        if (html.includes('nouveau') || html.includes('Nouveau')) {
-          return res.json({ exists: false, source: 'ozone' });
+    // Also try JSON login in case ajax-form expects JSON response
+    if (!redir && loginRes.status === 200) {
+      let jsonSuccess = false;
+      try {
+        const parsed = JSON.parse(loginBody);
+        if (parsed.success || parsed.redirect || parsed.status === 'success') {
+          jsonSuccess = true;
+          if (parsed.redirect) {
+            const jUrl = parsed.redirect.startsWith('http') ? parsed.redirect : `${BASE}/${parsed.redirect.replace(/^\//, '')}`;
+            const jRes = await fetch(jUrl, {
+              headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
+              redirect: 'manual',
+            });
+            allCookies = mergeCookies(allCookies, extractCookies(jRes));
+          }
         }
       } catch {}
     }
 
-    // Debug
+    // Step 3: Try blacklist search
+    const searchUrl = `${BASE}/V2/blacklist/search`;
+    const r = await fetch(`${searchUrl}?jaxPhone=${phone}`, {
+      headers: {
+        'User-Agent': UA,
+        'Cookie': allCookies.join('; '),
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'text/html, application/json, */*',
+        'Referer': `${BASE}/parcels?action=add`,
+      },
+    });
+    const html = await r.text();
+
+    // Check if we got a valid blacklist response
+    if (r.status < 400 && !html.includes('<!DOCTYPE') && !html.includes('window.location')) {
+      const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
+      const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+
+      if (livMatch || retMatch || html.includes('existe') || html.includes('blackListResult') || html.includes('blacklist')) {
+        const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
+        const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
+        const exists = delivered > 0 || returned > 0 || html.toLowerCase().includes('existe');
+        return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
+      }
+      if (html.includes('nouveau') || html.includes('Nouveau') || html.trim() === '' || html.includes('Aucun')) {
+        return res.json({ exists: false, source: 'ozone' });
+      }
+    }
+
+    // Debug: check if logged in
     const debugRes = await fetch(`${BASE}/parcels?action=add`, {
-      headers: { 'User-Agent': UA, 'Cookie': finalCookies.join('; ') },
+      headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
     });
     const dHtml = await debugRes.text();
     const loggedIn = dHtml.includes('VICTOURY') || dHtml.includes('Nouveau Colis') || dHtml.includes('parcel_phone');
@@ -119,16 +171,20 @@ export default async function handler(req, res) {
     return res.json({
       error: 'no_endpoint_worked',
       loggedIn,
-      cookieCount: finalCookies.length,
-      cookies: finalCookies.map(c => c.split('=')[0]),
-      token: token ? token.substring(0, 10) + '...' : 'missing',
+      cookieCount: allCookies.length,
+      loginUrl,
+      emailField,
+      passField,
+      hiddenInputs,
       loginStatus: loginRes.status,
       loginRedirect: redir || 'none',
-      loginPageSnippet: loginHtml.substring(loginHtml.indexOf('<form'), loginHtml.indexOf('<form') + 800).replace(/\s+/g, ' '),
-      loginRedirect: redir || 'none',
-      debugSnippet: dHtml.substring(0, 500),
+      loginBodySnippet: loginBody.substring(0, 500),
+      blacklistStatus: r.status,
+      blacklistSnippet: html.substring(0, 500),
+      debugLoggedIn: loggedIn,
+      debugSnippet: dHtml.substring(0, 300),
     });
   } catch (e) {
-    return res.status(500).json({ error: e.message, stack: e.stack?.substring(0, 200) });
+    return res.status(500).json({ error: e.message, stack: e.stack?.substring(0, 300) });
   }
 }
