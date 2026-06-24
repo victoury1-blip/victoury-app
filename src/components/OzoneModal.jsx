@@ -97,50 +97,16 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     const ctrl = new AbortController();
     const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone;
 
-    (async () => {
-      try {
-        // Step 1: Login to Ozone via proxy to get session
-        const loginBody = new URLSearchParams();
-        loginBody.append('email', 'victoury1@gmail.com');
-        loginBody.append('password', '0663372556@SIMO@SIMO@');
-        loginBody.append('_token', '');
-        await fetch('/ozone-client/login', {
-          method: 'POST',
-          signal: ctrl.signal,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: loginBody.toString(),
-          credentials: 'include',
-        });
+    fetch(`/api/ozone-check?phone=${bare}`, { signal: ctrl.signal })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { setPhoneHistory(null); }
+        else if (data.exists) { setPhoneHistory({ exists: true, delivered: data.delivered, returned: data.returned, total: data.total }); }
+        else { setPhoneHistory({ exists: false }); }
+        setPhoneHistoryLoading(false);
+      })
+      .catch(e => { if (e.name !== 'AbortError') { setPhoneHistory(null); setPhoneHistoryLoading(false); } });
 
-        // Step 2: Call blacklist endpoint with session
-        const res = await fetch(`/ozone-client/V2/blacklist/search&jaxPhone=${bare}`, {
-          signal: ctrl.signal,
-          credentials: 'include',
-          headers: { 'Accept': 'text/html, */*', 'X-Requested-With': 'XMLHttpRequest' },
-        });
-        if (res.ok) {
-          const text = await res.text();
-          const isBlacklist = text.includes('blackListResult') || /Livr[ée]*\s*:/i.test(text) || /Retourn[ée]*\s*:/i.test(text) || text.includes('existe') || text.includes('nouveau');
-          if (isBlacklist) {
-            const livMatch = text.match(/Livr[ée]*\s*:\s*(\d+)/i);
-            const retMatch = text.match(/Retourn[ée]*\s*:\s*(\d+)/i);
-            const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
-            const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-            if (delivered > 0 || returned > 0 || text.toLowerCase().includes('existe')) {
-              setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned });
-            } else {
-              setPhoneHistory({ exists: false });
-            }
-            setPhoneHistoryLoading(false);
-            return;
-          }
-        }
-      } catch (e) {
-        if (e.name === 'AbortError') return;
-      }
-      setPhoneHistory(null);
-      setPhoneHistoryLoading(false);
-    })();
     return () => ctrl.abort();
   }, [form.phone]);
 
