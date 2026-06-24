@@ -105,20 +105,17 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
         });
         if (res.ok) {
           const html = await res.text();
-          const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
-          const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
-          if (livMatch || retMatch) {
+          const isBlacklistResponse = html.includes('blackListResult') || /Livr[ée]*\s*:/i.test(html) || /Retourn[ée]*\s*:/i.test(html) || html.includes('existe') || html.includes('nouveau');
+          if (isBlacklistResponse) {
+            const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
+            const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
             const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
             const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-            const exists = delivered > 0 || returned > 0;
-            if (exists || html.toLowerCase().includes('existe')) {
+            if (delivered > 0 || returned > 0 || html.toLowerCase().includes('existe')) {
               setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned });
-              setPhoneHistoryLoading(false);
-              return;
+            } else {
+              setPhoneHistory({ exists: false });
             }
-          }
-          if (html.toLowerCase().includes('nouveau') || html.toLowerCase().includes('not found') || (html.trim().length > 0 && !html.toLowerCase().includes('existe'))) {
-            setPhoneHistory({ exists: false });
             setPhoneHistoryLoading(false);
             return;
           }
