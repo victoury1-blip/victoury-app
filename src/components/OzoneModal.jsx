@@ -92,83 +92,57 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
 
   useEffect(() => {
     const phone = (form.phone || '').replace(/[\s\-\.]/g, '');
-    const cid = form.customerId || cfg.customerId;
-    const key = form.apiKey || cfg.apiKey;
-    if (!phone || phone.length < 9 || !cid || !key) { setPhoneHistory(null); return; }
+    if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
     const ctrl = new AbortController();
     const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone;
 
     (async () => {
-      const endpoints = [
-        `/ozone-client/V2/blacklist/search&jaxPhone=${bare}&customer_id=${cid}&api_key=${key}`,
-        `/ozone-client/V2/blacklist/search?jaxPhone=${bare}&customer_id=${cid}&api_key=${key}`,
-        `/ozone-api/customers/${cid}/${key}/check-phone/${bare}`,
-        `/ozone-api/customers/${cid}/${key}/check-phone?phone=${bare}`,
-        `/ozone-api/V2/blacklist/search?jaxPhone=${bare}&customer_id=${cid}&api_key=${key}`,
-      ];
-      for (const url of endpoints) {
-        if (ctrl.signal.aborted) return;
-        try {
-          const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept': 'text/html, application/json, */*' } });
-          if (!res.ok) continue;
+      try {
+        // Step 1: Login to Ozone via proxy to get session
+        const loginBody = new URLSearchParams();
+        loginBody.append('email', 'victoury1@gmail.com');
+        loginBody.append('password', '0663372556@SIMO@SIMO@');
+        loginBody.append('_token', '');
+        await fetch('/ozone-client/login', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: loginBody.toString(),
+          credentials: 'include',
+        });
+
+        // Step 2: Call blacklist endpoint with session
+        const res = await fetch(`/ozone-client/V2/blacklist/search&jaxPhone=${bare}`, {
+          signal: ctrl.signal,
+          credentials: 'include',
+          headers: { 'Accept': 'text/html, */*', 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (res.ok) {
           const text = await res.text();
-          let parsed = false;
-
-          // Try JSON
-          try {
-            const json = JSON.parse(text);
-            const d = json['CHECK-PHONE'] || json['check-phone'] || json;
-            let delivered = 0, returned = 0, total = 0, exists = false;
-            if (Array.isArray(d)) {
-              total = d.length; exists = total > 0;
-              for (const p of d) {
-                const st = (p.status || p.STATUS || p.statut || '').toString().toLowerCase();
-                if (st.includes('livr') || st.includes('deliver')) delivered++;
-                else if (st.includes('retour') || st.includes('return') || st.includes('refus')) returned++;
-              }
-            } else if (d && typeof d === 'object') {
-              delivered = parseInt(d['DELIVERED'] || d['delivered'] || d['livre'] || '0', 10);
-              returned = parseInt(d['RETURNED'] || d['returned'] || d['retourne'] || '0', 10);
-              total = parseInt(d['TOTAL'] || d['total'] || '0', 10) || (delivered + returned);
-              exists = !!(d['RESULT'] === 'FOUND' || d['exists'] || delivered > 0 || returned > 0);
+          const isBlacklist = text.includes('blackListResult') || /Livr[ée]*\s*:/i.test(text) || /Retourn[ée]*\s*:/i.test(text) || text.includes('existe') || text.includes('nouveau');
+          if (isBlacklist) {
+            const livMatch = text.match(/Livr[ée]*\s*:\s*(\d+)/i);
+            const retMatch = text.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+            const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
+            const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
+            if (delivered > 0 || returned > 0 || text.toLowerCase().includes('existe')) {
+              setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned });
+            } else {
+              setPhoneHistory({ exists: false });
             }
-            if (exists || delivered > 0 || returned > 0) {
-              setPhoneHistory({ exists: true, delivered, returned, total, source: 'ozone' });
-              setPhoneHistoryLoading(false); return;
-            }
-            if (d && (d['RESULT'] === 'NOT_FOUND' || (d['message'] || '').toLowerCase().includes('nouveau'))) {
-              setPhoneHistory({ exists: false, source: 'ozone' });
-              setPhoneHistoryLoading(false); return;
-            }
-            parsed = true;
-          } catch {}
-
-          // Try HTML
-          if (!parsed) {
-            const isBlacklist = text.includes('blackListResult') || /Livr[ée]*\s*:/i.test(text) || /Retourn[ée]*\s*:/i.test(text) || text.includes('existe') || text.includes('nouveau');
-            if (isBlacklist) {
-              const livMatch = text.match(/Livr[ée]*\s*:\s*(\d+)/i);
-              const retMatch = text.match(/Retourn[ée]*\s*:\s*(\d+)/i);
-              const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
-              const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-              if (delivered > 0 || returned > 0 || text.toLowerCase().includes('existe')) {
-                setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned, source: 'ozone' });
-              } else {
-                setPhoneHistory({ exists: false, source: 'ozone' });
-              }
-              setPhoneHistoryLoading(false); return;
-            }
+            setPhoneHistoryLoading(false);
+            return;
           }
-        } catch (e) {
-          if (e.name === 'AbortError') return;
         }
+      } catch (e) {
+        if (e.name === 'AbortError') return;
       }
       setPhoneHistory(null);
       setPhoneHistoryLoading(false);
     })();
     return () => ctrl.abort();
-  }, [form.phone, form.customerId, form.apiKey]);
+  }, [form.phone]);
 
   function parseCities(data) {
     if (!data) return [];
