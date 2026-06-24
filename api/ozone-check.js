@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Step 1: GET login page
+    // Step 1: GET login page to get session cookie
     const loginPage = await fetch(`${BASE}/login`, {
       headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
       redirect: 'follow',
@@ -40,40 +40,30 @@ export default async function handler(req, res) {
     const loginHtml = await loginPage.text();
     const cookies1 = extractCookies(loginPage);
 
-    // Extract all hidden inputs from the form
-    const hiddenInputs = {};
-    const hiddenPattern = /<input[^>]*type=["']hidden["'][^>]*>/gi;
-    let hMatch;
-    while ((hMatch = hiddenPattern.exec(loginHtml)) !== null) {
-      const nameM = hMatch[0].match(/name=["']([^"']+)["']/);
-      const valM = hMatch[0].match(/value=["']([^"']+)["']/);
-      if (nameM) hiddenInputs[nameM[1]] = valM ? valM[1] : '';
+    // Extract all input fields from login form
+    const allInputs = [];
+    const inputPattern = /<input[^>]*>/gi;
+    let im;
+    while ((im = inputPattern.exec(loginHtml)) !== null) {
+      const nameM = im[0].match(/name=["']([^"']+)["']/);
+      const typeM = im[0].match(/type=["']([^"']+)["']/);
+      const valM = im[0].match(/value=["']([^"']*?)["']/);
+      if (nameM) allInputs.push({ name: nameM[1], type: typeM ? typeM[1] : 'text', value: valM ? valM[1] : '' });
     }
 
-    // Find the form action URL
-    const formActionMatch = loginHtml.match(/form[^>]*action=["']([^"']+)["']/);
-    const formAction = formActionMatch ? formActionMatch[1] : `${BASE}/login`;
-    const loginUrl = formAction.startsWith('http') ? formAction : `${BASE}/${formAction.replace(/^\//, '')}`;
-
-    // Find input field names for email and password
-    const emailFieldMatch = loginHtml.match(/<input[^>]*type=["'](?:email|text)["'][^>]*name=["']([^"']+)["']/i)
-      || loginHtml.match(/<input[^>]*name=["']([^"']+)["'][^>]*type=["'](?:email|text)["']/i);
-    const passFieldMatch = loginHtml.match(/<input[^>]*type=["']password["'][^>]*name=["']([^"']+)["']/i)
-      || loginHtml.match(/<input[^>]*name=["']([^"']+)["'][^>]*type=["']password["']/i);
-
-    const emailField = emailFieldMatch ? emailFieldMatch[1] : 'email';
-    const passField = passFieldMatch ? passFieldMatch[1] : 'password';
-
-    // Step 2: POST login
-    const body = new URLSearchParams();
-    body.append(emailField, EMAIL);
-    body.append(passField, PASS);
-    for (const [k, v] of Object.entries(hiddenInputs)) {
-      body.append(k, v);
+    // Try Method 1: POST form-urlencoded to login?action=login
+    const body1 = new URLSearchParams();
+    body1.append('email', EMAIL);
+    body1.append('password', PASS);
+    body1.append('remember', 'on');
+    // Add any hidden fields
+    for (const inp of allInputs) {
+      if (inp.type === 'hidden' && inp.name !== 'email' && inp.name !== 'password') {
+        body1.append(inp.name, inp.value);
+      }
     }
-    body.append('remember', 'on');
 
-    const loginRes = await fetch(loginUrl, {
+    const loginRes1 = await fetch(`${BASE}/login?action=login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -82,71 +72,87 @@ export default async function handler(req, res) {
         'Referer': `${BASE}/login`,
         'Origin': BASE,
         'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/html, */*',
       },
-      body: body.toString(),
+      body: body1.toString(),
       redirect: 'manual',
     });
-    const cookies2 = extractCookies(loginRes);
+    const loginBody1 = await loginRes1.text();
+    const cookies2 = extractCookies(loginRes1);
     let allCookies = mergeCookies(cookies1, cookies2);
-    const loginBody = await loginRes.text();
+    const redir1 = loginRes1.headers.get('location');
 
-    // Follow redirect(s)
-    let redir = loginRes.headers.get('location');
+    // Try Method 2: POST JSON
+    const loginRes2 = await fetch(`${BASE}/login?action=login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': UA,
+        'Cookie': cookies1.join('; '),
+        'Referer': `${BASE}/login`,
+        'Origin': BASE,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/html, */*',
+      },
+      body: JSON.stringify({ email: EMAIL, password: PASS, remember: true }),
+      redirect: 'manual',
+    });
+    const loginBody2 = await loginRes2.text();
+    const cookies3 = extractCookies(loginRes2);
+    allCookies = mergeCookies(allCookies, cookies3);
+    const redir2 = loginRes2.headers.get('location');
+
+    // Try Method 3: POST to /login (without ?action=login)
+    const loginRes3 = await fetch(`${BASE}/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': UA,
+        'Cookie': cookies1.join('; '),
+        'Referer': `${BASE}/login`,
+        'Origin': BASE,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/html, */*',
+      },
+      body: body1.toString(),
+      redirect: 'manual',
+    });
+    const loginBody3 = await loginRes3.text();
+    const cookies4 = extractCookies(loginRes3);
+    allCookies = mergeCookies(allCookies, cookies4);
+    const redir3 = loginRes3.headers.get('location');
+
+    // Follow any redirect we got
+    const redir = redir1 || redir2 || redir3;
     if (redir) {
       const redirUrl = redir.startsWith('http') ? redir : `${BASE}${redir.startsWith('/') ? '' : '/'}${redir}`;
       const redirRes = await fetch(redirUrl, {
         headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
         redirect: 'manual',
       });
-      const cookies3 = extractCookies(redirRes);
-      allCookies = mergeCookies(allCookies, cookies3);
-
-      // Follow second redirect if needed
-      const redir2 = redirRes.headers.get('location');
-      if (redir2) {
-        const redir2Url = redir2.startsWith('http') ? redir2 : `${BASE}${redir2.startsWith('/') ? '' : '/'}${redir2}`;
-        const redir2Res = await fetch(redir2Url, {
-          headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
-          redirect: 'manual',
-        });
-        allCookies = mergeCookies(allCookies, extractCookies(redir2Res));
-      }
+      allCookies = mergeCookies(allCookies, extractCookies(redirRes));
     }
 
-    // Also try JSON login in case ajax-form expects JSON response
-    if (!redir && loginRes.status === 200) {
-      let jsonSuccess = false;
-      try {
-        const parsed = JSON.parse(loginBody);
-        if (parsed.success || parsed.redirect || parsed.status === 'success') {
-          jsonSuccess = true;
-          if (parsed.redirect) {
-            const jUrl = parsed.redirect.startsWith('http') ? parsed.redirect : `${BASE}/${parsed.redirect.replace(/^\//, '')}`;
-            const jRes = await fetch(jUrl, {
-              headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
-              redirect: 'manual',
-            });
-            allCookies = mergeCookies(allCookies, extractCookies(jRes));
-          }
-        }
-      } catch {}
-    }
-
-    // Step 3: Try blacklist search
-    const searchUrl = `${BASE}/V2/blacklist/search`;
-    const r = await fetch(`${searchUrl}?jaxPhone=${phone}`, {
-      headers: {
-        'User-Agent': UA,
-        'Cookie': allCookies.join('; '),
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'text/html, application/json, */*',
-        'Referer': `${BASE}/parcels?action=add`,
-      },
+    // Check if logged in
+    const checkRes = await fetch(`${BASE}/parcels?action=add`, {
+      headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
     });
-    const html = await r.text();
+    const checkHtml = await checkRes.text();
+    const loggedIn = checkHtml.includes('VICTOURY') || checkHtml.includes('Nouveau Colis') || checkHtml.includes('parcel_phone');
 
-    // Check if we got a valid blacklist response
-    if (r.status < 400 && !html.includes('<!DOCTYPE') && !html.includes('window.location')) {
+    if (loggedIn) {
+      // We're in! Try blacklist search
+      const r = await fetch(`${BASE}/V2/blacklist/search?jaxPhone=${phone}`, {
+        headers: {
+          'User-Agent': UA,
+          'Cookie': allCookies.join('; '),
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'text/html, application/json, */*',
+          'Referer': `${BASE}/parcels?action=add`,
+        },
+      });
+      const html = await r.text();
+
       const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
       const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
 
@@ -159,30 +165,25 @@ export default async function handler(req, res) {
       if (html.includes('nouveau') || html.includes('Nouveau') || html.trim() === '' || html.includes('Aucun')) {
         return res.json({ exists: false, source: 'ozone' });
       }
+
+      return res.json({
+        error: 'logged_in_but_blacklist_unclear',
+        loggedIn: true,
+        blacklistStatus: r.status,
+        blacklistResponse: html.substring(0, 800),
+      });
     }
 
-    // Debug: check if logged in
-    const debugRes = await fetch(`${BASE}/parcels?action=add`, {
-      headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
-    });
-    const dHtml = await debugRes.text();
-    const loggedIn = dHtml.includes('VICTOURY') || dHtml.includes('Nouveau Colis') || dHtml.includes('parcel_phone');
-
+    // Not logged in — return debug
     return res.json({
-      error: 'no_endpoint_worked',
-      loggedIn,
+      error: 'login_failed',
+      formInputs: allInputs,
+      method1: { status: loginRes1.status, redirect: redir1 || 'none', body: loginBody1.substring(0, 400) },
+      method2: { status: loginRes2.status, redirect: redir2 || 'none', body: loginBody2.substring(0, 400) },
+      method3: { status: loginRes3.status, redirect: redir3 || 'none', body: loginBody3.substring(0, 400) },
       cookieCount: allCookies.length,
-      loginUrl,
-      emailField,
-      passField,
-      hiddenInputs,
-      loginStatus: loginRes.status,
-      loginRedirect: redir || 'none',
-      loginBodySnippet: loginBody.substring(0, 500),
-      blacklistStatus: r.status,
-      blacklistSnippet: html.substring(0, 500),
-      debugLoggedIn: loggedIn,
-      debugSnippet: dHtml.substring(0, 300),
+      loginPageSize: loginHtml.length,
+      formSnippet: loginHtml.substring(loginHtml.indexOf('<form'), loginHtml.indexOf('</form>') + 7).substring(0, 1500),
     });
   } catch (e) {
     return res.status(500).json({ error: e.message, stack: e.stack?.substring(0, 300) });
