@@ -178,12 +178,12 @@ export default async function handler(req, res) {
     return res.json({
       error: 'login_failed',
       formInputs: allInputs,
-      method1: { status: loginRes1.status, redirect: redir1 || 'none', body: loginBody1.substring(0, 400) },
-      method2: { status: loginRes2.status, redirect: redir2 || 'none', body: loginBody2.substring(0, 400) },
-      method3: { status: loginRes3.status, redirect: redir3 || 'none', body: loginBody3.substring(0, 400) },
+      method1: { status: loginRes1.status, redirect: redir1 || 'none', body: loginBody1.substring(0, 1000) },
+      method2: { status: loginRes2.status, redirect: redir2 || 'none', body: loginBody2.substring(0, 1000) },
+      sentBody: body1.toString(),
       cookieCount: allCookies.length,
       loginPageSize: loginHtml.length,
-      formSnippet: loginHtml.substring(loginHtml.indexOf('<form'), loginHtml.indexOf('</form>') + 7).substring(0, 1500),
+      formSnippet: loginHtml.substring(loginHtml.indexOf('<form'), loginHtml.indexOf('</form>') + 7).substring(0, 2000),
     });
   } catch (e) {
     return res.status(500).json({ error: e.message, stack: e.stack?.substring(0, 300) });
