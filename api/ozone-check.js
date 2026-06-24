@@ -141,66 +141,30 @@ export default async function handler(req, res) {
     const loggedIn = checkHtml.includes('VICTOURY') || checkHtml.includes('Nouveau Colis') || checkHtml.includes('parcel_phone');
 
     if (loggedIn) {
-      // Try multiple methods to search blacklist
-      // First: scan parcels page source for AJAX endpoints related to phone/blacklist
-      const parcelsPage = await fetch(`${BASE}/parcels?action=add`, {
-        headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
+      // The correct endpoint: V2/BlackList/SearchAjax?Phone=XXXX
+      const r = await fetch(`${BASE}/V2/BlackList/SearchAjax?Phone=${phone}`, {
+        headers: {
+          'User-Agent': UA,
+          'Cookie': allCookies.join('; '),
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'text/html, application/json, */*',
+          'Referer': `${BASE}/parcels?action=add`,
+        },
       });
-      const parcelsHtml = await parcelsPage.text();
+      const html = await r.text();
 
-      // Find all ajaxLink calls and URLs mentioning blacklist/phone
-      const ajaxLinks = [];
-      const ajaxPattern = /ajaxLink\s*\(\s*['"]([^'"]+)['"]/g;
-      let m;
-      while ((m = ajaxPattern.exec(parcelsHtml)) !== null) {
-        ajaxLinks.push(m[1]);
+      if (html.trim()) {
+        // Parse: "Ce numéro existe déjà. ( Livré : 1) ( Retourné : 0) fois."
+        const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
+        const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+        const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
+        const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
+        const exists = delivered > 0 || returned > 0 || html.toLowerCase().includes('existe');
+        return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
       }
 
-      // Find any URL/endpoint mentioning phone, blacklist, or search
-      const phoneRelated = [];
-      const urlPattern = /['"]([^'"]*(?:phone|blacklist|search|check)[^'"]*)['"]/gi;
-      while ((m = urlPattern.exec(parcelsHtml)) !== null) {
-        if (m[1].length < 200) phoneRelated.push(m[1]);
-      }
-
-      // Find the blackListResult element and surrounding JS
-      const blIdx = parcelsHtml.indexOf('blackListResult');
-      const blacklistContext = blIdx >= 0 ? parcelsHtml.substring(Math.max(0, blIdx - 500), blIdx + 500) : 'not found';
-
-      // Find parcel_phone input and surrounding JS
-      const phIdx = parcelsHtml.indexOf('parcel_phone');
-      const phoneContext = phIdx >= 0 ? parcelsHtml.substring(Math.max(0, phIdx - 300), phIdx + 500) : 'not found';
-
-      // Now try the ajaxLink URLs we found
-      const results = [];
-      for (const link of ajaxLinks) {
-        if (!link.includes('blacklist') && !link.includes('phone') && !link.includes('search')) continue;
-        const url = `${BASE}/${link.replace(/&jaxPhone=.*/, '')}?jaxPhone=${phone}`;
-        try {
-          const r = await fetch(url, {
-            headers: {
-              'User-Agent': UA,
-              'Cookie': allCookies.join('; '),
-              'X-Requested-With': 'XMLHttpRequest',
-              'Accept': '*/*',
-              'Referer': `${BASE}/parcels?action=add`,
-            },
-          });
-          const html = await r.text();
-          results.push({ url, status: r.status, len: html.trim().length, body: html.substring(0, 500) });
-        } catch {}
-      }
-
-      return res.json({
-        error: 'debug_parcels_page',
-        loggedIn: true,
-        phone,
-        ajaxLinks,
-        phoneRelated: phoneRelated.slice(0, 20),
-        blacklistContext: blacklistContext.replace(/\s+/g, ' ').substring(0, 1000),
-        phoneContext: phoneContext.replace(/\s+/g, ' ').substring(0, 800),
-        results,
-      });
+      // Empty response = new number
+      return res.json({ exists: false, source: 'ozone' });
     }
 
     // Not logged in — return debug
