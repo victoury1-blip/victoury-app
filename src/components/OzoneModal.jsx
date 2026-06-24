@@ -393,7 +393,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
               {phoneHistoryLoading && (
                 <div className="flex items-center gap-2 text-xs text-gray-400">
                   <Loader2 size={12} className="animate-spin" />
-                  <span>جاري التحقق من الرقم...</span>
+                  <span>Vérification du numéro...</span>
                 </div>
               )}
               {phoneHistory && !phoneHistoryLoading && (
@@ -406,16 +406,16 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                 }`}>
                   {phoneHistory.exists ? (
                     <>
-                      <p dir="rtl">هاد الرقم موجود عندنا. ( تم التوصيل: <strong>{phoneHistory.delivered}</strong> ) ( مرجوع: <strong>{phoneHistory.returned}</strong> ) من أصل {phoneHistory.total} طلب.</p>
+                      <p>Ce numéro existe déjà. ( Livré : <strong>{phoneHistory.delivered}</strong> ) ( Retourné : <strong>{phoneHistory.returned}</strong> ) fois. Total : {phoneHistory.total} colis.</p>
                       {phoneHistory.returned > 0 && phoneHistory.delivered === 0 && (
-                        <p dir="rtl" className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                        <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
                           <AlertTriangle size={12} />
-                          تحذير: ما توصل حتى كوليس، {phoneHistory.returned} مرجوع!
+                          ⚠ Attention : aucun colis livré, {phoneHistory.returned} retour{phoneHistory.returned > 1 ? 's' : ''} !
                         </p>
                       )}
                     </>
                   ) : (
-                    <p dir="rtl">✅ رقم جديد — ما كاين حتى سجل من قبل.</p>
+                    <p>✅ Nouveau numéro — aucun historique trouvé.</p>
                   )}
                 </div>
               )}
