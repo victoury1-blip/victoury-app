@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/ozone-client/:path*", "destination": "https://client.ozoneexpress.ma/:path*" },
     { "source": "/ozone-api/:path*", "destination": "https://api.ozonexpress.ma/:path*" },
     { "source": "/wc-api/:path*", "destination": "https://victoury-maroc.com/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }

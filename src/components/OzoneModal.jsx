@@ -94,15 +94,51 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     const phone = (form.phone || '').replace(/[\s\-\.]/g, '');
     if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
-    const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone.startsWith('0') ? phone : phone;
-    supabase.from('orders').select('id, status').ilike('phone', `%${bare.slice(-9)}`)
-      .then(({ data }) => {
-        if (!data || !data.length) { setPhoneHistory({ exists: false }); setPhoneHistoryLoading(false); return; }
-        const delivered = data.filter(o => o.status === 'livre').length;
-        const returned = data.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
-        setPhoneHistory({ exists: true, total: data.length, delivered, returned });
-        setPhoneHistoryLoading(false);
-      }).catch(() => { setPhoneHistory(null); setPhoneHistoryLoading(false); });
+    const ctrl = new AbortController();
+    const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone;
+
+    (async () => {
+      try {
+        const res = await fetch(`/ozone-client/V2/blacklist/search&jaxPhone=${bare}`, {
+          signal: ctrl.signal,
+          headers: { 'Accept': 'text/html, */*' },
+        });
+        if (res.ok) {
+          const html = await res.text();
+          const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
+          const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+          if (livMatch || retMatch) {
+            const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
+            const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
+            const exists = delivered > 0 || returned > 0;
+            if (exists || html.toLowerCase().includes('existe')) {
+              setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned });
+              setPhoneHistoryLoading(false);
+              return;
+            }
+          }
+          if (html.toLowerCase().includes('nouveau') || html.toLowerCase().includes('not found') || (html.trim().length > 0 && !html.toLowerCase().includes('existe'))) {
+            setPhoneHistory({ exists: false });
+            setPhoneHistoryLoading(false);
+            return;
+          }
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+      }
+      try {
+        const { data } = await supabase.from('orders').select('id, status').ilike('phone', `%${bare.slice(-9)}`);
+        if (data && data.length > 0) {
+          const delivered = data.filter(o => o.status === 'livre').length;
+          const returned = data.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
+          setPhoneHistory({ exists: true, total: data.length, delivered, returned });
+        } else {
+          setPhoneHistory({ exists: false });
+        }
+      } catch { setPhoneHistory(null); }
+      setPhoneHistoryLoading(false);
+    })();
+    return () => ctrl.abort();
   }, [form.phone]);
 
   function parseCities(data) {
