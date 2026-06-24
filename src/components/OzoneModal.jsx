@@ -92,51 +92,83 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
 
   useEffect(() => {
     const phone = (form.phone || '').replace(/[\s\-\.]/g, '');
-    if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
+    const cid = form.customerId || cfg.customerId;
+    const key = form.apiKey || cfg.apiKey;
+    if (!phone || phone.length < 9 || !cid || !key) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
     const ctrl = new AbortController();
     const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone;
 
     (async () => {
-      try {
-        const res = await fetch(`/ozone-client/V2/blacklist/search&jaxPhone=${bare}`, {
-          signal: ctrl.signal,
-          headers: { 'Accept': 'text/html, */*' },
-        });
-        if (res.ok) {
-          const html = await res.text();
-          const isBlacklistResponse = html.includes('blackListResult') || /Livr[ée]*\s*:/i.test(html) || /Retourn[ée]*\s*:/i.test(html) || html.includes('existe') || html.includes('nouveau');
-          if (isBlacklistResponse) {
-            const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
-            const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
-            const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
-            const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-            if (delivered > 0 || returned > 0 || html.toLowerCase().includes('existe')) {
-              setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned });
-            } else {
-              setPhoneHistory({ exists: false });
+      const endpoints = [
+        `/ozone-client/V2/blacklist/search&jaxPhone=${bare}&customer_id=${cid}&api_key=${key}`,
+        `/ozone-client/V2/blacklist/search?jaxPhone=${bare}&customer_id=${cid}&api_key=${key}`,
+        `/ozone-api/customers/${cid}/${key}/check-phone/${bare}`,
+        `/ozone-api/customers/${cid}/${key}/check-phone?phone=${bare}`,
+        `/ozone-api/V2/blacklist/search?jaxPhone=${bare}&customer_id=${cid}&api_key=${key}`,
+      ];
+      for (const url of endpoints) {
+        if (ctrl.signal.aborted) return;
+        try {
+          const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept': 'text/html, application/json, */*' } });
+          if (!res.ok) continue;
+          const text = await res.text();
+          let parsed = false;
+
+          // Try JSON
+          try {
+            const json = JSON.parse(text);
+            const d = json['CHECK-PHONE'] || json['check-phone'] || json;
+            let delivered = 0, returned = 0, total = 0, exists = false;
+            if (Array.isArray(d)) {
+              total = d.length; exists = total > 0;
+              for (const p of d) {
+                const st = (p.status || p.STATUS || p.statut || '').toString().toLowerCase();
+                if (st.includes('livr') || st.includes('deliver')) delivered++;
+                else if (st.includes('retour') || st.includes('return') || st.includes('refus')) returned++;
+              }
+            } else if (d && typeof d === 'object') {
+              delivered = parseInt(d['DELIVERED'] || d['delivered'] || d['livre'] || '0', 10);
+              returned = parseInt(d['RETURNED'] || d['returned'] || d['retourne'] || '0', 10);
+              total = parseInt(d['TOTAL'] || d['total'] || '0', 10) || (delivered + returned);
+              exists = !!(d['RESULT'] === 'FOUND' || d['exists'] || delivered > 0 || returned > 0);
             }
-            setPhoneHistoryLoading(false);
-            return;
+            if (exists || delivered > 0 || returned > 0) {
+              setPhoneHistory({ exists: true, delivered, returned, total, source: 'ozone' });
+              setPhoneHistoryLoading(false); return;
+            }
+            if (d && (d['RESULT'] === 'NOT_FOUND' || (d['message'] || '').toLowerCase().includes('nouveau'))) {
+              setPhoneHistory({ exists: false, source: 'ozone' });
+              setPhoneHistoryLoading(false); return;
+            }
+            parsed = true;
+          } catch {}
+
+          // Try HTML
+          if (!parsed) {
+            const isBlacklist = text.includes('blackListResult') || /Livr[ée]*\s*:/i.test(text) || /Retourn[ée]*\s*:/i.test(text) || text.includes('existe') || text.includes('nouveau');
+            if (isBlacklist) {
+              const livMatch = text.match(/Livr[ée]*\s*:\s*(\d+)/i);
+              const retMatch = text.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+              const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
+              const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
+              if (delivered > 0 || returned > 0 || text.toLowerCase().includes('existe')) {
+                setPhoneHistory({ exists: true, delivered, returned, total: delivered + returned, source: 'ozone' });
+              } else {
+                setPhoneHistory({ exists: false, source: 'ozone' });
+              }
+              setPhoneHistoryLoading(false); return;
+            }
           }
+        } catch (e) {
+          if (e.name === 'AbortError') return;
         }
-      } catch (e) {
-        if (e.name === 'AbortError') return;
       }
-      try {
-        const { data } = await supabase.from('orders').select('id, status').ilike('recipient->>phone', `%${bare.slice(-9)}`);
-        if (data && data.length > 0) {
-          const delivered = data.filter(o => o.status === 'livre').length;
-          const returned = data.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
-          setPhoneHistory({ exists: true, total: data.length, delivered, returned });
-        } else {
-          setPhoneHistory({ exists: false });
-        }
-      } catch { setPhoneHistory(null); }
+      setPhoneHistory(null);
       setPhoneHistoryLoading(false);
     })();
     return () => ctrl.abort();
-  }, [form.phone]);
+  }, [form.phone, form.customerId, form.apiKey]);
 
   function parseCities(data) {
     if (!data) return [];
