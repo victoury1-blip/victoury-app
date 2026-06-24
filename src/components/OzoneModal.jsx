@@ -124,7 +124,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
         if (e.name === 'AbortError') return;
       }
       try {
-        const { data } = await supabase.from('orders').select('id, status').ilike('phone', `%${bare.slice(-9)}`);
+        const { data } = await supabase.from('orders').select('id, status').ilike('recipient->>phone', `%${bare.slice(-9)}`);
         if (data && data.length > 0) {
           const delivered = data.filter(o => o.status === 'livre').length;
           const returned = data.filter(o => ['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)).length;
