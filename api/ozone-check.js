@@ -141,36 +141,48 @@ export default async function handler(req, res) {
     const loggedIn = checkHtml.includes('VICTOURY') || checkHtml.includes('Nouveau Colis') || checkHtml.includes('parcel_phone');
 
     if (loggedIn) {
-      // We're in! Try blacklist search
-      const r = await fetch(`${BASE}/V2/blacklist/search?jaxPhone=${phone}`, {
-        headers: {
-          'User-Agent': UA,
-          'Cookie': allCookies.join('; '),
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'text/html, application/json, */*',
-          'Referer': `${BASE}/parcels?action=add`,
-        },
-      });
-      const html = await r.text();
+      // Try multiple blacklist/search URLs
+      const urls = [
+        `${BASE}/V2/blacklist/search?jaxPhone=${phone}`,
+        `${BASE}/blacklist/search?jaxPhone=${phone}`,
+        `${BASE}/V2/blacklist/search&jaxPhone=${phone}`,
+      ];
 
-      const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
-      const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+      const results = [];
+      for (const url of urls) {
+        try {
+          const r = await fetch(url, {
+            headers: {
+              'User-Agent': UA,
+              'Cookie': allCookies.join('; '),
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'text/html, application/json, */*',
+              'Referer': `${BASE}/parcels?action=add`,
+            },
+          });
+          const html = await r.text();
+          results.push({ url, status: r.status, body: html.substring(0, 600) });
 
-      if (livMatch || retMatch || html.includes('existe') || html.includes('blackListResult') || html.includes('blacklist')) {
-        const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
-        const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-        const exists = delivered > 0 || returned > 0 || html.toLowerCase().includes('existe');
-        return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
+          if (r.status >= 400 || html.includes('window.location') || html.includes('<!DOCTYPE')) continue;
+
+          const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
+          const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+
+          if (livMatch || retMatch || html.includes('existe') || html.includes('blackListResult')) {
+            const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
+            const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
+            const exists = delivered > 0 || returned > 0 || html.toLowerCase().includes('existe');
+            return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
+          }
+        } catch {}
       }
-      if (html.includes('nouveau') || html.includes('Nouveau') || html.trim() === '' || html.includes('Aucun')) {
-        return res.json({ exists: false, source: 'ozone' });
-      }
 
+      // Nothing matched — return all raw responses for debug
       return res.json({
-        error: 'logged_in_but_blacklist_unclear',
+        error: 'logged_in_but_no_blacklist_match',
         loggedIn: true,
-        blacklistStatus: r.status,
-        blacklistResponse: html.substring(0, 800),
+        phone,
+        results,
       });
     }
 
