@@ -120,8 +120,11 @@ export default async function handler(req, res) {
       error: 'no_endpoint_worked',
       loggedIn,
       cookieCount: finalCookies.length,
+      cookies: finalCookies.map(c => c.split('=')[0]),
       token: token ? token.substring(0, 10) + '...' : 'missing',
       loginStatus: loginRes.status,
+      loginRedirect: redir || 'none',
+      loginPageSnippet: loginHtml.substring(loginHtml.indexOf('<form'), loginHtml.indexOf('<form') + 800).replace(/\s+/g, ' '),
       loginRedirect: redir || 'none',
       debugSnippet: dHtml.substring(0, 500),
     });
