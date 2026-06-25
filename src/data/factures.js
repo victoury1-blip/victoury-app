@@ -19,17 +19,19 @@ export function saveDeletedIds(ids) {
   localStorage.setItem(DEL_KEY, JSON.stringify(ids));
   cloudSet(DEL_KEY, ids);
 }
-export async function loadDeletedIdsRemote() {
+export async function syncDeletedIds() {
+  const local = loadDeletedIds();
+  let remote = [];
   try {
-    const remote = await cloudGet(DEL_KEY);
-    if (Array.isArray(remote) && remote.length) {
-      const local = loadDeletedIds();
-      const merged = [...new Set([...local, ...remote])];
-      localStorage.setItem(DEL_KEY, JSON.stringify(merged));
-      return merged;
-    }
+    const r = await cloudGet(DEL_KEY);
+    if (Array.isArray(r)) remote = r;
   } catch {}
-  return loadDeletedIds();
+  const merged = [...new Set([...local, ...remote])];
+  localStorage.setItem(DEL_KEY, JSON.stringify(merged));
+  if (merged.length > remote.length || merged.some(id => !remote.includes(id))) {
+    cloudSet(DEL_KEY, merged);
+  }
+  return merged;
 }
 export async function loadFacturesRemote() {
   try {
