@@ -43,19 +43,6 @@ export async function cloudGet(key) {
       return d2.value;
     }
 
-    // Last fallback: any row with this key
-    const { data: d3 } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', key)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (d3?.value !== undefined && d3?.value !== null) {
-      localStorage.setItem(key, JSON.stringify(d3.value));
-      return d3.value;
-    }
-
     return null;
   } catch {
     try {
