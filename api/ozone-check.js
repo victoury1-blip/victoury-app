@@ -179,6 +179,6 @@ export default async function handler(req, res) {
       formSnippet: loginHtml.substring(loginHtml.indexOf('<form'), loginHtml.indexOf('</form>') + 7).substring(0, 2000),
     });
   } catch (e) {
-    return res.status(500).json({ error: e.message, stack: e.stack?.substring(0, 300) });
+    return res.status(500).json({ error: e.message });
   }
 }

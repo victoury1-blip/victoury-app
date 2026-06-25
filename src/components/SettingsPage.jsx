@@ -66,16 +66,10 @@ function Modal({ open, onClose, title, icon, iconBg, children }) {
 
 export default function SettingsPage({ onWooOrdersImported, orders = [], setOrders }) {
   const [openModal, setOpenModal] = useState(null);
-  const [syncLogs, setSyncLogs] = useState([]);
   const [ozoneSyncState, setOzoneSyncState] = useState({ status: 'idle', message: '', count: 0 });
   const [ozoneTrackInput, setOzoneTrackInput] = useState('');
   const [ozoneTrackResult, setOzoneTrackResult] = useState(null);
   const [ozoneTrackLoading, setOzoneTrackLoading] = useState(false);
-
-  useEffect(() => {
-    supabase.from('settings').select('value').eq('key', 'wc_sync_logs').single()
-      .then(({ data }) => { if (Array.isArray(data?.value)) setSyncLogs(data.value); });
-  }, []);
 
   /* ── WooCommerce state ── */
   const [woo, setWoo] = useState({ siteUrl: '', consumerKey: '', consumerSecret: '', showKey: false, showSecret: false, testStatus: 'idle', syncStatus: 'idle', saved: false });
