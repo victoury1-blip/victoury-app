@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
-import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer, BookmarkPlus, Bookmark } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { openLabelPage } from './LabelPrint';
@@ -1080,6 +1080,38 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
   function applyFilter() { setAppliedFilter({ ...filterForm }); setFilterOpen(false); }
   function resetFilter() { setFilterForm(emptyFilter); setAppliedFilter(emptyFilter); setLivreurOpen(false); }
+
+  /* ── Saved filters ── */
+  const [savedFilters, setSavedFilters] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('victoury_saved_filters') || '[]'); } catch { return []; }
+  });
+  const [saveFilterName, setSaveFilterName] = useState('');
+  const [savedFilterDropdown, setSavedFilterDropdown] = useState(false);
+  const savedFilterRef = useRef(null);
+  function persistSavedFilters(list) { localStorage.setItem('victoury_saved_filters', JSON.stringify(list)); setSavedFilters(list); }
+  function handleSaveFilter() {
+    const name = saveFilterName.trim();
+    if (!name) return;
+    const entry = { name, filter: { ...filterForm }, id: Date.now() };
+    const list = [...savedFilters.filter(f => f.name !== name), entry];
+    persistSavedFilters(list);
+    setSaveFilterName('');
+  }
+  function loadSavedFilter(entry) {
+    setFilterForm(entry.filter);
+    setAppliedFilter(entry.filter);
+    setSavedFilterDropdown(false);
+  }
+  function deleteSavedFilter(id) {
+    persistSavedFilters(savedFilters.filter(f => f.id !== id));
+  }
+  React.useEffect(() => {
+    if (!savedFilterDropdown) return;
+    function handler(e) { if (savedFilterRef.current && !savedFilterRef.current.contains(e.target)) setSavedFilterDropdown(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [savedFilterDropdown]);
+
   function parseFrDate(str) {
     if (!str) return null;
     const m = str.match(/(\d+)\/(\d+)\/(\d+)/);
@@ -1453,7 +1485,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
       {/* Table */}
       <div className={`flex-1 overflow-auto ${tab === 'sheet' ? 'hidden' : ''}`}>
-        <table className="w-full text-sm border-collapse min-w-[900px]">
+        <table className="w-full text-sm border-collapse min-w-[900px] hidden md:table">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
                 <th className="px-4 py-3 w-8">
@@ -1465,7 +1497,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
             </tr>
           </thead>
         </table>
-        <div style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
+        <div className="hidden md:block" style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
         <table className="w-full text-sm border-collapse min-w-[900px]">
           <tbody className="divide-y divide-gray-50">
             {colis.length === 0 ? (
@@ -1638,6 +1670,45 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
             })}
           </tbody>
         </table>
+        </div>
+
+        {/* Mobile card view */}
+        <div className="md:hidden">
+          {colis.length === 0 ? (
+            <div className="py-16 text-center text-gray-400 text-sm">Aucun colis dans le pipeline</div>
+          ) : pagedColis.map((o) => (
+            <div key={o.id} className={`bg-white border border-gray-200 rounded-lg p-3 mb-2 mx-3 ${selected.includes(o.id) ? 'ring-2 ring-indigo-400 bg-indigo-50' : isCasa(o.recipient?.city) ? 'border-sky-300 bg-sky-50/70' : ''}`}>
+              {/* Top row: checkbox + tracking + badge */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />
+                  <span className="font-mono text-orange-600 font-bold text-sm">{o.trackingNumber || o.id}</span>
+                </div>
+                <button onClick={() => setEditOrder(o)} className="flex items-center gap-1">
+                  <Badge statusKey={o.status} />
+                  <ChevronDown size={10} className="text-gray-400" />
+                </button>
+              </div>
+              {/* Middle: client + city */}
+              <div className="mb-2">
+                <div className="font-bold text-gray-900 text-sm truncate">{o.recipient.name}</div>
+                <div className="text-xs text-gray-500">{o.recipient.phone}</div>
+                <div className="font-bold text-gray-800 text-xs">{o.recipient.city}</div>
+              </div>
+              {/* Bottom: price + actions */}
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-gray-800 text-sm">{Number(o.price || 0).toFixed(2)} DH</span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setEditOrderFull(o)} className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200" title="Modifier">
+                    <Pencil size={13} />
+                  </button>
+                  <button onClick={() => setDeliveryOrder(o)} className="p-1.5 rounded bg-amber-100 text-amber-600 hover:bg-amber-200" title="Livraison">
+                    <Truck size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
