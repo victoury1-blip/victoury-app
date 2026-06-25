@@ -1211,11 +1211,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   function handleStatusSave(orderId, newStatus, note, reportDate) {
     const ts = getTs();
     const order = orders.find(o => o.id === orderId);
+    const leavePipeline = !COLIS_PIPELINE.includes(newStatus);
     setOrders((prev) => prev.map((o) => {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';
       const addedNote = note ? `\nNote interne: ${note}` : '';
-      return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
+      const updated = { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
+      if (leavePipeline) { updated.validated = false; updated.trackingNumber = null; }
+      return updated;
     }));
     if (order && order.recipient?.phone) {
       const wa = buildWhatsappMessage(order, newStatus);
