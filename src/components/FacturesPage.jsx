@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
-import { loadFactures, saveFactures, loadFacturesRemote, loadDeletedIdsRemote, saveDeletedIds, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
+import { loadFactures, saveFactures, loadFacturesRemote, syncDeletedIds, saveDeletedIds, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
@@ -584,7 +584,7 @@ export default function FacturesPage({ orders }) {
   ));
 
   useEffect(() => {
-    loadDeletedIdsRemote().then(delIds => {
+    syncDeletedIds().then(delIds => {
       delIds.forEach(id => deletedIdsRef.current.add(id));
       return loadFacturesRemote();
     }).then(remote => {
