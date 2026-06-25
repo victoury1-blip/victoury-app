@@ -1149,7 +1149,39 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     });
   }
 
-  const facturedIds = useMemo(() => new Set([...manualFacture]), [manualFacture]);
+  const [paidOrderIds, setPaidOrderIds] = useState(() => {
+    try {
+      const factures = JSON.parse(localStorage.getItem('victoury_factures') || '[]');
+      const ids = new Set();
+      factures.forEach(f => { if (f.statut === 'paye') (f.colis || []).forEach(c => ids.add(c.orderId)); });
+      return ids;
+    } catch { return new Set(); }
+  });
+
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === 'victoury_factures') {
+        try {
+          const factures = JSON.parse(e.newValue || '[]');
+          const ids = new Set();
+          factures.forEach(f => { if (f.statut === 'paye') (f.colis || []).forEach(c => ids.add(c.orderId)); });
+          setPaidOrderIds(ids);
+        } catch {}
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    const interval = setInterval(() => {
+      try {
+        const factures = JSON.parse(localStorage.getItem('victoury_factures') || '[]');
+        const ids = new Set();
+        factures.forEach(f => { if (f.statut === 'paye') (f.colis || []).forEach(c => ids.add(c.orderId)); });
+        setPaidOrderIds(ids);
+      } catch {}
+    }, 5000);
+    return () => { window.removeEventListener('storage', onStorage); clearInterval(interval); };
+  }, []);
+
+  const facturedIds = useMemo(() => new Set([...manualFacture, ...paidOrderIds]), [manualFacture, paidOrderIds]);
 
   function toggleFacture(orderId) {
     setManualFacture(prev => {
