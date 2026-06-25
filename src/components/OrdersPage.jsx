@@ -1431,8 +1431,6 @@ function NewOrderModal({ onClose, onSave }) {
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <input value={prod.color || ''} onChange={(e) => updateProduct(idx, 'color', e.target.value)}
-                        placeholder="Couleur" className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white" />
                       <select value={prod.size || ''} onChange={(e) => updateProduct(idx, 'size', e.target.value)}
                         className="border border-gray-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-16 shrink-0">
                         <option value="">T.</option>
