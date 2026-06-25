@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
-import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
+import { loadFactures, saveFactures, loadFacturesRemote, loadDeletedIdsRemote, saveDeletedIds, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
@@ -584,7 +584,10 @@ export default function FacturesPage({ orders }) {
   ));
 
   useEffect(() => {
-    loadFacturesRemote().then(remote => {
+    loadDeletedIdsRemote().then(delIds => {
+      delIds.forEach(id => deletedIdsRef.current.add(id));
+      return loadFacturesRemote();
+    }).then(remote => {
       if (Array.isArray(remote) && remote.length) {
         const del = deletedIdsRef.current;
         setFactures(prev => {
@@ -667,7 +670,7 @@ export default function FacturesPage({ orders }) {
   function del(id) {
     if (!window.confirm('Supprimer cette facture ?')) return;
     deletedIdsRef.current.add(id);
-    localStorage.setItem('victoury_factures_deleted', JSON.stringify([...deletedIdsRef.current]));
+    saveDeletedIds([...deletedIdsRef.current]);
     setFactures(prev => {
       const list = prev.filter(f => f.id !== id);
       saveFactures(list);

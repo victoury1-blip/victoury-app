@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 const KEY = 'victoury_factures';
 const CTR_KEY = 'victoury_fct_counter';
+const DEL_KEY = 'victoury_factures_deleted';
 
 export function loadFactures() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
@@ -10,6 +11,25 @@ export function loadFactures() {
 export function saveFactures(list) {
   localStorage.setItem(KEY, JSON.stringify(list));
   cloudSet(KEY, list);
+}
+export function loadDeletedIds() {
+  try { return JSON.parse(localStorage.getItem(DEL_KEY) || '[]'); } catch { return []; }
+}
+export function saveDeletedIds(ids) {
+  localStorage.setItem(DEL_KEY, JSON.stringify(ids));
+  cloudSet(DEL_KEY, ids);
+}
+export async function loadDeletedIdsRemote() {
+  try {
+    const remote = await cloudGet(DEL_KEY);
+    if (Array.isArray(remote) && remote.length) {
+      const local = loadDeletedIds();
+      const merged = [...new Set([...local, ...remote])];
+      localStorage.setItem(DEL_KEY, JSON.stringify(merged));
+      return merged;
+    }
+  } catch {}
+  return loadDeletedIds();
 }
 export async function loadFacturesRemote() {
   try {
