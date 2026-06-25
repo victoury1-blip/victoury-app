@@ -66,23 +66,34 @@ export async function cloudGet(key) {
 }
 
 export async function cloudSet(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
   try {
     const userId = await uid();
-    // Delete all rows for this key owned by this user
+    const row = { key, value, updated_at: new Date().toISOString() };
+    if (userId) row.user_id = userId;
+
+    // Try upsert first (most reliable)
+    const { error } = await supabase.from('settings').upsert(row, {
+      onConflict: 'key,user_id',
+    });
+    if (!error) {
+      // Clean up null-user rows if we have a userId
+      if (userId) {
+        await supabase.from('settings').delete().eq('key', key).is('user_id', null);
+      }
+      return;
+    }
+
+    // Fallback: delete then insert
     if (userId) {
       await supabase.from('settings').delete().eq('key', key).eq('user_id', userId);
     }
-    // Also clean up null-user rows
     await supabase.from('settings').delete().eq('key', key).is('user_id', null);
-
-    const row = { key, value, updated_at: new Date().toISOString() };
-    if (userId) row.user_id = userId;
-    const { error } = await supabase.from('settings').insert(row);
-    if (error) throw error;
+    const { error: e2 } = await supabase.from('settings').insert(row);
+    if (e2) throw e2;
   } catch (e) {
     console.error('cloudSet failed:', key, e?.message || e);
   }
-  localStorage.setItem(key, JSON.stringify(value));
 }
 
 export function localGet(key) {
