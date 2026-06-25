@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
-import { loadFactures, saveFactures, loadFacturesRemote, syncDeletedIds, saveDeletedIds, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
+import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
@@ -579,27 +579,14 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 export default function FacturesPage({ orders }) {
   const [factures, setFactures] = useState(() => loadFactures());
   const [newOpen, setNewOpen] = useState(false);
-  const deletedIdsRef = React.useRef(new Set(
-    JSON.parse(localStorage.getItem('victoury_factures_deleted') || '[]')
-  ));
 
   useEffect(() => {
-    syncDeletedIds().then(delIds => {
-      delIds.forEach(id => deletedIdsRef.current.add(id));
-      return loadFacturesRemote();
-    }).then(remote => {
-      if (Array.isArray(remote) && remote.length) {
-        const del = deletedIdsRef.current;
-        setFactures(prev => {
-          const remoteMap = new Map(remote.filter(f => !del.has(f.id)).map(f => [f.id, f]));
-          const localNew = prev.filter(f => !remoteMap.has(f.id) && !del.has(f.id));
-          const merged = [...remoteMap.values(), ...localNew];
-          saveFactures(merged);
-          return merged;
-        });
+    loadFacturesRemote().then(remote => {
+      if (Array.isArray(remote)) {
+        setFactures(remote);
+        saveFactures(remote);
       }
     });
-    // Sync livreurs + frais from cloud for cross-device support
     cloudGet('livreurs').then(remote => {
       if (Array.isArray(remote) && remote.length) {
         localStorage.setItem('livreurs', JSON.stringify(remote));
@@ -618,16 +605,9 @@ export default function FacturesPage({ orders }) {
         filter: 'key=eq.victoury_factures',
       }, (payload) => {
         const val = payload.new?.value;
-        if (Array.isArray(val) && val.length) {
-          const del = deletedIdsRef.current;
-          setFactures(prev => {
-            const filtered = val.filter(f => !del.has(f.id));
-            const remoteMap = new Map(filtered.map(f => [f.id, f]));
-            const localNew = prev.filter(f => !remoteMap.has(f.id) && !del.has(f.id));
-            const merged = [...filtered, ...localNew];
-            localStorage.setItem('victoury_factures', JSON.stringify(merged));
-            return merged;
-          });
+        if (Array.isArray(val)) {
+          setFactures(val);
+          localStorage.setItem('victoury_factures', JSON.stringify(val));
         }
       })
       .subscribe();
@@ -669,8 +649,6 @@ export default function FacturesPage({ orders }) {
   }
   function del(id) {
     if (!window.confirm('Supprimer cette facture ?')) return;
-    deletedIdsRef.current.add(id);
-    saveDeletedIds([...deletedIdsRef.current]);
     setFactures(prev => {
       const list = prev.filter(f => f.id !== id);
       saveFactures(list);

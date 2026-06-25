@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 
 const KEY = 'victoury_factures';
 const CTR_KEY = 'victoury_fct_counter';
-const DEL_KEY = 'victoury_factures_deleted';
 
 export function loadFactures() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
@@ -11,27 +10,6 @@ export function loadFactures() {
 export function saveFactures(list) {
   localStorage.setItem(KEY, JSON.stringify(list));
   cloudSet(KEY, list);
-}
-export function loadDeletedIds() {
-  try { return JSON.parse(localStorage.getItem(DEL_KEY) || '[]'); } catch { return []; }
-}
-export function saveDeletedIds(ids) {
-  localStorage.setItem(DEL_KEY, JSON.stringify(ids));
-  cloudSet(DEL_KEY, ids);
-}
-export async function syncDeletedIds() {
-  const local = loadDeletedIds();
-  let remote = [];
-  try {
-    const r = await cloudGet(DEL_KEY);
-    if (Array.isArray(r)) remote = r;
-  } catch {}
-  const merged = [...new Set([...local, ...remote])];
-  localStorage.setItem(DEL_KEY, JSON.stringify(merged));
-  if (merged.length > remote.length || merged.some(id => !remote.includes(id))) {
-    cloudSet(DEL_KEY, merged);
-  }
-  return merged;
 }
 export async function loadFacturesRemote() {
   try {
@@ -51,13 +29,11 @@ export async function nextRef() {
     const { data, error } = await supabase.rpc('next_fct_id');
     if (!error && data) return `FCT-${dd}-${String(data).padStart(4,'0')}`;
   } catch {}
-  /* fallback localStorage */
   const n = parseInt(localStorage.getItem(CTR_KEY) || '0', 10) + 1;
   localStorage.setItem(CTR_KEY, String(n));
   return `FCT-${dd}-${String(n).padStart(4,'0')}`;
 }
 
-/** Eligible order statuses for facturation */
 export const ELIGIBLE_STATUSES = ['livre', 'refuse', 'annule', 'change'];
 
 export function statusLabel(s) {
