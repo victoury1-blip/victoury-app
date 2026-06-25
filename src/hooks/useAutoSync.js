@@ -135,17 +135,11 @@ export default function useAutoSync(session) {
       }
     }
 
-    function handleBeforeUnload() {
-      pushToCloud();
-    }
-
     document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [session]);
 }

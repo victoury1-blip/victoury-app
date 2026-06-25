@@ -422,10 +422,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             onClick={async () => {
               if (!window.confirm('Vider le cache local et recharger depuis Supabase ?')) return;
               /* Sync remote deleted IDs first */
-              const { data } = await supabase.from('settings').select('value').eq('key', 'deleted_order_ids').single();
-              const remote = Array.isArray(data?.value) ? data.value : [];
+              const remote = await cloudGet('deleted_order_ids');
               const local = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]');
-              const merged = [...new Set([...remote, ...local])];
+              const merged = [...new Set([...(Array.isArray(remote) ? remote : []), ...local])];
               localStorage.setItem('deleted_order_ids', JSON.stringify(merged));
               window.location.reload();
             }}
@@ -442,8 +441,8 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               localStorage.clear();
               Object.entries(saved).forEach(([k, v]) => localStorage.setItem(k, v));
               /* Re-sync deleted IDs from Supabase */
-              const { data } = await supabase.from('settings').select('value').eq('key', 'deleted_order_ids').single();
-              if (data?.value) localStorage.setItem('deleted_order_ids', JSON.stringify(data.value));
+              const delRemote = await cloudGet('deleted_order_ids');
+              if (Array.isArray(delRemote)) localStorage.setItem('deleted_order_ids', JSON.stringify(delRemote));
               window.location.reload();
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition"

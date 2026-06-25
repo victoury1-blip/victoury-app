@@ -136,21 +136,25 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
   }
 
   useEffect(() => {
-    /* 1. Use cities saved from LivraisonPage (real IDs from Ozon API) */
-    const stored = (() => { try { return JSON.parse(localStorage.getItem('frais_1') || '[]'); } catch { return []; } })();
+    /* 1. Use cities saved from LivraisonPage (find Ozone livreur dynamically) */
+    const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
+    const ozoneLiv = livreurs.find(l => l.isOzone) || livreurs[0];
+    const fraisKey = ozoneLiv ? `frais_${ozoneLiv.id}` : null;
+    const stored = fraisKey ? (() => { try { return JSON.parse(localStorage.getItem(fraisKey) || '[]'); } catch { return []; } })() : [];
     if (Array.isArray(stored) && stored.length > 0) {
       const list = stored.map((c) => ({ id: c.id, name: c.ville }));
       setCities(list); autoMatchCity(list); setCitiesLoading(false); return;
     }
     /* 1b. Try Supabase if not in localStorage */
-    cloudGet('frais_1').then(remote => {
-      if (Array.isArray(remote) && remote.length > 0) {
-        const list = remote.map((c) => ({ id: c.id, name: c.ville }));
-        localStorage.setItem('frais_1', JSON.stringify(remote));
-        setCities(list); autoMatchCity(list); setCitiesLoading(false);
-        return;
-      }
-    });
+    if (fraisKey) {
+      cloudGet(fraisKey).then(remote => {
+        if (Array.isArray(remote) && remote.length > 0) {
+          const list = remote.map((c) => ({ id: c.id, name: c.ville }));
+          localStorage.setItem(fraisKey, JSON.stringify(remote));
+          setCities(list); autoMatchCity(list); setCitiesLoading(false);
+        }
+      });
+    }
 
     /* 2. Fetch directly from Ozon public cities API */
     (async () => {
