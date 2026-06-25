@@ -399,7 +399,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                   phoneHistory.exists
                     ? phoneHistory.returned > 0 && phoneHistory.delivered === 0
                       ? 'bg-red-50 border border-red-200 text-red-700'
-                      : 'bg-amber-50 border border-amber-200 text-amber-800'
+                      : 'bg-gray-50 border border-gray-200 text-gray-800'
                     : 'bg-green-50 border border-green-100 text-green-700'
                 }`}>
                   {phoneHistory.exists ? (
