@@ -1476,6 +1476,55 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   <button onClick={applyFilter} className="px-4 py-1.5 rounded bg-gray-700 hover:bg-gray-800 text-sm text-white font-semibold transition-colors">Appliquer les filtres</button>
                 </div>
               </div>
+              {/* Saved filters row */}
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-1.5 flex-1">
+                  <input
+                    value={saveFilterName}
+                    onChange={e => setSaveFilterName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveFilter(); }}
+                    placeholder="Nom du filtre..."
+                    className="border border-gray-300 rounded px-2.5 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400 w-40"
+                  />
+                  <button
+                    onClick={handleSaveFilter}
+                    disabled={!saveFilterName.trim()}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-xs text-white font-semibold transition-colors disabled:opacity-40"
+                  >
+                    <BookmarkPlus size={12} /> Sauvegarder
+                  </button>
+                </div>
+                {savedFilters.length > 0 && (
+                  <div ref={savedFilterRef} className="relative">
+                    <button
+                      onClick={() => setSavedFilterDropdown(o => !o)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded border border-indigo-300 bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors"
+                    >
+                      <Bookmark size={12} /> Filtres sauvegardés ({savedFilters.length}) <ChevronDown size={10} />
+                    </button>
+                    {savedFilterDropdown && (
+                      <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[200px] max-h-48 overflow-y-auto">
+                        {savedFilters.map(sf => (
+                          <div key={sf.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                            <button
+                              onMouseDown={() => loadSavedFilter(sf)}
+                              className="text-sm text-gray-800 font-medium text-left flex-1 truncate"
+                            >
+                              {sf.name}
+                            </button>
+                            <button
+                              onMouseDown={() => deleteSavedFilter(sf.id)}
+                              className="p-1 text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
