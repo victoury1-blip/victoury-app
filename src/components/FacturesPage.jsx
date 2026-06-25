@@ -574,12 +574,21 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 export default function FacturesPage({ orders }) {
   const [factures, setFactures] = useState(() => loadFactures());
   const [newOpen, setNewOpen] = useState(false);
+  const deletedIdsRef = React.useRef(new Set(
+    JSON.parse(localStorage.getItem('victoury_factures_deleted') || '[]')
+  ));
 
   useEffect(() => {
     loadFacturesRemote().then(remote => {
-      if (remote) {
-        setFactures(Array.isArray(remote) ? remote : []);
-        saveFactures(Array.isArray(remote) ? remote : []);
+      if (Array.isArray(remote) && remote.length) {
+        const del = deletedIdsRef.current;
+        setFactures(prev => {
+          const remoteMap = new Map(remote.filter(f => !del.has(f.id)).map(f => [f.id, f]));
+          const localNew = prev.filter(f => !remoteMap.has(f.id) && !del.has(f.id));
+          const merged = [...remoteMap.values(), ...localNew];
+          saveFactures(merged);
+          return merged;
+        });
       }
     });
     // Sync livreurs + frais from cloud for cross-device support
@@ -601,9 +610,16 @@ export default function FacturesPage({ orders }) {
         filter: 'key=eq.victoury_factures',
       }, (payload) => {
         const val = payload.new?.value;
-        if (Array.isArray(val)) {
-          setFactures(val);
-          localStorage.setItem('victoury_factures', JSON.stringify(val));
+        if (Array.isArray(val) && val.length) {
+          const del = deletedIdsRef.current;
+          setFactures(prev => {
+            const filtered = val.filter(f => !del.has(f.id));
+            const remoteMap = new Map(filtered.map(f => [f.id, f]));
+            const localNew = prev.filter(f => !remoteMap.has(f.id) && !del.has(f.id));
+            const merged = [...filtered, ...localNew];
+            localStorage.setItem('victoury_factures', JSON.stringify(merged));
+            return merged;
+          });
         }
       })
       .subscribe();
@@ -645,6 +661,8 @@ export default function FacturesPage({ orders }) {
   }
   function del(id) {
     if (!window.confirm('Supprimer cette facture ?')) return;
+    deletedIdsRef.current.add(id);
+    localStorage.setItem('victoury_factures_deleted', JSON.stringify([...deletedIdsRef.current]));
     setFactures(prev => {
       const list = prev.filter(f => f.id !== id);
       saveFactures(list);
