@@ -403,7 +403,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   }, []);
 
   const eligible = useMemo(() => orders.filter(o =>
-    ELIGIBLE_STATUSES.includes(o.status) && o.validated === true && (livreur ? (o.recipient?.delivery || '') === livreur : true)
+    ELIGIBLE_STATUSES.includes(o.status) && (o.validated || o.trackingNumber) && (livreur ? (o.recipient?.delivery || '') === livreur : true)
   ), [orders, livreur]);
 
   const livreurs = [...new Set(orders.map(o => o.recipient?.delivery).filter(Boolean))];
