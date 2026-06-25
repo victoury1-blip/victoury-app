@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package } from 'lucide-react';
 import { loadProducts, loadProductsRemote } from '../data/products';
 import { loadFactures } from '../data/factures';
-import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -62,8 +61,8 @@ export default function ProfitPage({ orders = [] }) {
         });
       }
     });
-    supabase.from('settings').select('value').eq('key', 'victoury_factures').single().then(({ data }) => {
-      if (Array.isArray(data?.value)) setFactures(data.value);
+    cloudGet('victoury_factures').then(data => {
+      if (Array.isArray(data)) setFactures(data);
     });
   }, []);
 

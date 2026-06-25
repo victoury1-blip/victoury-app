@@ -6,7 +6,7 @@ const SYNC_KEYS = [
   'victoury_products',
   'victoury_statuses',
   'victoury_factures',
-  'victoury_facture_ctr',
+  'victoury_fct_counter',
   'livreurs',
   'victoury_recu_ids',
   'victoury_manual_facture',

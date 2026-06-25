@@ -259,7 +259,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     if (!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret) return;
     setWoo((p) => ({ ...p, testStatus: 'loading' }));
     try {
-      const res = await fetch(`/wc-api/wp-json/wc/v3/orders?per_page=1&consumer_key=${woo.consumerKey}&consumer_secret=${woo.consumerSecret}`);
+      const res = await fetch('/wc-api/wp-json/wc/v3/orders?per_page=1', {
+        headers: { 'Authorization': 'Basic ' + btoa(woo.consumerKey + ':' + woo.consumerSecret) },
+      });
       setWoo((p) => ({ ...p, testStatus: res.ok ? 'success' : 'error' }));
     } catch { setWoo((p) => ({ ...p, testStatus: 'error' })); }
   }
@@ -274,7 +276,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   async function syncWoo() {
     setWoo((p) => ({ ...p, syncStatus: 'loading' }));
     try {
-      const res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&consumer_key=${woo.consumerKey}&consumer_secret=${woo.consumerSecret}`);
+      const res = await fetch('/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50', {
+        headers: { 'Authorization': 'Basic ' + btoa(woo.consumerKey + ':' + woo.consumerSecret) },
+      });
       if (!res.ok) throw new Error();
       const data = await res.json();
       const getMeta = (meta, ...keys) => {
