@@ -72,23 +72,21 @@ export async function cloudSet(key, value) {
     const row = { key, value, updated_at: new Date().toISOString() };
     if (userId) row.user_id = userId;
 
-    // Try upsert first (most reliable)
-    const { error } = await supabase.from('settings').upsert(row, {
-      onConflict: 'key,user_id',
-    });
-    if (!error) {
-      // Clean up null-user rows if we have a userId
-      if (userId) {
+    if (userId) {
+      const { error } = await supabase.from('settings').upsert(row, {
+        onConflict: 'key,user_id',
+      });
+      if (!error) {
         await supabase.from('settings').delete().eq('key', key).is('user_id', null);
+        return;
       }
-      return;
     }
 
-    // Fallback: delete then insert
+    // NULL user_id: upsert won't dedupe NULLs, so delete+insert
+    await supabase.from('settings').delete().eq('key', key).is('user_id', null);
     if (userId) {
       await supabase.from('settings').delete().eq('key', key).eq('user_id', userId);
     }
-    await supabase.from('settings').delete().eq('key', key).is('user_id', null);
     const { error: e2 } = await supabase.from('settings').insert(row);
     if (e2) throw e2;
   } catch (e) {
