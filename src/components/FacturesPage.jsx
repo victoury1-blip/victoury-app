@@ -725,6 +725,60 @@ export default function FacturesPage({ orders }) {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
+        {/* Mobile card view */}
+        <div className="md:hidden">
+          {filtered.length === 0 && (
+            <div className="py-16 text-center text-gray-400">Aucune facture</div>
+          )}
+          {filtered.map(f => (
+            <div key={f.id} className="bg-white border border-gray-200 rounded-lg p-4 mb-3 mx-4">
+              {/* Top row: ref + statut */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-mono text-xs font-bold text-gray-700">{f.ref}</span>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${STATUT_STYLE[f.statut]}`}>
+                  {STATUT_LABEL[f.statut]}
+                </span>
+              </div>
+              {/* Livreur */}
+              <div className="text-sm text-gray-700 mb-2">{f.livreur || '—'}</div>
+              {/* Total Net */}
+              <div className="font-bold text-green-700 mb-3">{fmt(f.totalNet)} DH</div>
+              {/* Bottom row: toggles + actions */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500">Clôturé</span>
+                    <button onClick={() => toggleCloture(f)} className="focus:outline-none">
+                      {f.locked
+                        ? <div className="w-10 h-5 bg-blue-500 rounded-full flex items-center justify-end px-0.5"><div className="w-4 h-4 bg-white rounded-full shadow" /></div>
+                        : <div className="w-10 h-5 bg-gray-300 rounded-full flex items-center px-0.5"><div className="w-4 h-4 bg-white rounded-full shadow" /></div>}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500">Versé</span>
+                    <button onClick={() => toggleVerse(f)} className="focus:outline-none">
+                      {f.statut === 'paye'
+                        ? <div className="w-10 h-5 bg-green-500 rounded-full flex items-center justify-end px-0.5"><div className="w-4 h-4 bg-white rounded-full shadow" /></div>
+                        : <div className="w-10 h-5 bg-gray-300 rounded-full flex items-center px-0.5"><div className="w-4 h-4 bg-white rounded-full shadow" /></div>}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setDetail(f)} title="Voir détail"
+                    className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"><Eye size={13} /></button>
+                  <button onClick={() => printFacture(f)} title="PDF"
+                    className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"><Printer size={13} /></button>
+                  {!f.locked && (
+                    <button onClick={() => del(f.id)} title="Supprimer"
+                      className="p-1.5 rounded bg-red-50 text-red-500 hover:bg-red-100"><Trash2 size={13} /></button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Desktop table */}
+        <div className="hidden md:block">
         <table className="w-full text-sm border-collapse">
           <thead className="bg-white border-b border-gray-200 sticky top-0 z-10">
             <tr>
@@ -804,6 +858,7 @@ export default function FacturesPage({ orders }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {newOpen && (
