@@ -94,8 +94,11 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
     onUpdate(updated);
   }
   function toggleVerse() {
-    const updated = { ...facture, statut: facture.statut === 'paye' ? 'en_attente' : 'paye', datePaiement: facture.statut !== 'paye' ? nowTs() : null };
-    onUpdate(updated);
+    if (facture.statut === 'paye') {
+      onUpdate({ ...facture, statut: 'en_attente', locked: false, datePaiement: null });
+    } else {
+      onUpdate({ ...facture, statut: 'paye', locked: true, datePaiement: nowTs() });
+    }
   }
 
   return (
@@ -634,7 +637,11 @@ export default function FacturesPage({ orders }) {
     updateFacture({ ...f, locked: !f.locked, statut: !f.locked ? 'cloture' : 'en_attente' });
   }
   function toggleVerse(f) {
-    updateFacture({ ...f, statut: f.statut === 'paye' ? 'en_attente' : 'paye', datePaiement: f.statut !== 'paye' ? nowTs() : null });
+    if (f.statut === 'paye') {
+      updateFacture({ ...f, statut: 'en_attente', locked: false, datePaiement: null });
+    } else {
+      updateFacture({ ...f, statut: 'paye', locked: true, datePaiement: nowTs() });
+    }
   }
   function del(id) {
     if (!window.confirm('Supprimer cette facture ?')) return;
