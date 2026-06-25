@@ -300,15 +300,31 @@ function printFacture(f) {
 }
 
 /* ─── helpers: get delivery fee from fraisList (supports partial city match) ─── */
+function normalizeCity(name) {
+  return (name || '').toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[-_\s']/g, '')
+    .replace(/ou/g, 'u')
+    .replace(/gu/g, 'g');
+}
+
 function getLivreurFraisFromList(fraisList, city, status) {
   if (!fraisList?.length || !city) return null;
   const cn = city.toLowerCase().trim();
+  const cnN = normalizeCity(city);
   /* 1. Exact match */
   let row = fraisList.find(c => (c.ville || '').toLowerCase().trim() === cn);
-  /* 2. Partial match (French includes order-city or vice versa) */
+  /* 2. Normalized match */
+  if (!row) row = fraisList.find(c => normalizeCity(c.ville) === cnN);
+  /* 3. Partial match */
   if (!row) row = fraisList.find(c => {
     const vl = (c.ville || '').toLowerCase().trim();
     return vl && (vl.includes(cn) || cn.includes(vl));
+  });
+  /* 4. Normalized partial match */
+  if (!row) row = fraisList.find(c => {
+    const vlN = normalizeCity(c.ville);
+    return vlN && (vlN.includes(cnN) || cnN.includes(vlN));
   });
   if (!row) return null;
   if (status === 'livre')  return row.livre  ?? null;
