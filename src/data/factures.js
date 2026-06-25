@@ -1,4 +1,5 @@
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import { supabase } from '../lib/supabase';
 
 const KEY = 'victoury_factures';
 const CTR_KEY = 'victoury_fct_counter';

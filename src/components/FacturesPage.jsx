@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -192,7 +192,7 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
               <button onClick={toggleCloture} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${facture.locked ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-amber-500 text-white hover:bg-amber-600'}`}>
                 {facture.locked ? 'Rouvrir' : 'Clôturer la facture'}
               </button>
-              <button onClick={() => { if(window.confirm('Supprimer cette facture ?')) onDelete(facture.id); }}
+              <button onClick={() => onDelete(facture.id)}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600">
                 <Trash2 size={12} /> Supprimer
               </button>
@@ -298,6 +298,7 @@ function printFacture(f) {
   </body></html>`;
 
   const w = window.open('', '_blank');
+  if (!w) { alert('Popup bloqué — autorisez les popups pour télécharger le PDF.'); return; }
   w.document.write(html);
   w.document.close();
 }
@@ -455,6 +456,10 @@ function NewFactureModal({ orders, onClose, onCreated }) {
         prix: o.price || 0,
         fraisLivraison: selected[o.id] || 0,
         recipient: o.recipient?.name,
+        city: o.recipient?.city,
+        phone: o.recipient?.phone,
+        product: o.product?.name || '',
+        date: o.dateUpdated || o.dateAdded || '',
       })),
       totalLivre,
       totalFrais,
@@ -724,9 +729,6 @@ export default function FacturesPage({ orders }) {
             </select>
           </div>
           <div className="flex gap-2 ml-2">
-            <button className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900">
-              Filtrer
-            </button>
             <button onClick={reset} className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
               <RefreshCw size={13} /> Réinitialiser
             </button>
