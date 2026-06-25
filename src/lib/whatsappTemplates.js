@@ -78,7 +78,7 @@ export function buildWhatsappMessage(order, status) {
     .replace(/\{name\}/g, order.recipient.name || '')
     .replace(/\{tracking\}/g, tn)
     .replace(/\{price\}/g, order.price || '0')
-    .replace(/\{livreur\}/g, livreur?.nom || order.recipient?.delivery || '')
+    .replace(/\{livreur\}/g, dp.name || livreur?.nom || order.recipient?.delivery || '')
     .replace(/\{livreurPhone\}/g, dpPhone)
     .replace(/\{city\}/g, order.recipient?.city || '')
     .replace(/\{address\}/g, order.recipient?.address || '');
