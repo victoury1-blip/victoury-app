@@ -244,11 +244,12 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
 }
 
 /* ─── PDF print ─── */
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function printFacture(f) {
   const rows = f.colis.map(c => `
     <tr>
-      <td>${c.orderId}</td>
-      <td>${statusLabel(c.status)}</td>
+      <td>${esc(c.orderId)}</td>
+      <td>${esc(statusLabel(c.status))}</td>
       <td>${fmt(c.prix)} DH</td>
       <td>${fmt(c.fraisLivraison)} DH</td>
     </tr>`).join('');
@@ -271,12 +272,12 @@ function printFacture(f) {
     .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
     @media print { button { display:none; } }
   </style></head><body>
-  <h1>📄 Facture — ${f.ref}</h1>
+  <h1>📄 Facture — ${esc(f.ref)}</h1>
   <div class="meta">
-    Livreur: <strong>${f.livreur || '—'}</strong> &nbsp;|&nbsp;
-    Date de création: <strong>${f.dateCreation}</strong> &nbsp;|&nbsp;
-    Statut: <strong>${STATUT_LABEL[f.statut]}</strong>
-    ${f.datePaiement ? ` &nbsp;|&nbsp; Date paiement: <strong>${f.datePaiement}</strong>` : ''}
+    Livreur: <strong>${esc(f.livreur || '—')}</strong> &nbsp;|&nbsp;
+    Date de création: <strong>${esc(f.dateCreation)}</strong> &nbsp;|&nbsp;
+    Statut: <strong>${esc(STATUT_LABEL[f.statut])}</strong>
+    ${f.datePaiement ? ` &nbsp;|&nbsp; Date paiement: <strong>${esc(f.datePaiement)}</strong>` : ''}
   </div>
   <table>
     <thead><tr><th>Commande</th><th>Statut</th><th>Prix</th><th>Frais livraison</th></tr></thead>
@@ -598,13 +599,18 @@ export default function FacturesPage({ orders }) {
       }
     });
 
+    let currentUserId = null;
+    supabase.auth.getUser().then(({ data }) => { currentUserId = data?.user?.id || null; });
+
     const channel = supabase
       .channel('settings-factures')
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'settings',
         filter: 'key=eq.victoury_factures',
       }, (payload) => {
-        const val = payload.new?.value;
+        const row = payload.new;
+        if (currentUserId && row?.user_id && row.user_id !== currentUserId) return;
+        const val = row?.value;
         if (Array.isArray(val)) {
           setFactures(val);
           localStorage.setItem('victoury_factures', JSON.stringify(val));

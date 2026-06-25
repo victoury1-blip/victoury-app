@@ -525,17 +525,18 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
   }
 
   function bulkPrintBordereau() {
+    const _e = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const data = selectedOrders;
     const rows = data.map(o => `
       <tr>
-        <td style="font-weight:bold;color:#1e3a8a">${o.id}</td>
-        <td>${o.recipient?.name || '—'}</td>
-        <td>${o.recipient?.phone || '—'}</td>
-        <td>${o.recipient?.city || '—'}</td>
-        <td>${o.recipient?.address || '—'}</td>
-        <td>${(o.products?.[0]?.name || o.product?.name || '—')}</td>
+        <td style="font-weight:bold;color:#1e3a8a">${_e(o.id)}</td>
+        <td>${_e(o.recipient?.name || '—')}</td>
+        <td>${_e(o.recipient?.phone || '—')}</td>
+        <td>${_e(o.recipient?.city || '—')}</td>
+        <td>${_e(o.recipient?.address || '—')}</td>
+        <td>${_e(o.products?.[0]?.name || o.product?.name || '—')}</td>
         <td style="font-weight:bold">${Number(o.price || 0).toFixed(2)} DH</td>
-        <td>${o.recipient?.delivery || '—'}</td>
+        <td>${_e(o.recipient?.delivery || '—')}</td>
       </tr>`).join('');
 
     const totalPrice = data.reduce((s, o) => s + (o.price || 0), 0);
@@ -744,9 +745,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     });
   }, [orders, currentStatuses, search, appliedFilter, modifiedIds]);
 
-  const paged = useMemo(() => paginate(filtered, pgPage, pgPer), [filtered, pgPage, pgPer]);
-  const safePage = Math.min(pgPage, Math.max(1, Math.ceil(filtered.length / pgPer)));
-  if (safePage !== pgPage && filtered.length > 0) setPgPage(safePage);
+  const maxPage = Math.max(1, Math.ceil(filtered.length / pgPer));
+  useEffect(() => {
+    if (pgPage > maxPage && filtered.length > 0) setPgPage(maxPage);
+  }, [pgPage, maxPage, filtered.length]);
+  const paged = useMemo(() => paginate(filtered, Math.min(pgPage, maxPage), pgPer), [filtered, pgPage, maxPage, pgPer]);
 
   function toggleSelect(id) {
     setSelected((prev) =>
