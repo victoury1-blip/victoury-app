@@ -459,37 +459,6 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         </div>
       </div>
 
-      {/* Sync Logs */}
-      {syncLogs.length > 0 && (
-        <div className="mb-5 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-slate-50 to-white px-5 pt-4 pb-3 flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-gray-800 text-sm">Journal de synchronisation WooCommerce</h3>
-              <p className="text-xs text-gray-400 mt-0.5">{syncLogs.length} entrée{syncLogs.length > 1 ? 's' : ''} (100 max)</p>
-            </div>
-            <button onClick={() => {
-              cloudSet('wc_sync_logs', []).then(() => setSyncLogs([]));
-            }} className="text-xs text-red-500 hover:text-red-700 font-medium">Effacer</button>
-          </div>
-          <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
-            {syncLogs.map((log, i) => (
-              <div key={i} className={`px-5 py-2 flex items-start gap-3 text-xs ${log.status === 'error' ? 'bg-red-50' : ''}`}>
-                <span className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${log.status === 'error' ? 'bg-red-500' : 'bg-green-500'}`} />
-                <div className="flex-1 min-w-0">
-                  <span className="text-gray-400">{log.ts ? new Date(log.ts).toLocaleString('fr-MA') : ''}</span>
-                  {log.status === 'error'
-                    ? <span className="ml-2 text-red-600 font-medium">{log.error}</span>
-                    : <span className="ml-2 text-gray-700">
-                        {log.newOrders > 0 && <span className="text-green-700 font-semibold">+{log.newOrders} nouvelle{log.newOrders > 1 ? 's' : ''} </span>}
-                        {log.updatedOrders > 0 && <span className="text-blue-700 font-semibold">{log.updatedOrders} misé{log.updatedOrders > 1 ? 's' : ''} à jour </span>}
-                      </span>
-                  }
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
