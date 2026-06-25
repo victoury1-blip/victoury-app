@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
@@ -400,7 +400,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   }, []);
 
   const eligible = useMemo(() => orders.filter(o =>
-    ELIGIBLE_STATUSES.includes(o.status) && (livreur ? (o.recipient?.delivery || '') === livreur : true)
+    ELIGIBLE_STATUSES.includes(o.status) && o.validated === true && (livreur ? (o.recipient?.delivery || '') === livreur : true)
   ), [orders, livreur]);
 
   const livreurs = [...new Set(orders.map(o => o.recipient?.delivery).filter(Boolean))];
@@ -571,17 +571,12 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 export default function FacturesPage({ orders }) {
   const [factures, setFactures] = useState(() => loadFactures());
   const [newOpen, setNewOpen] = useState(false);
-  const [autoGenerating, setAutoGenerating] = useState(false);
 
   useEffect(() => {
     loadFacturesRemote().then(remote => {
-      if (remote && remote.length) {
-        setFactures(prev => {
-          // Merge: remote is source of truth, but keep any local-only factures
-          const remoteMap = new Map(remote.map(f => [f.id, f]));
-          const localOnly = prev.filter(f => !remoteMap.has(f.id));
-          return [...remote, ...localOnly];
-        });
+      if (remote) {
+        setFactures(Array.isArray(remote) ? remote : []);
+        saveFactures(Array.isArray(remote) ? remote : []);
       }
     });
     // Sync livreurs + frais from cloud for cross-device support
@@ -604,11 +599,8 @@ export default function FacturesPage({ orders }) {
       }, (payload) => {
         const val = payload.new?.value;
         if (Array.isArray(val)) {
-          setFactures(prev => {
-            const remoteMap = new Map(val.map(f => [f.id, f]));
-            const localOnly = prev.filter(f => !remoteMap.has(f.id));
-            return [...val, ...localOnly];
-          });
+          setFactures(val);
+          localStorage.setItem('victoury_factures', JSON.stringify(val));
         }
       })
       .subscribe();
@@ -619,97 +611,7 @@ export default function FacturesPage({ orders }) {
   const [filterLivreur, setFilterLivreur] = useState('');
   const [filterStatut, setFilterStatut] = useState('');
   const [notes, setNotes] = useState({});
-  const autoGenRef = useRef(new Set());
 
-  /* ── Auto-create facture when order status changes to eligible ── */
-  useEffect(() => {
-    (async () => {
-      // Read current factures from state via functional update pattern
-      let currentFactures;
-      setFactures(prev => { currentFactures = prev; return prev; });
-
-      const already = new Set(currentFactures.flatMap(f => f.colis.map(c => c.orderId)));
-      const pending = orders.filter(o => ELIGIBLE_STATUSES.includes(o.status) && !already.has(o.id) && !autoGenRef.current.has(o.id));
-      if (!pending.length) return;
-
-      pending.forEach(o => autoGenRef.current.add(o.id));
-
-      const fraisDefault = 0;
-      const byLivreur = {};
-      pending.forEach(o => {
-        const lv = o.recipient?.delivery || 'Manuel';
-        if (!byLivreur[lv]) byLivreur[lv] = [];
-        byLivreur[lv].push(o);
-      });
-
-      let livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
-      if (!livreursList.length) {
-        const remote = await cloudGet('livreurs');
-        if (Array.isArray(remote) && remote.length) {
-          livreursList = remote;
-          localStorage.setItem('livreurs', JSON.stringify(remote));
-        }
-      }
-      const fraisCache = {};
-      await Promise.all(livreursList.map(async (l) => {
-        const remote = await cloudGet(`frais_${l.id}`);
-        if (Array.isArray(remote) && remote.length) {
-          localStorage.setItem(`frais_${l.id}`, JSON.stringify(remote));
-          fraisCache[l.id] = remote;
-        } else {
-          const local = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
-          if (local.length) { fraisCache[l.id] = local; return; }
-          if (l.isOzone) {
-            const oz = await fetchOzoneFrais(l.id);
-            if (oz.length) { fraisCache[l.id] = oz; return; }
-          }
-          fraisCache[l.id] = [];
-        }
-      }));
-
-      const newFactures = [];
-      for (const [lv, cols] of Object.entries(byLivreur)) {
-        const ref = await nextRef();
-        const livres = cols.filter(o => o.status === 'livre');
-        const totalLivre = livres.reduce((s, o) => s + (o.price || 0), 0);
-        const totalFrais = cols.reduce((s, o) => {
-          const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache, livreursList);
-          return s + (auto !== null ? auto : fraisDefault);
-        }, 0);
-        const totalNet = totalLivre - totalFrais;
-        newFactures.push({
-          id: ref, ref,
-          dateCreation: nowTs(),
-          datePaiement: null,
-          statut: 'en_attente',
-          livreur: lv,
-          colis: cols.map(o => {
-            const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache, livreursList);
-            return {
-              orderId: o.id,
-              status: o.status,
-              prix: o.price || 0,
-              fraisLivraison: auto !== null ? auto : fraisDefault,
-              recipient: o.recipient?.name,
-              city: o.recipient?.city,
-              phone: o.recipient?.phone,
-              product: o.product?.name || '',
-              date: o.dateUpdated || o.dateAdded || '',
-            };
-          }),
-          totalLivre, totalFrais, totalNet,
-          locked: false,
-        });
-      }
-      if (newFactures.length) {
-        setFactures(prev => {
-          const list = [...prev, ...newFactures];
-          saveFactures(list);
-          return list;
-        });
-      }
-    })();
-  }, [orders]);
 
   const livreurs = [...new Set(factures.map(f => f.livreur).filter(Boolean))];
 
@@ -745,95 +647,6 @@ export default function FacturesPage({ orders }) {
   }
   function reset() { setFilterLivreur(''); setFilterStatut(''); }
 
-  /* ── Auto-generate factures for eligible unprocessed orders ── */
-  async function autoGenerate() {
-    let currentFactures;
-    setFactures(prev => { currentFactures = prev; return prev; });
-
-    const already = new Set(currentFactures.flatMap(f => f.colis.map(c => c.orderId)));
-    const pending = orders.filter(o => ELIGIBLE_STATUSES.includes(o.status) && !already.has(o.id));
-    if (!pending.length) { alert('Aucune commande éligible à facturer.'); return; }
-    setAutoGenerating(true);
-
-    const byLivreur = {};
-    pending.forEach(o => {
-      const lv = o.recipient?.delivery || 'Manuel';
-      if (!byLivreur[lv]) byLivreur[lv] = [];
-      byLivreur[lv].push(o);
-    });
-
-    let livreursList = JSON.parse(localStorage.getItem('livreurs') || '[]');
-    if (!livreursList.length) {
-      const remote = await cloudGet('livreurs');
-      if (Array.isArray(remote) && remote.length) {
-        livreursList = remote;
-        localStorage.setItem('livreurs', JSON.stringify(remote));
-      }
-    }
-    const fraisCache = {};
-    await Promise.all(livreursList.map(async (l) => {
-      const remote = await cloudGet(`frais_${l.id}`);
-      if (Array.isArray(remote) && remote.length) {
-        localStorage.setItem(`frais_${l.id}`, JSON.stringify(remote));
-        fraisCache[l.id] = remote;
-      } else {
-        const local = JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]');
-        if (local.length) { fraisCache[l.id] = local; return; }
-        if (l.isOzone) {
-          const oz = await fetchOzoneFrais(l.id);
-          if (oz.length) { fraisCache[l.id] = oz; return; }
-        }
-        fraisCache[l.id] = [];
-      }
-    }));
-
-    const newFactures = [];
-    for (const [lv, cols] of Object.entries(byLivreur)) {
-      const ref = await nextRef();
-      const livres = cols.filter(o => o.status === 'livre');
-      const totalLivre = livres.reduce((s, o) => s + (o.price || 0), 0);
-      const totalFrais = cols.reduce((s, o) => {
-        const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache, livreursList);
-        return s + (auto !== null ? auto : 0);
-      }, 0);
-      const totalNet = totalLivre - totalFrais;
-      newFactures.push({
-        id: ref, ref,
-        dateCreation: nowTs(),
-        datePaiement: null,
-        statut: 'en_attente',
-        livreur: lv,
-        colis: cols.map(o => {
-          const auto = getLivreurFrais(lv, o.recipient?.city, o.status, fraisCache, livreursList);
-          return {
-            orderId: o.id,
-            status: o.status,
-            prix: o.price || 0,
-            fraisLivraison: auto !== null ? auto : 0,
-            recipient: o.recipient?.name,
-            city: o.recipient?.city,
-            phone: o.recipient?.phone,
-            product: o.product?.name || '',
-            date: o.dateUpdated || o.dateAdded || '',
-          };
-        }),
-        totalLivre, totalFrais, totalNet,
-        locked: false,
-      });
-    }
-    setFactures(prev => {
-      const list = [...prev, ...newFactures];
-      saveFactures(list);
-      return list;
-    });
-    setAutoGenerating(false);
-  }
-
-  /* Count pending orders not in any facture */
-  const pendingCount = useMemo(() => {
-    const already = new Set(factures.flatMap(f => f.colis.map(c => c.orderId)));
-    return orders.filter(o => ELIGIBLE_STATUSES.includes(o.status) && !already.has(o.id)).length;
-  }, [factures, orders]);
 
   const selCls = 'border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
 
