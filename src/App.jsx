@@ -1,19 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import OrdersPage from './components/OrdersPage';
-const Dashboard = React.lazy(() => import('./components/Dashboard'));
-import SettingsPage from './components/SettingsPage';
-import EtatsPage from './components/EtatsPage';
-import LivraisonPage from './components/LivraisonPage';
-import ListeColisPage from './components/ListeColisPage';
-import StockPage from './components/StockPage';
-import FacturesPage from './components/FacturesPage';
-import ProfitPage from './components/ProfitPage';
-import RamassagePage from './components/RamassagePage';
-import RetourPage from './components/RetourPage';
 import LoginPage from './components/LoginPage';
-import ModeratorsPage from './components/ModeratorsPage';
+
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const OrdersPage = React.lazy(() => import('./components/OrdersPage'));
+const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
+const EtatsPage = React.lazy(() => import('./components/EtatsPage'));
+const LivraisonPage = React.lazy(() => import('./components/LivraisonPage'));
+const ListeColisPage = React.lazy(() => import('./components/ListeColisPage'));
+const StockPage = React.lazy(() => import('./components/StockPage'));
+const FacturesPage = React.lazy(() => import('./components/FacturesPage'));
+const ProfitPage = React.lazy(() => import('./components/ProfitPage'));
+const RamassagePage = React.lazy(() => import('./components/RamassagePage'));
+const RetourPage = React.lazy(() => import('./components/RetourPage'));
+const ModeratorsPage = React.lazy(() => import('./components/ModeratorsPage'));
 import { supabase } from './lib/supabase';
 const _offlineStore = () => import('./lib/offlineStore');
 const saveOrdersOffline = async (...a) => (await _offlineStore()).saveOrdersOffline(...a);
@@ -575,9 +576,10 @@ export default function App() {
         )}
         <div className="flex-1 overflow-auto">
         <ErrorBoundary>
+        <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<React.Suspense fallback={<div className="p-8 text-center text-gray-400">Chargement...</div>}><Dashboard orders={orders} /></React.Suspense>} />
+          <Route path="/dashboard" element={<Dashboard orders={orders} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />
@@ -598,6 +600,7 @@ export default function App() {
           <Route path="/reglage" element={<PermGate perm="reglages"><SettingsPage onWooOrdersImported={handleWooImport} orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </Suspense>
         </ErrorBoundary>
         </div>
       </main>
