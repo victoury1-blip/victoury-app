@@ -1,9 +1,35 @@
+const rateLimitMap = new Map();
+
+function rateLimit(ip, maxRequests = 10, windowMs = 60000) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.start > windowMs) {
+    rateLimitMap.set(ip, { start: now, count: 1 });
+    return false;
+  }
+  entry.count++;
+  return entry.count > maxRequests;
+}
+
 export default async function handler(req, res) {
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
+  if (rateLimit(clientIp)) {
+    return res.status(429).json({ error: 'Trop de requêtes. Réessayez dans une minute.' });
+  }
+
   const phone = req.query.phone;
   if (!phone) return res.status(400).json({ error: 'phone required' });
 
-  const EMAIL = 'victoury1@gmail.com';
-  const PASS = '0663372556@SIMO@SIMO@';
+  if (!/^\d{8,15}$/.test(phone)) {
+    return res.status(400).json({ error: 'Format de téléphone invalide' });
+  }
+
+  const EMAIL = process.env.OZONE_EMAIL;
+  const PASS = process.env.OZONE_PASS;
+  if (!EMAIL || !PASS) {
+    return res.status(500).json({ error: 'Ozone credentials not configured' });
+  }
+
   const BASE = 'https://client.ozoneexpress.ma';
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -32,7 +58,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Step 1: GET login page to get session cookie
     const loginPage = await fetch(`${BASE}/login`, {
       headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
       redirect: 'follow',
@@ -40,7 +65,6 @@ export default async function handler(req, res) {
     const loginHtml = await loginPage.text();
     const cookies1 = extractCookies(loginPage);
 
-    // Extract all input fields from login form
     const allInputs = [];
     const inputPattern = /<input[^>]*>/gi;
     let im;
@@ -51,12 +75,10 @@ export default async function handler(req, res) {
       if (nameM) allInputs.push({ name: nameM[1], type: typeM ? typeM[1] : 'text', value: valM ? valM[1] : '' });
     }
 
-    // Try Method 1: POST form-urlencoded to login?action=login
     const body1 = new URLSearchParams();
     body1.append('login_customers_email', EMAIL);
     body1.append('login_customers_password', PASS);
     body1.append('remember', 'on');
-    // Add any hidden fields
     for (const inp of allInputs) {
       if (inp.type === 'hidden' && inp.name !== 'email' && inp.name !== 'password') {
         body1.append(inp.name, inp.value);
@@ -77,12 +99,11 @@ export default async function handler(req, res) {
       body: body1.toString(),
       redirect: 'manual',
     });
-    const loginBody1 = await loginRes1.text();
+    await loginRes1.text();
     const cookies2 = extractCookies(loginRes1);
     let allCookies = mergeCookies(cookies1, cookies2);
     const redir1 = loginRes1.headers.get('location');
 
-    // Try Method 2: POST JSON
     const loginRes2 = await fetch(`${BASE}/login?action=login`, {
       method: 'POST',
       headers: {
@@ -97,12 +118,11 @@ export default async function handler(req, res) {
       body: JSON.stringify({ login_customers_email: EMAIL, login_customers_password: PASS, remember: true }),
       redirect: 'manual',
     });
-    const loginBody2 = await loginRes2.text();
+    await loginRes2.text();
     const cookies3 = extractCookies(loginRes2);
     allCookies = mergeCookies(allCookies, cookies3);
     const redir2 = loginRes2.headers.get('location');
 
-    // Try Method 3: POST to /login (without ?action=login)
     const loginRes3 = await fetch(`${BASE}/login`, {
       method: 'POST',
       headers: {
@@ -117,12 +137,11 @@ export default async function handler(req, res) {
       body: body1.toString(),
       redirect: 'manual',
     });
-    const loginBody3 = await loginRes3.text();
+    await loginRes3.text();
     const cookies4 = extractCookies(loginRes3);
     allCookies = mergeCookies(allCookies, cookies4);
     const redir3 = loginRes3.headers.get('location');
 
-    // Follow any redirect we got
     const redir = redir1 || redir2 || redir3;
     if (redir) {
       const redirUrl = redir.startsWith('http') ? redir : `${BASE}${redir.startsWith('/') ? '' : '/'}${redir}`;
@@ -133,7 +152,6 @@ export default async function handler(req, res) {
       allCookies = mergeCookies(allCookies, extractCookies(redirRes));
     }
 
-    // Check if logged in
     const checkRes = await fetch(`${BASE}/parcels?action=add`, {
       headers: { 'User-Agent': UA, 'Cookie': allCookies.join('; ') },
     });
@@ -141,8 +159,8 @@ export default async function handler(req, res) {
     const loggedIn = checkHtml.includes('VICTOURY') || checkHtml.includes('Nouveau Colis') || checkHtml.includes('parcel_phone');
 
     if (loggedIn) {
-      // The correct endpoint: V2/BlackList/SearchAjax?Phone=XXXX
-      const r = await fetch(`${BASE}/V2/BlackList/SearchAjax?Phone=${phone}`, {
+      const safePhone = encodeURIComponent(phone);
+      const r = await fetch(`${BASE}/V2/BlackList/SearchAjax?Phone=${safePhone}`, {
         headers: {
           'User-Agent': UA,
           'Cookie': allCookies.join('; '),
@@ -154,7 +172,6 @@ export default async function handler(req, res) {
       const html = await r.text();
 
       if (html.trim()) {
-        // Parse: "Ce numéro existe déjà. ( Livré : 1) ( Retourné : 0) fois."
         const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
         const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
         const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
@@ -163,22 +180,11 @@ export default async function handler(req, res) {
         return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
       }
 
-      // Empty response = new number
       return res.json({ exists: false, source: 'ozone' });
     }
 
-    // Not logged in — return debug
-    return res.json({
-      error: 'login_failed',
-      formInputs: allInputs,
-      method1: { status: loginRes1.status, redirect: redir1 || 'none', body: loginBody1.substring(0, 1000) },
-      method2: { status: loginRes2.status, redirect: redir2 || 'none', body: loginBody2.substring(0, 1000) },
-      sentBody: body1.toString(),
-      cookieCount: allCookies.length,
-      loginPageSize: loginHtml.length,
-      formSnippet: loginHtml.substring(loginHtml.indexOf('<form'), loginHtml.indexOf('</form>') + 7).substring(0, 2000),
-    });
+    return res.status(401).json({ error: 'login_failed' });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
