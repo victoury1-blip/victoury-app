@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw, Zap } from 'lucide-react';
+import { Plus, Printer, X, Check, FileText, Eye, ArrowLeft, ToggleLeft, ToggleRight, Trash2, RefreshCw } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -842,16 +842,6 @@ export default function FacturesPage({ orders }) {
             <p className="text-xs text-gray-500 mt-0.5">Gestion des factures des livreurs</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={autoGenerate} disabled={autoGenerating || pendingCount === 0}
-              className="relative flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600 disabled:opacity-50">
-              <Zap size={14} />
-              {autoGenerating ? 'Génération...' : 'Générer auto'}
-              {pendingCount > 0 && !autoGenerating && (
-                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {pendingCount > 9 ? '9+' : pendingCount}
-                </span>
-              )}
-            </button>
             <button onClick={() => setNewOpen(true)}
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
               <Plus size={14} /> Nouvelle facture
@@ -972,7 +962,7 @@ export default function FacturesPage({ orders }) {
       </div>
 
       {newOpen && (
-        <NewFactureModal orders={orders} onClose={() => setNewOpen(false)} onCreated={setFactures} />
+        <NewFactureModal orders={orders.filter(o => !factures.some(f => f.colis.some(c => c.orderId === o.id)))} onClose={() => setNewOpen(false)} onCreated={setFactures} />
       )}
     </div>
   );
