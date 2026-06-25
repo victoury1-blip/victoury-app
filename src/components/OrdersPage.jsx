@@ -1272,6 +1272,82 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           </tbody>
         </table>
         </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-gray-400">Aucune commande trouvée</div>
+          )}
+          {paged.map((order) => (
+            <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 mx-3">
+              {/* Top row: checkbox + order ID + status */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(order.id)}
+                    onChange={() => toggleSelect(order.id)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <span className="font-mono text-orange-600 font-bold text-sm">{order.trackingNumber || order.id}</span>
+                </div>
+                <button
+                  onClick={() => setStatusDropdown({ order })}
+                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <StatusBadge status={order.status} reportDate={order.reportDate} />
+                </button>
+              </div>
+              {/* Middle: client name, city */}
+              <div className="mb-2">
+                <div className="font-bold text-gray-900">{order.recipient?.name}</div>
+                <div className="font-bold text-gray-800 text-sm">{order.recipient?.city}</div>
+                <PhoneChip phone={order.recipient?.phone} allOrders={externalOrders} />
+              </div>
+              {/* Bottom: price + actions */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-extrabold text-xl text-gray-900">
+                    {Number(order.price || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-500 ml-1">DH</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => openEdit(order)}
+                    className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                    title="Modifier"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={() => setHistoryOrder(order)}
+                    className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                    title="Historique"
+                  >
+                    <History size={13} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Supprimer la commande ${order.id} ?`)) {
+                        setOrders(prev => {
+                          const next = prev.filter(o => o.id !== order.id);
+                          recalcVictCounter(next);
+                          return next;
+                        });
+                        onDeleteOrder?.(order.id);
+                      }
+                    }}
+                    className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                    title="Supprimer"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <Pagination total={filtered.length} page={pgPage} perPage={pgPer} onPageChange={setPgPage} onPerPageChange={setPgPer} />
