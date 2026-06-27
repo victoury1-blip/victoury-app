@@ -27,6 +27,7 @@ const SYNC_KEYS = [
   'phone_colors',
   'victoury_wa_templates',
   'gs_import',
+  'victoury_saved_filters',
 ];
 
 const MERGE_KEYS = new Set([
