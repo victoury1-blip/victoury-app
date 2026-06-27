@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronUp, Check, ImageIcon, X,
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
-import { importProductsFromWooCommerce } from '../lib/woocommerce';
+import { importProductsFromWooCommerce, updateWooStock } from '../lib/woocommerce';
 
 /* ─── helpers ─── */
 function stockColor(n) {
@@ -296,7 +296,12 @@ export default function StockPage() {
   function applyAdjust(prodId, varIdx) {
     persist(products.map(p => {
       if (p.id !== prodId) return p;
-      const vars = p.variations.map((v, i) => i === varIdx ? { ...v, stock: Math.max(0, (v.stock || 0) + (v.ajust || 0)), ajust: 0 } : v);
+      const vars = p.variations.map((v, i) => {
+        if (i !== varIdx) return v;
+        const newStock = Math.max(0, (v.stock || 0) + (v.ajust || 0));
+        if (p.wooId) updateWooStock(p.wooId, v.wooVarId, newStock);
+        return { ...v, stock: newStock, ajust: 0 };
+      });
       return { ...p, variations: vars };
     }));
   }

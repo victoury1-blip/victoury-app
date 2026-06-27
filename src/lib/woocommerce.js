@@ -50,6 +50,7 @@ async function fetchWooVariations(productId) {
 function mapWooProduct(wooProduct, variations) {
   const vars = variations.length > 0
     ? variations.map(v => ({
+        wooVarId: v.id,
         taille: v.attributes?.[0]?.option || 'N/A',
         stock: v.stock_quantity ?? 0,
         prix: parseFloat(v.regular_price) || parseFloat(wooProduct.regular_price) || 0,
@@ -79,6 +80,27 @@ function mapWooProduct(wooProduct, variations) {
     sizeType: 'alpha',
     variations: vars,
   };
+}
+
+export async function updateWooStock(wooProductId, variationId, newStock) {
+  const { ck, cs } = getWooKeys();
+  if (!ck || !cs || !wooProductId) return;
+  try {
+    const path = variationId
+      ? `/products/${wooProductId}/variations/${variationId}`
+      : `/products/${wooProductId}`;
+    const res = await fetch(wooUrl(path), {
+      method: 'PUT',
+      headers: { ...wooHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stock_quantity: newStock, manage_stock: true }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('[woo] stock update failed:', err.message || res.status);
+    }
+  } catch (e) {
+    console.error('[woo] stock update error:', e?.message);
+  }
 }
 
 export async function importProductsFromWooCommerce(onProgress) {
