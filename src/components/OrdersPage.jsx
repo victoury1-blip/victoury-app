@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import useDebounce from '../hooks/useDebounce';
 import Pagination, { paginate } from './Pagination';
 import {
   Search,
@@ -266,14 +267,14 @@ function HistoryModal({ order, onClose }) {
     { timestamp: order.dateAdded || '—', status: order.status, user: 'Création' }
   ];
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg">
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="font-bold text-gray-900">Historique du commande</h2>
             <p className="text-xs text-gray-400 mt-0.5">{order.id}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
           <p className="text-sm font-semibold text-gray-800">{order.recipient.name} // {order.recipient.city} ({order.recipient.phone})</p>
@@ -320,14 +321,14 @@ function CustomerHistoryModal({ phone, orders, onClose }) {
   const tauxLivraison = orders.length > 0 ? Math.round((livreCount / orders.length) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }} onClick={onClose}>
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="font-bold text-gray-900">{customerName}</h2>
             <p className="text-xs text-gray-400 mt-0.5">{phone}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
           <div>
@@ -397,11 +398,11 @@ function StatusChangeModal({ order, onClose, onSave }) {
   const [note, setNote] = useState('');
   const [reportDate, setReportDate] = useState(order.reportDate || '');
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }} onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-800">Modifier le statut de la commande</h3>
-          <button type="button" onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="space-y-4">
           <div>
@@ -657,6 +658,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     setExternalOrders(updater);
   }
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [pgPage, setPgPage] = useState(1);
   const [pgPer, setPgPer] = useState(10);
   const [selected, setSelected] = useState([]);
@@ -758,7 +760,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       if (inColisPipeline) return false;
       if (!currentStatuses.includes(o.status)) return false;
       /* Search */
-      const q = search.toLowerCase();
+      const q = debouncedSearch.toLowerCase();
       if (q && !o.id.toLowerCase().includes(q) && !o.recipient.name.toLowerCase().includes(q) && !o.recipient.phone.includes(q) && !o.product.name.toLowerCase().includes(q)) return false;
       /* Advanced filters */
       if (af.status && o.status !== af.status) return false;
@@ -777,7 +779,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       }
       return true;
     });
-  }, [orders, currentStatuses, search, appliedFilter, modifiedIds]);
+  }, [orders, currentStatuses, debouncedSearch, appliedFilter, modifiedIds]);
 
   const maxPage = Math.max(1, Math.ceil(filtered.length / pgPer));
   useEffect(() => {
@@ -1241,14 +1243,14 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     <button
                       onClick={() => openEdit(order)}
                       className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                      title="Modifier"
+                      title="Modifier" aria-label="Modifier"
                     >
                       <Pencil size={13} />
                     </button>
                     <button
                       onClick={() => setHistoryOrder(order)}
                       className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                      title="Historique"
+                      title="Historique" aria-label="Historique"
                     >
                       <History size={13} />
                     </button>
@@ -1264,7 +1266,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                         }
                       }}
                       className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                      title="Supprimer"
+                      title="Supprimer" aria-label="Supprimer"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -1446,14 +1448,14 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
       {/* WhatsApp auto popup */}
       {whatsappPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setWhatsappPopup(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') setWhatsappPopup(null); }} onClick={() => setWhatsappPopup(null)}>
           <div className="bg-white rounded-2xl shadow-2xl p-5 w-[95vw] max-w-md mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">💬</span>
                 <span className="font-bold text-green-800 text-sm">Envoyer WhatsApp</span>
               </div>
-              <button onClick={() => setWhatsappPopup(null)} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
+              <button onClick={() => setWhatsappPopup(null)} aria-label="Fermer" className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
             </div>
             <p className="text-xs text-gray-500 mb-2">Client: <span className="font-bold text-gray-800">{whatsappPopup.name}</span> — {whatsappPopup.orderId}</p>
             <textarea
@@ -1549,14 +1551,14 @@ function NewOrderModal({ onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] sm:max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0 bg-gray-900 rounded-t-2xl">
           <div>
             <h3 className="font-bold text-white">Nouvelle commande</h3>
             <p className="text-xs text-gray-300 mt-0.5">ID : auto-généré</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 text-gray-300 transition"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Fermer" className="p-2 rounded-full hover:bg-gray-700 text-gray-300 transition"><X size={18} /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 

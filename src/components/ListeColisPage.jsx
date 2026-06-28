@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
 import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock } from 'lucide-react';
@@ -281,7 +282,7 @@ function SheetImportSection({ orders = [], setOrders }) {
 
 
   const mappingModal = mappingOpen && pendingData && (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') { setMappingOpen(false); setPendingData(null); } }}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 bg-green-50">
           <h3 className="font-bold text-green-800 text-sm">Mapping des colonnes</h3>
@@ -514,14 +515,14 @@ function ColisHistoryModal({ order, onClose }) {
     { timestamp: order.dateAdded || '—', status: order.status, user: 'Création' }
   ];
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg">
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="font-bold text-gray-900">Historique du commande</h2>
             <p className="text-xs text-gray-400 mt-0.5">{order.id}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
         </div>
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
           <p className="text-sm font-semibold text-gray-800">{order.recipient?.name} // {order.recipient?.city} ({order.recipient?.phone})</p>
@@ -612,11 +613,11 @@ function StatusModal({ order, onClose, onSave }) {
   const [reportDate, setReportDate] = useState(order.reportDate || '');
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-800">Modifier le statut de la commande</h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Fermer" className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
         </div>
 
         <div className="space-y-4">
@@ -779,7 +780,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
@@ -790,7 +791,7 @@ function DeliveryStatusModal({ order, onClose, onSave }) {
               <p className="text-xs text-gray-400">{order.recipient?.name} — {order.recipient?.city}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Fermer" className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
         </div>
 
         <div className="p-4 max-h-[70vh] overflow-y-auto space-y-3">
@@ -1122,6 +1123,7 @@ const isCasa = (city) => {
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [pgPage, setPgPage] = useState(1);
   const [pgPer, setPgPer] = useState(10);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -1305,7 +1307,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
   /* Show only orders in the colis pipeline */
   const colis = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = debouncedSearch.toLowerCase();
     const af = appliedFilter;
     return orders.filter((o) => {
       const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
@@ -1332,7 +1334,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       }
       return true;
     });
-  }, [orders, search, appliedFilter]);
+  }, [orders, debouncedSearch, appliedFilter]);
 
   const maxPage = Math.max(1, Math.ceil(colis.length / pgPer));
   useEffect(() => {

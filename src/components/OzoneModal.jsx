@@ -260,7 +260,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
   const cityName = cities.find((c) => c.id === form.cityId)?.name || '';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
 
         {/* Header */}
@@ -274,7 +274,7 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
               <p className="text-xs text-gray-400">{order.id}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+          <button onClick={onClose} aria-label="Fermer" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
             <X size={16} />
           </button>
         </div>

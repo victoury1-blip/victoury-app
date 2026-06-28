@@ -855,12 +855,12 @@ export default function FacturesPage({ orders }) {
                 {/* Actions */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => setDetail(f)} title="Voir détail"
+                    <button onClick={() => setDetail(f)} title="Voir détail" aria-label="Voir détail"
                       className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"><Eye size={13} /></button>
-                    <button onClick={() => printFacture(f, toast)} title="PDF"
+                    <button onClick={() => printFacture(f, toast)} title="PDF" aria-label="Imprimer"
                       className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"><Printer size={13} /></button>
                     {!f.locked && (
-                      <button onClick={() => del(f.id)} title="Supprimer"
+                      <button onClick={() => del(f.id)} title="Supprimer" aria-label="Supprimer"
                         className="p-1.5 rounded bg-red-50 text-red-500 hover:bg-red-100"><Trash2 size={13} /></button>
                     )}
                   </div>

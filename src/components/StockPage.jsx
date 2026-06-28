@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
+import useDebounce from '../hooks/useDebounce';
 import {
   Plus, Upload, RefreshCw, Filter, Pencil, Trash2,
   ChevronDown, ChevronUp, Check, ImageIcon, X,
@@ -74,12 +75,12 @@ function ProductModal({ initial, onClose, onSave }) {
   const lc = 'block text-xs font-semibold text-gray-600 mb-1';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="font-bold text-gray-800 text-lg">{isNew ? 'Ajouter un produit' : 'Modifier le produit'}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Fermer" className="p-1 hover:bg-gray-100 rounded"><X size={16} className="text-gray-400" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
@@ -276,6 +277,7 @@ export default function StockPage() {
     });
   }, []);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [filterStatut, setFilterStatut] = useState('');
   const [filterBoutique, setFilterBoutique] = useState('');
 
@@ -321,12 +323,12 @@ export default function StockPage() {
   }
 
   const filtered = useMemo(() => products.filter(p => {
-    const q = search.toLowerCase();
+    const q = debouncedSearch.toLowerCase();
     const matchQ = !q || p.name.toLowerCase().includes(q) || (p.ref || '').toLowerCase().includes(q);
     const matchS = !filterStatut || p.statut === filterStatut;
     const matchB = !filterBoutique || p.boutique === filterBoutique;
     return matchQ && matchS && matchB;
-  }), [products, search, filterStatut, filterBoutique]);
+  }), [products, debouncedSearch, filterStatut, filterBoutique]);
 
   const totalStock = products.reduce((s, p) => s + getTotalStock(p), 0);
 
@@ -480,9 +482,9 @@ export default function StockPage() {
                           Voir variations
                         </button>
                         <button onClick={() => { setEditProduct(p); setAddOpen(true); }}
-                          className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"><Pencil size={13} /></button>
+                          className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200" aria-label="Modifier"><Pencil size={13} /></button>
                         <button onClick={() => handleDelete(p.id)}
-                          className="p-1.5 rounded bg-red-100 text-red-500 hover:bg-red-200"><Trash2 size={13} /></button>
+                          className="p-1.5 rounded bg-red-100 text-red-500 hover:bg-red-200" aria-label="Supprimer"><Trash2 size={13} /></button>
                       </div>
                     </td>
                   </tr>
