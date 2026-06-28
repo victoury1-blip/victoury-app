@@ -3,6 +3,7 @@ import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-reac
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import { useToast } from './Toast';
 
 /* ─── Auto-fetch Ozone cities frais ─── */
 async function fetchOzoneFrais(livreurId) {
@@ -49,6 +50,7 @@ const STATUT_LABEL = { en_attente: 'Ouvert', paye: 'Versé', cloture: 'Clôturé
 
 /* ─── Facture Detail View ─── */
 function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
+  const toast = useToast();
   const [recalculating, setRecalculating] = useState(false);
 
   async function recalculerFrais() {
@@ -110,7 +112,7 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
           <p className="text-xs text-gray-500 mt-0.5">Gestion des factures des livreurs</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => printFacture(facture)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+          <button onClick={() => printFacture(facture, toast)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
             <Printer size={14} /> Télécharger PDF
           </button>
           <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">
@@ -245,7 +247,7 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
 
 /* ─── PDF print ─── */
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function printFacture(f) {
+function printFacture(f, toast) {
   const rows = f.colis.map(c => `
     <tr>
       <td>${esc(c.orderId)}</td>
@@ -299,7 +301,7 @@ function printFacture(f) {
   </body></html>`;
 
   const w = window.open('', '_blank');
-  if (!w) { alert('Popup bloqué — autorisez les popups pour télécharger le PDF.'); return; }
+  if (!w) { if (toast) toast.error('Popup bloqué — autorisez les popups pour télécharger le PDF.'); return; }
   w.document.write(html);
   w.document.close();
 }
@@ -476,12 +478,12 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   const ic = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="font-bold text-gray-800 text-lg">Nouvelle facture</h2>
-          <button onClick={onClose}><X size={16} className="text-gray-400" /></button>
+          <button onClick={onClose} aria-label="Fermer"><X size={16} className="text-gray-400" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -578,6 +580,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 
 /* ─── Main FacturesPage ─── */
 export default function FacturesPage({ orders }) {
+  const toast = useToast();
   const [factures, setFactures] = useState(() => loadFactures());
   const [newOpen, setNewOpen] = useState(false);
 
@@ -728,7 +731,10 @@ export default function FacturesPage({ orders }) {
         {/* Mobile card view */}
         <div className="md:hidden">
           {filtered.length === 0 && (
-            <div className="py-16 text-center text-gray-400">Aucune facture</div>
+            <div className="py-16 text-center text-gray-400 flex flex-col items-center gap-2">
+              <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
+              <span className="text-sm">Aucune facture trouvée</span>
+            </div>
           )}
           {filtered.map(f => (
             <div key={f.id} className="bg-white border border-gray-200 rounded-lg p-4 mb-3 mx-4">
@@ -764,12 +770,12 @@ export default function FacturesPage({ orders }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => setDetail(f)} title="Voir détail"
+                  <button onClick={() => setDetail(f)} title="Voir détail" aria-label="Voir détail"
                     className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"><Eye size={13} /></button>
-                  <button onClick={() => printFacture(f)} title="PDF"
+                  <button onClick={() => printFacture(f, toast)} title="PDF" aria-label="Imprimer"
                     className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"><Printer size={13} /></button>
                   {!f.locked && (
-                    <button onClick={() => del(f.id)} title="Supprimer"
+                    <button onClick={() => del(f.id)} title="Supprimer" aria-label="Supprimer"
                       className="p-1.5 rounded bg-red-50 text-red-500 hover:bg-red-100"><Trash2 size={13} /></button>
                   )}
                 </div>
@@ -789,7 +795,12 @@ export default function FacturesPage({ orders }) {
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={12} className="py-16 text-center text-gray-400">Aucune facture</td></tr>
+              <tr><td colSpan={12} className="py-16 text-center text-gray-400">
+                <div className="flex flex-col items-center gap-2">
+                  <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
+                  <span className="text-sm">Aucune facture trouvée</span>
+                </div>
+              </td></tr>
             )}
             {filtered.map(f => (
               <tr key={f.id} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition">
@@ -846,7 +857,7 @@ export default function FacturesPage({ orders }) {
                   <div className="flex items-center gap-1.5">
                     <button onClick={() => setDetail(f)} title="Voir détail"
                       className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"><Eye size={13} /></button>
-                    <button onClick={() => printFacture(f)} title="PDF"
+                    <button onClick={() => printFacture(f, toast)} title="PDF"
                       className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200"><Printer size={13} /></button>
                     {!f.locked && (
                       <button onClick={() => del(f.id)} title="Supprimer"

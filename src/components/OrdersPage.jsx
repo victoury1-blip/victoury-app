@@ -1106,8 +1106,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-gray-400">
-                  Aucune commande trouvée
+                <td colSpan={9} className="text-center py-16 text-gray-400">
+                  <div className="flex flex-col items-center gap-2">
+                    <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                    <span className="text-sm">Aucune commande trouvée</span>
+                  </div>
                 </td>
               </tr>
             )}
@@ -1276,7 +1279,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         {/* Mobile Card View */}
         <div className="md:hidden">
           {filtered.length === 0 && (
-            <div className="text-center py-12 text-gray-400">Aucune commande trouvée</div>
+            <div className="text-center py-16 text-gray-400 flex flex-col items-center gap-2">
+              <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+              <span className="text-sm">Aucune commande trouvée</span>
+            </div>
           )}
           {paged.map((order) => (
             <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 mx-3">

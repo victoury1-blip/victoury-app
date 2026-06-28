@@ -8,6 +8,7 @@ import { openLabelPage } from './LabelPrint';
 import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import PhoneChip, { normalizePhone } from './PhoneChip';
+import { useToast } from './Toast';
 
 /* ── Google Sheets status config ── */
 const SHEET_STATUSES = [
@@ -101,6 +102,7 @@ function parseCSV(text) {
 }
 
 function SheetImportSection({ orders = [], setOrders }) {
+  const toast = useToast();
   const [headers, setHeaders] = useState([]);
   const [rows, setRows]       = useState([]);
   const [search, setSearch]   = useState('');
@@ -137,7 +139,7 @@ function SheetImportSection({ orders = [], setOrders }) {
         text = text.split('\n').map(l => l.split('\t').map(c => c.includes(',') ? `"${c}"` : c).join(',')).join('\n');
       }
       const { headers: h, rows: r } = parseCSV(text);
-      if (!h.length) { alert('Fichier non reconnu.'); return; }
+      if (!h.length) { toast.error('Fichier non reconnu.'); return; }
       setPendingData({ headers: h, rows: r });
       setMappingOpen(true);
     };
@@ -227,9 +229,9 @@ function SheetImportSection({ orders = [], setOrders }) {
       });
       existingIds.add(code);
     }
-    if (!newOrders.length) { alert('Tous ces colis existent déjà dans le pipeline.'); return; }
+    if (!newOrders.length) { toast.warning('Tous ces colis existent déjà dans le pipeline.'); return; }
     setOrders(prev => [...newOrders, ...prev]);
-    alert(`${newOrders.length} colis importé(s) vers Liste des colis.`);
+    toast.success(`${newOrders.length} colis importé(s) vers Liste des colis.`);
   }
   const livrePhones = useMemo(() => {
     const set = new Set();
@@ -403,7 +405,12 @@ function SheetImportSection({ orders = [], setOrders }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
-              <tr><td colSpan={headers.length + 3} className="py-12 text-center text-gray-400 text-sm">Aucune ligne trouvée</td></tr>
+              <tr><td colSpan={headers.length + 3} className="py-16 text-center text-gray-400 text-sm">
+                <div className="flex flex-col items-center gap-2">
+                  <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  <span>Aucune ligne trouvée</span>
+                </div>
+              </td></tr>
             ) : filtered.map((row, idx) => {
               const delivered = isDelivered(row);
               return (
@@ -1613,7 +1620,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         <table className="w-full text-sm border-collapse min-w-[900px]">
           <tbody className="divide-y divide-gray-50">
             {colis.length === 0 ? (
-              <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">Aucun colis dans le pipeline</td></tr>
+              <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">
+                <div className="flex flex-col items-center gap-2">
+                  <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                  <span>Aucun colis dans le pipeline</span>
+                </div>
+              </td></tr>
             ) : pagedColis.map((o) => {
               const note = (o.note || '').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
@@ -1765,6 +1777,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                         onClick={() => setEditOrderFull(o)}
                         className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
                         title="Modifier la commande"
+                        aria-label="Modifier"
                       >
                         <Pencil size={13} />
                       </button>
@@ -1772,6 +1785,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                         onClick={() => setDeliveryOrder(o)}
                         className="p-1.5 rounded bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors"
                         title="Statut livraison"
+                        aria-label="Livraison"
                       >
                         <Truck size={13} />
                       </button>
@@ -1779,6 +1793,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                         onClick={() => setHistoryOrder(o)}
                         className="p-1.5 rounded bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
                         title="Historique"
+                        aria-label="Historique"
                       >
                         <Clock size={13} />
                       </button>
@@ -1794,7 +1809,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         {/* Mobile card view */}
         <div className="md:hidden">
           {colis.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 text-sm">Aucun colis dans le pipeline</div>
+            <div className="py-16 text-center text-gray-400 text-sm flex flex-col items-center gap-2">
+              <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+              <span>Aucun colis dans le pipeline</span>
+            </div>
           ) : pagedColis.map((o) => (
             <div key={o.id} className={`bg-white border border-gray-200 rounded-lg p-3 mb-2 mx-3 ${selected.includes(o.id) ? 'ring-2 ring-indigo-400 bg-indigo-50' : isCasa(o.recipient?.city) ? 'border-sky-300 bg-sky-50/70' : ''}`}>
               {/* Top row: checkbox + tracking + badge */}
@@ -1818,13 +1836,13 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
               <div className="flex items-center justify-between">
                 <span className="font-bold text-gray-800 text-sm">{Number(o.price || 0).toFixed(2)} DH</span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => setEditOrderFull(o)} className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200" title="Modifier">
+                  <button onClick={() => setEditOrderFull(o)} className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200" title="Modifier" aria-label="Modifier">
                     <Pencil size={13} />
                   </button>
-                  <button onClick={() => setDeliveryOrder(o)} className="p-1.5 rounded bg-amber-100 text-amber-600 hover:bg-amber-200" title="Livraison">
+                  <button onClick={() => setDeliveryOrder(o)} className="p-1.5 rounded bg-amber-100 text-amber-600 hover:bg-amber-200" title="Livraison" aria-label="Livraison">
                     <Truck size={13} />
                   </button>
-                  <button onClick={() => setHistoryOrder(o)} className="p-1.5 rounded bg-purple-100 text-purple-600 hover:bg-purple-200" title="Historique">
+                  <button onClick={() => setHistoryOrder(o)} className="p-1.5 rounded bg-purple-100 text-purple-600 hover:bg-purple-200" title="Historique" aria-label="Historique">
                     <Clock size={13} />
                   </button>
                 </div>
@@ -1886,14 +1904,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
       {/* WhatsApp Notification Popup */}
       {whatsappPopup && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') setWhatsappPopup(null); }}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-green-50">
               <div className="flex items-center gap-2">
                 <svg viewBox="0 0 24 24" className="w-5 h-5 text-green-600 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.61.61l4.458-1.495A11.952 11.952 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.37 0-4.567-.816-6.3-2.183l-.44-.348-2.865.96.96-2.865-.348-.44A9.965 9.965 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
                 <span className="font-bold text-green-800 text-sm">Envoyer WhatsApp</span>
               </div>
-              <button onClick={() => setWhatsappPopup(null)} className="p-1 hover:bg-gray-100 rounded"><X size={15} className="text-gray-400" /></button>
+              <button onClick={() => setWhatsappPopup(null)} className="p-1 hover:bg-gray-100 rounded" aria-label="Fermer"><X size={15} className="text-gray-400" /></button>
             </div>
             <div className="p-4 space-y-3">
               <p className="text-xs text-gray-500">Client: <span className="font-bold text-gray-800">{whatsappPopup.name}</span> — {whatsappPopup.orderId}</p>

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, Check, Plus, Trash2 } from 'lucide-react';
 import { useStatuses } from '../contexts/StatusContext';
 import { loadProducts, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
+import { useToast } from './Toast';
 
 function getCitiesForLivreur(livreurName) {
   try {
@@ -100,6 +101,9 @@ function CityAutocomplete({ value, onChange, livreur }) {
 
 export default function OrderModal({ order, onClose, onSave }) {
   const { statuses } = useStatuses();
+  const toast = useToast();
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     ...order,
     recipient: { ...order.recipient },
@@ -131,7 +135,20 @@ export default function OrderModal({ order, onClose, onSave }) {
     setForm((p) => ({ ...p, products: p.products.filter((_, i) => i !== idx) }));
   }
 
-  function handleSave() {
+  function validate() {
+    const errs = {};
+    if (!form.recipient.name || !form.recipient.name.trim()) errs.name = 'Le nom est requis';
+    const phoneDigits = (form.recipient.phone || '').replace(/\D/g, '');
+    if (!form.recipient.phone || phoneDigits.length < 8) errs.phone = 'Numéro invalide (min 8 chiffres)';
+    if (!form.price || form.price <= 0) errs.price = 'Le prix doit être supérieur à 0';
+    return errs;
+  }
+
+  async function handleSave() {
+    const errs = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setSaving(true);
     try {
       const updated = {
         ...form,
@@ -139,14 +156,17 @@ export default function OrderModal({ order, onClose, onSave }) {
         note: form.noteInterne,
       };
       onSave(updated);
+      toast.success('Commande enregistrée');
     } catch (err) {
       console.error('Save failed:', err);
-      alert('Erreur: ' + err.message);
+      toast.error('Erreur: ' + err.message);
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] sm:max-h-[92vh] flex flex-col">
 
         {/* Header */}
@@ -157,7 +177,7 @@ export default function OrderModal({ order, onClose, onSave }) {
             </h2>
             <p className="text-xs text-gray-300 mt-0.5">Mettez à jour les informations</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 text-gray-300 transition">
+          <button onClick={onClose} aria-label="Fermer" className="p-2 rounded-full hover:bg-gray-700 text-gray-300 transition">
             <X size={18} />
           </button>
         </div>
@@ -184,10 +204,11 @@ export default function OrderModal({ order, onClose, onSave }) {
               <Field label="Nom du client">
                 <input
                   value={form.recipient.name}
-                  onChange={(e) => updateRecipient('name', e.target.value)}
-                  className={inputCls}
+                  onChange={(e) => { updateRecipient('name', e.target.value); setErrors(p => ({ ...p, name: undefined })); }}
+                  className={`${inputCls} ${errors.name ? 'border-red-400' : ''}`}
                   placeholder="Nom complet"
                 />
+                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
               </Field>
 
               {form.status === 'reporter' && (
@@ -204,10 +225,11 @@ export default function OrderModal({ order, onClose, onSave }) {
               <Field label="Téléphone" icon="📞">
                 <input
                   value={form.recipient.phone}
-                  onChange={(e) => updateRecipient('phone', e.target.value)}
-                  className={inputCls}
+                  onChange={(e) => { updateRecipient('phone', e.target.value); setErrors(p => ({ ...p, phone: undefined })); }}
+                  className={`${inputCls} ${errors.phone ? 'border-red-400' : ''}`}
                   placeholder="+212..."
                 />
+                {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
               </Field>
 
               <Field label="Adresse" icon="📍">
@@ -280,7 +302,7 @@ export default function OrderModal({ order, onClose, onSave }) {
                       onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
                       className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-12 shrink-0"
                     />
-                    <button onClick={() => removeProduct(idx)}
+                    <button onClick={() => removeProduct(idx)} aria-label="Supprimer"
                       className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0 transition">
                       <Trash2 size={13} />
                     </button>
@@ -304,10 +326,11 @@ export default function OrderModal({ order, onClose, onSave }) {
                 <input
                   type="number"
                   value={form.price}
-                  onChange={(e) => update('price', Number(e.target.value))}
-                  className={inputCls}
+                  onChange={(e) => { update('price', Number(e.target.value)); setErrors(p => ({ ...p, price: undefined })); }}
+                  className={`${inputCls} ${errors.price ? 'border-red-400' : ''}`}
                   placeholder="0.00"
                 />
+                {errors.price && <p className="text-xs text-red-500 mt-1">{errors.price}</p>}
               </Field>
               <Field label="Échange" icon="🔄">
                 <button
@@ -363,10 +386,11 @@ export default function OrderModal({ order, onClose, onSave }) {
           <button
             type="button"
             onClick={handleSave}
-            className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+            disabled={saving}
+            className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Check size={14} />
-            Enregistrer
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
           </button>
         </div>
       </div>

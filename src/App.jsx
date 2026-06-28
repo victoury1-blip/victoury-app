@@ -29,6 +29,7 @@ import useNotifications from './hooks/useNotifications';
 import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
+import { ToastProvider } from './components/Toast';
 
 const TAB_FROM_PARAM = {
   'a-confirmer': 'a_confirmer',
@@ -558,6 +559,7 @@ export default function App() {
   }
 
   return (
+    <ToastProvider>
     <PermissionsProvider session={session}>
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       <Sidebar orders={orders} session={session} />
@@ -607,5 +609,6 @@ export default function App() {
       <IOSInstallPrompt />
     </div>
     </PermissionsProvider>
+    </ToastProvider>
   );
 }

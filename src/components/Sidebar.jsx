@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { usePermissions } from '../lib/permissions';
+import { useToast } from './Toast';
 import {
   LayoutDashboard, ShoppingCart, Package, Archive,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown,
@@ -54,6 +55,7 @@ const NAV_ITEMS = [
 ];
 
 function ProfileModal({ onClose, session }) {
+  const toast = useToast();
   const [profile, setProfile] = useState(() => {
     try { return JSON.parse(localStorage.getItem('victoury_profile') || '{}'); } catch { return {}; }
   });
@@ -84,7 +86,7 @@ function ProfileModal({ onClose, session }) {
   function handleAvatar(e) {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 500_000) { alert('Image trop grande (max 500 KB)'); return; }
+    if (file.size > 500_000) { toast.warning('Image trop grande (max 500 KB)'); return; }
     const reader = new FileReader();
     reader.onload = ev => saveProfile({ ...profile, avatar: ev.target.result });
     reader.readAsDataURL(file);
