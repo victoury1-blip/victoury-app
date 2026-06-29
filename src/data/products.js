@@ -42,6 +42,9 @@ export function loadProducts() {
           ];
         }
         if (!p.statut) p.statut = 'Active';
+        if (p.source === 'chic-affiliate' && p.variations.every(v => !v.stock)) {
+          p.variations = p.variations.map(v => ({ ...v, stock: 10 }));
+        }
         return p;
       });
     }
@@ -67,6 +70,9 @@ export async function loadProductsRemote() {
         ];
       }
       if (!p.statut) p.statut = 'Active';
+      if (p.source === 'chic-affiliate' && p.variations.every(v => !v.stock)) {
+        p.variations = p.variations.map(v => ({ ...v, stock: 10 }));
+      }
       return p;
     });
   }
