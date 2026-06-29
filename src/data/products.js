@@ -30,7 +30,20 @@ const INITIAL_PRODUCTS = [
 export function loadProducts() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed.map(p => {
+        if (!p.variations) {
+          p.variations = [
+            { taille: 'S', stock: 0, prix: p.prix || p.salePrice || 0, compareAt: 0, ajust: 0 },
+            { taille: 'M', stock: 0, prix: p.prix || p.salePrice || 0, compareAt: 0, ajust: 0 },
+            { taille: 'L', stock: 0, prix: p.prix || p.salePrice || 0, compareAt: 0, ajust: 0 },
+            { taille: 'XL', stock: 0, prix: p.prix || p.salePrice || 0, compareAt: 0, ajust: 0 },
+          ];
+        }
+        return p;
+      });
+    }
   } catch {}
   return INITIAL_PRODUCTS;
 }
@@ -47,6 +60,7 @@ export async function loadProductsRemote() {
 }
 
 export function getTotalStock(product) {
+  if (!product.variations) return 0;
   return product.variations.reduce((s, v) => s + (v.stock || 0), 0);
 }
 

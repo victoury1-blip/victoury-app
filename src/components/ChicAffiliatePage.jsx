@@ -139,8 +139,22 @@ function ProductsTab() {
   function importProduct(p) {
     try {
       const existing = loadProducts();
-      const already = existing.find(x => x.chicId === p.chicId);
-      if (already) { alert('Produit déjà importé'); return; }
+      const already = existing.find(x => x.chicId === p.chicId || x.id === `CHIC-${p.chicId}`);
+      if (already) {
+        if (!already.variations) {
+          const updated = existing.map(x => x === already ? { ...already, variations: [
+            { taille: 'S', stock: 0, prix: already.prix || 0, compareAt: 0, ajust: 0 },
+            { taille: 'M', stock: 0, prix: already.prix || 0, compareAt: 0, ajust: 0 },
+            { taille: 'L', stock: 0, prix: already.prix || 0, compareAt: 0, ajust: 0 },
+            { taille: 'XL', stock: 0, prix: already.prix || 0, compareAt: 0, ajust: 0 },
+          ] } : x);
+          saveProducts(updated);
+          alert('Produit mis à jour avec les variations');
+          return;
+        }
+        alert('Produit déjà importé');
+        return;
+      }
       const sale = parseFloat((p.salePrice || '0').toString().replace(/[^\d.]/g, ''));
       const purchase = parseFloat((p.resellerPrice || '0').toString().replace(/[^\d.]/g, ''));
       const newProd = {
