@@ -21,7 +21,7 @@ function ProductModal({ initial, onClose, onSave }) {
 
   const emptyVar = (t) => ({ taille: t, stock: 0, prix: 0, compareAt: 0, ajust: 0 });
 
-  const [form, setForm] = useState(() => initial ? { ...initial, variations: initial.variations.map(v => ({ ...v })) } : {
+  const [form, setForm] = useState(() => initial ? { ...initial, variations: (initial.variations || SIZE_OPTIONS.map(emptyVar)).map(v => ({ ...v })) } : {
     id: Date.now(),
     ref: '',
     name: '',
@@ -290,7 +290,7 @@ export default function StockPage() {
   function handleAdjust(prodId, varIdx, delta) {
     persist(products.map(p => {
       if (p.id !== prodId) return p;
-      const vars = p.variations.map((v, i) => i === varIdx ? { ...v, ajust: (v.ajust || 0) + delta } : v);
+      const vars = (p.variations || []).map((v, i) => i === varIdx ? { ...v, ajust: (v.ajust || 0) + delta } : v);
       return { ...p, variations: vars };
     }));
   }
@@ -298,7 +298,7 @@ export default function StockPage() {
   function applyAdjust(prodId, varIdx) {
     persist(products.map(p => {
       if (p.id !== prodId) return p;
-      const vars = p.variations.map((v, i) => {
+      const vars = (p.variations || []).map((v, i) => {
         if (i !== varIdx) return v;
         const newStock = Math.max(0, (v.stock || 0) + (v.ajust || 0));
         if (p.wooId) updateWooStock(p.wooId, v.wooVarId, newStock);
@@ -432,7 +432,7 @@ export default function StockPage() {
                         onClick={() => toggleExpand(p.id)}
                         className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full hover:bg-blue-100"
                       >
-                        📋 {p.variations.length} variations
+                        📋 {(p.variations || []).length} variations
                         {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
                       </button>
                     </td>
@@ -442,7 +442,7 @@ export default function StockPage() {
                       <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${stockColor(total)}`}>
                         {total}
                       </span>
-                      <div className="text-xs text-gray-400 mt-0.5">{p.variations.length} var.</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{(p.variations || []).length} var.</div>
                     </td>
 
                     {/* Ajuster (global — no-op, expand to adjust per variation) */}
@@ -503,7 +503,7 @@ export default function StockPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-blue-100">
-                            {p.variations.map((v, i) => (
+                            {(p.variations || []).map((v, i) => (
                               <tr key={i} className="hover:bg-blue-50">
                                 <td className="px-3 py-2">
                                   <span className="inline-flex items-center px-2 py-0.5 bg-gray-200 text-gray-800 rounded text-xs font-bold">
