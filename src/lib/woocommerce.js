@@ -122,7 +122,13 @@ export async function pushProductToWoo(product) {
   };
 
   if (product.image) {
-    const imgSrc = product.image.startsWith('data:') ? undefined : product.image;
+    let imgSrc = product.image;
+    if (imgSrc.startsWith('data:')) {
+      imgSrc = undefined;
+    } else if (imgSrc.includes('/api/chic-image?url=')) {
+      const match = imgSrc.match(/[?&]url=([^&]+)/);
+      imgSrc = match ? decodeURIComponent(match[1]) : undefined;
+    }
     if (imgSrc) body.images = [{ src: imgSrc }];
   }
 
