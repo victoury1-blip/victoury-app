@@ -185,7 +185,7 @@ export default function Dashboard({ orders = [] }) {
   /* ── Chic Affiliate stats ── */
   const chicStats = useMemo(() => {
     try {
-      const allProducts = JSON.parse(localStorage.getItem('my_products') || '[]');
+      const allProducts = JSON.parse(localStorage.getItem('victoury_products') || '[]');
       const chicProducts = allProducts.filter(p => p.source === 'chic-affiliate');
       const chicNames = new Set(chicProducts.map(p => p.name?.toLowerCase()).filter(Boolean));
 
