@@ -118,8 +118,14 @@ function ProductsTab() {
   const PAGE_SIZE = 50;
   const [importedIds, setImportedIds] = useState(() => {
     try {
-      const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
-      return new Set(prods.filter(p => p.chicId).map(p => p.chicId));
+      const prods = loadProducts();
+      return new Set(prods.filter(p => p.source === 'chic-affiliate').map(p => p.chicId || p.name?.toLowerCase()));
+    } catch { return new Set(); }
+  });
+  const [importedNames, setImportedNames] = useState(() => {
+    try {
+      const prods = loadProducts();
+      return new Set(prods.filter(p => p.source === 'chic-affiliate').map(p => p.name?.toLowerCase()).filter(Boolean));
     } catch { return new Set(); }
   });
 
@@ -147,12 +153,13 @@ function ProductsTab() {
   async function importProduct(p) {
     try {
       const existing = loadProducts();
-      if (p.chicId) {
-        const already = existing.find(x => x.chicId === p.chicId);
-        if (already) {
-          alert('Produit déjà importé');
-          return;
-        }
+      const already = existing.find(x =>
+        (p.chicId && x.chicId === p.chicId) ||
+        (p.name && x.source === 'chic-affiliate' && x.name?.toLowerCase() === p.name.toLowerCase())
+      );
+      if (already) {
+        if (!importingAllRef.current) alert('Produit déjà importé');
+        return;
       }
       setImporting(p.chicId || p.name);
 
@@ -194,6 +201,7 @@ function ProductsTab() {
       const updated = [newProd, ...existing];
       saveProducts(updated);
       if (p.chicId) setImportedIds(prev => new Set([...prev, p.chicId]));
+      if (p.name) setImportedNames(prev => new Set([...prev, p.name.toLowerCase()]));
       if (!importingAllRef.current) alert(`✅ Produit importé avec ${allImages.length} images, ${details.colors.length} couleurs, ${sizes.length} tailles !`);
     } catch (e) {
       alert('Erreur: ' + e.message);
@@ -207,7 +215,7 @@ function ProductsTab() {
   const [importProgress, setImportProgress] = useState('');
 
   async function importAll() {
-    const notImported = filtered.filter(p => !p.chicId || !importedIds.has(p.chicId));
+    const notImported = filtered.filter(p => !isImported(p));
     if (notImported.length === 0) { alert('Tous les produits sont déjà importés !'); return; }
     if (!window.confirm(`Importer ${notImported.length} produits ?`)) return;
 
@@ -234,8 +242,14 @@ function ProductsTab() {
     !search || (p.name || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  function isImported(p) {
+    if (p.chicId && importedIds.has(p.chicId)) return true;
+    if (p.name && importedNames.has(p.name.toLowerCase())) return true;
+    return false;
+  }
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const notImportedCount = filtered.filter(p => !p.chicId || !importedIds.has(p.chicId)).length;
+  const notImportedCount = filtered.filter(p => !isImported(p)).length;
 
   return (
     <div className="space-y-4">
@@ -297,7 +311,7 @@ function ProductsTab() {
                       <td className="px-3 py-2">{purchase.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2 text-green-600 font-medium">{profit.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2">
-                        {p.chicId && importedIds.has(p.chicId) ? (
+                        {isImported(p) ? (
                           <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium">
                             <Check size={12} /> Importé
                           </span>
@@ -338,7 +352,7 @@ function ProductsTab() {
                       <span>Achat: {purchase.toFixed(2)} Dhs</span>
                       <span className="text-green-600 font-medium">+{profit.toFixed(2)}</span>
                     </div>
-                    {p.chicId && importedIds.has(p.chicId) ? (
+                    {isImported(p) ? (
                       <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium w-fit">
                         <Check size={12} /> Importé
                       </span>
