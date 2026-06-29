@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
-  Star, AlertTriangle, Users, ArrowRight, ArrowUpRight, ArrowDownRight, Minus,
+  Star, AlertTriangle, Users, ArrowRight, ArrowUpRight, ArrowDownRight, Minus, Store,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -182,6 +182,48 @@ export default function Dashboard({ orders = [] }) {
     { icon: DollarSign, label: "Chiffre d'affaires", value: `${ca.toLocaleString('fr-MA', { minimumFractionDigits: 2 })} DH`, iconBg: 'bg-purple-500', sub: `Livré: ${livreCA.toLocaleString('fr-MA',{minimumFractionDigits:2})} DH` },
   ];
 
+  /* ── Chic Affiliate stats ── */
+  const chicStats = useMemo(() => {
+    try {
+      const allProducts = JSON.parse(localStorage.getItem('my_products') || '[]');
+      const chicProducts = allProducts.filter(p => p.source === 'chic-affiliate');
+      const chicNames = new Set(chicProducts.map(p => p.name?.toLowerCase()).filter(Boolean));
+
+      const chicOrders = orders.filter(o => {
+        const prods = o.products || [o.product];
+        return (prods || []).some(p => p?.name && chicNames.has(p.name.toLowerCase()));
+      });
+
+      const todayChic = chicOrders.filter(o => {
+        const d = parseDate(o.dateAdded);
+        return d && d >= startOf(new Date(), 'day');
+      });
+
+      const todayCA = todayChic.filter(o => ['confirme', 'livre'].includes(o.status))
+        .reduce((s, o) => s + (o.price || 0), 0);
+
+      const todayCost = todayChic.filter(o => ['confirme', 'livre'].includes(o.status)).reduce((s, o) => {
+        const prods = o.products || [o.product];
+        let cost = 0;
+        (prods || []).forEach(p => {
+          if (!p?.name) return;
+          const sp = chicProducts.find(sp => sp.name?.toLowerCase() === p.name.toLowerCase());
+          if (sp) cost += parseFloat(sp.prixAchat || sp.purchasePrice || 0) * (p.qty || 1);
+        });
+        return s + cost;
+      }, 0);
+
+      return {
+        productCount: chicProducts.length,
+        todayOrders: todayChic.length,
+        todayCA,
+        todayProfit: todayCA - todayCost,
+      };
+    } catch {
+      return { productCount: 0, todayOrders: 0, todayCA: 0, todayProfit: 0 };
+    }
+  }, [orders]);
+
   const statusRows = [
     { label: 'Nouveau (À confirmer)', count: counts.nouveau, amount: orders.filter(o=>o.status==='nouveau').reduce((s,o)=>s+(o.price||0),0), color: 'bg-blue-400' },
     { label: 'Confirmé', count: counts.confirme, amount: orders.filter(o=>o.status==='confirme').reduce((s,o)=>s+(o.price||0),0), color: 'bg-green-500' },
@@ -336,6 +378,35 @@ export default function Dashboard({ orders = [] }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
         {kpis.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
+
+      {/* Chic Affiliate stats */}
+      {chicStats.productCount > 0 && (
+        <div className="bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+          <Store size={72} className="absolute right-3 bottom-2 opacity-10 text-white" />
+          <div className="flex items-center gap-2 mb-3">
+            <Store size={18} className="text-white" />
+            <span className="text-white font-bold text-sm">Chic Affiliate</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <p className="text-white/70 text-xs">Produits importés</p>
+              <p className="text-white font-black text-2xl">{chicStats.productCount}</p>
+            </div>
+            <div>
+              <p className="text-white/70 text-xs">Commandes aujourd'hui</p>
+              <p className="text-white font-black text-2xl">{chicStats.todayOrders}</p>
+            </div>
+            <div>
+              <p className="text-white/70 text-xs">CA aujourd'hui</p>
+              <p className="text-white font-black text-2xl">{chicStats.todayCA.toLocaleString('fr-MA')} <span className="text-sm font-bold">DH</span></p>
+            </div>
+            <div>
+              <p className="text-white/70 text-xs">Bénéfice aujourd'hui</p>
+              <p className="text-white font-black text-2xl">{chicStats.todayProfit.toLocaleString('fr-MA')} <span className="text-sm font-bold">DH</span></p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
