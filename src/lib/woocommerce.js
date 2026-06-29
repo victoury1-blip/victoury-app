@@ -103,6 +103,76 @@ export async function updateWooStock(wooProductId, variationId, newStock) {
   }
 }
 
+export async function pushProductToWoo(product) {
+  const { ck, cs } = getWooKeys();
+  if (!ck || !cs) throw new Error('WooCommerce non configuré — allez dans Paramètres');
+
+  const variations = (product.variations || []).filter(v => v.taille && v.taille !== '?');
+  const isVariable = variations.length > 1;
+
+  const body = {
+    name: product.name,
+    type: isVariable ? 'variable' : 'simple',
+    status: product.statut === 'Active' ? 'publish' : 'draft',
+    regular_price: isVariable ? undefined : String(product.compareAt || product.prix || 0),
+    sale_price: isVariable ? undefined : String(product.prix || 0),
+    manage_stock: !isVariable,
+    stock_quantity: isVariable ? undefined : (variations[0]?.stock || 0),
+    sku: product.ref || '',
+  };
+
+  if (product.image) {
+    const imgSrc = product.image.startsWith('data:') ? undefined : product.image;
+    if (imgSrc) body.images = [{ src: imgSrc }];
+  }
+
+  if (isVariable) {
+    body.attributes = [{
+      name: 'Taille',
+      position: 0,
+      visible: true,
+      variation: true,
+      options: variations.map(v => v.taille),
+    }];
+  }
+
+  const res = await fetch(wooUrl('/products'), {
+    method: 'POST',
+    headers: { ...wooHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Erreur WooCommerce ${res.status}`);
+  }
+
+  const created = await res.json();
+
+  if (isVariable) {
+    const varBatch = variations.map(v => ({
+      regular_price: String(v.compareAt || v.prix || 0),
+      sale_price: String(v.prix || 0),
+      manage_stock: true,
+      stock_quantity: v.stock || 0,
+      attributes: [{ name: 'Taille', option: v.taille }],
+    }));
+
+    const batchRes = await fetch(wooUrl(`/products/${created.id}/variations/batch`), {
+      method: 'POST',
+      headers: { ...wooHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ create: varBatch }),
+    });
+
+    if (!batchRes.ok) {
+      const err = await batchRes.json().catch(() => ({}));
+      console.error('[woo] variations batch error:', err);
+    }
+  }
+
+  return created;
+}
+
 export async function importProductsFromWooCommerce(onProgress) {
   const { ck, cs } = getWooKeys();
   if (!ck || !cs) {

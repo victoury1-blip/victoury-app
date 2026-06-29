@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, Check, ImageIcon, X,
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
-import { importProductsFromWooCommerce, updateWooStock } from '../lib/woocommerce';
+import { importProductsFromWooCommerce, updateWooStock, pushProductToWoo } from '../lib/woocommerce';
 
 /* ─── helpers ─── */
 function stockColor(n) {
@@ -322,6 +322,25 @@ export default function StockPage() {
     setEditProduct(null);
   }
 
+  const [pushing, setPushing] = useState(null);
+
+  async function handlePushToWoo(product) {
+    if (product.wooId) {
+      alert('Ce produit est déjà sur WooCommerce (ID: ' + product.wooId + ')');
+      return;
+    }
+    setPushing(product.id);
+    try {
+      const created = await pushProductToWoo(product);
+      persist(products.map(p => p.id === product.id ? { ...p, wooId: created.id, boutique: 'WooCommerce' } : p));
+      alert(`✅ Produit publié sur WooCommerce ! (ID: ${created.id})`);
+    } catch (e) {
+      alert('❌ Erreur: ' + e.message);
+    } finally {
+      setPushing(null);
+    }
+  }
+
   const filtered = useMemo(() => products.filter(p => {
     const q = debouncedSearch.toLowerCase();
     const matchQ = !q || p.name.toLowerCase().includes(q) || (p.ref || '').toLowerCase().includes(q);
@@ -481,6 +500,15 @@ export default function StockPage() {
                           className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 whitespace-nowrap">
                           Voir variations
                         </button>
+                        {!p.wooId && (
+                          <button onClick={() => handlePushToWoo(p)} disabled={pushing === p.id}
+                            className="px-2 py-1 text-xs bg-purple-50 text-purple-600 rounded hover:bg-purple-100 whitespace-nowrap disabled:opacity-50">
+                            {pushing === p.id ? '...' : '🚀 WooCommerce'}
+                          </button>
+                        )}
+                        {p.wooId && (
+                          <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded whitespace-nowrap">✅ Woo #{p.wooId}</span>
+                        )}
                         <button onClick={() => { setEditProduct(p); setAddOpen(true); }}
                           className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200" aria-label="Modifier"><Pencil size={13} /></button>
                         <button onClick={() => handleDelete(p.id)}
