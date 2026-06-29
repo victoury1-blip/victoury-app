@@ -712,6 +712,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     if (!config) { alert('Chic Affiliate non configuré — allez dans la page Chic Affiliate'); return; }
     const match = getChicProductForOrder(order);
     if (!match) { alert('Produit Chic non trouvé'); return; }
+    if (!match.chicProd.chicId) { alert('Ce produit Chic n\'a pas d\'ID — réimportez-le depuis la page Chic Affiliate'); return; }
 
     setChicSending(order.id);
     try {
