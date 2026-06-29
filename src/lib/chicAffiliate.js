@@ -64,9 +64,13 @@ export async function fetchChicProducts() {
       const img = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-lazy-src') || imgEl?.getAttribute('data-original') || imgEl?.getAttribute('src') || '';
       const rawImg = img.startsWith('//') ? `https:${img}` : img.startsWith('/') ? `https://www.chic-affiliate.com${img}` : img;
       const proxyImg = rawImg ? `/api/chic-image?url=${encodeURIComponent(rawImg)}` : '';
+      const link = card.querySelector('a[href*="/affiliate/products/"]');
+      const href = link?.getAttribute('href') || '';
+      const chicId = href.match(/\/products\/(\d+)/)?.[1] || '';
       if (name) {
         products.push({
           name,
+          chicId,
           salePrice: prices[0] || '',
           resellerPrice: prices[1] || '',
           image: proxyImg,
@@ -79,6 +83,95 @@ export async function fetchChicProducts() {
     return { data: [], recordsTotal: 0, html: allText.slice(0, 2000) };
   }
   return { data: products, recordsTotal: products.length };
+}
+
+export async function fetchChicProductDetails(chicProductId) {
+  const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  const { html } = await res.json();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  const token = doc.querySelector('input[name="_token"]')?.value || '';
+  const productId = doc.querySelector('input[name="product_id"]')?.value || chicProductId;
+
+  const sizes = [];
+  doc.querySelectorAll('input[name="size"], button[data-size], .size-option').forEach(el => {
+    const val = el.value || el.getAttribute('data-size') || el.textContent?.trim();
+    if (val) sizes.push(val);
+  });
+  if (sizes.length === 0) {
+    const sizeText = html.match(/Choisir la taille[\s\S]*?<\/div>/i)?.[0] || '';
+    const sizeMatches = sizeText.match(/>(S|M|L|XL|XXL|2XL|3XL)</g);
+    if (sizeMatches) sizeMatches.forEach(m => sizes.push(m.replace('>', '')));
+  }
+
+  const colors = [];
+  doc.querySelectorAll('input[name="color"], [data-color-id]').forEach(el => {
+    const id = el.value || el.getAttribute('data-color-id');
+    const label = el.getAttribute('title') || el.getAttribute('data-color-name') || '';
+    const bg = el.style?.backgroundColor || el.getAttribute('data-color') || '';
+    if (id) colors.push({ id, label, bg });
+  });
+  if (colors.length === 0) {
+    const colorRegex = /name="color"[^>]*value="(\d+)"/g;
+    let m;
+    while ((m = colorRegex.exec(html)) !== null) {
+      colors.push({ id: m[1], label: '', bg: '' });
+    }
+    if (colors.length === 0) {
+      const colorMatch = html.match(/color.*?value="(\d+)"/i);
+      if (colorMatch) colors.push({ id: colorMatch[1], label: '', bg: '' });
+    }
+  }
+
+  const cities = [];
+  const villeSelect = doc.querySelector('select[name="ville"], #ville');
+  if (villeSelect) {
+    villeSelect.querySelectorAll('option').forEach(opt => {
+      const val = opt.value;
+      const text = opt.textContent?.trim();
+      if (val && text && val !== '') cities.push({ id: val, name: text });
+    });
+  }
+
+  return { token, productId, sizes, colors, cities };
+}
+
+export async function createChicOrder(orderData) {
+  const {
+    token, productId, size, color, quantity,
+    recipientPrice, recipient, phone,
+    villeId, fraisLivraison, address, comment,
+  } = orderData;
+
+  const body = new URLSearchParams({
+    _token: token,
+    product_id: productId,
+    size: size || '',
+    color: color || '',
+    quantity: String(quantity || 1),
+    recipient_price: String(recipientPrice || ''),
+    recipient: recipient || '',
+    recipient_phone: phone || '',
+    ville: villeId || '',
+    ville_id: villeId || '',
+    frais_livraison: String(fraisLivraison || ''),
+    shipping_address: address || '',
+    comment: comment || '',
+    frais_retour: '',
+    frais_refus: '',
+  });
+
+  const res = await fetch(proxyUrl('/affiliate/orders/store'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  const data = await res.json();
+  if (data.success) return data;
+  if (data.error) throw new Error(data.error);
+  throw new Error('Erreur lors de la création de la commande');
 }
 
 export async function fetchChicCounts() {

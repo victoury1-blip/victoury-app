@@ -19,10 +19,25 @@ export default async function handler(req, res) {
     };
     if (xsrfDecoded) headers['X-XSRF-TOKEN'] = xsrfDecoded;
 
-    const response = await fetch(url, { headers, redirect: 'manual' });
+    const fetchOpts = { headers, redirect: 'manual' };
+
+    if (req.method === 'POST') {
+      fetchOpts.method = 'POST';
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      headers['Accept'] = 'text/html,application/json';
+      headers['Origin'] = 'https://www.chic-affiliate.com';
+      const body = typeof req.body === 'string' ? req.body : new URLSearchParams(req.body).toString();
+      fetchOpts.body = body;
+    }
+
+    const response = await fetch(url, fetchOpts);
 
     if (response.status === 302 || response.status === 301) {
-      return res.status(401).json({ error: 'Session expirée — reconnectez-vous sur chic-affiliate.com' });
+      const location = response.headers.get('location') || '';
+      if (location.includes('/login')) {
+        return res.status(401).json({ error: 'Session expirée — reconnectez-vous sur chic-affiliate.com' });
+      }
+      return res.status(200).json({ success: true, redirect: location });
     }
 
     const text = await response.text();

@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Store, Settings, Search, ChevronDown, ChevronRight, RefreshCw,
   Download, Loader2, AlertCircle, CheckCircle2, Package, ShoppingCart,
+  Send,
 } from 'lucide-react';
 import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
-  fetchChicCounts, stripHtml,
+  fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
 } from '../lib/chicAffiliate';
 
 /* ── Status badge ── */
@@ -137,17 +138,20 @@ function ProductsTab() {
   function importProduct(p) {
     try {
       const existing = JSON.parse(localStorage.getItem('victoury_products') || '[]');
-      const already = existing.find(x => x.chicId === p.id);
+      const already = existing.find(x => x.chicId === p.chicId);
       if (already) { alert('Produit déjà importé'); return; }
+      const sale = parseFloat((p.salePrice || '0').toString().replace(/[^\d.]/g, ''));
+      const purchase = parseFloat((p.resellerPrice || '0').toString().replace(/[^\d.]/g, ''));
       const newProd = {
-        id: `CHIC-${p.id}`,
-        chicId: p.id,
+        id: `CHIC-${p.chicId}`,
+        chicId: p.chicId,
         name: p.name || '',
-        salePrice: parseFloat(stripHtml(p.sale_price || '0')),
-        purchasePrice: parseFloat(p.purchase_price || '0'),
+        salePrice: sale,
+        purchasePrice: purchase,
         stock: 0,
         visible: true,
         source: 'chic-affiliate',
+        image: p.image || '',
         importedAt: new Date().toISOString(),
       };
       const updated = [...existing, newProd];
@@ -451,6 +455,188 @@ function OrdersTab() {
   );
 }
 
+/* ── Send Order to Chic ── */
+function SendOrderTab() {
+  const [chicProducts, setChicProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [details, setDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [form, setForm] = useState({
+    size: '', color: '', quantity: '1', recipientPrice: '',
+    recipient: '', phone: '', villeId: '', fraisLivraison: '',
+    address: '', comment: '',
+  });
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
+    setChicProducts(prods.filter(p => p.source === 'chic-affiliate' && p.chicId));
+  }, []);
+
+  async function loadProductDetails(chicId) {
+    if (!chicId) { setDetails(null); return; }
+    setLoadingDetails(true);
+    try {
+      const d = await fetchChicProductDetails(chicId);
+      setDetails(d);
+      setForm(f => ({ ...f, size: d.sizes?.[0] || '', color: d.colors?.[0]?.id || '' }));
+    } catch (e) {
+      setDetails(null);
+      alert('Erreur: ' + e.message);
+    } finally {
+      setLoadingDetails(false);
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!details?.token) { alert('Chargez d\'abord un produit'); return; }
+    if (!form.recipient || !form.phone || !form.villeId || !form.address) {
+      alert('Remplissez tous les champs obligatoires'); return;
+    }
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await createChicOrder({
+        token: details.token,
+        productId: details.productId,
+        ...form,
+      });
+      setResult({ ok: true, msg: 'Commande envoyée avec succès à Chic Affiliate!' });
+      setForm(f => ({ ...f, recipient: '', phone: '', address: '', comment: '' }));
+    } catch (err) {
+      setResult({ ok: false, msg: err.message });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Produit Chic *</label>
+        <select
+          value={selectedProduct}
+          onChange={e => { setSelectedProduct(e.target.value); loadProductDetails(e.target.value); }}
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          <option value="">— Sélectionnez un produit importé —</option>
+          {chicProducts.map(p => (
+            <option key={p.chicId} value={p.chicId}>{p.name} ({p.salePrice} Dhs)</option>
+          ))}
+        </select>
+        {chicProducts.length === 0 && (
+          <p className="text-xs text-orange-600 mt-1">Aucun produit Chic importé. Importez d'abord depuis l'onglet Produits.</p>
+        )}
+      </div>
+
+      {loadingDetails && <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 size={14} className="animate-spin" /> Chargement des options...</div>}
+
+      {details && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {details.sizes?.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Taille</label>
+                <div className="flex gap-1 flex-wrap">
+                  {details.sizes.map(s => (
+                    <button key={s} type="button" onClick={() => setForm(f => ({ ...f, size: s }))}
+                      className={`px-3 py-1 text-xs rounded-lg border ${form.size === s ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 hover:bg-gray-50'}`}
+                    >{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {details.colors?.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Couleur</label>
+                <div className="flex gap-1 flex-wrap">
+                  {details.colors.map(c => (
+                    <button key={c.id} type="button" onClick={() => setForm(f => ({ ...f, color: c.id }))}
+                      className={`px-3 py-1 text-xs rounded-lg border ${form.color === c.id ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 hover:bg-gray-50'}`}
+                    >{c.label || `#${c.id}`}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Quantité *</label>
+              <input type="number" min="1" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Prix de Vente</label>
+              <input type="text" value={form.recipientPrice} onChange={e => setForm(f => ({ ...f, recipientPrice: e.target.value }))}
+                placeholder={chicProducts.find(p => p.chicId === selectedProduct)?.salePrice?.toString() || ''}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+          </div>
+
+          <h3 className="text-sm font-semibold text-gray-700 border-t pt-3">Informations client</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Nom du client *</label>
+              <input type="text" value={form.recipient} onChange={e => setForm(f => ({ ...f, recipient: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Téléphone *</label>
+              <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+          </div>
+
+          <h3 className="text-sm font-semibold text-gray-700 border-t pt-3">Livraison</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Ville *</label>
+              <select value={form.villeId} onChange={e => setForm(f => ({ ...f, villeId: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <option value="">— Sélectionnez —</option>
+                {(details.cities || []).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Frais de livraison</label>
+              <input type="text" value={form.fraisLivraison} onChange={e => setForm(f => ({ ...f, fraisLivraison: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Adresse de livraison *</label>
+            <textarea value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+              rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Commentaire</label>
+            <textarea value={form.comment} onChange={e => setForm(f => ({ ...f, comment: e.target.value }))}
+              rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          <button type="submit" disabled={sending}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50">
+            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            Envoyer à Chic Affiliate
+          </button>
+
+          {result && (
+            <div className={`text-sm p-3 rounded-lg ${result.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {result.ok ? <CheckCircle2 size={14} className="inline mr-1" /> : <AlertCircle size={14} className="inline mr-1" />}
+              {result.msg}
+            </div>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+
 /* ── Main Page ── */
 export default function ChicAffiliatePage() {
   const [tab, setTab] = useState('products');
@@ -485,11 +671,17 @@ export default function ChicAffiliatePage() {
         >
           <ShoppingCart size={14} /> Commandes
         </button>
+        <button
+          onClick={() => setTab('send')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'send' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+        >
+          <Send size={14} /> Envoyer
+        </button>
       </div>
 
       {/* Content */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
-        {tab === 'products' ? <ProductsTab /> : <OrdersTab />}
+        {tab === 'products' ? <ProductsTab /> : tab === 'orders' ? <OrdersTab /> : <SendOrderTab />}
       </div>
     </div>
   );
