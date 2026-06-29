@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
@@ -9,6 +9,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import { loadProducts, loadProductsRemote } from '../data/products';
 
 /* ── date helpers ── */
 function parseDate(str) {
@@ -183,46 +184,53 @@ export default function Dashboard({ orders = [] }) {
   ];
 
   /* ── Chic Affiliate stats ── */
+  const [chicProducts, setChicProducts] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    const local = loadProducts().filter(p => p.source === 'chic-affiliate');
+    setChicProducts(local);
+    loadProductsRemote().then(remote => {
+      if (cancelled) return;
+      const chic = (remote || []).filter(p => p.source === 'chic-affiliate');
+      if (chic.length > local.length) setChicProducts(chic);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const chicStats = useMemo(() => {
-    try {
-      const allProducts = JSON.parse(localStorage.getItem('victoury_products') || '[]');
-      const chicProducts = allProducts.filter(p => p.source === 'chic-affiliate');
-      const chicNames = new Set(chicProducts.map(p => p.name?.toLowerCase()).filter(Boolean));
+    const chicNames = new Set(chicProducts.map(p => p.name?.toLowerCase()).filter(Boolean));
 
-      const chicOrders = orders.filter(o => {
-        const prods = o.products || [o.product];
-        return (prods || []).some(p => p?.name && chicNames.has(p.name.toLowerCase()));
+    const chicOrders = orders.filter(o => {
+      const prods = o.products || [o.product];
+      return (prods || []).some(p => p?.name && chicNames.has(p.name.toLowerCase()));
+    });
+
+    const todayChic = chicOrders.filter(o => {
+      const d = parseDate(o.dateAdded);
+      return d && d >= startOf(new Date(), 'day');
+    });
+
+    const todayCA = todayChic.filter(o => ['confirme', 'livre'].includes(o.status))
+      .reduce((s, o) => s + (o.price || 0), 0);
+
+    const todayCost = todayChic.filter(o => ['confirme', 'livre'].includes(o.status)).reduce((s, o) => {
+      const prods = o.products || [o.product];
+      let cost = 0;
+      (prods || []).forEach(p => {
+        if (!p?.name) return;
+        const sp = chicProducts.find(sp => sp.name?.toLowerCase() === p.name.toLowerCase());
+        if (sp) cost += parseFloat(sp.prixAchat || sp.purchasePrice || 0) * (p.qty || 1);
       });
+      return s + cost;
+    }, 0);
 
-      const todayChic = chicOrders.filter(o => {
-        const d = parseDate(o.dateAdded);
-        return d && d >= startOf(new Date(), 'day');
-      });
-
-      const todayCA = todayChic.filter(o => ['confirme', 'livre'].includes(o.status))
-        .reduce((s, o) => s + (o.price || 0), 0);
-
-      const todayCost = todayChic.filter(o => ['confirme', 'livre'].includes(o.status)).reduce((s, o) => {
-        const prods = o.products || [o.product];
-        let cost = 0;
-        (prods || []).forEach(p => {
-          if (!p?.name) return;
-          const sp = chicProducts.find(sp => sp.name?.toLowerCase() === p.name.toLowerCase());
-          if (sp) cost += parseFloat(sp.prixAchat || sp.purchasePrice || 0) * (p.qty || 1);
-        });
-        return s + cost;
-      }, 0);
-
-      return {
-        productCount: chicProducts.length,
-        todayOrders: todayChic.length,
-        todayCA,
-        todayProfit: todayCA - todayCost,
-      };
-    } catch {
-      return { productCount: 0, todayOrders: 0, todayCA: 0, todayProfit: 0 };
-    }
-  }, [orders]);
+    return {
+      productCount: chicProducts.length,
+      todayOrders: todayChic.length,
+      todayCA,
+      todayProfit: todayCA - todayCost,
+    };
+  }, [orders, chicProducts]);
 
   const statusRows = [
     { label: 'Nouveau (À confirmer)', count: counts.nouveau, amount: orders.filter(o=>o.status==='nouveau').reduce((s,o)=>s+(o.price||0),0), color: 'bg-blue-400' },
