@@ -190,6 +190,7 @@ function ProductsTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
+                  <th className="px-3 py-2">Image</th>
                   <th className="px-3 py-2">Nom</th>
                   <th className="px-3 py-2">Prix Vente</th>
                   <th className="px-3 py-2">Prix Revendeur</th>
@@ -204,6 +205,9 @@ function ProductsTab() {
                   const profit = sale - purchase;
                   return (
                     <tr key={p.id || i} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        {p.image ? <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded-lg" /> : <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center"><Package size={16} className="text-gray-400" /></div>}
+                      </td>
                       <td className="px-3 py-2 font-medium text-gray-800">{p.name || '—'}</td>
                       <td className="px-3 py-2">{sale.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2">{purchase.toFixed(2)} Dhs</td>
@@ -220,7 +224,7 @@ function ProductsTab() {
                   );
                 })}
                 {!filtered.length && (
-                  <tr><td colSpan={5} className="text-center py-8 text-gray-400">Aucun produit</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">Aucun produit</td></tr>
                 )}
               </tbody>
             </table>
@@ -233,19 +237,22 @@ function ProductsTab() {
               const purchase = parseFloat((p.resellerPrice || p.purchase_price || '0').toString().replace(/[^\d.]/g, ''));
               const profit = sale - purchase;
               return (
-                <div key={p.id || i} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
-                  <div className="font-medium text-gray-800 text-sm">{p.name || '—'}</div>
-                  <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>Vente: {sale.toFixed(2)} Dhs</span>
-                    <span>Achat: {purchase.toFixed(2)} Dhs</span>
-                    <span className="text-green-600 font-medium">+{profit.toFixed(2)}</span>
+                <div key={p.id || i} className="bg-white border border-gray-200 rounded-lg p-3 flex gap-3">
+                  {p.image ? <img src={p.image} alt={p.name} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" /> : <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0"><Package size={20} className="text-gray-400" /></div>}
+                  <div className="flex-1 space-y-1">
+                    <div className="font-medium text-gray-800 text-sm">{p.name || '—'}</div>
+                    <div className="flex items-center justify-between text-xs text-gray-600">
+                      <span>Vente: {sale.toFixed(2)} Dhs</span>
+                      <span>Achat: {purchase.toFixed(2)} Dhs</span>
+                      <span className="text-green-600 font-medium">+{profit.toFixed(2)}</span>
+                    </div>
+                    <button
+                      onClick={() => importProduct(p)}
+                      className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
+                    >
+                      <Download size={12} /> Importer
+                    </button>
                   </div>
-                  <button
-                    onClick={() => importProduct(p)}
-                    className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
-                  >
-                    <Download size={12} /> Importer
-                  </button>
                 </div>
               );
             })}
