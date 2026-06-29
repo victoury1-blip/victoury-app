@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, Check, ImageIcon, X,
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
-import { importProductsFromWooCommerce, updateWooStock, pushProductToWoo } from '../lib/woocommerce';
+import { importProductsFromWooCommerce, updateWooStock, pushProductToWoo, deleteWooProduct } from '../lib/woocommerce';
 
 /* ─── helpers ─── */
 function stockColor(n) {
@@ -309,7 +309,12 @@ export default function StockPage() {
   }
 
   function handleDelete(id) {
-    if (!window.confirm('Supprimer ce produit ?')) return;
+    const product = products.find(p => p.id === id);
+    const msg = product?.wooId
+      ? 'Supprimer ce produit du Stock ET de WooCommerce ?'
+      : 'Supprimer ce produit ?';
+    if (!window.confirm(msg)) return;
+    if (product?.wooId) deleteWooProduct(product.wooId);
     persist(products.filter(p => p.id !== id));
   }
 

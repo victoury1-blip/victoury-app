@@ -82,6 +82,23 @@ function mapWooProduct(wooProduct, variations) {
   };
 }
 
+export async function deleteWooProduct(wooProductId) {
+  const { ck, cs } = getWooKeys();
+  if (!ck || !cs || !wooProductId) return;
+  try {
+    const res = await fetch(wooUrl(`/products/${wooProductId}`, { force: true }), {
+      method: 'DELETE',
+      headers: wooHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('[woo] delete failed:', err.message || res.status);
+    }
+  } catch (e) {
+    console.error('[woo] delete error:', e?.message);
+  }
+}
+
 export async function updateWooStock(wooProductId, variationId, newStock) {
   const { ck, cs } = getWooKeys();
   if (!ck || !cs || !wooProductId) return;
