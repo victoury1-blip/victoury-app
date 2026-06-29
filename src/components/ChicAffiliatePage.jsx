@@ -142,7 +142,9 @@ function ProductsTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  function importProduct(p) {
+  const [importing, setImporting] = useState(null);
+
+  async function importProduct(p) {
     try {
       const existing = loadProducts();
       if (p.chicId) {
@@ -152,14 +154,32 @@ function ProductsTab() {
           return;
         }
       }
+      setImporting(p.chicId || p.name);
+
+      let details = { sizes: [], colors: [], images: [], description: '' };
+      if (p.chicId) {
+        try {
+          details = await fetchChicProductDetails(p.chicId);
+        } catch {}
+      }
+
       const sale = parseFloat((p.salePrice || '0').toString().replace(/[^\d.]/g, ''));
       const purchase = parseFloat((p.resellerPrice || '0').toString().replace(/[^\d.]/g, ''));
+
+      const sizes = details.sizes.length > 0 ? details.sizes : ['S', 'M', 'L', 'XL'];
+      const variations = sizes.map(t => ({ taille: t, stock: 10, prix: sale, compareAt: sale, ajust: 0 }));
+
+      const allImages = details.images.length > 0 ? details.images : (p.image ? [p.image] : []);
+
       const newProd = {
         id: p.chicId ? `CHIC-${p.chicId}` : `CHIC-${Date.now()}`,
         ref: p.chicId ? `CHIC-${p.chicId}` : `CHIC-${Date.now()}`,
         chicId: p.chicId,
         name: p.name || '',
-        image: p.image || null,
+        image: allImages[0] || p.image || null,
+        images: allImages,
+        colors: details.colors,
+        description: details.description,
         statut: 'Active',
         boutique: 'Chic Affiliate',
         shopifyId: '',
@@ -169,19 +189,16 @@ function ProductsTab() {
         source: 'chic-affiliate',
         purchasePrice: purchase,
         stock_quantity: 10,
-        variations: [
-          { taille: 'S', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
-          { taille: 'M', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
-          { taille: 'L', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
-          { taille: 'XL', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
-        ],
+        variations,
       };
       const updated = [newProd, ...existing];
       saveProducts(updated);
       if (p.chicId) setImportedIds(prev => new Set([...prev, p.chicId]));
-      alert('Produit importé dans le Stock avec succès!');
+      alert(`✅ Produit importé avec ${allImages.length} images, ${details.colors.length} couleurs, ${sizes.length} tailles !`);
     } catch (e) {
       alert('Erreur: ' + e.message);
+    } finally {
+      setImporting(null);
     }
   }
 
@@ -247,9 +264,10 @@ function ProductsTab() {
                         ) : (
                           <button
                             onClick={() => importProduct(p)}
-                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
+                            disabled={importing === (p.chicId || p.name)}
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                           >
-                            <Download size={12} /> Importer
+                            {importing === (p.chicId || p.name) ? <><Loader2 size={12} className="animate-spin" /> Chargement...</> : <><Download size={12} /> Importer</>}
                           </button>
                         )}
                       </td>
@@ -287,9 +305,10 @@ function ProductsTab() {
                     ) : (
                       <button
                         onClick={() => importProduct(p)}
-                        className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
+                        disabled={importing === (p.chicId || p.name)}
+                        className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                       >
-                        <Download size={12} /> Importer
+                        {importing === (p.chicId || p.name) ? <><Loader2 size={12} className="animate-spin" /> Chargement...</> : <><Download size={12} /> Importer</>}
                       </button>
                     )}
                   </div>

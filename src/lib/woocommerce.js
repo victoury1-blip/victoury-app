@@ -121,16 +121,20 @@ export async function pushProductToWoo(product) {
     sku: '',
   };
 
-  if (product.image) {
-    let imgSrc = product.image;
-    if (imgSrc.startsWith('data:')) {
-      imgSrc = undefined;
-    } else if (imgSrc.includes('/api/chic-image?url=')) {
-      const match = imgSrc.match(/[?&]url=([^&]+)/);
-      imgSrc = match ? decodeURIComponent(match[1]) : undefined;
+  function resolveImg(url) {
+    if (!url || url.startsWith('data:')) return null;
+    if (url.includes('/api/chic-image?url=')) {
+      const match = url.match(/[?&]url=([^&]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
     }
-    if (imgSrc) body.images = [{ src: imgSrc }];
+    return url;
   }
+
+  const allImages = (product.images || (product.image ? [product.image] : []))
+    .map(resolveImg).filter(Boolean);
+  if (allImages.length > 0) body.images = allImages.map(src => ({ src }));
+
+  if (product.description) body.description = product.description;
 
   if (isVariable) {
     body.attributes = [{

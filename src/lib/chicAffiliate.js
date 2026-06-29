@@ -134,7 +134,26 @@ export async function fetchChicProductDetails(chicProductId) {
     });
   }
 
-  return { token, productId, sizes, colors, cities };
+  const images = [];
+  doc.querySelectorAll('.product-gallery img, .swiper img, .carousel img, [class*="slider"] img, [class*="gallery"] img').forEach(img => {
+    const src = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('src') || '';
+    const fullSrc = src.startsWith('//') ? `https:${src}` : src.startsWith('/') ? `https://www.chic-affiliate.com${src}` : src;
+    if (fullSrc && fullSrc.includes('http') && !images.includes(fullSrc)) images.push(fullSrc);
+  });
+  if (images.length === 0) {
+    const imgRegex = /src="(https?:\/\/[^"]*(?:product_photos|uploads)[^"]*)"/g;
+    let im;
+    while ((im = imgRegex.exec(html)) !== null) {
+      if (!images.includes(im[1])) images.push(im[1]);
+    }
+  }
+
+  const descEl = doc.querySelector('.description, [class*="description"], .product-description');
+  const description = descEl?.textContent?.trim() || '';
+
+  const proxyImages = images.map(u => `/api/chic-image?url=${encodeURIComponent(u)}`);
+
+  return { token, productId, sizes, colors, cities, images: proxyImages, description };
 }
 
 export async function createChicOrder(orderData) {
