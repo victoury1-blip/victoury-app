@@ -134,10 +134,26 @@ function ProductsTab() {
     setError(null);
     try {
       const data = await fetchChicProducts();
-      setProducts(data.data || []);
+      const chicList = data.data || [];
+      setProducts(chicList);
       setTotal(data.recordsTotal || 0);
-      if (data.html && data.data?.length === 0) {
+      if (data.html && chicList.length === 0) {
         setError('Produits non détectés — vérifiez la connexion');
+      }
+      if (chicList.length > 0) {
+        const stored = loadProducts();
+        let changed = false;
+        const updated = stored.map(p => {
+          if (p.source === 'chic-affiliate' && !p.chicId && p.name) {
+            const match = chicList.find(c => c.name?.toLowerCase().trim() === p.name.toLowerCase().trim());
+            if (match?.chicId) {
+              changed = true;
+              return { ...p, chicId: match.chicId, ref: `CHIC-${match.chicId}` };
+            }
+          }
+          return p;
+        });
+        if (changed) saveProducts(updated);
       }
     } catch (e) {
       setError(e.message);
