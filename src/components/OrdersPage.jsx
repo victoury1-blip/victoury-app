@@ -36,6 +36,7 @@ import { useStatuses } from '../contexts/StatusContext';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { loadProducts, loadProductsRemote } from '../data/products';
+import { fetchChicProductDetails, createChicOrder, getChicConfig } from '../lib/chicAffiliate';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 
@@ -673,6 +674,65 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [modifiedIds, setModifiedIds] = useState(new Set());
   const [historyOrder, setHistoryOrder] = useState(null);
   const [customerHistory, setCustomerHistory] = useState(null);
+  const [chicSending, setChicSending] = useState(null);
+
+  const chicProducts = useMemo(() => {
+    try {
+      const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
+      return prods.filter(p => p.source === 'chic-affiliate' && p.chicId);
+    } catch { return []; }
+  }, []);
+
+  function isChicOrder(order) {
+    const prods = order.products?.length ? order.products : [order.product];
+    return prods.some(p => chicProducts.find(cp => cp.name === p?.name));
+  }
+
+  function getChicProductForOrder(order) {
+    const prods = order.products?.length ? order.products : [order.product];
+    for (const p of prods) {
+      const cp = chicProducts.find(cp => cp.name === p?.name);
+      if (cp) return { chicProd: cp, orderProd: p };
+    }
+    return null;
+  }
+
+  async function forwardToChic(order) {
+    const config = getChicConfig();
+    if (!config) { alert('Chic Affiliate non configuré — allez dans la page Chic Affiliate'); return; }
+    const match = getChicProductForOrder(order);
+    if (!match) { alert('Produit Chic non trouvé'); return; }
+
+    setChicSending(order.id);
+    try {
+      const details = await fetchChicProductDetails(match.chicProd.chicId);
+      const villeMatch = details.cities.find(c =>
+        c.name.toLowerCase().includes((order.recipient?.city || '').toLowerCase())
+      );
+
+      await createChicOrder({
+        token: details.token,
+        productId: details.productId,
+        size: match.orderProd.size || (details.sizes[0] || ''),
+        color: details.colors[0]?.id || '',
+        quantity: match.orderProd.qty || 1,
+        recipientPrice: order.price || 0,
+        recipient: order.recipient?.name || '',
+        phone: order.recipient?.phone || '',
+        villeId: villeMatch?.id || (details.cities[0]?.id || ''),
+        fraisLivraison: '',
+        address: order.recipient?.address || '',
+        comment: `Commande ${order.id}`,
+      });
+
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, chicForwarded: true } : o));
+      alert(`✅ Commande ${order.id} envoyée à Chic Affiliate !`);
+    } catch (e) {
+      alert('❌ Erreur: ' + e.message);
+    } finally {
+      setChicSending(null);
+    }
+  }
 
   /* ── Advanced filter ── */
   const [filterOpen, setFilterOpen] = useState(false);
@@ -1240,6 +1300,19 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 {/* Action */}
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-1.5">
+                    {isChicOrder(order) && !order.chicForwarded && (
+                      <button
+                        onClick={() => forwardToChic(order)}
+                        disabled={chicSending === order.id}
+                        className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+                        title="Envoyer à Chic Affiliate"
+                      >
+                        {chicSending === order.id ? '...' : '📦 Chic'}
+                      </button>
+                    )}
+                    {order.chicForwarded && (
+                      <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded whitespace-nowrap">✅ Chic</span>
+                    )}
                     <button
                       onClick={() => openEdit(order)}
                       className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
@@ -1321,6 +1394,18 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <span className="text-sm font-semibold text-gray-500 ml-1">DH</span>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {isChicOrder(order) && !order.chicForwarded && (
+                    <button
+                      onClick={() => forwardToChic(order)}
+                      disabled={chicSending === order.id}
+                      className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {chicSending === order.id ? '...' : '📦 Chic'}
+                    </button>
+                  )}
+                  {order.chicForwarded && (
+                    <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded">✅</span>
+                  )}
                   <button
                     onClick={() => openEdit(order)}
                     className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
