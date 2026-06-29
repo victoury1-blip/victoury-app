@@ -145,7 +145,9 @@ function ProductsTab() {
         let changed = false;
         const updated = stored.map(p => {
           if (p.source === 'chic-affiliate' && !p.chicId && p.name) {
-            const match = chicList.find(c => c.name?.toLowerCase().trim() === p.name.toLowerCase().trim());
+            const norm = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const match = chicList.find(c => norm(c.name) === norm(p.name))
+              || chicList.find(c => norm(c.name).includes(norm(p.name)) || norm(p.name).includes(norm(c.name)));
             if (match?.chicId) {
               changed = true;
               return { ...p, chicId: match.chicId, ref: `CHIC-${match.chicId}` };

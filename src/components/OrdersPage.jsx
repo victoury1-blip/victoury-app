@@ -717,10 +717,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       let chicId = match.chicProd.chicId;
       if (!chicId) {
         const chicList = await fetchChicProducts();
-        const found = (chicList.data || []).find(cp =>
-          cp.name?.toLowerCase().trim() === match.chicProd.name?.toLowerCase().trim()
-        );
-        if (!found?.chicId) { alert('Produit Chic non trouvé sur chic-affiliate.com'); setChicSending(null); return; }
+        const normalize = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const prodName = normalize(match.chicProd.name);
+        const found = (chicList.data || []).find(cp => normalize(cp.name) === prodName)
+          || (chicList.data || []).find(cp => normalize(cp.name).includes(prodName) || prodName.includes(normalize(cp.name)));
+        if (!found?.chicId) { alert(`Produit "${match.chicProd.name}" non trouvé sur chic-affiliate.com`); setChicSending(null); return; }
         chicId = found.chicId;
         const prods = loadProducts().map(p =>
           p.id === match.chicProd.id ? { ...p, chicId } : p
