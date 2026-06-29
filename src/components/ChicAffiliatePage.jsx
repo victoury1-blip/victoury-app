@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Store, Settings, Search, ChevronDown, ChevronRight, RefreshCw,
-  Download, Loader2, AlertCircle, CheckCircle2, Package, ShoppingCart,
+  Download, Loader2, AlertCircle, CheckCircle2, Check, Package, ShoppingCart,
   Send,
 } from 'lucide-react';
 import {
@@ -116,6 +116,12 @@ function ProductsTab() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
+  const [importedIds, setImportedIds] = useState(() => {
+    try {
+      const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
+      return new Set(prods.filter(p => p.chicId).map(p => p.chicId));
+    } catch { return new Set(); }
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,6 +178,7 @@ function ProductsTab() {
       };
       const updated = [newProd, ...existing];
       saveProducts(updated);
+      if (p.chicId) setImportedIds(prev => new Set([...prev, p.chicId]));
       alert('Produit importé dans le Stock avec succès!');
     } catch (e) {
       alert('Erreur: ' + e.message);
@@ -233,12 +240,18 @@ function ProductsTab() {
                       <td className="px-3 py-2">{purchase.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2 text-green-600 font-medium">{profit.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2">
-                        <button
-                          onClick={() => importProduct(p)}
-                          className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
-                        >
-                          <Download size={12} /> Importer
-                        </button>
+                        {p.chicId && importedIds.has(p.chicId) ? (
+                          <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium">
+                            <Check size={12} /> Importé
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => importProduct(p)}
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
+                          >
+                            <Download size={12} /> Importer
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -267,12 +280,18 @@ function ProductsTab() {
                       <span>Achat: {purchase.toFixed(2)} Dhs</span>
                       <span className="text-green-600 font-medium">+{profit.toFixed(2)}</span>
                     </div>
-                    <button
-                      onClick={() => importProduct(p)}
-                      className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
-                    >
-                      <Download size={12} /> Importer
-                    </button>
+                    {p.chicId && importedIds.has(p.chicId) ? (
+                      <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium w-fit">
+                        <Check size={12} /> Importé
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => importProduct(p)}
+                        className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
+                      >
+                        <Download size={12} /> Importer
+                      </button>
+                    )}
                   </div>
                 </div>
               );
