@@ -33,7 +33,7 @@ export function loadProducts() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return parsed.map(p => {
-        if (!p.variations) {
+        if (!p.variations || p.variations.length === 0) {
           p.variations = [
             { taille: 'S', stock: 0, prix: p.prix || p.salePrice || 0, compareAt: 0, ajust: 0 },
             { taille: 'M', stock: 0, prix: p.prix || p.salePrice || 0, compareAt: 0, ajust: 0 },
@@ -41,6 +41,7 @@ export function loadProducts() {
             { taille: 'XL', stock: 0, prix: p.prix || p.salePrice || 0, compareAt: 0, ajust: 0 },
           ];
         }
+        if (!p.statut) p.statut = 'Active';
         return p;
       });
     }
@@ -55,7 +56,20 @@ export function saveProducts(products) {
 
 export async function loadProductsRemote() {
   const remote = await cloudGet(STORAGE_KEY);
-  if (Array.isArray(remote) && remote.length > 0) return remote;
+  if (Array.isArray(remote) && remote.length > 0) {
+    return remote.map(p => {
+      if (!p.variations || p.variations.length === 0) {
+        p.variations = [
+          { taille: 'S', stock: 0, prix: p.prix || 0, compareAt: 0, ajust: 0 },
+          { taille: 'M', stock: 0, prix: p.prix || 0, compareAt: 0, ajust: 0 },
+          { taille: 'L', stock: 0, prix: p.prix || 0, compareAt: 0, ajust: 0 },
+          { taille: 'XL', stock: 0, prix: p.prix || 0, compareAt: 0, ajust: 0 },
+        ];
+      }
+      if (!p.statut) p.statut = 'Active';
+      return p;
+    });
+  }
   return null;
 }
 
