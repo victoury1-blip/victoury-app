@@ -676,22 +676,33 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [customerHistory, setCustomerHistory] = useState(null);
   const [chicSending, setChicSending] = useState(null);
 
-  const chicProducts = useMemo(() => {
+  const [chicProducts, setChicProducts] = useState(() => {
     try {
-      const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
-      return prods.filter(p => p.source === 'chic-affiliate' && p.chicId);
+      return JSON.parse(localStorage.getItem('victoury_products') || '[]')
+        .filter(p => p.source === 'chic-affiliate' && p.chicId);
     } catch { return []; }
+  });
+  useEffect(() => {
+    loadProductsRemote().then(remote => {
+      const chic = (remote || []).filter(p => p.source === 'chic-affiliate' && p.chicId);
+      if (chic.length > 0) setChicProducts(chic);
+    }).catch(() => {});
   }, []);
 
   function isChicOrder(order) {
     const prods = order.products?.length ? order.products : [order.product];
-    return prods.some(p => chicProducts.find(cp => cp.name === p?.name));
+    return prods.some(p => p?.name && chicProducts.find(cp =>
+      cp.name?.toLowerCase().trim() === p.name.toLowerCase().trim()
+    ));
   }
 
   function getChicProductForOrder(order) {
     const prods = order.products?.length ? order.products : [order.product];
     for (const p of prods) {
-      const cp = chicProducts.find(cp => cp.name === p?.name);
+      if (!p?.name) continue;
+      const cp = chicProducts.find(cp =>
+        cp.name?.toLowerCase().trim() === p.name.toLowerCase().trim()
+      );
       if (cp) return { chicProd: cp, orderProd: p };
     }
     return null;
