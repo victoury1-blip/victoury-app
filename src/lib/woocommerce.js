@@ -118,7 +118,7 @@ export async function pushProductToWoo(product) {
     sale_price: isVariable ? undefined : String(product.prix || 0),
     manage_stock: !isVariable,
     stock_quantity: isVariable ? undefined : (variations[0]?.stock || 0),
-    sku: product.ref || '',
+    sku: '',
   };
 
   if (product.image) {
