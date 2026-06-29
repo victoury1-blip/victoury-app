@@ -35,8 +35,8 @@ import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
-import { loadProducts, loadProductsRemote } from '../data/products';
-import { fetchChicProductDetails, createChicOrder, getChicConfig } from '../lib/chicAffiliate';
+import { loadProducts, loadProductsRemote, saveProducts } from '../data/products';
+import { fetchChicProductDetails, fetchChicProducts, createChicOrder, getChicConfig } from '../lib/chicAffiliate';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 
@@ -712,11 +712,22 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     if (!config) { alert('Chic Affiliate non configuré — allez dans la page Chic Affiliate'); return; }
     const match = getChicProductForOrder(order);
     if (!match) { alert('Produit Chic non trouvé'); return; }
-    if (!match.chicProd.chicId) { alert('Ce produit Chic n\'a pas d\'ID — réimportez-le depuis la page Chic Affiliate'); return; }
-
     setChicSending(order.id);
     try {
-      const details = await fetchChicProductDetails(match.chicProd.chicId);
+      let chicId = match.chicProd.chicId;
+      if (!chicId) {
+        const chicList = await fetchChicProducts();
+        const found = (chicList.data || []).find(cp =>
+          cp.name?.toLowerCase().trim() === match.chicProd.name?.toLowerCase().trim()
+        );
+        if (!found?.chicId) { alert('Produit Chic non trouvé sur chic-affiliate.com'); setChicSending(null); return; }
+        chicId = found.chicId;
+        const prods = loadProducts().map(p =>
+          p.id === match.chicProd.id ? { ...p, chicId } : p
+        );
+        saveProducts(prods);
+      }
+      const details = await fetchChicProductDetails(chicId);
       const villeMatch = details.cities.find(c =>
         c.name.toLowerCase().includes((order.recipient?.city || '').toLowerCase())
       );
