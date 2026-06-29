@@ -5,7 +5,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const imageUrl = decodeURIComponent(url);
+    let imageUrl = url;
+    try { imageUrl = decodeURIComponent(imageUrl); } catch {}
+    if (imageUrl.includes('%2F') || imageUrl.includes('%3A')) {
+      try { imageUrl = decodeURIComponent(imageUrl); } catch {}
+    }
+    if (!imageUrl.startsWith('http')) {
+      return res.status(400).json({ error: 'A valid URL was not provided.' });
+    }
     const response = await fetch(imageUrl, {
       headers: {
         'Referer': 'https://www.chic-affiliate.com/',
