@@ -64,7 +64,17 @@ export async function fetchChicProducts(start = 0, length = 50) {
 }
 
 export async function fetchChicCounts() {
-  const res = await fetch(proxyUrl('/affiliate/orders/getCounts'));
+  const params = new URLSearchParams({
+    draw: '1',
+    start: '0',
+    length: '1',
+    'columns[0][data]': 'id',
+    'columns[0][searchable]': 'true',
+    'order[0][column]': '0',
+    'order[0][dir]': 'desc',
+  });
+  const res = await fetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  return { total: data.recordsTotal || 0 };
 }
