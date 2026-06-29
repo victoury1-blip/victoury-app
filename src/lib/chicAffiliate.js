@@ -21,11 +21,12 @@ export function saveChicConfig(config) {
   cloudSet(STORAGE_KEY, config);
 }
 
-function proxyUrl(path) {
+function proxyUrl(path, mode) {
   const config = getChicConfig();
   if (!config) throw new Error('Chic Affiliate non configuré');
   const params = new URLSearchParams({ path, session: config.sessionCookie });
   if (config.xsrfToken) params.set('xsrf', config.xsrfToken);
+  if (mode) params.set('mode', mode);
   return `/api/chic-proxy?${params}`;
 }
 
@@ -47,20 +48,34 @@ export async function fetchChicOrders(startDate, endDate, start = 0, length = 50
   return res.json();
 }
 
-export async function fetchChicProducts(start = 0, length = 50) {
-  const params = new URLSearchParams({
-    draw: '1',
-    start: String(start),
-    length: String(length),
-    'columns[0][data]': 'id',
-    'columns[0][searchable]': 'true',
-    'order[0][column]': '0',
-    'order[0][dir]': 'desc',
-  });
-
-  const res = await fetch(proxyUrl(`/affiliate/products/dataTables?${params}`));
+export async function fetchChicProducts() {
+  const res = await fetch(proxyUrl('/affiliate/products', 'html'));
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
-  return res.json();
+  const { html } = await res.json();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const products = [];
+  const cards = doc.querySelectorAll('.card, .product-card, [class*="product"]');
+  if (cards.length > 0) {
+    cards.forEach(card => {
+      const name = card.querySelector('h5, h4, h3, .product-name, .card-title')?.textContent?.trim() || '';
+      const texts = card.textContent || '';
+      const prices = texts.match(/[\d,.]+\s*MAD/g) || [];
+      const img = card.querySelector('img')?.getAttribute('src') || '';
+      if (name) {
+        products.push({
+          name,
+          salePrice: prices[0] || '',
+          resellerPrice: prices[1] || '',
+          image: img.startsWith('http') ? img : img ? `https://www.chic-affiliate.com${img}` : '',
+        });
+      }
+    });
+  }
+  if (products.length === 0) {
+    const allText = doc.body?.innerHTML || '';
+    return { data: [], recordsTotal: 0, html: allText.slice(0, 2000) };
+  }
+  return { data: products, recordsTotal: products.length };
 }
 
 export async function fetchChicCounts() {

@@ -115,13 +115,16 @@ function ProductsTab() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
-  const load = useCallback(async (start = 0) => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchChicProducts(start, PAGE_SIZE);
+      const data = await fetchChicProducts();
       setProducts(data.data || []);
       setTotal(data.recordsTotal || 0);
+      if (data.html && data.data?.length === 0) {
+        setError('Produits non détectés — vérifiez la connexion');
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -129,7 +132,7 @@ function ProductsTab() {
     }
   }, []);
 
-  useEffect(() => { load(page * PAGE_SIZE); }, [page, load]);
+  useEffect(() => { load(); }, [load]);
 
   function importProduct(p) {
     try {
@@ -195,12 +198,12 @@ function ProductsTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => {
-                  const sale = parseFloat(stripHtml(p.sale_price || '0'));
-                  const purchase = parseFloat(p.purchase_price || '0');
+                {filtered.map((p, i) => {
+                  const sale = parseFloat((p.salePrice || p.sale_price || '0').toString().replace(/[^\d.]/g, ''));
+                  const purchase = parseFloat((p.resellerPrice || p.purchase_price || '0').toString().replace(/[^\d.]/g, ''));
                   const profit = sale - purchase;
                   return (
-                    <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={p.id || i} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-3 py-2 font-medium text-gray-800">{p.name || '—'}</td>
                       <td className="px-3 py-2">{sale.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2">{purchase.toFixed(2)} Dhs</td>
@@ -225,12 +228,12 @@ function ProductsTab() {
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
-            {filtered.map(p => {
-              const sale = parseFloat(stripHtml(p.sale_price || '0'));
-              const purchase = parseFloat(p.purchase_price || '0');
+            {filtered.map((p, i) => {
+              const sale = parseFloat((p.salePrice || p.sale_price || '0').toString().replace(/[^\d.]/g, ''));
+              const purchase = parseFloat((p.resellerPrice || p.purchase_price || '0').toString().replace(/[^\d.]/g, ''));
               const profit = sale - purchase;
               return (
-                <div key={p.id} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+                <div key={p.id || i} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
                   <div className="font-medium text-gray-800 text-sm">{p.name || '—'}</div>
                   <div className="flex items-center justify-between text-xs text-gray-600">
                     <span>Vente: {sale.toFixed(2)} Dhs</span>

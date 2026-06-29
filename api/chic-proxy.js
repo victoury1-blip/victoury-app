@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const { path, xsrf, session } = req.query;
+  const { path, xsrf, session, mode } = req.query;
   if (!path || !session) {
     return res.status(400).json({ error: 'Missing path or session' });
   }
@@ -12,9 +12,9 @@ export default async function handler(req, res) {
     const cookie = `laravel_session=${sess}${xsrfDecoded ? `; XSRF-TOKEN=${xsrfDecoded}` : ''}`;
     const headers = {
       'Cookie': cookie,
-      'Accept': 'application/json',
+      'Accept': mode === 'html' ? 'text/html' : 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
-      'Referer': 'https://www.chic-affiliate.com/affiliate/orders',
+      'Referer': 'https://www.chic-affiliate.com/affiliate/products',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     };
     if (xsrfDecoded) headers['X-XSRF-TOKEN'] = xsrfDecoded;
@@ -26,6 +26,11 @@ export default async function handler(req, res) {
     }
 
     const text = await response.text();
+
+    if (mode === 'html') {
+      return res.status(200).json({ html: text });
+    }
+
     try {
       res.status(response.status).json(JSON.parse(text));
     } catch {
