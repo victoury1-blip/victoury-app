@@ -8,6 +8,7 @@ import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
 } from '../lib/chicAffiliate';
+import { loadProducts, saveProducts } from '../data/products';
 
 /* ── Status badge ── */
 function StatusBadge({ raw }) {
@@ -137,27 +138,35 @@ function ProductsTab() {
 
   function importProduct(p) {
     try {
-      const existing = JSON.parse(localStorage.getItem('victoury_products') || '[]');
+      const existing = loadProducts();
       const already = existing.find(x => x.chicId === p.chicId);
       if (already) { alert('Produit déjà importé'); return; }
       const sale = parseFloat((p.salePrice || '0').toString().replace(/[^\d.]/g, ''));
       const purchase = parseFloat((p.resellerPrice || '0').toString().replace(/[^\d.]/g, ''));
       const newProd = {
         id: `CHIC-${p.chicId}`,
+        ref: `CHIC-${p.chicId}`,
         chicId: p.chicId,
         name: p.name || '',
-        salePrice: sale,
-        purchasePrice: purchase,
-        stock: 0,
-        visible: true,
+        image: p.image || null,
+        statut: 'Active',
+        boutique: 'Chic Affiliate',
+        shopifyId: '',
+        prix: sale,
+        compareAt: sale,
+        etiquette: '',
         source: 'chic-affiliate',
-        image: p.image || '',
-        importedAt: new Date().toISOString(),
+        purchasePrice: purchase,
+        variations: [
+          { taille: 'S', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
+          { taille: 'M', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
+          { taille: 'L', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
+          { taille: 'XL', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
+        ],
       };
-      const updated = [...existing, newProd];
-      localStorage.setItem('victoury_products', JSON.stringify(updated));
-      import('../lib/cloudSettings').then(m => m.cloudSet('victoury_products', updated));
-      alert('Produit importé avec succès');
+      const updated = [newProd, ...existing];
+      saveProducts(updated);
+      alert('Produit importé dans le Stock avec succès!');
     } catch (e) {
       alert('Erreur: ' + e.message);
     }
