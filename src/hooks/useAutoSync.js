@@ -28,6 +28,7 @@ const SYNC_KEYS = [
   'victoury_wa_templates',
   'gs_import',
   'victoury_saved_filters',
+  'chic_config',
 ];
 
 const MERGE_KEYS = new Set([

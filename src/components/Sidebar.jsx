@@ -5,7 +5,7 @@ import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { usePermissions } from '../lib/permissions';
 import { useToast } from './Toast';
 import {
-  LayoutDashboard, ShoppingCart, Package, Archive,
+  LayoutDashboard, ShoppingCart, Package, Archive, Store,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
   Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User,
@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
+  { path: '/chic-affiliate', label: 'Chic Affiliate', icon: Store },
   {
     path: '/ramassage',
     label: 'Ramassage',

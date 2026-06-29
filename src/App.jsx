@@ -10,6 +10,7 @@ const EtatsPage = React.lazy(() => import('./components/EtatsPage'));
 const LivraisonPage = React.lazy(() => import('./components/LivraisonPage'));
 const ListeColisPage = React.lazy(() => import('./components/ListeColisPage'));
 const StockPage = React.lazy(() => import('./components/StockPage'));
+const ChicAffiliatePage = React.lazy(() => import('./components/ChicAffiliatePage'));
 const FacturesPage = React.lazy(() => import('./components/FacturesPage'));
 const ProfitPage = React.lazy(() => import('./components/ProfitPage'));
 const RamassagePage = React.lazy(() => import('./components/RamassagePage'));
@@ -586,6 +587,7 @@ export default function App() {
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
+          <Route path="/chic-affiliate" element={<ChicAffiliatePage />} />
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
           <Route path="/ramassage/scanner" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/ramassage/bons" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />

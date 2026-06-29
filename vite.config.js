@@ -48,7 +48,7 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/wc-api/],
+        navigateFallbackDenylist: [/^\/wc-api/, /^\/chic-api/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -72,6 +72,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/wc-api/, ''),
+      },
+      '/chic-api': {
+        target: 'https://www.chic-affiliate.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/chic-api/, ''),
       },
     },
   },
