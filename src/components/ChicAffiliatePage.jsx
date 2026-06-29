@@ -162,11 +162,12 @@ function ProductsTab() {
         etiquette: '',
         source: 'chic-affiliate',
         purchasePrice: purchase,
+        stock_quantity: 10,
         variations: [
-          { taille: 'S', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
-          { taille: 'M', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
-          { taille: 'L', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
-          { taille: 'XL', stock: 0, prix: sale, compareAt: sale, ajust: 0 },
+          { taille: 'S', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
+          { taille: 'M', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
+          { taille: 'L', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
+          { taille: 'XL', stock: 10, prix: sale, compareAt: sale, ajust: 0 },
         ],
       };
       const updated = [newProd, ...existing];
