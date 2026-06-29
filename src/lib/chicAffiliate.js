@@ -21,19 +21,15 @@ export function saveChicConfig(config) {
   cloudSet(STORAGE_KEY, config);
 }
 
-function getHeaders(config) {
-  return {
-    'X-Requested-With': 'XMLHttpRequest',
-    'Accept': 'application/json',
-    'Cookie': `XSRF-TOKEN=${config.xsrfToken}; laravel_session=${config.sessionCookie}`,
-    'X-XSRF-TOKEN': decodeURIComponent(config.xsrfToken),
-  };
+function proxyUrl(path) {
+  const config = getChicConfig();
+  if (!config) throw new Error('Chic Affiliate non configuré');
+  const params = new URLSearchParams({ path, session: config.sessionCookie });
+  if (config.xsrfToken) params.set('xsrf', config.xsrfToken);
+  return `/api/chic-proxy?${params}`;
 }
 
 export async function fetchChicOrders(startDate, endDate, start = 0, length = 50) {
-  const config = getChicConfig();
-  if (!config) throw new Error('Chic Affiliate non configuré');
-
   const params = new URLSearchParams({
     draw: '1',
     start: String(start),
@@ -43,22 +39,15 @@ export async function fetchChicOrders(startDate, endDate, start = 0, length = 50
     'order[0][column]': '0',
     'order[0][dir]': 'desc',
   });
-
   if (startDate) params.set('startDate', startDate);
   if (endDate) params.set('endDate', endDate);
 
-  const res = await fetch(`/chic-api/affiliate/orders/dataTables?${params}`, {
-    headers: getHeaders(config),
-  });
-
+  const res = await fetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   return res.json();
 }
 
 export async function fetchChicProducts(start = 0, length = 50) {
-  const config = getChicConfig();
-  if (!config) throw new Error('Chic Affiliate non configuré');
-
   const params = new URLSearchParams({
     draw: '1',
     start: String(start),
@@ -69,22 +58,13 @@ export async function fetchChicProducts(start = 0, length = 50) {
     'order[0][dir]': 'desc',
   });
 
-  const res = await fetch(`/chic-api/affiliate/products/dataTables?${params}`, {
-    headers: getHeaders(config),
-  });
-
+  const res = await fetch(proxyUrl(`/affiliate/products/dataTables?${params}`));
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   return res.json();
 }
 
 export async function fetchChicCounts() {
-  const config = getChicConfig();
-  if (!config) throw new Error('Chic Affiliate non configuré');
-
-  const res = await fetch('/chic-api/affiliate/orders/getCounts', {
-    headers: getHeaders(config),
-  });
-
+  const res = await fetch(proxyUrl('/affiliate/orders/getCounts'));
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   return res.json();
 }
