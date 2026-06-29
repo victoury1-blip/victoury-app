@@ -677,15 +677,14 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [chicSending, setChicSending] = useState(null);
 
   const [chicProducts, setChicProducts] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('victoury_products') || '[]')
-        .filter(p => p.source === 'chic-affiliate' && p.chicId);
-    } catch { return []; }
+    return loadProducts().filter(p => p.source === 'chic-affiliate');
   });
   useEffect(() => {
+    const local = loadProducts().filter(p => p.source === 'chic-affiliate');
+    if (local.length > 0) setChicProducts(local);
     loadProductsRemote().then(remote => {
-      const chic = (remote || []).filter(p => p.source === 'chic-affiliate' && p.chicId);
-      if (chic.length > 0) setChicProducts(chic);
+      const chic = (remote || []).filter(p => p.source === 'chic-affiliate');
+      if (chic.length > chicProducts.length) setChicProducts(chic);
     }).catch(() => {});
   }, []);
 
