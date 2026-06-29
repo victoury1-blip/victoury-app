@@ -62,13 +62,14 @@ export async function fetchChicProducts() {
       const prices = texts.match(/[\d,.]+\s*MAD/g) || [];
       const imgEl = card.querySelector('img');
       const img = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-lazy-src') || imgEl?.getAttribute('data-original') || imgEl?.getAttribute('src') || '';
-      const cleanImg = img.startsWith('//') ? `https:${img}` : img.startsWith('/') ? `https://www.chic-affiliate.com${img}` : img;
+      const rawImg = img.startsWith('//') ? `https:${img}` : img.startsWith('/') ? `https://www.chic-affiliate.com${img}` : img;
+      const proxyImg = rawImg ? `/api/chic-image?url=${encodeURIComponent(rawImg)}` : '';
       if (name) {
         products.push({
           name,
           salePrice: prices[0] || '',
           resellerPrice: prices[1] || '',
-          image: cleanImg,
+          image: proxyImg,
         });
       }
     });

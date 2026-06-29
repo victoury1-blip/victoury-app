@@ -206,7 +206,8 @@ function ProductsTab() {
                   return (
                     <tr key={p.id || i} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="px-3 py-2">
-                        {p.image ? <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded-lg" /> : <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center"><Package size={16} className="text-gray-400" /></div>}
+                        {p.image ? <img src={p.image} alt={p.name} referrerPolicy="no-referrer" className="w-12 h-12 object-cover rounded-lg" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }} /> : null}
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg items-center justify-center" style={{ display: p.image ? 'none' : 'flex' }}><Package size={16} className="text-gray-400" /></div>
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-800">{p.name || '—'}</td>
                       <td className="px-3 py-2">{sale.toFixed(2)} Dhs</td>
@@ -238,7 +239,8 @@ function ProductsTab() {
               const profit = sale - purchase;
               return (
                 <div key={p.id || i} className="bg-white border border-gray-200 rounded-lg p-3 flex gap-3">
-                  {p.image ? <img src={p.image} alt={p.name} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" /> : <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0"><Package size={20} className="text-gray-400" /></div>}
+                  {p.image ? <img src={p.image} alt={p.name} referrerPolicy="no-referrer" className="w-16 h-16 object-cover rounded-lg flex-shrink-0" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }} /> : null}
+                  <div className="w-16 h-16 bg-gray-100 rounded-lg items-center justify-center flex-shrink-0" style={{ display: p.image ? 'none' : 'flex' }}><Package size={20} className="text-gray-400" /></div>
                   <div className="flex-1 space-y-1">
                     <div className="font-medium text-gray-800 text-sm">{p.name || '—'}</div>
                     <div className="flex items-center justify-between text-xs text-gray-600">
