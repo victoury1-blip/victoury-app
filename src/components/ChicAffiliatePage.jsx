@@ -194,7 +194,7 @@ function ProductsTab() {
       const updated = [newProd, ...existing];
       saveProducts(updated);
       if (p.chicId) setImportedIds(prev => new Set([...prev, p.chicId]));
-      alert(`✅ Produit importé avec ${allImages.length} images, ${details.colors.length} couleurs, ${sizes.length} tailles !`);
+      if (!importingAll) alert(`✅ Produit importé avec ${allImages.length} images, ${details.colors.length} couleurs, ${sizes.length} tailles !`);
     } catch (e) {
       alert('Erreur: ' + e.message);
     } finally {
@@ -202,16 +202,43 @@ function ProductsTab() {
     }
   }
 
+  const [importingAll, setImportingAll] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
+
+  async function importAll() {
+    const notImported = filtered.filter(p => !p.chicId || !importedIds.has(p.chicId));
+    if (notImported.length === 0) { alert('Tous les produits sont déjà importés !'); return; }
+    if (!window.confirm(`Importer ${notImported.length} produits ?`)) return;
+
+    setImportingAll(true);
+    let success = 0, fail = 0;
+    for (let i = 0; i < notImported.length; i++) {
+      const p = notImported[i];
+      setImportProgress(`${i + 1}/${notImported.length}: ${p.name || '...'}`);
+      try {
+        await importProduct(p);
+        success++;
+      } catch {
+        fail++;
+      }
+    }
+    setImportingAll(false);
+    setImportProgress('');
+    alert(`✅ ${success} produits importés${fail ? `, ${fail} erreurs` : ''} !`);
+  }
+
   const filtered = products.filter(p =>
     !search || (p.name || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const notImportedCount = filtered.filter(p => !p.chicId || !importedIds.has(p.chicId)).length;
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="relative">
+      {/* Search + Import All */}
+      <div className="flex gap-2">
+      <div className="relative flex-1">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
@@ -220,6 +247,16 @@ function ProductsTab() {
           placeholder="Rechercher un produit..."
           className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
+      </div>
+      {notImportedCount > 0 && (
+        <button
+          onClick={importAll}
+          disabled={importingAll}
+          className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition whitespace-nowrap disabled:opacity-50"
+        >
+          {importingAll ? <><Loader2 size={14} className="animate-spin" /> {importProgress}</> : <><Download size={14} /> Importer Tout ({notImportedCount})</>}
+        </button>
+      )}
       </div>
 
       {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg"><AlertCircle size={14} className="inline mr-1" />{error}</div>}

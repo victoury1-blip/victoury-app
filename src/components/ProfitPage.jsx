@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package } from 'lucide-react';
+import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package, Store } from 'lucide-react';
 import { loadProducts, loadProductsRemote } from '../data/products';
 import { loadFactures } from '../data/factures';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -141,8 +141,9 @@ export default function ProfitPage({ orders = [] }) {
           const common = pnWords.filter(w => snWords.some(sw => sw.includes(w) || w.includes(sw)));
           return common.length >= 2;
         });
-      if (sp && sp.prixAchat) {
-        cost += (parseFloat(sp.prixAchat) || 0) * (p.qty || 1);
+      if (sp) {
+        const unitCost = parseFloat(sp.prixAchat || sp.purchasePrice || 0);
+        if (unitCost) cost += unitCost * (p.qty || 1);
       }
     }
     return cost;
@@ -158,6 +159,23 @@ export default function ProfitPage({ orders = [] }) {
 
   const totalRefuse = allFactureColis.filter(c => c.status === 'refuse').length;
   const totalLivre = livresColis.length;
+
+  const chicProducts = stockProducts.filter(p => p.source === 'chic-affiliate');
+  const chicOrdersList = orders.filter(o => {
+    const prods = o.products?.length ? o.products : [o.product];
+    return prods.some(p => chicProducts.find(cp => cp.name === p?.name));
+  });
+  const chicCA = chicOrdersList.reduce((s, o) => s + (o.price || 0), 0);
+  const chicCost = chicOrdersList.reduce((s, o) => {
+    const prods = o.products?.length ? o.products : [o.product];
+    let cost = 0;
+    for (const p of prods) {
+      const sp = chicProducts.find(cp => cp.name === p?.name);
+      if (sp) cost += (parseFloat(sp.purchasePrice) || 0) * (p.qty || 1);
+    }
+    return s + cost;
+  }, 0);
+  const chicProfit = chicCA - chicCost;
 
   const selCls = 'border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
 
@@ -226,6 +244,33 @@ export default function ProfitPage({ orders = [] }) {
             subtitle={`${pct(profitNet, ca)}% du CA (après pub)`} progress={Math.max(0, parseFloat(pct(profitNet, ca)))}
             color={{ border: 'border-teal-500', icon: 'text-teal-500', text: profitNet >= 0 ? 'text-teal-700' : 'text-red-600', bar: 'bg-teal-500' }} />
         </div>
+
+        {/* Chic Affiliate Summary */}
+        {chicOrdersList.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-bold text-gray-700 mb-3 text-sm flex items-center gap-2">
+              <Store size={14} className="text-indigo-600" /> Profit Chic Affiliate
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="bg-indigo-50 rounded-xl p-3">
+                <div className="text-[10px] font-semibold text-gray-500 uppercase">Commandes</div>
+                <div className="text-lg font-black text-indigo-700">{chicOrdersList.length}</div>
+              </div>
+              <div className="bg-blue-50 rounded-xl p-3">
+                <div className="text-[10px] font-semibold text-gray-500 uppercase">Ventes</div>
+                <div className="text-lg font-black text-blue-700">{fmt(chicCA)}</div>
+              </div>
+              <div className="bg-red-50 rounded-xl p-3">
+                <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût Revendeur</div>
+                <div className="text-lg font-black text-red-600">{fmt(chicCost)}</div>
+              </div>
+              <div className="bg-green-50 rounded-xl p-3">
+                <div className="text-[10px] font-semibold text-gray-500 uppercase">Bénéfice</div>
+                <div className={`text-lg font-black ${chicProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(chicProfit)}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Formula breakdown */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
