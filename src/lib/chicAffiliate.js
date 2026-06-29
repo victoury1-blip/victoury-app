@@ -60,13 +60,15 @@ export async function fetchChicProducts() {
       const name = card.querySelector('h5, h4, h3, .product-name, .card-title')?.textContent?.trim() || '';
       const texts = card.textContent || '';
       const prices = texts.match(/[\d,.]+\s*MAD/g) || [];
-      const img = card.querySelector('img')?.getAttribute('src') || '';
+      const imgEl = card.querySelector('img');
+      const img = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-lazy-src') || imgEl?.getAttribute('data-original') || imgEl?.getAttribute('src') || '';
+      const cleanImg = img.startsWith('//') ? `https:${img}` : img.startsWith('/') ? `https://www.chic-affiliate.com${img}` : img;
       if (name) {
         products.push({
           name,
           salePrice: prices[0] || '',
           resellerPrice: prices[1] || '',
-          image: img.startsWith('http') ? img : img ? `https://www.chic-affiliate.com${img}` : '',
+          image: cleanImg,
         });
       }
     });
