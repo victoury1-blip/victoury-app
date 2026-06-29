@@ -194,7 +194,7 @@ function ProductsTab() {
       const updated = [newProd, ...existing];
       saveProducts(updated);
       if (p.chicId) setImportedIds(prev => new Set([...prev, p.chicId]));
-      if (!importingAll) alert(`✅ Produit importé avec ${allImages.length} images, ${details.colors.length} couleurs, ${sizes.length} tailles !`);
+      if (!importingAllRef.current) alert(`✅ Produit importé avec ${allImages.length} images, ${details.colors.length} couleurs, ${sizes.length} tailles !`);
     } catch (e) {
       alert('Erreur: ' + e.message);
     } finally {
@@ -203,6 +203,7 @@ function ProductsTab() {
   }
 
   const [importingAll, setImportingAll] = useState(false);
+  const importingAllRef = React.useRef(false);
   const [importProgress, setImportProgress] = useState('');
 
   async function importAll() {
@@ -211,6 +212,7 @@ function ProductsTab() {
     if (!window.confirm(`Importer ${notImported.length} produits ?`)) return;
 
     setImportingAll(true);
+    importingAllRef.current = true;
     let success = 0, fail = 0;
     for (let i = 0; i < notImported.length; i++) {
       const p = notImported[i];
@@ -223,6 +225,7 @@ function ProductsTab() {
       }
     }
     setImportingAll(false);
+    importingAllRef.current = false;
     setImportProgress('');
     alert(`✅ ${success} produits importés${fail ? `, ${fail} erreurs` : ''} !`);
   }
