@@ -60,10 +60,37 @@ const STATUS_COLORS = {
   en_suivi: 'bg-purple-100 text-purple-700', att_ramassage: 'bg-amber-100 text-amber-700',
 };
 
-/* ── KPI card ── */
-function KpiCard({ icon: Icon, label, value, sub, iconBg }) {
+/* ── Skeleton loader ── */
+function DashboardSkeleton() {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
+    <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full animate-pulse">
+      <div>
+        <div className="h-7 w-48 bg-gray-200 rounded-lg" />
+        <div className="h-4 w-64 bg-gray-200 rounded-lg mt-2" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-32 bg-gray-200 rounded-2xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-28 bg-gray-200 rounded-2xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-64 bg-gray-200 rounded-2xl" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── KPI card ── */
+const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, iconBg }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow animate-fade-in">
       <div className="flex items-start justify-between">
         <div className={`${iconBg} p-3 rounded-xl`}>
           <Icon size={20} className="text-white" />
@@ -76,14 +103,14 @@ function KpiCard({ icon: Icon, label, value, sub, iconBg }) {
       </div>
     </div>
   );
-}
+});
 
 /* ── Period summary card ── */
-function PeriodCard({ label, dateHint, orders, bgClass }) {
+const PeriodCard = React.memo(function PeriodCard({ label, dateHint, orders, bgClass }) {
   const ca = orders.reduce((s, o) => s + (o.price || 0), 0);
   const total = orders.length;
   return (
-    <div className={`${bgClass} rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden select-none`}>
+    <div className={`${bgClass} rounded-2xl p-5 flex flex-col gap-3 relative overflow-hidden select-none animate-fade-in`}>
       <ShoppingCart size={72} className="absolute right-3 bottom-2 opacity-10 text-white" />
       <div className="flex items-center justify-between">
         <span className="text-white font-bold text-sm">{label}</span>
@@ -103,10 +130,10 @@ function PeriodCard({ label, dateHint, orders, bgClass }) {
       </div>
     </div>
   );
-}
+});
 
 /* ── Status row ── */
-function StatusRow({ label, count, amount, color }) {
+const StatusRow = React.memo(function StatusRow({ label, count, amount, color }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
       <div className="flex items-center gap-2">
@@ -121,9 +148,9 @@ function StatusRow({ label, count, amount, color }) {
       </div>
     </div>
   );
-}
+});
 
-export default function Dashboard({ orders = [] }) {
+export default function Dashboard({ orders = [], isLoading = false }) {
   const navigate = useNavigate();
   const now = new Date();
   const weekStart = startOf(now, 'week');
@@ -352,6 +379,10 @@ export default function Dashboard({ orders = [] }) {
         fill: STATUS_CHART_COLORS[status] || '#94a3b8',
       }));
   }, [orders]);
+
+  if (isLoading && orders.length === 0) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full">
