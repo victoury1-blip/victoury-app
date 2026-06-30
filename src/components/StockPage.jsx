@@ -359,7 +359,15 @@ export default function StockPage() {
   const selCls = 'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white';
 
   if (loadingProducts) {
-    return <div className="flex items-center justify-center h-64 gap-2 text-gray-400"><RefreshCw size={18} className="animate-spin" /><span>Chargement...</span></div>;
+    return (
+      <div className="flex flex-col h-full bg-gray-50 p-4 gap-3 animate-pulse">
+        <div className="h-9 w-48 bg-gray-200 rounded-lg" />
+        <div className="h-10 w-full bg-gray-200 rounded-xl" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-12 w-full bg-gray-200 rounded-xl" />
+        ))}
+      </div>
+    );
   }
 
   return (
