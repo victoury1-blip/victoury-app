@@ -1379,9 +1379,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   }
 
   if (isLoading) return (
-    <div className="flex flex-col items-center justify-center h-full gap-4">
-      <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      <p className="text-sm text-gray-400 font-medium">Chargement des colis…</p>
+    <div className="flex flex-col h-full p-4 gap-3 animate-pulse">
+      <div className="h-9 w-48 bg-gray-200 rounded-lg" />
+      <div className="h-10 w-full bg-gray-200 rounded-xl" />
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="h-14 w-full bg-gray-200 rounded-xl" />
+      ))}
     </div>
   );
 
