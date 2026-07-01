@@ -237,12 +237,26 @@ function ScannerPage({ orders, setOrders }) {
       </div>
 
       {message && (
-        <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium flex items-center justify-between gap-3 ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-          <span>{message.text}</span>
+        <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          <div className="flex items-start justify-between gap-3">
+            <span>{message.text}</span>
+            {message.type === 'error' && message.text.includes('Permission') && (
+              <div className="flex flex-col gap-1 shrink-0">
+                <button onClick={() => { setMessage(null); setScanning(true); }} className="text-xs font-bold underline hover:no-underline whitespace-nowrap">
+                  Réessayer
+                </button>
+                <button onClick={() => window.location.reload()} className="text-xs font-bold underline hover:no-underline whitespace-nowrap">
+                  Recharger
+                </button>
+              </div>
+            )}
+          </div>
           {message.type === 'error' && message.text.includes('Permission') && (
-            <button onClick={() => window.location.reload()} className="shrink-0 text-xs font-bold underline hover:no-underline">
-              Recharger
-            </button>
+            <div className="mt-2 text-xs opacity-80 space-y-0.5">
+              <p className="font-semibold">Pour activer la caméra :</p>
+              <p>📱 Paramètres Android → Apps → <strong>VICTOURY</strong> → Autorisations → Caméra → Autoriser</p>
+              <p>Ou dans Chrome → ⋮ → Paramètres du site → Caméra → Autoriser</p>
+            </div>
           )}
         </div>
       )}
