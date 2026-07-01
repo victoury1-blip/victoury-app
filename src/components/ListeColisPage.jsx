@@ -1140,52 +1140,51 @@ function ScanModal({ orders, onFound, onClose }) {
     setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });
   }, [orders, onFound]);
 
+  const processCodeRef = useRef(processCode);
+  useEffect(() => { processCodeRef.current = processCode; }, [processCode]);
+
   useEffect(() => {
     if (!scanning) return;
     let stream;
-    let rafId;
-    let detector;
+    let intervalId;
+    let stopped = false;
 
     async function start() {
       try {
-        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
-        if ('BarcodeDetector' in window) {
-          detector = new window.BarcodeDetector({ formats });
-        }
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
         });
+        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
         const video = document.getElementById('colis-scanner-video');
         if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
         video.srcObject = stream;
         scannerRef.current = stream;
         await video.play();
 
+        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
+        const detector = 'BarcodeDetector' in window ? new window.BarcodeDetector({ formats }) : null;
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        const scan = async () => {
-          if (!stream?.active) return;
-          if (video.readyState >= 2 && video.videoWidth > 0) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        intervalId = setInterval(async () => {
+          if (stopped || !stream?.active || video.readyState < 2 || !video.videoWidth) return;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            const qr = jsQR(imageData.data, imageData.width, imageData.height);
-            if (qr?.data) { processCode(qr.data); return; }
+          const qr = jsQR(imageData.data, imageData.width, imageData.height);
+          if (qr?.data) { clearInterval(intervalId); processCodeRef.current(qr.data); return; }
 
-            if (detector) {
-              try {
-                const results = await detector.detect(canvas);
-                if (results.length > 0) { processCode(results[0].rawValue); return; }
-              } catch {}
-            }
+          if (detector) {
+            try {
+              const results = await detector.detect(canvas);
+              if (results.length > 0) { clearInterval(intervalId); processCodeRef.current(results[0].rawValue); }
+            } catch {}
           }
-          rafId = requestAnimationFrame(scan);
-        };
-        rafId = requestAnimationFrame(scan);
+        }, 250);
       } catch (err) {
+        if (stopped) return;
         const reason = err?.name === 'NotAllowedError'
           ? 'Permission caméra refusée'
           : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
@@ -1198,12 +1197,13 @@ function ScanModal({ orders, onFound, onClose }) {
 
     const timer = setTimeout(start, 80);
     return () => {
+      stopped = true;
       clearTimeout(timer);
-      cancelAnimationFrame(rafId);
+      clearInterval(intervalId);
       if (stream) stream.getTracks().forEach(t => t.stop());
       scannerRef.current = null;
     };
-  }, [scanning, processCode]);
+  }, [scanning]);
 
   function stopScanner() {
     if (scannerRef.current) {

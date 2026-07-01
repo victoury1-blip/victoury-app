@@ -105,54 +105,51 @@ function ScannerPage({ orders, setOrders }) {
     setManualInput('');
   }
 
+  const processScannedCodeRef = useRef(processScannedCode);
+  useEffect(() => { processScannedCodeRef.current = processScannedCode; }, [processScannedCode]);
+
   useEffect(() => {
     if (!scanning) return;
     let stream;
-    let rafId;
-    let detector;
+    let intervalId;
+    let stopped = false;
 
     async function start() {
       try {
-        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
-        if ('BarcodeDetector' in window) {
-          detector = new window.BarcodeDetector({ formats });
-        }
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
         });
+        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
         const video = document.getElementById('ramassage-scanner-video');
         if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
         video.srcObject = stream;
         scannerRef.current = stream;
         await video.play();
 
+        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
+        const detector = 'BarcodeDetector' in window ? new window.BarcodeDetector({ formats }) : null;
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        const scan = async () => {
-          if (!stream?.active) return;
-          if (video.readyState >= 2 && video.videoWidth > 0) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        intervalId = setInterval(async () => {
+          if (stopped || !stream?.active || video.readyState < 2 || !video.videoWidth) return;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            // Try jsQR first (reliable pure-JS QR scanner)
-            const qr = jsQR(imageData.data, imageData.width, imageData.height);
-            if (qr?.data) { processScannedCode(qr.data); return; }
+          const qr = jsQR(imageData.data, imageData.width, imageData.height);
+          if (qr?.data) { clearInterval(intervalId); processScannedCodeRef.current(qr.data); return; }
 
-            // Try BarcodeDetector for 1D barcodes (Code 128, EAN, etc.)
-            if (detector) {
-              try {
-                const results = await detector.detect(canvas);
-                if (results.length > 0) { processScannedCode(results[0].rawValue); return; }
-              } catch {}
-            }
+          if (detector) {
+            try {
+              const results = await detector.detect(canvas);
+              if (results.length > 0) { clearInterval(intervalId); processScannedCodeRef.current(results[0].rawValue); }
+            } catch {}
           }
-          rafId = requestAnimationFrame(scan);
-        };
-        rafId = requestAnimationFrame(scan);
+        }, 250);
       } catch (err) {
+        if (stopped) return;
         const reason = err?.name === 'NotAllowedError'
           ? 'Permission caméra refusée — vérifiez les paramètres Android: Paramètres → Apps → Chrome → Autorisations → Caméra'
           : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
@@ -165,12 +162,13 @@ function ScannerPage({ orders, setOrders }) {
 
     const timer = setTimeout(start, 80);
     return () => {
+      stopped = true;
       clearTimeout(timer);
-      cancelAnimationFrame(rafId);
+      clearInterval(intervalId);
       if (stream) stream.getTracks().forEach(t => t.stop());
       scannerRef.current = null;
     };
-  }, [scanning, processScannedCode]);
+  }, [scanning]);
 
   function stopScanner() {
     if (scannerRef.current) {
