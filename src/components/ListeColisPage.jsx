@@ -1126,11 +1126,15 @@ const isCasa = (city) => {
 function ScanModal({ orders, onFound, onClose }) {
   const [scanning, setScanning] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [manualInput, setManualInput] = useState('');
   const scannerRef = useRef(null);
+  const inputRef = useRef(null);
 
   const processCode = useCallback((code) => {
-    const order = orders.find(o => o.id === code || o.trackingNumber === code || o.ozoneTracking === code);
-    if (!order) { setMsg({ text: `Non trouvé: ${code}`, error: true }); return; }
+    const trimmed = (code || '').trim();
+    if (!trimmed) return;
+    const order = orders.find(o => o.id === trimmed || o.trackingNumber === trimmed || o.ozoneTracking === trimmed);
+    if (!order) { setMsg({ text: `Non trouvé: ${trimmed}`, error: true }); return; }
     try { new (window.AudioContext || window.webkitAudioContext)().createOscillator(); } catch {}
     onFound(order.id);
     setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });
@@ -1144,13 +1148,23 @@ function ScanModal({ orders, onFound, onClose }) {
         html5Qr = new Html5Qrcode('colis-qr-reader');
         scannerRef.current = html5Qr;
         await html5Qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, processCode, () => {});
-      } catch { setMsg({ text: 'Impossible d\'accéder à la caméra', error: true }); setScanning(false); }
+      } catch {
+        setMsg({ text: 'Caméra inaccessible (HTTPS requis ou permission refusée)', error: true });
+        setScanning(false);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
     }, 100);
     return () => { clearTimeout(t); if (html5Qr?.isScanning) html5Qr.stop().catch(() => {}); };
   }, [scanning, processCode]);
 
   function stop() { if (scannerRef.current?.isScanning) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; } setScanning(false); }
   function close() { stop(); onClose(); }
+
+  function handleManualSubmit(e) {
+    e.preventDefault();
+    processCode(manualInput);
+    setManualInput('');
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4" onClick={close}>
@@ -1159,19 +1173,34 @@ function ScanModal({ orders, onFound, onClose }) {
           <h2 className="font-bold text-gray-900 flex items-center gap-2"><ScanLine size={18} className="text-blue-600" /> Scanner un colis</h2>
           <button onClick={close} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={15} className="text-gray-400" /></button>
         </div>
-        <div className="p-5">
+        <div className="p-5 space-y-3">
           {scanning ? (
             <>
               <div id="colis-qr-reader" className="w-full rounded-xl overflow-hidden" />
-              <button onClick={stop} className="mt-3 w-full py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Arrêter</button>
+              <button onClick={stop} className="w-full py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Arrêter</button>
             </>
           ) : (
             <button onClick={() => setScanning(true)} className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 flex items-center justify-center gap-2">
               <ScanLine size={18} /> Démarrer la caméra
             </button>
           )}
-          {msg && <div className={`mt-3 px-4 py-2.5 rounded-lg text-sm font-medium text-center ${msg.error ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{msg.text}</div>}
-          <p className="mt-3 text-xs text-gray-400 text-center">Scannez le code-barres ou QR code du bon de livraison</p>
+          {msg && <div className={`px-4 py-2.5 rounded-lg text-sm font-medium text-center ${msg.error ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{msg.text}</div>}
+          {/* Manual fallback */}
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs text-gray-400 text-center mb-2">Ou saisissez le numéro manuellement</p>
+            <form onSubmit={handleManualSubmit} className="flex gap-2">
+              <input
+                ref={inputRef}
+                value={manualInput}
+                onChange={e => setManualInput(e.target.value)}
+                placeholder="Ex: VICT0001"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              />
+              <button type="submit" disabled={!manualInput.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
+                OK
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
