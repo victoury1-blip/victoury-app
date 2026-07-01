@@ -117,7 +117,7 @@ function ScannerRetourPage({ orders, setOrders }) {
           () => {}
         );
       } catch {
-        showMessage('Impossible d\'accéder à la caméra', 'error');
+        showMessage('Caméra inaccessible — utilisez la saisie manuelle ci-dessous', 'error');
         setScanning(false);
       }
     }, 100);
