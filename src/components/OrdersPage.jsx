@@ -1166,7 +1166,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       })()}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto px-4 pb-4">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-sm border-collapse min-w-[900px]">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
@@ -1375,6 +1376,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             ))}
           </tbody>
         </table>
+        </div>
         </div>
 
         {/* Mobile Card View */}

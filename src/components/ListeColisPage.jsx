@@ -392,7 +392,8 @@ function SheetImportSection({ orders = [], setOrders }) {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto px-4 pb-4">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-sm border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
@@ -460,6 +461,7 @@ function SheetImportSection({ orders = [], setOrders }) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Footer */}
