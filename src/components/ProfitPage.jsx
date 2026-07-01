@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package, Store } from 'lucide-react';
-import { loadProducts, loadProductsRemote } from '../data/products';
+import useProducts from '../hooks/useProducts';
 import { loadFactures } from '../data/factures';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
@@ -92,12 +92,7 @@ export default function ProfitPage({ orders = [] }) {
     setApplied({ dateFrom: firstDay, dateTo: lastDay });
   }
 
-  const [stockProducts, setStockProducts] = useState(() => loadProducts());
-  useEffect(() => {
-    loadProductsRemote().then(remote => {
-      if (remote) { setStockProducts(remote); localStorage.setItem('victoury_products', JSON.stringify(remote)); }
-    });
-  }, []);
+  const { products: stockProducts } = useProducts();
 
   // Get all colis from factures, within the period
   const allFactureColis = useMemo(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
@@ -9,7 +9,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { loadProducts, loadProductsRemote } from '../data/products';
+import useProducts from '../hooks/useProducts';
 
 /* ── date helpers ── */
 function parseDate(str) {
@@ -211,18 +211,7 @@ export default function Dashboard({ orders = [], isLoading = false }) {
   ];
 
   /* ── Chic Affiliate stats ── */
-  const [chicProducts, setChicProducts] = useState([]);
-  useEffect(() => {
-    let cancelled = false;
-    const local = loadProducts().filter(p => p.source === 'chic-affiliate');
-    setChicProducts(local);
-    loadProductsRemote().then(remote => {
-      if (cancelled) return;
-      const chic = (remote || []).filter(p => p.source === 'chic-affiliate');
-      if (chic.length > local.length) setChicProducts(chic);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const { products: chicProducts } = useProducts(p => p.source === 'chic-affiliate');
 
   const chicStats = useMemo(() => {
     const chicNames = new Set(chicProducts.map(p => p.name?.toLowerCase()).filter(Boolean));
