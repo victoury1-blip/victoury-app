@@ -122,6 +122,14 @@ export default function App() {
   const { notifyNewOrder } = useOrderNotifications();
 
   useEffect(() => {
+    if (!('setAppBadge' in navigator)) return;
+    const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi','retour_recu','echange_recu']);
+    const count = orders.filter(o => !COLIS_PIPE.has(o.status) && o.status === 'nouveau').length;
+    if (count > 0) navigator.setAppBadge(count).catch(() => {});
+    else navigator.clearAppBadge().catch(() => {});
+  }, [orders]);
+
+  useEffect(() => {
     const on = () => setOffline(false);
     const off = () => setOffline(true);
     window.addEventListener('online', on);

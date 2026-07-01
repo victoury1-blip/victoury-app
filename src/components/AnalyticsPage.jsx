@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ShoppingCart, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { ShoppingCart, DollarSign, TrendingUp, TrendingDown, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const STATUS_COLORS = {
   livre: '#22c55e',
@@ -130,14 +131,54 @@ export default function AnalyticsPage({ orders = [] }) {
       }));
   }, [filtered]);
 
+  function exportExcel() {
+    const STATUS_LABELS = {
+      nouveau: 'À confirmer', en_suivi: 'En suivi', reporter: 'Reporté',
+      confirme: 'Confirmé', livre: 'Livré', refuse: 'Refusé',
+      annule: 'Annulé', att_ramassage: 'Att. ramassage', expedier: 'Expédié',
+      recu_livreur: 'Reçu livreur', change: 'Échange', pas_rep_lv: 'Pas rép. LV',
+    };
+
+    const rows = filtered.map(o => ({
+      'ID': o.id,
+      'Nom': o.recipient?.name || '',
+      'Téléphone': o.recipient?.phone || '',
+      'Ville': o.recipient?.city || '',
+      'Adresse': o.recipient?.address || '',
+      'Livreur': o.recipient?.delivery?.nom || '',
+      'Produit': o.product?.name || '',
+      'Taille': o.product?.size || '',
+      'Qté': o.product?.qty || 1,
+      'Prix (MAD)': parseFloat(o.price) || 0,
+      'Statut': STATUS_LABELS[o.status] || o.status,
+      'Note': o.note || '',
+      'Date ajout': o.dateAdded || '',
+      'Date maj': o.dateUpdated || '',
+    }));
+
+    const summary = [
+      { Indicateur: 'Total commandes', Valeur: kpis.total },
+      { Indicateur: "Chiffre d'affaires (MAD)", Valeur: kpis.ca },
+      { Indicateur: 'Taux de livraison', Valeur: `${kpis.tauxLiv}%` },
+      { Indicateur: 'Taux de refus', Valeur: `${kpis.tauxRef}%` },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Commandes');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Résumé');
+
+    const today = new Date().toLocaleDateString('fr-MA').replace(/\//g, '-');
+    XLSX.writeFile(wb, `victoury-${period}j-${today}.xlsx`);
+  }
+
   const periods = [7, 30, 90];
   const periodLabels = { 7: '7 jours', 30: '30 jours', 90: '90 jours' };
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-800">Analytiques</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {periods.map(p => (
             <button
               key={p}
@@ -149,6 +190,14 @@ export default function AnalyticsPage({ orders = [] }) {
               {periodLabels[p]}
             </button>
           ))}
+          <button
+            onClick={exportExcel}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+          >
+            <Download size={15} />
+            Excel
+          </button>
         </div>
       </div>
 
