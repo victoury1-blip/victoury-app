@@ -117,10 +117,14 @@ function ScannerRetourPage({ orders, setOrders }) {
           () => {}
         );
       } catch (err) {
-        const reason = err?.name === 'NotAllowedError' ? 'Permission refusée (autorisez la caméra dans Chrome → Paramètres du site)'
-          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
-          : err?.name === 'NotReadableError' ? 'Caméra utilisée par une autre app'
-          : `Erreur caméra: ${err?.name || err?.message || 'inconnue'}`;
+        const msg = typeof err === 'string' ? err : (err?.message || err?.name || '');
+        const reason = (err?.name === 'NotAllowedError' || msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('allowed'))
+          ? 'Permission caméra refusée — Chrome → ⋮ → Paramètres du site → Caméra → Autoriser'
+          : (err?.name === 'NotFoundError' || msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('no camera'))
+          ? 'Aucune caméra arrière détectée'
+          : (err?.name === 'NotReadableError' || msg.toLowerCase().includes('in use') || msg.toLowerCase().includes('already'))
+          ? 'Caméra utilisée par une autre app — redémarrez Chrome'
+          : `Erreur caméra: "${msg || JSON.stringify(err)}"`;
         showMessage(reason, 'error');
         setScanning(false);
       }

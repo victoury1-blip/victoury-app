@@ -1149,10 +1149,14 @@ function ScanModal({ orders, onFound, onClose }) {
         scannerRef.current = html5Qr;
         await html5Qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, processCode, () => {});
       } catch (err) {
-        const reason = err?.name === 'NotAllowedError' ? 'Permission refusée — autorisez la caméra dans Chrome → Paramètres du site'
-          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
-          : err?.name === 'NotReadableError' ? 'Caméra utilisée par une autre app — fermez les autres onglets'
-          : `Erreur: ${err?.name || err?.message || 'inconnue'}`;
+        const m = typeof err === 'string' ? err : (err?.message || err?.name || '');
+        const reason = (err?.name === 'NotAllowedError' || m.toLowerCase().includes('permission') || m.toLowerCase().includes('allowed'))
+          ? 'Permission caméra refusée — Chrome → ⋮ → Paramètres du site → Caméra → Autoriser'
+          : (err?.name === 'NotFoundError' || m.toLowerCase().includes('not found') || m.toLowerCase().includes('no camera'))
+          ? 'Aucune caméra arrière détectée'
+          : (err?.name === 'NotReadableError' || m.toLowerCase().includes('in use') || m.toLowerCase().includes('already'))
+          ? 'Caméra utilisée par une autre app — redémarrez Chrome'
+          : `Erreur: "${m || JSON.stringify(err)}"`;
         setMsg({ text: reason, error: true });
         setScanning(false);
         setTimeout(() => inputRef.current?.focus(), 100);
