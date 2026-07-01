@@ -106,6 +106,14 @@ The `mapRow(o)` helper in `App.jsx` converts a raw Supabase row to the app's ord
 
 Has an **Excel export** button (green, top-right) that generates a `.xlsx` file via `xlsx` library with two sheets: full orders list + summary stats. Filename is auto-generated with period and date.
 
+### Liste des Colis PDF Export
+
+`ListeColisPage` has a `printColisParLivreur(data)` function that opens a print window with orders grouped by livreur. Triggered by the 🖨️ button in the toolbar. If rows are selected, exports only selected; otherwise exports all colis. Uses `window.open` + `window.print()` — same pattern as `printFacture` in `FacturesPage.jsx`.
+
+### Table Row Styling
+
+Orders and Colis tables use `border-separate border-spacing-y-1` on the body `<table>` with `border border-gray-200 rounded-xl bg-white` on each `<tr>` — giving a card-per-row look. The sticky header uses a separate `<table>` with `border-collapse`.
+
 ### App Badge
 
 `App.jsx` calls `navigator.setAppBadge(count)` whenever orders change to show the count of `nouveau` status orders on the PWA app icon. Works on Android Chrome/Edge with the app installed. Clears automatically when no pending orders.
