@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useParams, useLocation } from 're
 import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
 import ScrollToTop from './components/ScrollToTop';
+import OfflineBanner from './components/OfflineBanner';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const OrdersPage = React.lazy(() => import('./components/OrdersPage'));
@@ -615,6 +616,7 @@ export default function App() {
         </div>
       </main>
       <IOSInstallPrompt />
+      <OfflineBanner />
     </div>
     </PermissionsProvider>
     </ToastProvider>
