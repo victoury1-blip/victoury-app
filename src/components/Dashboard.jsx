@@ -89,12 +89,21 @@ function DashboardSkeleton() {
 }
 
 /* ── KPI card ── */
-const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, iconBg }) {
+const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, iconBg, trend }) {
   const numericTarget = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^\d.]/g, '')) || 0;
   const animated = useCountUp(numericTarget);
   const displayValue = typeof value === 'number'
     ? Math.round(animated).toLocaleString('fr-MA')
     : String(value).replace(/[\d,.]+/, Math.round(animated).toLocaleString('fr-MA'));
+
+  const trendEl = trend != null && trend !== 0 ? (
+    <span className={`flex items-center gap-0.5 text-xs font-bold ${trend > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+      {trend > 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+      {Math.abs(trend)}%
+    </span>
+  ) : trend === 0 ? (
+    <span className="flex items-center gap-0.5 text-xs font-bold text-gray-400"><Minus size={13} /> 0%</span>
+  ) : null;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow animate-fade-in">
@@ -102,6 +111,7 @@ const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, ico
         <div className={`${iconBg} p-3 rounded-xl`}>
           <Icon size={20} className="text-white" />
         </div>
+        {trendEl}
       </div>
       <div>
         <p className="text-2xl font-black text-gray-900 leading-tight">{displayValue}</p>
@@ -208,13 +218,18 @@ export default function Dashboard({ orders = [], isLoading = false }) {
     { label: 'Total', dateHint: null, orders, bgClass: 'bg-gradient-to-br from-orange-500 to-orange-600' },
   ], [orders]);
 
+  function trendPct(today, yesterday) {
+    if (yesterday === 0) return today > 0 ? 100 : null;
+    return Math.round(((today - yesterday) / yesterday) * 100);
+  }
+
   const kpis = [
-    { icon: ShoppingCart, label: 'Total commandes', value: counts.total, iconBg: 'bg-blue-500', sub: `${counts.nouveau} nouvelles` },
-    { icon: CheckCircle, label: 'Confirmées', value: counts.confirme, iconBg: 'bg-green-500', sub: `${counts.en_suivi} en suivi` },
-    { icon: Truck, label: 'Livrées', value: counts.livre, iconBg: 'bg-emerald-500', sub: `Taux: ${taux}%` },
-    { icon: XCircle, label: 'Refusées / Annulées', value: counts.refuse + counts.annule, iconBg: 'bg-red-500', sub: `${counts.refuse} ref, ${counts.annule} ann` },
+    { icon: ShoppingCart, label: 'Total commandes', value: counts.total, iconBg: 'bg-blue-500', sub: `${counts.nouveau} nouvelles`, trend: trendPct(todayOrders.length, yesterdayOrders.length) },
+    { icon: CheckCircle, label: 'Confirmées', value: counts.confirme, iconBg: 'bg-green-500', sub: `${counts.en_suivi} en suivi`, trend: trendPct(daily.todayConfirm, daily.yestConfirm) },
+    { icon: Truck, label: 'Livrées', value: counts.livre, iconBg: 'bg-emerald-500', sub: `Taux: ${taux}%`, trend: trendPct(daily.todayLivre, daily.yestLivre) },
+    { icon: XCircle, label: 'Refusées / Annulées', value: counts.refuse + counts.annule, iconBg: 'bg-red-500', sub: `${counts.refuse} ref, ${counts.annule} ann`, trend: trendPct(daily.todayRefuse, daily.yestRefuse) },
     { icon: RotateCcw, label: 'Reportées', value: counts.reporter, iconBg: 'bg-orange-500', sub: `${counts.expedier} expédié, ${counts.att_ram} att. ram.` },
-    { icon: DollarSign, label: "Chiffre d'affaires", value: `${ca.toLocaleString('fr-MA', { minimumFractionDigits: 2 })} DH`, iconBg: 'bg-purple-500', sub: `Livré: ${livreCA.toLocaleString('fr-MA',{minimumFractionDigits:2})} DH` },
+    { icon: DollarSign, label: "Chiffre d'affaires", value: `${ca.toLocaleString('fr-MA', { minimumFractionDigits: 2 })} DH`, iconBg: 'bg-purple-500', sub: `Livré: ${livreCA.toLocaleString('fr-MA',{minimumFractionDigits:2})} DH`, trend: trendPct(daily.todayCA, daily.yestCA) },
   ];
 
   /* ── Chic Affiliate stats ── */
