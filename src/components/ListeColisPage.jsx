@@ -1148,8 +1148,12 @@ function ScanModal({ orders, onFound, onClose }) {
         html5Qr = new Html5Qrcode('colis-qr-reader');
         scannerRef.current = html5Qr;
         await html5Qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, processCode, () => {});
-      } catch {
-        setMsg({ text: 'Caméra inaccessible (HTTPS requis ou permission refusée)', error: true });
+      } catch (err) {
+        const reason = err?.name === 'NotAllowedError' ? 'Permission refusée — autorisez la caméra dans Chrome → Paramètres du site'
+          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
+          : err?.name === 'NotReadableError' ? 'Caméra utilisée par une autre app — fermez les autres onglets'
+          : `Erreur: ${err?.name || err?.message || 'inconnue'}`;
+        setMsg({ text: reason, error: true });
         setScanning(false);
         setTimeout(() => inputRef.current?.focus(), 100);
       }

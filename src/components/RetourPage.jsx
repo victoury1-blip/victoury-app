@@ -116,8 +116,12 @@ function ScannerRetourPage({ orders, setOrders }) {
           (decodedText) => processScannedCode(decodedText),
           () => {}
         );
-      } catch {
-        showMessage('Caméra inaccessible — utilisez la saisie manuelle ci-dessous', 'error');
+      } catch (err) {
+        const reason = err?.name === 'NotAllowedError' ? 'Permission refusée (autorisez la caméra dans Chrome → Paramètres du site)'
+          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
+          : err?.name === 'NotReadableError' ? 'Caméra utilisée par une autre app'
+          : `Erreur caméra: ${err?.name || err?.message || 'inconnue'}`;
+        showMessage(reason, 'error');
         setScanning(false);
       }
     }, 100);
