@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import useDebounce from '../hooks/useDebounce';
+import useSearchShortcut from '../hooks/useSearchShortcut';
 import {
   Plus, Upload, RefreshCw, Filter, Pencil, Trash2,
   ChevronDown, ChevronUp, Check, ImageIcon, X,
@@ -278,6 +279,8 @@ export default function StockPage() {
   }, []);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
+  const searchRef = useRef(null);
+  useSearchShortcut(searchRef);
   const [filterStatut, setFilterStatut] = useState('');
   const [filterBoutique, setFilterBoutique] = useState('');
 
@@ -415,8 +418,9 @@ export default function StockPage() {
             <Filter size={13} /> Filtrer
           </button>
           <input
+            ref={searchRef}
             value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher un produit..."
+            placeholder="Rechercher... (/)"
             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
         </div>

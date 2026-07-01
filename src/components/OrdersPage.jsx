@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import useDebounce from '../hooks/useDebounce';
+import useSearchShortcut from '../hooks/useSearchShortcut';
 import Pagination, { paginate } from './Pagination';
 import {
   Search,
@@ -34,6 +35,7 @@ import OzoneModal from './OzoneModal';
 import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
 import { supabase } from '../lib/supabase';
+import { useToast } from './Toast';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { loadProducts, loadProductsRemote, saveProducts } from '../data/products';
 import { fetchChicProductDetails, fetchChicProducts, createChicOrder, getChicConfig } from '../lib/chicAffiliate';
@@ -658,8 +660,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   function setOrders(updater) {
     setExternalOrders(updater);
   }
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
+  const searchRef = useRef(null);
+  useSearchShortcut(searchRef);
   const [pgPage, setPgPage] = useState(1);
   const [pgPer, setPgPer] = useState(10);
   const [selected, setSelected] = useState([]);
@@ -709,9 +714,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
   async function forwardToChic(order) {
     const config = getChicConfig();
-    if (!config) { alert('Chic Affiliate non configuré — allez dans la page Chic Affiliate'); return; }
+    if (!config) { toast.error('Chic Affiliate non configuré — allez dans la page Chic Affiliate'); return; }
     const match = getChicProductForOrder(order);
-    if (!match) { alert('Produit Chic non trouvé'); return; }
+    if (!match) { toast.error('Produit Chic non trouvé'); return; }
     setChicSending(order.id);
     try {
       let chicId = match.chicProd.chicId;
@@ -721,7 +726,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         const prodName = normalize(match.chicProd.name);
         const found = (chicList.data || []).find(cp => normalize(cp.name) === prodName)
           || (chicList.data || []).find(cp => normalize(cp.name).includes(prodName) || prodName.includes(normalize(cp.name)));
-        if (!found?.chicId) { alert(`Produit "${match.chicProd.name}" non trouvé sur chic-affiliate.com`); setChicSending(null); return; }
+        if (!found?.chicId) { toast.error(`Produit "${match.chicProd.name}" non trouvé sur chic-affiliate.com`); setChicSending(null); return; }
         chicId = found.chicId;
         const prods = loadProducts().map(p =>
           p.id === match.chicProd.id ? { ...p, chicId } : p
@@ -749,9 +754,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       });
 
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, chicForwarded: true } : o));
-      alert(`✅ Commande ${order.id} envoyée à Chic Affiliate !`);
+      toast.success(`Commande ${order.id} envoyée à Chic Affiliate !`);
     } catch (e) {
-      alert('❌ Erreur: ' + e.message);
+      toast.error('Erreur: ' + e.message);
     } finally {
       setChicSending(null);
     }
@@ -976,6 +981,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           <input
             type="text"
             placeholder="Rechercher une commande..."
+            ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-3 pr-10 py-1.5 border border-gray-300 rounded-l-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -1388,7 +1394,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             </div>
           )}
           {paged.map((order) => (
-            <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 mx-3">
+            <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-3 mb-2 mx-3 shadow-sm">
               {/* Top row: checkbox + order ID + status */}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -1398,29 +1404,31 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     onChange={() => toggleSelect(order.id)}
                     className="w-4 h-4 rounded"
                   />
-                  <span className="font-mono text-orange-600 font-bold text-sm">{order.trackingNumber || order.id}</span>
+                  <span className="font-mono text-orange-600 font-bold text-xs bg-orange-50 px-2 py-0.5 rounded-full">{order.trackingNumber || order.id}</span>
                 </div>
-                <button
-                  onClick={() => setStatusDropdown({ order })}
-                  className="cursor-pointer hover:opacity-80 transition-opacity"
-                >
+                <button onClick={() => setStatusDropdown({ order })} className="cursor-pointer hover:opacity-80 transition-opacity">
                   <StatusBadge status={order.status} reportDate={order.reportDate} />
                 </button>
               </div>
-              {/* Middle: client name, city */}
-              <div className="mb-2">
-                <div className="font-bold text-gray-900">{order.recipient?.name}</div>
-                <div className="font-bold text-gray-800 text-sm">{order.recipient?.city}</div>
-                <PhoneChip phone={order.recipient?.phone} allOrders={externalOrders} />
-              </div>
-              {/* Bottom: price + actions */}
-              <div className="flex items-center justify-between">
+              {/* Middle: client info */}
+              <div className="flex items-start justify-between mb-2">
                 <div>
-                  <span className="font-extrabold text-xl text-gray-900">
+                  <div className="font-bold text-gray-900 text-sm">{order.recipient?.name}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                    <MapPin size={10} className="text-gray-400" />{order.recipient?.city}
+                  </div>
+                  <PhoneChip phone={order.recipient?.phone} allOrders={externalOrders} />
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="font-extrabold text-lg text-gray-900">
                     {Number(order.price || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm font-semibold text-gray-500 ml-1">DH</span>
+                  <span className="text-xs font-semibold text-gray-500 ml-1">DH</span>
+                  {order.product?.name && <div className="text-xs text-gray-400 mt-0.5 max-w-[120px] truncate text-right">{order.product.name}</div>}
                 </div>
+              </div>
+              {/* Bottom: actions */}
+              <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-gray-50">
                 <div className="flex items-center gap-1.5">
                   {isChicOrder(order) && !order.chicForwarded && (
                     <button
