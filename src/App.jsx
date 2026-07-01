@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
+import ScrollToTop from './components/ScrollToTop';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const OrdersPage = React.lazy(() => import('./components/OrdersPage'));
@@ -86,6 +87,7 @@ export default function App() {
   const initialLoadDoneRef = useRef(false);
   const wooConfigRef = useRef(null);
   const notifConfigRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -578,7 +580,8 @@ export default function App() {
             <button onClick={() => { setWooError(null); setDbError(null); }} className="ml-2 text-red-400 hover:text-red-600 font-bold">✕</button>
           </div>
         )}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
+        <ScrollToTop scrollRef={scrollContainerRef} />
         <ErrorBoundary>
         <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
         <div className="page-enter h-full">
