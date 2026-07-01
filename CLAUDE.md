@@ -104,6 +104,12 @@ The `mapRow(o)` helper in `App.jsx` converts a raw Supabase row to the app's ord
 
 `src/components/AnalyticsPage.jsx` receives `orders` as a prop and computes all stats client-side with `useMemo`. Shows: KPI cards, daily bar chart (7/30/90 days), status pie chart, top cities, top products, livreur performance table. Uses `recharts` (already in dependencies).
 
+Has an **Excel export** button (green, top-right) that generates a `.xlsx` file via `xlsx` library with two sheets: full orders list + summary stats. Filename is auto-generated with period and date.
+
+### App Badge
+
+`App.jsx` calls `navigator.setAppBadge(count)` whenever orders change to show the count of `nouveau` status orders on the PWA app icon. Works on Android Chrome/Edge with the app installed. Clears automatically when no pending orders.
+
 ## Environment Variables
 
 Required in `.env.local` (and in Vercel dashboard):
