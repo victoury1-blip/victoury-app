@@ -1610,7 +1610,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       {tab === 'sheet' && <SheetImportSection orders={orders} setOrders={setOrders} />}
 
       {/* Table */}
-      <div className={`flex-1 overflow-auto ${tab === 'sheet' ? 'hidden' : ''}`}>
+      <div className={`flex-1 overflow-auto px-4 pb-4 ${tab === 'sheet' ? 'hidden' : ''}`}>
+      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-sm border-collapse min-w-[900px] hidden md:table">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
@@ -1633,11 +1634,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   <span>Aucun colis dans le pipeline</span>
                 </div>
               </td></tr>
-            ) : pagedColis.map((o) => {
+            ) : pagedColis.map((o, idx) => {
               const note = (o.note || '').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
               return (
-                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60' : 'hover:bg-gray-50 border-l-[3px] border-transparent'}`}>
+                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60' : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50/30 border-l-[3px] border-transparent`}`}>
                   {/* Checkbox */}
                   <td className="px-4 py-3 w-8">
                     <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />
@@ -1857,6 +1858,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
             </div>
           ))}
         </div>
+      </div>
       </div>
 
       {tab === 'colis' && (
