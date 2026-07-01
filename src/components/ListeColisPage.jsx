@@ -1625,8 +1625,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           </thead>
         </table>
         <div className="hidden md:block" style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
-        <table className="w-full text-sm border-collapse min-w-[900px]">
-          <tbody className="divide-y divide-gray-50">
+        <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px]">
+          <tbody>
             {colis.length === 0 ? (
               <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">
                 <div className="flex flex-col items-center gap-2">
@@ -1638,7 +1638,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
               const note = (o.note || '').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
               return (
-                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60' : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} hover:bg-blue-50/30 border-l-[3px] border-transparent`}`}>
+                <tr key={o.id} className={`border rounded-xl transition-all ${selected.includes(o.id) ? 'bg-indigo-50 border-indigo-300 shadow-sm' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-sky-300 hover:bg-sky-100/60' : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}`}>
                   {/* Checkbox */}
                   <td className="px-4 py-3 w-8">
                     <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />

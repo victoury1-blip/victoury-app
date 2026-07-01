@@ -1222,7 +1222,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           </thead>
         </table>
         <div style={paged.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
-        <table className="w-full text-sm border-collapse min-w-[900px]">
+        <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px]">
           <tbody>
             {filtered.length === 0 && (
               <tr>
@@ -1237,12 +1237,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             {paged.map((order, idx) => (
               <tr
                 key={order.id}
-                className={`border-b border-gray-100 transition-colors ${
+                className={`border rounded-xl transition-all ${
                   selected.includes(order.id)
-                    ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
+                    ? 'bg-indigo-50 border-indigo-300 shadow-sm'
                     : isCasa(order.recipient?.city)
-                      ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60'
-                      : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} border-l-[3px] border-transparent hover:bg-blue-50/30`
+                      ? 'bg-sky-50/70 border-sky-300 hover:bg-sky-100/60'
+                      : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
                 }`}
               >
                 {/* Checkbox */}
