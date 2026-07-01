@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
 
@@ -87,6 +87,7 @@ export default function App() {
   const wooConfigRef = useRef(null);
   const notifConfigRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useAutoSync(session);
   useNotifications(orders);
@@ -580,7 +581,8 @@ export default function App() {
         <div className="flex-1 overflow-auto">
         <ErrorBoundary>
         <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
-        <Routes>
+        <div className="page-enter h-full">
+        <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard orders={orders} isLoading={isLoading} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
@@ -604,6 +606,7 @@ export default function App() {
           <Route path="/reglage" element={<PermGate perm="reglages"><SettingsPage onWooOrdersImported={handleWooImport} orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </div>
         </Suspense>
         </ErrorBoundary>
         </div>
