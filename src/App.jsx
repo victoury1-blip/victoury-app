@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
 import ScrollToTop from './components/ScrollToTop';
 import OfflineBanner from './components/OfflineBanner';
+import PWAUpdateBanner from './components/PWAUpdateBanner';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const OrdersPage = React.lazy(() => import('./components/OrdersPage'));
@@ -617,6 +618,7 @@ export default function App() {
       </main>
       <IOSInstallPrompt />
       <OfflineBanner />
+      <PWAUpdateBanner />
     </div>
     </PermissionsProvider>
     </ToastProvider>
