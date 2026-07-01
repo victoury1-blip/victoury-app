@@ -1142,32 +1142,56 @@ function ScanModal({ orders, onFound, onClose }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let html5Qr;
-    const t = setTimeout(async () => {
+    let stream;
+    let rafId;
+    let detector;
+
+    async function start() {
       try {
-        const el = document.getElementById('colis-qr-reader');
-        if (el) el.innerHTML = '';
-        html5Qr = new Html5Qrcode('colis-qr-reader');
-        scannerRef.current = html5Qr;
-        await html5Qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, processCode, () => {});
+        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
+        if ('BarcodeDetector' in window) {
+          detector = new window.BarcodeDetector({ formats });
+        }
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const video = document.getElementById('colis-qr-reader-video');
+        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
+        video.srcObject = stream;
+        await video.play();
+        scannerRef.current = stream;
+
+        if (detector) {
+          const scan = async () => {
+            if (!stream.active) return;
+            try {
+              const results = await detector.detect(video);
+              if (results.length > 0) processCode(results[0].rawValue);
+            } catch {}
+            rafId = requestAnimationFrame(scan);
+          };
+          rafId = requestAnimationFrame(scan);
+        }
       } catch (err) {
         const m = typeof err === 'string' ? err : (err?.message || err?.name || '');
-        const reason = (err?.name === 'NotAllowedError' || m.toLowerCase().includes('permission') || m.toLowerCase().includes('allowed'))
-          ? 'Permission caméra refusée — Chrome → ⋮ → Paramètres du site → Caméra → Autoriser'
-          : (err?.name === 'NotFoundError' || m.toLowerCase().includes('not found') || m.toLowerCase().includes('no camera'))
-          ? 'Aucune caméra arrière détectée'
-          : (err?.name === 'NotReadableError' || m.toLowerCase().includes('in use') || m.toLowerCase().includes('already'))
-          ? 'Caméra utilisée par une autre app — redémarrez Chrome'
-          : `Erreur: "${m || JSON.stringify(err)}"`;
+        const reason = err?.name === 'NotAllowedError'
+          ? 'Permission refusée — appuyez sur 🔒 dans la barre URL → Caméra → Autoriser'
+          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
+          : err?.name === 'NotReadableError' ? 'Caméra utilisée par une autre app'
+          : `Erreur: "${m || 'inconnue'}"`;
         setMsg({ text: reason, error: true });
         setScanning(false);
         setTimeout(() => inputRef.current?.focus(), 100);
       }
-    }, 100);
-    return () => { clearTimeout(t); if (html5Qr?.isScanning) html5Qr.stop().catch(() => {}); };
+    }
+
+    start();
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      scannerRef.current = null;
+    };
   }, [scanning, processCode]);
 
-  function stop() { if (scannerRef.current?.isScanning) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; } setScanning(false); }
+  function stop() { if (scannerRef.current) { scannerRef.current.getTracks?.().forEach(t => t.stop()); scannerRef.current = null; } setScanning(false); }
   function close() { stop(); onClose(); }
 
   function handleManualSubmit(e) {
@@ -1186,7 +1210,11 @@ function ScanModal({ orders, onFound, onClose }) {
         <div className="p-5 space-y-3">
           {scanning ? (
             <>
-              <div id="colis-qr-reader" className="w-full rounded-xl overflow-hidden" />
+              <video id="colis-qr-reader-video" className="w-full rounded-xl bg-black" playsInline muted style={{ maxHeight: 240 }} />
+              {'BarcodeDetector' in window
+                ? <p className="text-xs text-gray-400 text-center">Pointez la caméra vers le code-barres</p>
+                : <p className="text-xs text-amber-500 text-center">Détection non disponible — saisissez ci-dessous</p>
+              }
               <button onClick={stop} className="w-full py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Arrêter</button>
             </>
           ) : (

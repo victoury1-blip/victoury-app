@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
 import { supabase } from '../lib/supabase';
 
 function ScannerPage({ orders, setOrders }) {
@@ -107,43 +106,61 @@ function ScannerPage({ orders, setOrders }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let html5Qr;
-    const timer = setTimeout(async () => {
+    let stream;
+    let rafId;
+    let detector;
+
+    async function start() {
       try {
-        const el = document.getElementById('qr-reader');
-        if (el) el.innerHTML = '';
-        html5Qr = new Html5Qrcode('qr-reader');
-        scannerRef.current = html5Qr;
-        await html5Qr.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => processScannedCode(decodedText),
-          () => {}
-        );
+        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
+        if ('BarcodeDetector' in window) {
+          detector = new window.BarcodeDetector({ formats });
+        }
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const video = document.getElementById('qr-reader-video');
+        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
+        video.srcObject = stream;
+        await video.play();
+        scannerRef.current = stream;
+
+        if (detector) {
+          const scan = async () => {
+            if (!stream.active) return;
+            try {
+              const results = await detector.detect(video);
+              if (results.length > 0) {
+                processScannedCode(results[0].rawValue);
+              }
+            } catch {}
+            rafId = requestAnimationFrame(scan);
+          };
+          rafId = requestAnimationFrame(scan);
+        }
       } catch (err) {
         const msg = typeof err === 'string' ? err : (err?.message || err?.name || '');
-        const reason = (err?.name === 'NotAllowedError' || msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('allowed'))
-          ? 'Permission caméra refusée — Chrome → ⋮ → Paramètres du site → Caméra → Autoriser'
-          : (err?.name === 'NotFoundError' || msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('no camera'))
+        const reason = err?.name === 'NotAllowedError'
+          ? 'Permission caméra refusée — appuyez sur le cadenas 🔒 dans la barre URL → Caméra → Autoriser'
+          : err?.name === 'NotFoundError'
           ? 'Aucune caméra arrière détectée'
-          : (err?.name === 'NotReadableError' || msg.toLowerCase().includes('in use') || msg.toLowerCase().includes('already'))
-          ? 'Caméra utilisée par une autre app — redémarrez Chrome'
-          : `Erreur caméra: "${msg || JSON.stringify(err)}"`;
+          : err?.name === 'NotReadableError'
+          ? 'Caméra utilisée par une autre app — fermez les autres apps'
+          : `Erreur caméra: "${msg || 'inconnue'}"`;
         showMessage(reason, 'error');
         setScanning(false);
       }
-    }, 100);
+    }
+
+    start();
     return () => {
-      clearTimeout(timer);
-      if (html5Qr && html5Qr.isScanning) {
-        html5Qr.stop().catch(() => {});
-      }
+      cancelAnimationFrame(rafId);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      scannerRef.current = null;
     };
   }, [scanning, processScannedCode]);
 
   function stopScanner() {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      scannerRef.current.stop().catch(() => {});
+    if (scannerRef.current) {
+      scannerRef.current.getTracks?.().forEach(t => t.stop());
       scannerRef.current = null;
     }
     setScanning(false);
@@ -358,10 +375,15 @@ function ScannerPage({ orders, setOrders }) {
               </button>
             </div>
             <div className="p-4">
-              <div id="qr-reader" className="rounded-lg overflow-hidden" />
+              <video id="qr-reader-video" className="w-full rounded-lg bg-black" playsInline muted style={{ maxHeight: 280 }} />
+              {'BarcodeDetector' in window ? (
+                <p className="text-xs text-gray-400 text-center mt-2">Pointez la caméra vers le code-barres</p>
+              ) : (
+                <p className="text-xs text-amber-500 text-center mt-2">Détection auto non disponible — saisissez manuellement</p>
+              )}
               <button
                 onClick={stopScanner}
-                className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium transition"
+                className="w-full mt-3 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium transition"
               >
                 Arrêter le scan
               </button>
