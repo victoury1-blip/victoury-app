@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
-import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock, ScanLine, Copy } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import OrderModal from './OrderModal';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { openLabelPage } from './LabelPrint';
@@ -1122,6 +1123,61 @@ const isCasa = (city) => {
   return ['casa','casablanca','كازا','كازابلانكا','الدارالبيضاء','الدار البيضاء','dar el beida','darelbeida'].some(k => c.includes(k.replace(/[\s\-]/g, '')));
 };
 
+function ScanModal({ orders, onFound, onClose }) {
+  const [scanning, setScanning] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const scannerRef = useRef(null);
+
+  const processCode = useCallback((code) => {
+    const order = orders.find(o => o.id === code || o.trackingNumber === code || o.ozoneTracking === code);
+    if (!order) { setMsg({ text: `Non trouvé: ${code}`, error: true }); return; }
+    try { new (window.AudioContext || window.webkitAudioContext)().createOscillator(); } catch {}
+    onFound(order.id);
+    setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });
+  }, [orders, onFound]);
+
+  useEffect(() => {
+    if (!scanning) return;
+    let html5Qr;
+    const t = setTimeout(async () => {
+      try {
+        html5Qr = new Html5Qrcode('colis-qr-reader');
+        scannerRef.current = html5Qr;
+        await html5Qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, processCode, () => {});
+      } catch { setMsg({ text: 'Impossible d\'accéder à la caméra', error: true }); setScanning(false); }
+    }, 100);
+    return () => { clearTimeout(t); if (html5Qr?.isScanning) html5Qr.stop().catch(() => {}); };
+  }, [scanning, processCode]);
+
+  function stop() { if (scannerRef.current?.isScanning) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; } setScanning(false); }
+  function close() { stop(); onClose(); }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4" onClick={close}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2"><ScanLine size={18} className="text-blue-600" /> Scanner un colis</h2>
+          <button onClick={close} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={15} className="text-gray-400" /></button>
+        </div>
+        <div className="p-5">
+          {scanning ? (
+            <>
+              <div id="colis-qr-reader" className="w-full rounded-xl overflow-hidden" />
+              <button onClick={stop} className="mt-3 w-full py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Arrêter</button>
+            </>
+          ) : (
+            <button onClick={() => setScanning(true)} className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 flex items-center justify-center gap-2">
+              <ScanLine size={18} /> Démarrer la caméra
+            </button>
+          )}
+          {msg && <div className={`mt-3 px-4 py-2.5 rounded-lg text-sm font-medium text-center ${msg.error ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{msg.text}</div>}
+          <p className="mt-3 text-xs text-gray-400 text-center">Scannez le code-barres ou QR code du bon de livraison</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [tab, setTab] = useState('colis');
   const [search, setSearch] = useState('');
@@ -1201,6 +1257,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const [deliveryOrder, setDeliveryOrder] = useState(null);
   const [historyOrder, setHistoryOrder] = useState(null);
   const [selected, setSelected] = useState([]);
+  const [showScanner, setShowScanner] = useState(false);
+  const toast = useToast();
 
   /* Manual facture toggles stored in localStorage */
   const [manualFacture, setManualFacture] = useState(() => {
@@ -1525,6 +1583,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           }} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer étiquettes">
             <Printer size={14} />
           </button>
+          <button onClick={() => setShowScanner(true)} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-blue-600" title="Scanner un colis">
+            <ScanLine size={14} />
+          </button>
         </>)}
       </div>
 
@@ -1712,7 +1773,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   </td>
                   {/* Destinataire */}
                   <td className="px-4 py-4 min-w-[220px]">
-                    <div className="text-sm font-bold text-orange-600 font-mono mb-1">{o.trackingNumber || o.id}</div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-sm font-bold text-orange-600 font-mono">{o.trackingNumber || o.id}</span>
+                      {o.trackingNumber && (
+                        <button
+                          onClick={() => navigator.clipboard.writeText(o.trackingNumber).then(() => toast.success('Copié !')).catch(() => {})}
+                          className="p-0.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Copier le numéro de suivi"
+                        >
+                          <Copy size={11} />
+                        </button>
+                      )}
+                    </div>
                     <div className="text-base font-bold text-gray-900 max-w-[220px] truncate">{o.recipient.name}</div>
                     <div className="text-sm text-gray-500 mt-0.5">{o.recipient.address}</div>
                     <div className="text-sm font-bold text-gray-800">{o.recipient.city}</div>
@@ -1976,6 +2048,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
       {historyOrder && (
         <ColisHistoryModal order={historyOrder} onClose={() => setHistoryOrder(null)} />
+      )}
+
+      {showScanner && (
+        <ScanModal
+          orders={colis}
+          onFound={(id) => {
+            setSelected(prev => [...new Set([...prev, id])]);
+            setShowScanner(false);
+            toast.success('Colis sélectionné !');
+          }}
+          onClose={() => setShowScanner(false)}
+        />
       )}
 
       {/* WhatsApp Notification Popup */}
