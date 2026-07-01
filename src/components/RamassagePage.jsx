@@ -149,8 +149,9 @@ function ScannerPage({ orders, setOrders }) {
       }
     }
 
-    start();
+    const timer = setTimeout(start, 80);
     return () => {
+      clearTimeout(timer);
       cancelAnimationFrame(rafId);
       if (stream) stream.getTracks().forEach(t => t.stop());
       scannerRef.current = null;
