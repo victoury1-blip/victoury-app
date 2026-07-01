@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import jsQR from 'jsqr';
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
@@ -1160,19 +1161,30 @@ function ScanModal({ orders, onFound, onClose }) {
         scannerRef.current = stream;
         await video.play();
 
-        if (detector) {
-          const scan = async () => {
-            if (!stream?.active) return;
-            try {
-              const results = await detector.detect(video);
-              if (results.length > 0) {
-                processCode(results[0].rawValue);
-              }
-            } catch {}
-            rafId = requestAnimationFrame(scan);
-          };
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        const scan = async () => {
+          if (!stream?.active) return;
+          if (video.readyState >= 2 && video.videoWidth > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            const qr = jsQR(imageData.data, imageData.width, imageData.height);
+            if (qr?.data) { processCode(qr.data); return; }
+
+            if (detector) {
+              try {
+                const results = await detector.detect(canvas);
+                if (results.length > 0) { processCode(results[0].rawValue); return; }
+              } catch {}
+            }
+          }
           rafId = requestAnimationFrame(scan);
-        }
+        };
+        rafId = requestAnimationFrame(scan);
       } catch (err) {
         const reason = err?.name === 'NotAllowedError'
           ? 'Permission caméra refusée'

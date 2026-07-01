@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import jsQR from 'jsqr';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -125,19 +126,32 @@ function ScannerPage({ orders, setOrders }) {
         scannerRef.current = stream;
         await video.play();
 
-        if (detector) {
-          const scan = async () => {
-            if (!stream?.active) return;
-            try {
-              const results = await detector.detect(video);
-              if (results.length > 0) {
-                processScannedCode(results[0].rawValue);
-              }
-            } catch {}
-            rafId = requestAnimationFrame(scan);
-          };
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        const scan = async () => {
+          if (!stream?.active) return;
+          if (video.readyState >= 2 && video.videoWidth > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // Try jsQR first (reliable pure-JS QR scanner)
+            const qr = jsQR(imageData.data, imageData.width, imageData.height);
+            if (qr?.data) { processScannedCode(qr.data); return; }
+
+            // Try BarcodeDetector for 1D barcodes (Code 128, EAN, etc.)
+            if (detector) {
+              try {
+                const results = await detector.detect(canvas);
+                if (results.length > 0) { processScannedCode(results[0].rawValue); return; }
+              } catch {}
+            }
+          }
           rafId = requestAnimationFrame(scan);
-        }
+        };
+        rafId = requestAnimationFrame(scan);
       } catch (err) {
         const reason = err?.name === 'NotAllowedError'
           ? 'Permission caméra refusée — vérifiez les paramètres Android: Paramètres → Apps → Chrome → Autorisations → Caméra'
