@@ -6,13 +6,14 @@ import { usePermissions } from '../lib/permissions';
 import { useToast } from './Toast';
 import {
   LayoutDashboard, ShoppingCart, Package, Archive, Store,
-  Truck, RotateCcw, BarChart2, MapPin, ChevronDown,
+  Truck, RotateCcw, BarChart2, MapPin, ChevronDown, Activity,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
   Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/dashboard',   label: 'Tableau de bord', icon: LayoutDashboard },
+  { path: '/analytics',   label: 'Statistiques',    icon: Activity },
   {
     path: '/commandes',
     label: 'Commandes',

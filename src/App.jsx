@@ -17,6 +17,7 @@ const ChicAffiliatePage = React.lazy(() => import('./components/ChicAffiliatePag
 const FacturesPage = React.lazy(() => import('./components/FacturesPage'));
 const ProfitPage = React.lazy(() => import('./components/ProfitPage'));
 const RamassagePage = React.lazy(() => import('./components/RamassagePage'));
+const AnalyticsPage = React.lazy(() => import('./components/AnalyticsPage'));
 const RetourPage = React.lazy(() => import('./components/RetourPage'));
 const ModeratorsPage = React.lazy(() => import('./components/ModeratorsPage'));
 import { supabase } from './lib/supabase';
@@ -30,6 +31,7 @@ const deleteOrderOffline = async (...a) => (await _offlineStore()).deleteOrderOf
 import { cloudGet, cloudSet } from './lib/cloudSettings';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
+import useOrderNotifications from './hooks/useOrderNotifications';
 import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
@@ -117,6 +119,7 @@ export default function App() {
 
   useAutoSync(session);
   useNotifications(orders);
+  const { notifyNewOrder } = useOrderNotifications();
 
   useEffect(() => {
     const on = () => setOffline(false);
@@ -270,7 +273,11 @@ export default function App() {
       .channel('orders-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, ({ new: o }) => {
         if (o.is_deleted || deletedIdsRef.current.has(o.id)) return;
-        setOrders(prev => prev.some(x => x.id === o.id) ? prev : [mapRow(o), ...prev]);
+        setOrders(prev => {
+          if (prev.some(x => x.id === o.id)) return prev;
+          if (initialLoadDoneRef.current) notifyNewOrder(mapRow(o));
+          return [mapRow(o), ...prev];
+        });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, ({ new: o }) => {
         if (o.is_deleted) {
@@ -420,6 +427,8 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
+            /* Browser push notification for first new order */
+            if (initialLoadDoneRef.current) fresh.slice(0, 1).forEach(notifyNewOrder);
             /* Play notification sound — only after initial DB load */
             if (initialLoadDoneRef.current) try {
               notifConfigRef.current = JSON.parse(localStorage.getItem('notification_sound') || '{}');
@@ -650,6 +659,7 @@ export default function App() {
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard orders={orders} isLoading={isLoading} />} />
+          <Route path="/analytics" element={<AnalyticsPage orders={orders} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />

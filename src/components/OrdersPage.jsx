@@ -242,11 +242,11 @@ function getUserDisplayName(email) {
   } catch { return email || 'inconnu'; }
 }
 
-function recordHistory(orderId, status, user) {
+function recordHistory(orderId, status, user, fromStatus = null, note = null) {
   const key = `order_history_${orderId}`;
   const hist = JSON.parse(localStorage.getItem(key) || '[]');
   const ts = now();
-  const entry = { timestamp: ts, status, user: getUserDisplayName(user) };
+  const entry = { timestamp: ts, status, fromStatus, note, user: getUserDisplayName(user) };
   hist.push(entry);
   localStorage.setItem(key, JSON.stringify(hist));
   supabase.from('order_history').insert({ order_id: orderId, status, user_name: entry.user, timestamp: ts }).then(() => {}).catch?.(() => {});
@@ -299,7 +299,16 @@ function HistoryModal({ order, onClose }) {
               {[...displayHist].reverse().map((h, i) => (
                 <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-6 py-2.5 text-xs text-gray-700">{h.timestamp}</td>
-                  <td className="px-6 py-2.5"><StatusBadge status={h.status} /></td>
+                  <td className="px-6 py-2.5">
+                    {h.note ? (
+                      <span className="text-xs text-blue-700 font-medium">{h.note}</span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        {h.fromStatus && <><StatusBadge status={h.fromStatus} /><span className="text-gray-400 text-xs">→</span></>}
+                        <StatusBadge status={h.status} />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-2.5 text-xs text-gray-700 font-medium">{h.user}</td>
                 </tr>
               ))}
@@ -930,7 +939,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   function saveOrder(updated) {
     const prev = orders.find(o => o.id === updated.id);
     if (prev && prev.status !== updated.status) {
-      recordHistory(updated.id, updated.status, currentUser);
+      recordHistory(updated.id, updated.status, currentUser, prev.status);
+    }
+    if (prev && prev.recipient?.delivery?.nom !== updated.recipient?.delivery?.nom) {
+      const livreurNote = `Livreur: ${prev.recipient?.delivery?.nom || '—'} → ${updated.recipient?.delivery?.nom || '—'}`;
+      recordHistory(updated.id, updated.status, currentUser, null, livreurNote);
     }
     if (!updated.trackingNumber) {
       updated.trackingNumber = updated.id;
