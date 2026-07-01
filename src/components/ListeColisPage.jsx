@@ -1739,7 +1739,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
       {/* Table */}
       <div className={`flex-1 overflow-auto px-4 pb-4 ${tab === 'sheet' ? 'hidden' : ''}`}>
-      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
         <table className="w-full text-sm border-collapse min-w-[900px] hidden md:table">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
