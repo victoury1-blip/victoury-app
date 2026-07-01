@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import useCountUp from '../hooks/useCountUp';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
@@ -89,6 +90,12 @@ function DashboardSkeleton() {
 
 /* ── KPI card ── */
 const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, iconBg }) {
+  const numericTarget = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^\d.]/g, '')) || 0;
+  const animated = useCountUp(numericTarget);
+  const displayValue = typeof value === 'number'
+    ? Math.round(animated).toLocaleString('fr-MA')
+    : String(value).replace(/[\d,.]+/, Math.round(animated).toLocaleString('fr-MA'));
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow animate-fade-in">
       <div className="flex items-start justify-between">
@@ -97,7 +104,7 @@ const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, ico
         </div>
       </div>
       <div>
-        <p className="text-2xl font-black text-gray-900 leading-tight">{value}</p>
+        <p className="text-2xl font-black text-gray-900 leading-tight">{displayValue}</p>
         <p className="text-xs font-medium text-gray-500 mt-0.5">{label}</p>
         {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
       </div>
