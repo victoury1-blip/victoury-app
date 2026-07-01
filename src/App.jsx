@@ -76,6 +76,28 @@ function UnderConstruction() {
   );
 }
 
+function mapRow(o) {
+  return {
+    id: o.id,
+    recipient: o.recipient,
+    product: o.product,
+    products: o.products || null,
+    price: o.price,
+    status: o.status,
+    note: o.note,
+    dateAdded: o.date_added,
+    dateUpdated: o.date_updated,
+    validated: o.validated,
+    echange: o.echange || false,
+    reportDate: o.report_date || null,
+    noteLivraison: o.note_livraison || '',
+    trackingNumber: o.tracking_number || null,
+    ozoneTracking: o.ozone_tracking || null,
+    ozoneLastStatus: o.ozone_last_status || null,
+    manuallyModified: o.manually_modified || false,
+  };
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined);
   const [orders, setOrders] = useState([]);
@@ -225,25 +247,7 @@ export default function App() {
       const deletedIds = (delRows || []).map(r => r.id);
       deletedIdsRef.current = new Set(deletedIds);
       localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
-      setOrders(data.map((o) => ({
-        id: o.id,
-        recipient: o.recipient,
-        product: o.product,
-        products: o.products || null,
-        price: o.price,
-        status: o.status,
-        note: o.note,
-        dateAdded: o.date_added,
-        dateUpdated: o.date_updated,
-        validated: o.validated,
-        echange: o.echange || false,
-        reportDate: o.report_date || null,
-        noteLivraison: o.note_livraison || '',
-        trackingNumber: o.tracking_number || null,
-        ozoneTracking: o.ozone_tracking || null,
-        ozoneLastStatus: o.ozone_last_status || null,
-        manuallyModified: o.manually_modified || false,
-      })));
+      setOrders(data.map(mapRow));
       setIsLoading(false);
       initialLoadDoneRef.current = true;
       // Cache orders to IndexedDB for offline use
@@ -257,6 +261,62 @@ export default function App() {
       }))).catch(e => console.error('Failed to cache orders offline:', e));
     }
     load();
+  }, [session]);
+
+  /* ── Realtime: sync order changes from other devices ── */
+  useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel('orders-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, ({ new: o }) => {
+        if (o.is_deleted || deletedIdsRef.current.has(o.id)) return;
+        setOrders(prev => prev.some(x => x.id === o.id) ? prev : [mapRow(o), ...prev]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, ({ new: o }) => {
+        if (o.is_deleted) {
+          deletedIdsRef.current.add(o.id);
+          setOrders(prev => prev.filter(x => x.id !== o.id));
+          return;
+        }
+        setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ...mapRow(o) } : x));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, ({ old }) => {
+        setOrders(prev => prev.filter(x => x.id !== old.id));
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [session]);
+
+  /* ── Reload settings from Supabase when app regains focus (cross-device sync) ── */
+  useEffect(() => {
+    if (!session) return;
+    const SYNC_KEYS = [
+      'livreurs', 'victoury_products', 'victoury_statuses',
+      'auzone_config', 'woo_config', 'victoury_app_config', 'victoury_shop_config',
+      'phone_colors', 'notification_sound',
+    ];
+    const userId = session?.user?.id;
+    async function reloadSettings() {
+      try {
+        const promises = [];
+        if (userId) promises.push(supabase.from('settings').select('key, value').in('key', SYNC_KEYS).eq('user_id', userId));
+        promises.push(supabase.from('settings').select('key, value').in('key', SYNC_KEYS).is('user_id', null));
+        const results = await Promise.all(promises);
+        const seen = new Set();
+        for (const { data } of results) {
+          if (!data) continue;
+          for (const row of data) {
+            if (row.value != null && !seen.has(row.key)) {
+              seen.add(row.key);
+              localStorage.setItem(row.key, JSON.stringify(row.value));
+            }
+          }
+        }
+      } catch {}
+    }
+    const onVisibility = () => { if (document.visibilityState === 'visible') reloadSettings(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [session]);
 
   /* ── Error logger → Supabase error_logs table ── */
