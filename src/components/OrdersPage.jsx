@@ -1242,7 +1242,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
                     : isCasa(order.recipient?.city)
                       ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60'
-                      : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-l-[3px] border-transparent hover:bg-blue-50/30`
+                      : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} border-l-[3px] border-transparent hover:bg-blue-50/30`
                 }`}
               >
                 {/* Checkbox */}

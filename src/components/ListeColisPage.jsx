@@ -416,7 +416,7 @@ function SheetImportSection({ orders = [], setOrders }) {
             ) : filtered.map((row, idx) => {
               const delivered = isDelivered(row);
               return (
-              <tr key={row._id} className={`border-b border-gray-100 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50/30`}>
+              <tr key={row._id} className={`border-b border-gray-100 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} hover:bg-blue-50/30`}>
                 <td className="px-3 py-2.5 text-xs text-gray-400">{idx + 1}</td>
                 {headers.map(h => {
                   const isProduct = PRODUCT_KEYS.includes(h.toLowerCase());
@@ -1638,7 +1638,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
               const note = (o.note || '').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
               return (
-                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60' : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50/30 border-l-[3px] border-transparent`}`}>
+                <tr key={o.id} className={`transition-colors ${selected.includes(o.id) ? 'bg-indigo-50 border-l-[3px] border-indigo-500' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60' : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} hover:bg-blue-50/30 border-l-[3px] border-transparent`}`}>
                   {/* Checkbox */}
                   <td className="px-4 py-3 w-8">
                     <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />
