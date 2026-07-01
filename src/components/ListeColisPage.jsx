@@ -415,7 +415,14 @@ function SheetImportSection({ orders = [], setOrders }) {
             ) : filtered.map((row, idx) => {
               const delivered = isDelivered(row);
               return (
-              <tr key={row._id} className={`hover:bg-gray-50 ${row._status === 'livre' ? 'bg-blue-50/30' : row._status === 'confirme' ? 'bg-green-50/30' : row._status === 'annule' || row._status === 'refuse' ? 'bg-red-50/20' : ''}`}>
+              <tr key={row._id} className={`border-b border-gray-100 transition-colors ${
+                row._status === 'livre' ? 'bg-emerald-50/50 border-l-[3px] border-emerald-400 hover:bg-emerald-50'
+                : row._status === 'confirme' ? 'bg-green-50/50 border-l-[3px] border-green-400 hover:bg-green-50'
+                : row._status === 'annule' || row._status === 'refuse' ? 'bg-red-50/40 border-l-[3px] border-red-300 hover:bg-red-50'
+                : row._status === 'reporter' ? 'bg-orange-50/50 border-l-[3px] border-orange-300 hover:bg-orange-50'
+                : ['en_suivi','att_ramassage','expedier','recu_livreur'].includes(row._status) ? 'bg-blue-50/40 border-l-[3px] border-blue-300 hover:bg-blue-50'
+                : 'bg-white border-l-[3px] border-transparent hover:bg-gray-50/60'
+              }`}>
                 <td className="px-3 py-2.5 text-xs text-gray-400">{idx + 1}</td>
                 {headers.map(h => {
                   const isProduct = PRODUCT_KEYS.includes(h.toLowerCase());

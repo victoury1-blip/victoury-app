@@ -1210,7 +1210,17 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     ? 'bg-indigo-50 border-l-[3px] border-indigo-500'
                     : isCasa(order.recipient?.city)
                       ? 'bg-sky-50/70 border-l-[3px] border-sky-400 hover:bg-sky-100/60'
-                      : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-blue-50/30 border-l-[3px] border-transparent`
+                      : order.status === 'livre'
+                        ? 'bg-emerald-50/50 border-l-[3px] border-emerald-400 hover:bg-emerald-50'
+                        : order.status === 'confirme'
+                          ? 'bg-green-50/50 border-l-[3px] border-green-400 hover:bg-green-50'
+                          : ['refuse','annule'].includes(order.status)
+                            ? 'bg-red-50/40 border-l-[3px] border-red-300 hover:bg-red-50'
+                            : order.status === 'reporter'
+                              ? 'bg-orange-50/50 border-l-[3px] border-orange-300 hover:bg-orange-50'
+                              : ['en_suivi','att_ramassage','expedier','recu_livreur'].includes(order.status)
+                                ? 'bg-blue-50/40 border-l-[3px] border-blue-300 hover:bg-blue-50'
+                                : 'bg-white border-l-[3px] border-transparent hover:bg-gray-50/60'
                 }`}
               >
                 {/* Checkbox */}
