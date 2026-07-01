@@ -297,7 +297,11 @@ function ProductsTab() {
       {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg"><AlertCircle size={14} className="inline mr-1" />{error}</div>}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-blue-600" /></div>
+        <div className="flex flex-col gap-2 py-4 animate-pulse">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-12 w-full bg-gray-200 rounded-xl" />
+          ))}
+        </div>
       ) : (
         <>
           {/* Desktop table */}
@@ -492,7 +496,11 @@ function OrdersTab() {
       {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg"><AlertCircle size={14} className="inline mr-1" />{error}</div>}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-blue-600" /></div>
+        <div className="flex flex-col gap-2 py-4 animate-pulse">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-12 w-full bg-gray-200 rounded-xl" />
+          ))}
+        </div>
       ) : (
         <>
           {/* Desktop table */}
