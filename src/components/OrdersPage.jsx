@@ -665,6 +665,18 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const debouncedSearch = useDebounce(search, 300);
   const searchRef = useRef(null);
   useSearchShortcut(searchRef);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const idx = tabs.findIndex(t => t.id === activeTab);
+      if (e.key === 'ArrowRight') setActiveTab(tabs[(idx + 1) % tabs.length].id);
+      if (e.key === 'ArrowLeft')  setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length].id);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeTab, setActiveTab]);
   const [pgPage, setPgPage] = useState(1);
   const [pgPer, setPgPer] = useState(10);
   const [selected, setSelected] = useState([]);
@@ -980,7 +992,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         <div className="relative flex items-center flex-1 max-w-xs">
           <input
             type="text"
-            placeholder="Rechercher une commande..."
+            placeholder="Rechercher une commande... (/)"
             ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
