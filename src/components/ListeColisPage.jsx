@@ -1125,7 +1125,9 @@ const isCasa = (city) => {
 function ScanModal({ orders, onFound, onClose }) {
   const [msg, setMsg] = useState(null);
   const [manualInput, setManualInput] = useState('');
+  const [scanning, setScanning] = useState(false);
   const inputRef = useRef(null);
+  const scannerRef = useRef(null);
 
   const processCode = useCallback((code) => {
     const trimmed = (code || '').trim();
@@ -1137,27 +1139,68 @@ function ScanModal({ orders, onFound, onClose }) {
     setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });
   }, [orders, onFound]);
 
-  async function handleCapturePhoto(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    try {
-      if ('BarcodeDetector' in window) {
-        const detector = new window.BarcodeDetector({ formats: ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'] });
-        const img = await createImageBitmap(file);
-        const results = await detector.detect(img);
-        if (results.length > 0) { processCode(results[0].rawValue); return; }
-        setMsg({ text: 'Aucun code-barres détecté', error: true });
-      } else {
-        setMsg({ text: 'Scanner non disponible — saisissez ci-dessous', error: true });
-        setTimeout(() => inputRef.current?.focus(), 100);
+  useEffect(() => {
+    if (!scanning) return;
+    let stream;
+    let rafId;
+    let detector;
+
+    async function start() {
+      try {
+        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
+        if ('BarcodeDetector' in window) {
+          detector = new window.BarcodeDetector({ formats });
+        }
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        const video = document.getElementById('colis-scanner-video');
+        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
+        video.srcObject = stream;
+        scannerRef.current = stream;
+        await video.play();
+
+        if (detector) {
+          const scan = async () => {
+            if (!stream?.active) return;
+            try {
+              const results = await detector.detect(video);
+              if (results.length > 0) {
+                processCode(results[0].rawValue);
+              }
+            } catch {}
+            rafId = requestAnimationFrame(scan);
+          };
+          rafId = requestAnimationFrame(scan);
+        }
+      } catch (err) {
+        const reason = err?.name === 'NotAllowedError'
+          ? 'Permission caméra refusée'
+          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
+          : err?.name === 'NotReadableError' ? 'Caméra occupée par une autre app'
+          : `Erreur: ${err?.name || err?.message || 'inconnue'}`;
+        setMsg({ text: reason, error: true });
+        setScanning(false);
       }
-    } catch (err) {
-      setMsg({ text: 'Erreur: ' + (err?.message || 'inconnue'), error: true });
     }
+
+    start();
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      scannerRef.current = null;
+    };
+  }, [scanning, processCode]);
+
+  function stopScanner() {
+    if (scannerRef.current) {
+      scannerRef.current.getTracks().forEach(t => t.stop());
+      scannerRef.current = null;
+    }
+    setScanning(false);
   }
 
-  function close() { onClose(); }
+  function close() { stopScanner(); onClose(); }
 
   function handleManualSubmit(e) {
     e.preventDefault();
@@ -1173,10 +1216,43 @@ function ScanModal({ orders, onFound, onClose }) {
           <button onClick={close} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={15} className="text-gray-400" /></button>
         </div>
         <div className="p-5 space-y-3">
-          <label className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 flex items-center justify-center gap-2 cursor-pointer">
-            <ScanLine size={18} /> Scanner (photo)
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapturePhoto} />
-          </label>
+          {!scanning ? (
+            <button
+              onClick={() => setScanning(true)}
+              className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 flex items-center justify-center gap-2"
+            >
+              <ScanLine size={18} /> Scanner QR Code
+            </button>
+          ) : (
+            <div className="rounded-xl overflow-hidden">
+              <div className="relative bg-black" style={{ height: 240 }}>
+                <video
+                  id="colis-scanner-video"
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative w-40 h-40">
+                    <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-green-400 rounded-tl" />
+                    <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-green-400 rounded-tr" />
+                    <div className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-green-400 rounded-bl" />
+                    <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-green-400 rounded-br" />
+                  </div>
+                </div>
+                {'BarcodeDetector' in window
+                  ? <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70">Pointez vers le code-barres</p>
+                  : <p className="absolute bottom-2 left-0 right-0 text-center text-amber-300 text-xs">Détection auto indisponible</p>
+                }
+              </div>
+              <button
+                onClick={stopScanner}
+                className="w-full py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition"
+              >
+                Arrêter la caméra
+              </button>
+            </div>
+          )}
           {msg && <div className={`px-4 py-2.5 rounded-lg text-sm font-medium text-center ${msg.error ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{msg.text}</div>}
           {/* Manual fallback */}
           <div className="border-t border-gray-100 pt-3">

@@ -104,29 +104,64 @@ function ScannerRetourPage({ orders, setOrders }) {
 
   useEffect(() => {
     if (!scanning) return;
-  }, [scanning]);
+    let stream;
+    let rafId;
+    let detector;
 
-  async function handleCapturePhoto(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    try {
-      const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
-      if ('BarcodeDetector' in window) {
-        const detector = new window.BarcodeDetector({ formats });
-        const img = await createImageBitmap(file);
-        const results = await detector.detect(img);
-        if (results.length > 0) { processScannedCode(results[0].rawValue); return; }
-        showMessage('Aucun code-barres détecté dans la photo', 'error');
-      } else {
-        showMessage('BarcodeDetector non disponible — saisissez manuellement', 'error');
+    async function start() {
+      try {
+        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
+        if ('BarcodeDetector' in window) {
+          detector = new window.BarcodeDetector({ formats });
+        }
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        const video = document.getElementById('retour-scanner-video');
+        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
+        video.srcObject = stream;
+        scannerRef.current = stream;
+        await video.play();
+
+        if (detector) {
+          const scan = async () => {
+            if (!stream?.active) return;
+            try {
+              const results = await detector.detect(video);
+              if (results.length > 0) {
+                processScannedCode(results[0].rawValue);
+              }
+            } catch {}
+            rafId = requestAnimationFrame(scan);
+          };
+          rafId = requestAnimationFrame(scan);
+        }
+      } catch (err) {
+        const reason = err?.name === 'NotAllowedError'
+          ? 'Permission caméra refusée — vérifiez les paramètres Android: Paramètres → Apps → Chrome → Autorisations → Caméra'
+          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
+          : err?.name === 'NotReadableError' ? 'Caméra occupée par une autre app'
+          : `Erreur: ${err?.name || err?.message || 'inconnue'}`;
+        showMessage(reason, 'error');
+        setScanning(false);
       }
-    } catch (err) {
-      showMessage('Erreur: ' + (err?.message || 'inconnue'), 'error');
     }
-  }
 
-  function stopScanner() { setScanning(false); }
+    start();
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      scannerRef.current = null;
+    };
+  }, [scanning, processScannedCode]);
+
+  function stopScanner() {
+    if (scannerRef.current) {
+      scannerRef.current.getTracks().forEach(t => t.stop());
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  }
 
   function removeFromList(colisId) {
     setColisRetour(prev => prev.filter(c => c.id !== colisId));
@@ -184,11 +219,13 @@ function ScannerRetourPage({ orders, setOrders }) {
             <h2 className="font-semibold text-gray-700">Scanner</h2>
           </div>
           <div className="p-4 space-y-4">
-            <label className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center cursor-pointer">
+            <button
+              onClick={() => setScanning(true)}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center"
+            >
               <QrCode size={18} />
-              Scanner QR Code / Code-barres
-              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapturePhoto} />
-            </label>
+              Scanner QR Code
+            </button>
             <div>
               <p className="text-sm text-gray-500 mb-2">Ou saisir manuellement :</p>
               <div className="flex gap-2">
@@ -278,6 +315,54 @@ function ScannerRetourPage({ orders, setOrders }) {
         </div>
       </div>
 
+      {scanning && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <QrCode size={16} className="text-gray-600" /> Scanner un colis
+              </h3>
+              <button onClick={stopScanner} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="relative bg-black" style={{ height: 300 }}>
+              <video
+                id="retour-scanner-video"
+                className="w-full h-full object-cover"
+                playsInline
+                muted
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="relative w-48 h-48">
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br" />
+                </div>
+              </div>
+              {'BarcodeDetector' in window
+                ? <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70">Pointez vers le code-barres</p>
+                : <p className="absolute bottom-2 left-0 right-0 text-center text-amber-300 text-xs">Détection auto indisponible</p>
+              }
+            </div>
+            <div className="p-4 flex gap-2">
+              <button
+                onClick={stopScanner}
+                className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition"
+              >
+                Arrêter la caméra
+              </button>
+              <button
+                onClick={stopScanner}
+                className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
