@@ -106,63 +106,29 @@ function ScannerPage({ orders, setOrders }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let stream;
-    let rafId;
-    let detector;
+  }, [scanning]);
 
-    async function start() {
-      try {
-        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
-        if ('BarcodeDetector' in window) {
-          detector = new window.BarcodeDetector({ formats });
-        }
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        const video = document.getElementById('qr-reader-video');
-        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream;
-        await video.play();
-        scannerRef.current = stream;
-
-        if (detector) {
-          const scan = async () => {
-            if (!stream.active) return;
-            try {
-              const results = await detector.detect(video);
-              if (results.length > 0) {
-                processScannedCode(results[0].rawValue);
-              }
-            } catch {}
-            rafId = requestAnimationFrame(scan);
-          };
-          rafId = requestAnimationFrame(scan);
-        }
-      } catch (err) {
-        const msg = typeof err === 'string' ? err : (err?.message || err?.name || '');
-        const reason = err?.name === 'NotAllowedError'
-          ? 'Permission caméra refusée — appuyez sur le cadenas 🔒 dans la barre URL → Caméra → Autoriser'
-          : err?.name === 'NotFoundError'
-          ? 'Aucune caméra arrière détectée'
-          : err?.name === 'NotReadableError'
-          ? 'Caméra utilisée par une autre app — fermez les autres apps'
-          : `Erreur caméra: "${msg || 'inconnue'}"`;
-        showMessage(reason, 'error');
-        setScanning(false);
+  async function handleCapturePhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({ formats });
+        const img = await createImageBitmap(file);
+        const results = await detector.detect(img);
+        if (results.length > 0) { processScannedCode(results[0].rawValue); return; }
+        showMessage('Aucun code-barres détecté dans la photo', 'error');
+      } else {
+        showMessage('BarcodeDetector non disponible — saisissez manuellement', 'error');
       }
+    } catch (err) {
+      showMessage('Erreur lecture image: ' + (err?.message || 'inconnue'), 'error');
     }
-
-    start();
-    return () => {
-      cancelAnimationFrame(rafId);
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      scannerRef.current = null;
-    };
-  }, [scanning, processScannedCode]);
+  }
 
   function stopScanner() {
-    if (scannerRef.current) {
-      scannerRef.current.getTracks?.().forEach(t => t.stop());
-      scannerRef.current = null;
-    }
     setScanning(false);
   }
 
@@ -254,13 +220,11 @@ function ScannerPage({ orders, setOrders }) {
             <h2 className="font-semibold text-gray-700">Scanner</h2>
           </div>
           <div className="p-4 space-y-4">
-            <button
-              onClick={() => setScanning(true)}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center"
-            >
+            <label className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center cursor-pointer">
               <QrCode size={18} />
-              Scanner QR Code
-            </button>
+              Scanner QR Code / Code-barres
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapturePhoto} />
+            </label>
             <div>
               <p className="text-sm text-gray-500 mb-2">Ou saisir manuellement :</p>
               <div className="flex gap-2">
@@ -365,32 +329,6 @@ function ScannerPage({ orders, setOrders }) {
         </div>
       </div>
 
-      {scanning && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-800">Scanner</h3>
-              <button onClick={stopScanner} className="text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-4">
-              <video id="qr-reader-video" className="w-full rounded-lg bg-black" playsInline muted style={{ maxHeight: 280 }} />
-              {'BarcodeDetector' in window ? (
-                <p className="text-xs text-gray-400 text-center mt-2">Pointez la caméra vers le code-barres</p>
-              ) : (
-                <p className="text-xs text-amber-500 text-center mt-2">Détection auto non disponible — saisissez manuellement</p>
-              )}
-              <button
-                onClick={stopScanner}
-                className="w-full mt-3 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium transition"
-              >
-                Arrêter le scan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

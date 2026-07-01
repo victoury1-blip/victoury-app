@@ -1123,10 +1123,8 @@ const isCasa = (city) => {
 };
 
 function ScanModal({ orders, onFound, onClose }) {
-  const [scanning, setScanning] = useState(false);
   const [msg, setMsg] = useState(null);
   const [manualInput, setManualInput] = useState('');
-  const scannerRef = useRef(null);
   const inputRef = useRef(null);
 
   const processCode = useCallback((code) => {
@@ -1139,59 +1137,27 @@ function ScanModal({ orders, onFound, onClose }) {
     setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });
   }, [orders, onFound]);
 
-  useEffect(() => {
-    if (!scanning) return;
-    let stream;
-    let rafId;
-    let detector;
-
-    async function start() {
-      try {
-        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
-        if ('BarcodeDetector' in window) {
-          detector = new window.BarcodeDetector({ formats });
-        }
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        const video = document.getElementById('colis-qr-reader-video');
-        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream;
-        await video.play();
-        scannerRef.current = stream;
-
-        if (detector) {
-          const scan = async () => {
-            if (!stream.active) return;
-            try {
-              const results = await detector.detect(video);
-              if (results.length > 0) processCode(results[0].rawValue);
-            } catch {}
-            rafId = requestAnimationFrame(scan);
-          };
-          rafId = requestAnimationFrame(scan);
-        }
-      } catch (err) {
-        const m = typeof err === 'string' ? err : (err?.message || err?.name || '');
-        const reason = err?.name === 'NotAllowedError'
-          ? 'Permission refusée — appuyez sur 🔒 dans la barre URL → Caméra → Autoriser'
-          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
-          : err?.name === 'NotReadableError' ? 'Caméra utilisée par une autre app'
-          : `Erreur: "${m || 'inconnue'}"`;
-        setMsg({ text: reason, error: true });
-        setScanning(false);
+  async function handleCapturePhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({ formats: ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'] });
+        const img = await createImageBitmap(file);
+        const results = await detector.detect(img);
+        if (results.length > 0) { processCode(results[0].rawValue); return; }
+        setMsg({ text: 'Aucun code-barres détecté', error: true });
+      } else {
+        setMsg({ text: 'Scanner non disponible — saisissez ci-dessous', error: true });
         setTimeout(() => inputRef.current?.focus(), 100);
       }
+    } catch (err) {
+      setMsg({ text: 'Erreur: ' + (err?.message || 'inconnue'), error: true });
     }
+  }
 
-    start();
-    return () => {
-      cancelAnimationFrame(rafId);
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      scannerRef.current = null;
-    };
-  }, [scanning, processCode]);
-
-  function stop() { if (scannerRef.current) { scannerRef.current.getTracks?.().forEach(t => t.stop()); scannerRef.current = null; } setScanning(false); }
-  function close() { stop(); onClose(); }
+  function close() { onClose(); }
 
   function handleManualSubmit(e) {
     e.preventDefault();
@@ -1207,20 +1173,10 @@ function ScanModal({ orders, onFound, onClose }) {
           <button onClick={close} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={15} className="text-gray-400" /></button>
         </div>
         <div className="p-5 space-y-3">
-          {scanning ? (
-            <>
-              <video id="colis-qr-reader-video" className="w-full rounded-xl bg-black" playsInline muted style={{ maxHeight: 240 }} />
-              {'BarcodeDetector' in window
-                ? <p className="text-xs text-gray-400 text-center">Pointez la caméra vers le code-barres</p>
-                : <p className="text-xs text-amber-500 text-center">Détection non disponible — saisissez ci-dessous</p>
-              }
-              <button onClick={stop} className="w-full py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Arrêter</button>
-            </>
-          ) : (
-            <button onClick={() => setScanning(true)} className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 flex items-center justify-center gap-2">
-              <ScanLine size={18} /> Démarrer la caméra
-            </button>
-          )}
+          <label className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 flex items-center justify-center gap-2 cursor-pointer">
+            <ScanLine size={18} /> Scanner (photo)
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapturePhoto} />
+          </label>
           {msg && <div className={`px-4 py-2.5 rounded-lg text-sm font-medium text-center ${msg.error ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{msg.text}</div>}
           {/* Manual fallback */}
           <div className="border-t border-gray-100 pt-3">
