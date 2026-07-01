@@ -22,10 +22,8 @@ npx vitest run src/test/orders.test.js
 Feature branch: `claude/cool-tesla-rktpuc` → fast-forward merge to `main` → Vercel auto-deploys.
 
 ```bash
-# develop on feature branch
 git checkout claude/cool-tesla-rktpuc
-
-# merge to main when done
+# ... make changes, commit ...
 git checkout main && git merge --ff-only claude/cool-tesla-rktpuc && git push origin main
 ```
 
@@ -47,6 +45,12 @@ Almost all mutable data (livreurs, products, fees, factures, statuses) follows t
 
 Products specifically use `loadProducts()` (localStorage) + `loadProductsRemote()` (Supabase) from `src/data/products.js`. Use the `useProducts(optionalFilter)` hook instead of calling these directly.
 
+### Cross-Device Sync
+
+`App.jsx` subscribes to Supabase Realtime (`orders-realtime` channel) for live order updates across devices — INSERT, UPDATE, DELETE all propagate instantly. Settings (livreurs, products, etc.) are re-fetched from Supabase on `visibilitychange` (when the user returns to the tab/app).
+
+The `mapRow(o)` helper in `App.jsx` converts a raw Supabase row to the app's order shape — use it instead of manually mapping fields.
+
 ### Offline Support
 
 `src/lib/offlineStore.js` (IndexedDB via `idb`) queues mutations when offline. `useAutoSync` in `src/hooks/useAutoSync.js` flushes the queue when the connection returns.
@@ -55,7 +59,7 @@ Products specifically use `loadProducts()` (localStorage) + `loadProductsRemote(
 
 | File | Role |
 |------|------|
-| `src/App.jsx` | Root: auth, order loading, routing, offline/PWA banners |
+| `src/App.jsx` | Root: auth, order loading, routing, Realtime sync, offline/PWA banners |
 | `src/lib/cloudSettings.js` | `cloudGet` / `cloudSet` — the two-layer persistence helpers |
 | `src/data/products.js` | `loadProducts`, `saveProducts`, `loadProductsRemote` |
 | `src/data/statuses.js` | Order status definitions |
@@ -72,6 +76,15 @@ Products specifically use `loadProducts()` (localStorage) + `loadProductsRemote(
 | `useDebounce(value, delay)` | Debounce for search inputs |
 | `useAutoSync()` | Flush offline mutation queue on reconnect |
 | `useNotifications()` | In-app notification state |
+| `useOrderNotifications()` | Browser Push Notification API — `notifyNewOrder(order)` |
+
+### Order History
+
+`OrdersPage.jsx` has `recordHistory(orderId, status, user, fromStatus?, note?)` which logs status changes and livreur changes to:
+- `localStorage` key `order_history_{orderId}` (per device cache)
+- Supabase `order_history` table (`order_id`, `status`, `user_name`, `timestamp`)
+
+`HistoryModal` reads both sources and shows "from → to" transitions. Call `recordHistory` whenever a meaningful field changes on an order.
 
 ### UI Conventions
 
@@ -80,11 +93,16 @@ Products specifically use `loadProducts()` (localStorage) + `loadProductsRemote(
 - **Tables** — wrap in `<div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">` with alternating `bg-white` / `bg-gray-50` rows.
 - **Animations** — `page-enter` class (defined in `src/index.css`) for route transitions; `animate-fade-in` and `animate-slide-in` via Tailwind config (`src/tailwind.config.js`).
 - **Search inputs** — attach `ref={searchRef}` and `useSearchShortcut(searchRef)`, set placeholder to `"Rechercher... (/)"`.
+- **Keyboard navigation** — OrdersPage tabs support `←` / `→` arrow keys.
 - **Memoization** — wrap stable sub-components with `React.memo`; use `useMemo`/`useCallback` for expensive derivations passed as props.
 
 ### All pages are lazy-loaded
 
-`App.jsx` uses `React.lazy` for every page component. Stale chunk errors after a Vercel deploy are expected — the `PWAUpdateBanner` detects SW controller changes and prompts a reload. Users can also Ctrl+Shift+R to force a fresh load.
+`App.jsx` uses `React.lazy` for every page component. Stale chunk errors after a Vercel deploy are expected — the `PWAUpdateBanner` detects SW controller changes and prompts a reload.
+
+### Analytics Page (`/analytics`)
+
+`src/components/AnalyticsPage.jsx` receives `orders` as a prop and computes all stats client-side with `useMemo`. Shows: KPI cards, daily bar chart (7/30/90 days), status pie chart, top cities, top products, livreur performance table. Uses `recharts` (already in dependencies).
 
 ## Environment Variables
 
@@ -106,3 +124,4 @@ VITE_SUPABASE_ANON_KEY=...
 | `victoury_factures` | Saved factures array |
 | `victoury_products` | Products array |
 | `victoury_statuses` | Order status definitions |
+| `order_history_{id}` | Per-order status change log (cache of Supabase `order_history`) |
