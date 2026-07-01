@@ -3,7 +3,6 @@ import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
 import { Search, X, ChevronDown, Check, Upload, FileSpreadsheet, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock, ScanLine, Copy } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
 import OrderModal from './OrderModal';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { openLabelPage } from './LabelPrint';
