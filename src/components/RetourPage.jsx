@@ -108,6 +108,8 @@ function ScannerRetourPage({ orders, setOrders }) {
     let html5Qr;
     const timer = setTimeout(async () => {
       try {
+        const el = document.getElementById('qr-reader-retour');
+        if (el) el.innerHTML = '';
         html5Qr = new Html5Qrcode('qr-reader-retour');
         scannerRef.current = html5Qr;
         await html5Qr.start(

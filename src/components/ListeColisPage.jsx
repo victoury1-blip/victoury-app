@@ -1145,6 +1145,8 @@ function ScanModal({ orders, onFound, onClose }) {
     let html5Qr;
     const t = setTimeout(async () => {
       try {
+        const el = document.getElementById('colis-qr-reader');
+        if (el) el.innerHTML = '';
         html5Qr = new Html5Qrcode('colis-qr-reader');
         scannerRef.current = html5Qr;
         await html5Qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, processCode, () => {});

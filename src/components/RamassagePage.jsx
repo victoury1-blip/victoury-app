@@ -110,6 +110,8 @@ function ScannerPage({ orders, setOrders }) {
     let html5Qr;
     const timer = setTimeout(async () => {
       try {
+        const el = document.getElementById('qr-reader');
+        if (el) el.innerHTML = '';
         html5Qr = new Html5Qrcode('qr-reader');
         scannerRef.current = html5Qr;
         await html5Qr.start(
@@ -219,8 +221,13 @@ function ScannerPage({ orders, setOrders }) {
       </div>
 
       {message && (
-        <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-          {message.text}
+        <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium flex items-center justify-between gap-3 ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          <span>{message.text}</span>
+          {message.type === 'error' && message.text.includes('Permission') && (
+            <button onClick={() => window.location.reload()} className="shrink-0 text-xs font-bold underline hover:no-underline">
+              Recharger
+            </button>
+          )}
         </div>
       )}
 
