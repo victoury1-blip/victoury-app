@@ -130,19 +130,36 @@ function ScannerRetourPage({ orders, setOrders }) {
         await new Promise(r => setTimeout(r, 1500));
         if (stopped) return;
 
-        intervalId = setInterval(() => {
-          if (stopped || video.readyState < 3 || !video.videoWidth) return;
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
-          if (code && !stopped) {
-            stopped = true;
-            clearInterval(intervalId);
-            processScannedCodeRef.current(code.data);
-          }
-        }, 300);
+        const track = stream.getVideoTracks()[0];
+        const imageCapture = window.ImageCapture ? new window.ImageCapture(track) : null;
+
+        intervalId = setInterval(async () => {
+          if (stopped) return;
+          try {
+            let bitmap;
+            if (imageCapture) {
+              bitmap = await imageCapture.grabFrame();
+            } else {
+              if (video.readyState < 3 || !video.videoWidth) return;
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              ctx.drawImage(video, 0, 0);
+            }
+            if (bitmap && 'BarcodeDetector' in window) {
+              const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix'] });
+              const barcodes = await detector.detect(bitmap);
+              if (barcodes.length > 0 && !stopped) {
+                stopped = true; clearInterval(intervalId); bitmap.close?.();
+                processScannedCodeRef.current(barcodes[0].rawValue); return;
+              }
+            }
+            if (bitmap) { canvas.width = bitmap.width; canvas.height = bitmap.height; ctx.drawImage(bitmap, 0, 0); bitmap.close?.(); }
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            if (!imgData.width) return;
+            const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+            if (code && !stopped) { stopped = true; clearInterval(intervalId); processScannedCodeRef.current(code.data); }
+          } catch {}
+        }, 500);
       } catch (err) {
         if (stopped) return;
         const msg = String(err?.message || err || '');
