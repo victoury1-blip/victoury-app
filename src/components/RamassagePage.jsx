@@ -59,10 +59,14 @@ function ScannerPage({ orders, setOrders }) {
       return;
     }
 
-    const order = orders.find(o => o.id === code || o.trackingNumber === code);
+    const order = orders.find(o =>
+      o.id === code || o.trackingNumber === code ||
+      String(o.id).toLowerCase() === code.toLowerCase() ||
+      String(o.trackingNumber || '').toLowerCase() === code.toLowerCase()
+    );
     if (!order) {
       playError();
-      showMessage(`Code ${code} non trouvé`, 'error');
+      showMessage(`Lu: "${code}" — non trouvé`, 'error');
       return;
     }
 
