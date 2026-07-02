@@ -129,8 +129,6 @@ function ScannerPage({ orders, setOrders }) {
               stopped = true;
               controls?.stop();
               processScannedCodeRef.current(result.getText());
-            } else if (err && err.name !== 'NotFoundException') {
-              showMessage('Erreur scan: ' + (err.name || err.message), 'error');
             }
           }
         );
