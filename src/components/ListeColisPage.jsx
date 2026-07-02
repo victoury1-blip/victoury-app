@@ -1145,56 +1145,42 @@ function ScanModal({ orders, onFound, onClose }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let stream;
-    let intervalId;
-    let stopped = false;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let stream, intervalId, stopped = false;
 
     async function start() {
       const video = document.getElementById('colis-scanner-video');
       if (!video || stopped) return;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
         });
         if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
         video.srcObject = stream;
-        video.play();
-        await new Promise(r => { video.oncanplay = r; });
-        await new Promise(r => setTimeout(r, 1500));
+        await video.play();
+        await new Promise(r => setTimeout(r, 800));
         if (stopped) return;
 
-        const track = stream.getVideoTracks()[0];
-        const imageCapture = window.ImageCapture ? new window.ImageCapture(track) : null;
+        if (!('BarcodeDetector' in window)) {
+          setMsg({ text: 'BarcodeDetector non disponible', error: true });
+          setScanning(false);
+          return;
+        }
+
+        const detector = new window.BarcodeDetector({
+          formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'],
+        });
 
         intervalId = setInterval(async () => {
-          if (stopped) return;
+          if (stopped || video.readyState < 2 || !video.videoWidth) return;
           try {
-            let bitmap;
-            if (imageCapture) {
-              bitmap = await imageCapture.grabFrame();
-            } else {
-              if (video.readyState < 3 || !video.videoWidth) return;
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              ctx.drawImage(video, 0, 0);
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0 && !stopped) {
+              stopped = true;
+              clearInterval(intervalId);
+              processCodeRef.current(barcodes[0].rawValue);
             }
-            if (bitmap && 'BarcodeDetector' in window) {
-              const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix'] });
-              const barcodes = await detector.detect(bitmap);
-              if (barcodes.length > 0 && !stopped) {
-                stopped = true; clearInterval(intervalId); bitmap.close?.();
-                processCodeRef.current(barcodes[0].rawValue); return;
-              }
-            }
-            if (bitmap) { canvas.width = bitmap.width; canvas.height = bitmap.height; ctx.drawImage(bitmap, 0, 0); bitmap.close?.(); }
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            if (!imgData.width) return;
-            const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
-            if (code && !stopped) { stopped = true; clearInterval(intervalId); processCodeRef.current(code.data); }
           } catch {}
-        }, 500);
+        }, 200);
       } catch (err) {
         if (stopped) return;
         const msg = String(err?.message || err || '');
@@ -1216,7 +1202,6 @@ function ScanModal({ orders, onFound, onClose }) {
       try { stream?.getTracks().forEach(t => t.stop()); } catch {}
       const v = document.getElementById('colis-scanner-video');
       if (v) v.srcObject = null;
-      scannerRef.current = null;
     };
   }, [scanning]);
 
