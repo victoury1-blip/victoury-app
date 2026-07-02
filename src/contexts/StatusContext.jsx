@@ -9,7 +9,12 @@ async function loadFromSupabase() {
   try {
     const remote = await cloudGet(SETTINGS_KEY);
     if (Array.isArray(remote) && remote.length > 0) {
-      return remote.map(s => ({ showInCommandes: true, showInColis: true, ...s }));
+      return remote.map(s => {
+        const merged = { showInCommandes: true, showInColis: true, ...s };
+        // migration: Annulé passe de l'orange au rouge (style Volcano)
+        if (merged.value === 'annule' && merged.color === '#F97316') merged.color = '#DC2626';
+        return merged;
+      });
     }
   } catch {}
   return null;

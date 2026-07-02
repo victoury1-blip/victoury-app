@@ -6,7 +6,7 @@ export const ALL_STATUSES = [
   { id: 8,  value: 'livre',            label: 'Livré',                    slug: 'livre',                color: '#10B981', isDefault: false, order: 8,  showInCommandes: true,  showInColis: true  },
   { id: 9,  value: 'manque_stock',     label: 'Manque de Stock',          slug: 'manque-de-stock',      color: '#D97706', isDefault: false, order: 9,  showInCommandes: true,  showInColis: false },
   { id: 10, value: 'pas_rep_1',        label: 'Pas de Réponse 1',         slug: 'pas-de-reponse-1',     color: '#FB923C', isDefault: false, order: 10, showInCommandes: true,  showInColis: false },
-  { id: 12, value: 'annule',           label: 'Annulé',                   slug: 'annule',               color: '#F97316', isDefault: false, order: 12, showInCommandes: true,  showInColis: true  },
+  { id: 12, value: 'annule',           label: 'Annulé',                   slug: 'annule',               color: '#DC2626', isDefault: false, order: 12, showInCommandes: true,  showInColis: true  },
   { id: 13, value: 'en_attente',       label: 'En Attente',               slug: 'en-attente',           color: '#0EA5E9', isDefault: false, order: 13, showInCommandes: true,  showInColis: false },
   { id: 14, value: 'photo_whatsapp',   label: 'Photo WhatsApp',           slug: 'photo-whatsapp',       color: '#F43F5E', isDefault: false, order: 14, showInCommandes: true,  showInColis: false },
   { id: 15, value: 'refuse',           label: 'Refusé',                   slug: 'refuse',               color: '#EF4444', isDefault: false, order: 15, showInCommandes: true,  showInColis: true  },
