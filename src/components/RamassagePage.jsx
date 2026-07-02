@@ -13,6 +13,7 @@ function ScannerPage({ orders, setOrders }) {
   const [frameCount, setFrameCount] = useState(0);
   const scannerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const msgTimerRef = useRef(null);
   const scannedIdsRef = useRef(new Set());
   const navigate = useNavigate();
 
@@ -51,8 +52,9 @@ function ScannerPage({ orders, setOrders }) {
   }
 
   function showMessage(text, type = 'success') {
+    if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
     setMessage({ text, type });
-    setTimeout(() => setMessage(null), 3000);
+    msgTimerRef.current = setTimeout(() => setMessage(null), type === 'error' ? 8000 : 4000);
   }
 
   const processScannedCode = useCallback((code) => {
@@ -136,8 +138,14 @@ function ScannerPage({ orders, setOrders }) {
         try {
           const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'] });
           const barcodes = await detector.detect(bitmap);
-          if (barcodes.length > 0) { processScannedCode(barcodes[0].rawValue); return; }
-        } catch {}
+          if (barcodes.length > 0) {
+            showMessage(`BD lu: "${barcodes[0].rawValue}" (${barcodes[0].format})`, 'success');
+            setTimeout(() => processScannedCode(barcodes[0].rawValue), 2000);
+            return;
+          }
+        } catch (bdErr) {
+          showMessage(`BD erreur: ${bdErr?.message || bdErr}`, 'error'); return;
+        }
       }
 
       // 2. jsQR raw
