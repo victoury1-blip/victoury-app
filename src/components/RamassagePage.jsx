@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck } from 'lucide-react';
+import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck, Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { printBon } from '../lib/printBon';
 
 function ScannerPage({ orders, setOrders }) {
   const [manualInput, setManualInput] = useState('');
@@ -555,6 +556,10 @@ function BonDetailPage({ orders }) {
           <button onClick={() => navigate('/ramassage/bons')} className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
             <ArrowLeft size={16} />
             Retour à la liste
+          </button>
+          <button onClick={() => printBon(bon, colisDetails, 'ramassage')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            <Printer size={16} />
+            Imprimer
           </button>
           {bon.status === 'en_cours' && (
             <button onClick={cloturerBon} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
