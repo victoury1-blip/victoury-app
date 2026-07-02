@@ -11,6 +11,7 @@ function ScannerPage({ orders, setOrders }) {
   const [message, setMessage] = useState(null);
   const [frameCount, setFrameCount] = useState(0);
   const scannerRef = useRef(null);
+  const fileInputRef = useRef(null);
   const scannedIdsRef = useRef(new Set());
   const navigate = useNavigate();
 
@@ -114,6 +115,36 @@ function ScannerPage({ orders, setOrders }) {
 
     showMessage(`${order.recipient?.name || code} ajouté au bon ${livreur}`);
   }, [orders, setOrders]);
+
+  async function handlePhotoCapture(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const bitmap = await createImageBitmap(file);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(bitmap, 0, 0);
+
+      // try jsQR
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+      if (code) { processScannedCode(code.data); return; }
+
+      // try BarcodeDetector
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix'] });
+        const barcodes = await detector.detect(bitmap);
+        if (barcodes.length > 0) { processScannedCode(barcodes[0].rawValue); return; }
+      }
+
+      showMessage('Code non détecté sur la photo — réessayez', 'error');
+    } catch {
+      showMessage('Erreur lecture photo', 'error');
+    }
+  }
 
   async function handleTraiter() {
     const input = manualInput.trim();
@@ -299,8 +330,23 @@ function ScannerPage({ orders, setOrders }) {
               className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center"
             >
               <QrCode size={18} />
-              Scanner QR Code
+              Scanner QR Code (live)
             </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center"
+            >
+              <QrCode size={18} />
+              📷 Prendre une photo
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoCapture}
+            />
             <div>
               <p className="text-sm text-gray-500 mb-2">Ou saisir manuellement :</p>
               <div className="flex gap-2">
