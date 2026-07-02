@@ -5,16 +5,20 @@ import { supabase } from '../lib/supabase';
 
 const SETTINGS_KEY = 'victoury_statuses';
 
+function migrate(list) {
+  return list.map(s => {
+    const merged = { showInCommandes: true, showInColis: true, ...s };
+    // migration: Annulé passe de l'orange au rouge (style Volcano)
+    if (merged.value === 'annule' && merged.color === '#F97316') merged.color = '#DC2626';
+    return merged;
+  });
+}
+
 async function loadFromSupabase() {
   try {
     const remote = await cloudGet(SETTINGS_KEY);
     if (Array.isArray(remote) && remote.length > 0) {
-      return remote.map(s => {
-        const merged = { showInCommandes: true, showInColis: true, ...s };
-        // migration: Annulé passe de l'orange au rouge (style Volcano)
-        if (merged.value === 'annule' && merged.color === '#F97316') merged.color = '#DC2626';
-        return merged;
-      });
+      return migrate(remote);
     }
   } catch {}
   return null;
@@ -49,7 +53,7 @@ export function StatusProvider({ children }) {
       }, (payload) => {
         const val = payload.new?.value;
         if (Array.isArray(val) && val.length > 0) {
-          const migrated = val.map(s => ({ showInCommandes: true, showInColis: true, ...s }));
+          const migrated = migrate(val);
           saveStatuses(migrated);
           setStatuses(migrated);
         }

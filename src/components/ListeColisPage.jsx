@@ -1128,7 +1128,6 @@ function ScanModal({ orders, onFound, onClose }) {
   const [manualInput, setManualInput] = useState('');
   const [scanning, setScanning] = useState(false);
   const inputRef = useRef(null);
-  const scannerRef = useRef(null);
 
   const processCode = useCallback((code) => {
     const trimmed = (code || '').trim();
@@ -1426,9 +1425,16 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   function toggleRecu(orderId) {
     setRecuIds(prev => {
       const next = new Set(prev);
-      if (next.has(orderId)) { next.delete(orderId); } else { next.add(orderId); }
+      const removing = next.has(orderId);
+      if (removing) { next.delete(orderId); } else { next.add(orderId); }
       localStorage.setItem('victoury_recu_ids', JSON.stringify([...next]));
-      cloudSet('victoury_recu_ids', [...next]);
+      // fusionner avec le cloud avant d'écrire pour ne pas écraser les scans d'autres appareils
+      cloudGet('victoury_recu_ids').then(cloud => {
+        const merged = new Set([...(Array.isArray(cloud) ? cloud : []), ...next]);
+        if (removing) merged.delete(orderId);
+        localStorage.setItem('victoury_recu_ids', JSON.stringify([...merged]));
+        cloudSet('victoury_recu_ids', [...merged]);
+      }).catch(() => cloudSet('victoury_recu_ids', [...next]));
       return next;
     });
   }
@@ -1591,7 +1597,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     };
     const grouped = {};
     data.forEach(o => {
-      const nom = o.recipient?.delivery?.nom || 'Sans livreur';
+      const d = o.recipient?.delivery;
+      const nom = (typeof d === 'string' ? d : d?.nom) || 'Sans livreur';
       if (!grouped[nom]) grouped[nom] = [];
       grouped[nom].push(o);
     });

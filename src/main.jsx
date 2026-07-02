@@ -30,8 +30,9 @@ function autoRecover() {
 }
 
 window.addEventListener('vite:preloadError', (e) => {
-  e.preventDefault?.();
-  autoRecover();
+  // ne supprimer l'erreur que si on recharge vraiment — sinon la laisser
+  // remonter jusqu'à RootErrorBoundary qui affiche le bouton Recharger
+  if (autoRecover()) e.preventDefault?.();
 });
 
 // Never show a white page: catch render crashes and offer a reload

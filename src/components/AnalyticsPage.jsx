@@ -113,7 +113,8 @@ export default function AnalyticsPage({ orders = [] }) {
   const livreurData = useMemo(() => {
     const map = {};
     filtered.forEach(o => {
-      const nom = o.recipient?.delivery?.nom;
+      const d = o.recipient?.delivery;
+      const nom = typeof d === 'string' ? d : d?.nom;
       if (!nom) return;
       if (!map[nom]) map[nom] = { total: 0, livre: 0, refuse: 0 };
       map[nom].total++;
@@ -174,7 +175,7 @@ export default function AnalyticsPage({ orders = [] }) {
       'Téléphone': o.recipient?.phone || '',
       'Ville': o.recipient?.city || '',
       'Adresse': o.recipient?.address || '',
-      'Livreur': o.recipient?.delivery?.nom || '',
+      'Livreur': (typeof o.recipient?.delivery === 'string' ? o.recipient.delivery : o.recipient?.delivery?.nom) || '',
       'Produit': o.product?.name || '',
       'Taille': o.product?.size || '',
       'Qté': o.product?.qty || 1,

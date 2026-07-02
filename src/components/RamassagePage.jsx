@@ -90,7 +90,9 @@ function ScannerPage({ orders, setOrders }) {
     playBeep();
 
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'expedier' } : o));
-    supabase.from('orders').update({ status: 'expedier' }).eq('id', order.id).then(() => {});
+    supabase.from('orders').update({ status: 'expedier' }).eq('id', order.id).then(({ error }) => {
+      if (error) showMessage(`⚠️ ${order.id}: non synchronisé (${error.message})`, 'error');
+    });
 
     setBonsSession(prev => {
       const existing = prev[livreur] || { colis: [], created_at: new Date().toISOString() };
@@ -248,6 +250,11 @@ function ScannerPage({ orders, setOrders }) {
         updated[livreur] = { ...bon, colis: newColis };
       }
       return updated;
+    });
+    // remettre le colis en attente de ramassage pour pouvoir le rescanner
+    setOrders(prev => prev.map(o => o.id === colisId ? { ...o, status: 'att_ramassage' } : o));
+    supabase.from('orders').update({ status: 'att_ramassage' }).eq('id', colisId).then(({ error }) => {
+      if (error) showMessage(`⚠️ ${colisId}: non synchronisé (${error.message})`, 'error');
     });
   }
 

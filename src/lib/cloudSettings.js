@@ -11,12 +11,13 @@ export async function cloudGet(key) {
 
     // Try with user_id first
     if (userId) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('settings')
         .select('value')
         .eq('key', key)
         .eq('user_id', userId)
         .maybeSingle();
+      if (error) throw error;
       if (data?.value !== undefined && data?.value !== null) {
         localStorage.setItem(key, JSON.stringify(data.value));
         return data.value;
@@ -24,12 +25,13 @@ export async function cloudGet(key) {
     }
 
     // Fallback: try user_id IS NULL
-    const { data: d2 } = await supabase
+    const { data: d2, error: e2 } = await supabase
       .from('settings')
       .select('value')
       .eq('key', key)
       .is('user_id', null)
       .maybeSingle();
+    if (e2) throw e2;
     if (d2?.value !== undefined && d2?.value !== null) {
       localStorage.setItem(key, JSON.stringify(d2.value));
       if (userId) {

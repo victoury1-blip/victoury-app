@@ -3,7 +3,7 @@ import jsQR from 'jsqr';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, RotateCcw, Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { cloudSet } from '../lib/cloudSettings';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { printBon } from '../lib/printBon';
 
 
@@ -12,7 +12,7 @@ function ScannerRetourPage({ orders, setOrders }) {
   const [colisRetour, setColisRetour] = useState([]);
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null);
-  const scannerRef = useRef(null);
+  const msgTimerRef = useRef(null);
   const scannedIdsRef = useRef(new Set());
   const navigate = useNavigate();
 
@@ -51,8 +51,9 @@ function ScannerRetourPage({ orders, setOrders }) {
   }
 
   function showMessage(text, type = 'success') {
+    if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
     setMessage({ text, type });
-    setTimeout(() => setMessage(null), 3000);
+    msgTimerRef.current = setTimeout(() => setMessage(null), type === 'error' ? 6000 : 3000);
   }
 
   const processScannedCode = useCallback((code) => {
@@ -85,11 +86,17 @@ function ScannerRetourPage({ orders, setOrders }) {
 
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, recu: true } : o));
     // marquer "Reçu" — même stockage que le badge de la Liste des Colis
+    // (fusion avec le cloud pour ne pas écraser les scans d'autres appareils)
     try {
       const ids = new Set(JSON.parse(localStorage.getItem('victoury_recu_ids') || '[]'));
       ids.add(order.id);
       localStorage.setItem('victoury_recu_ids', JSON.stringify([...ids]));
-      cloudSet('victoury_recu_ids', [...ids]);
+      cloudGet('victoury_recu_ids').then(cloud => {
+        const merged = new Set([...(Array.isArray(cloud) ? cloud : []), ...ids]);
+        merged.add(order.id);
+        localStorage.setItem('victoury_recu_ids', JSON.stringify([...merged]));
+        cloudSet('victoury_recu_ids', [...merged]);
+      }).catch(() => cloudSet('victoury_recu_ids', [...ids]));
     } catch {}
 
     setColisRetour(prev => {

@@ -43,7 +43,7 @@ function buildLabelHTML(order, config) {
     ? `<img src="${esc(config.logo)}" alt="" style="height:80px;object-fit:contain" />`
     : `<span style="font-weight:900;font-size:22px;letter-spacing:1px">${esc(shopName)}</span>`;
 
-  const noteHtml = (order.noteLivraison || shopNote)
+  const noteHtml = order.noteLivraison
     ? `<div style="padding:4px 12px;border-bottom:1px solid #000"><span style="color:#dc2626;font-weight:700;font-size:13px">Note: </span><span style="font-size:12px;color:#333">${esc(order.noteLivraison)}</span></div>`
     : '';
 
