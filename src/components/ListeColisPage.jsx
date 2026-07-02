@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BrowserMultiFormatReader, BrowserCodeReader } from '@zxing/browser';
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
@@ -1153,8 +1153,10 @@ function ScanModal({ orders, onFound, onClose }) {
       if (!video) return;
       try {
         const reader = new BrowserMultiFormatReader();
-        controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
+        const devices = await BrowserCodeReader.listVideoInputDevices();
+        const backCam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+        controls = await reader.decodeFromVideoDevice(
+          backCam?.deviceId,
           video,
           (result, err) => {
             if (stopped) return;

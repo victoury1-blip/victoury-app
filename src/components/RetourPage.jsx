@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BrowserMultiFormatReader, BrowserCodeReader } from '@zxing/browser';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -116,8 +116,10 @@ function ScannerRetourPage({ orders, setOrders }) {
       if (!video) return;
       try {
         const reader = new BrowserMultiFormatReader();
-        controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
+        const devices = await BrowserCodeReader.listVideoInputDevices();
+        const backCam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+        controls = await reader.decodeFromVideoDevice(
+          backCam?.deviceId,
           video,
           (result, err) => {
             if (stopped) return;
@@ -125,6 +127,8 @@ function ScannerRetourPage({ orders, setOrders }) {
               stopped = true;
               controls?.stop();
               processScannedCodeRef.current(result.getText());
+            } else if (err && err.name !== 'NotFoundException') {
+              showMessage('Erreur scan: ' + (err.name || err.message), 'error');
             }
           }
         );
