@@ -3,6 +3,7 @@ import jsQR from 'jsqr';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { cloudSet } from '../lib/cloudSettings';
 
 
 function ScannerRetourPage({ orders, setOrders }) {
@@ -78,7 +79,13 @@ function ScannerRetourPage({ orders, setOrders }) {
     playBeep();
 
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, recu: true } : o));
-    supabase.from('orders').update({ recu: true }).eq('id', order.id).then(() => {});
+    // marquer "Reçu" — même stockage que le badge de la Liste des Colis
+    try {
+      const ids = new Set(JSON.parse(localStorage.getItem('victoury_recu_ids') || '[]'));
+      ids.add(order.id);
+      localStorage.setItem('victoury_recu_ids', JSON.stringify([...ids]));
+      cloudSet('victoury_recu_ids', [...ids]);
+    } catch {}
 
     setColisRetour(prev => {
       if (prev.find(c => c.id === order.id)) return prev;
