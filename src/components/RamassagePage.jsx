@@ -55,7 +55,6 @@ function ScannerPage({ orders, setOrders }) {
   }
 
   const processScannedCode = useCallback((code) => {
-    setScanning(false);
     const order = orders.find(o =>
       o.id === code || o.trackingNumber === code ||
       String(o.id).toLowerCase() === code.toLowerCase() ||
@@ -163,6 +162,17 @@ function ScannerPage({ orders, setOrders }) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+        // scan continu : la caméra reste ouverte, cooldown pour ne pas relire le même code
+        let lastCode = '', lastAt = 0;
+        function onDetected(raw) {
+          const now = Date.now();
+          if (raw === lastCode && now - lastAt < 4000) return;
+          if (now - lastAt < 1200) return;
+          lastCode = raw;
+          lastAt = now;
+          processScannedCodeRef.current(raw);
+        }
+
         async function tick() {
           if (stopped) return;
           if (video.readyState >= 3 && video.videoWidth > 0) {
@@ -175,23 +185,21 @@ function ScannerPage({ orders, setOrders }) {
             canvas.height = side;
             ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
 
+            let found = false;
             if (detector) {
               try {
                 const barcodes = await detector.detect(canvas);
                 if (barcodes.length > 0 && !stopped) {
-                  stopped = true;
-                  processScannedCodeRef.current(barcodes[0].rawValue);
-                  return;
+                  found = true;
+                  onDetected(barcodes[0].rawValue);
                 }
               } catch {}
             }
-            if (!stopped) {
+            if (!found && !stopped) {
               const imgData = ctx.getImageData(0, 0, side, side);
               const code = jsQR(imgData.data, side, side, { inversionAttempts: 'attemptBoth' });
               if (code && code.data && !stopped) {
-                stopped = true;
-                processScannedCodeRef.current(code.data);
-                return;
+                onDetected(code.data);
               }
             }
           }
@@ -462,8 +470,13 @@ function ScannerPage({ orders, setOrders }) {
                 </div>
               </div>
               <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70 pointer-events-none">
-                {frameCount > 0 ? `🔍 Analyse... (${frameCount} frames)` : 'Pointez vers le code-barres'}
+                {frameCount > 0 ? '🔍 Scan continu — passez au colis suivant' : 'Pointez vers le code-barres'}
               </p>
+              {message && (
+                <div className={`absolute top-2 left-2 right-2 px-3 py-2 rounded-lg text-xs font-semibold text-center pointer-events-none ${message.type === 'error' ? 'bg-red-600/95 text-white' : 'bg-green-600/95 text-white'}`}>
+                  {message.text}
+                </div>
+              )}
             </div>
             <div className="p-4 flex gap-2">
               <button

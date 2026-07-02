@@ -1178,6 +1178,17 @@ function ScanModal({ orders, onFound, onClose }) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+        // scan continu : la caméra reste ouverte, cooldown pour ne pas relire le même code
+        let lastCode = '', lastAt = 0;
+        function onDetected(raw) {
+          const now = Date.now();
+          if (raw === lastCode && now - lastAt < 4000) return;
+          if (now - lastAt < 1200) return;
+          lastCode = raw;
+          lastAt = now;
+          processCodeRef.current(raw);
+        }
+
         intervalId = setInterval(async () => {
           if (stopped || video.readyState < 3 || !video.videoWidth) return;
           const vw = video.videoWidth, vh = video.videoHeight;
@@ -1187,24 +1198,21 @@ function ScanModal({ orders, onFound, onClose }) {
           canvas.height = side;
           ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
 
+          let found = false;
           if (detector) {
             try {
               const barcodes = await detector.detect(canvas);
               if (barcodes.length > 0 && !stopped) {
-                stopped = true;
-                clearInterval(intervalId);
-                processCodeRef.current(barcodes[0].rawValue);
-                return;
+                found = true;
+                onDetected(barcodes[0].rawValue);
               }
             } catch {}
           }
-          if (!stopped) {
+          if (!found && !stopped) {
             const imgData = ctx.getImageData(0, 0, side, side);
             const code = jsQR(imgData.data, side, side, { inversionAttempts: 'attemptBoth' });
             if (code && code.data && !stopped) {
-              stopped = true;
-              clearInterval(intervalId);
-              processCodeRef.current(code.data);
+              onDetected(code.data);
             }
           }
         }, 250);
