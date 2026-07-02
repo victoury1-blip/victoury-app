@@ -1,3 +1,4 @@
+import qrcode from 'qrcode-generator';
 import { supabase } from '../lib/supabase';
 import { esc } from '../lib/htmlUtils';
 
@@ -6,38 +7,26 @@ function getShopConfig() {
 }
 
 function generateQRCodeSVG(text, size = 120) {
-  const modules = [];
-  const seed = text.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  const grid = 21;
+  const qr = qrcode(0, 'M');
+  qr.addData(String(text));
+  qr.make();
+  const count = qr.getModuleCount();
+  const quiet = 2; // zone blanche obligatoire autour du QR
+  const grid = count + quiet * 2;
   const cellSize = size / grid;
 
-  const addFinder = (ox, oy) => {
-    for (let y = 0; y < 7; y++)
-      for (let x = 0; x < 7; x++)
-        if (y === 0 || y === 6 || x === 0 || x === 6 || (y >= 2 && y <= 4 && x >= 2 && x <= 4))
-          modules.push({ x: ox + x, y: oy + y });
-  };
-  addFinder(0, 0);
-  addFinder(grid - 7, 0);
-  addFinder(0, grid - 7);
-
-  let hash = seed;
-  for (let y = 0; y < grid; y++) {
-    for (let x = 0; x < grid; x++) {
-      const inFinder = (x < 8 && y < 8) || (x >= grid - 8 && y < 8) || (x < 8 && y >= grid - 8);
-      if (inFinder) continue;
-      hash = (hash * 1103515245 + 12345) & 0x7fffffff;
-      if (hash % 3 !== 0) modules.push({ x, y });
+  const rects = [];
+  for (let y = 0; y < count; y++) {
+    for (let x = 0; x < count; x++) {
+      if (qr.isDark(y, x)) {
+        rects.push(`<rect x="${(x + quiet) * cellSize}" y="${(y + quiet) * cellSize}" width="${cellSize}" height="${cellSize}" fill="black"/>`);
+      }
     }
   }
 
-  const rects = modules.map(m =>
-    `<rect x="${m.x * cellSize}" y="${m.y * cellSize}" width="${cellSize}" height="${cellSize}" fill="black"/>`
-  ).join('');
-
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <rect width="${size}" height="${size}" fill="white"/>
-    ${rects}
+    ${rects.join('')}
   </svg>`;
 }
 
