@@ -9,6 +9,7 @@ function ScannerPage({ orders, setOrders }) {
   const [bonsSession, setBonsSession] = useState({});
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null);
+  const [frameCount, setFrameCount] = useState(0);
   const scannerRef = useRef(null);
   const scannedIdsRef = useRef(new Set());
   const navigate = useNavigate();
@@ -53,6 +54,7 @@ function ScannerPage({ orders, setOrders }) {
   }
 
   const processScannedCode = useCallback((code) => {
+    setScanning(false);
     if (scannedIdsRef.current.has(code)) {
       playError();
       showMessage(`⚠️ Code ${code} déjà scanné !`, 'error');
@@ -125,6 +127,7 @@ function ScannerPage({ orders, setOrders }) {
 
   useEffect(() => {
     if (!scanning) return;
+    setFrameCount(0);
     let qr;
     let stopped = false;
 
@@ -134,13 +137,13 @@ function ScannerPage({ orders, setOrders }) {
         qr = new Html5Qrcode('ramassage-qr-reader');
         await qr.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
           (text) => {
             if (stopped) return;
             stopped = true;
             processScannedCodeRef.current(text);
           },
-          () => {}
+          () => { setFrameCount(n => n + 1); }
         );
         scannerRef.current = qr;
       } catch (err) {
@@ -404,7 +407,9 @@ function ScannerPage({ orders, setOrders }) {
                   <div className="absolute left-0 right-0 h-0.5 bg-red-400 opacity-80 animate-scan-line" style={{ top: '50%' }} />
                 </div>
               </div>
-              <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70 pointer-events-none">Pointez vers le code-barres</p>
+              <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70 pointer-events-none">
+                {frameCount > 0 ? `🔍 Analyse... (${frameCount} frames)` : 'Pointez vers le code-barres'}
+              </p>
             </div>
             <div className="p-4 flex gap-2">
               <button
