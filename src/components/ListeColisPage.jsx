@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+import { Html5Qrcode } from 'html5-qrcode';
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
@@ -1145,75 +1145,42 @@ function ScanModal({ orders, onFound, onClose }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let stream;
-    let intervalId;
+    let qr;
     let stopped = false;
 
     async function start() {
-      const video = document.getElementById('colis-scanner-video');
-      if (!video || stopped) return;
+      if (stopped || !document.getElementById('colis-qr-reader')) return;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        });
-        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream;
-        await video.play();
-
-        if ('BarcodeDetector' in window) {
-          const detector = new window.BarcodeDetector({
-            formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'aztec', 'data_matrix'],
-          });
-          intervalId = setInterval(async () => {
-            if (stopped || video.readyState < 2 || video.paused) return;
-            try {
-              const barcodes = await detector.detect(video);
-              if (barcodes.length > 0 && !stopped) {
-                stopped = true;
-                clearInterval(intervalId);
-                processCodeRef.current(barcodes[0].rawValue);
-              }
-            } catch {}
-          }, 200);
-        } else {
-          const canvas = document.createElement('canvas');
-          const ctx2d = canvas.getContext('2d');
-          const reader = new BrowserMultiFormatReader();
-          intervalId = setInterval(async () => {
-            if (stopped || video.readyState < 2 || video.paused) return;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx2d.drawImage(video, 0, 0);
-            try {
-              const result = reader.decodeFromCanvas(canvas);
-              if (result && !stopped) {
-                stopped = true;
-                clearInterval(intervalId);
-                processCodeRef.current(result.getText());
-              }
-            } catch {}
-          }, 250);
-        }
+        qr = new Html5Qrcode('colis-qr-reader');
+        await qr.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+          (text) => {
+            if (stopped) return;
+            stopped = true;
+            processCodeRef.current(text);
+          },
+          () => {}
+        );
+        scannerRef.current = qr;
       } catch (err) {
         if (stopped) return;
-        const reason = err?.name === 'NotAllowedError'
+        const msg = String(err?.message || err || '');
+        const reason = msg.includes('NotAllowed') || err?.name === 'NotAllowedError'
           ? 'Permission caméra refusée'
-          : err?.name === 'NotFoundError' ? 'Aucune caméra détectée'
-          : err?.name === 'NotReadableError' ? 'Caméra occupée par une autre app'
-          : `Erreur: ${err?.name || err?.message || 'inconnue'}`;
+          : msg.includes('NotFound') ? 'Aucune caméra détectée'
+          : msg.includes('NotReadable') ? 'Caméra occupée par une autre app'
+          : `Erreur caméra: ${msg || 'inconnue'}`;
         setMsg({ text: reason, error: true });
         setScanning(false);
       }
     }
 
-    const timer = setTimeout(start, 80);
+    const timer = setTimeout(start, 100);
     return () => {
       stopped = true;
       clearTimeout(timer);
-      clearInterval(intervalId);
-      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-      const v = document.getElementById('colis-scanner-video');
-      if (v) v.srcObject = null;
+      try { qr?.stop().catch(() => {}); } catch {}
       scannerRef.current = null;
     };
   }, [scanning]);
@@ -1247,14 +1214,9 @@ function ScanModal({ orders, onFound, onClose }) {
             </button>
           ) : (
             <div className="rounded-xl overflow-hidden">
-              <div className="relative bg-black" style={{ height: 240 }}>
-                <video
-                  id="colis-scanner-video"
-                  className="w-full h-full object-cover"
-                  playsInline
-                  muted
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative bg-black overflow-hidden" style={{ height: 240 }}>
+                <div id="colis-qr-reader" className="w-full h-full" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="relative w-40 h-40">
                     <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-white rounded-tl" />
                     <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-white rounded-tr" />
@@ -1262,10 +1224,7 @@ function ScanModal({ orders, onFound, onClose }) {
                     <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-white rounded-br" />
                   </div>
                 </div>
-                {'BarcodeDetector' in window
-                  ? <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70">Pointez vers le code-barres</p>
-                  : <p className="absolute bottom-2 left-0 right-0 text-center text-amber-300 text-xs">Détection auto indisponible</p>
-                }
+                <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70 pointer-events-none">Pointez vers le code-barres</p>
               </div>
               <button
                 onClick={stopScanner}
