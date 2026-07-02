@@ -132,14 +132,20 @@ function ScannerPage({ orders, setOrders }) {
         const detector = new window.BarcodeDetector({
           formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'],
         });
-        const barcodes = await detector.detect(img);
-        if (barcodes.length > 0) {
-          processScannedCode(barcodes[0].rawValue);
-          return;
+        try {
+          const barcodes = await detector.detect(img);
+          if (barcodes.length > 0) {
+            processScannedCode(barcodes[0].rawValue);
+            return;
+          }
+          showMessage(`BD: 0 codes trouvés (${img.naturalWidth}x${img.naturalHeight})`, 'error');
+        } catch (err) {
+          showMessage('BD erreur: ' + (err?.message || String(err)), 'error');
         }
+        return;
       }
 
-      showMessage('Non détecté — essayez le scanner live', 'error');
+      showMessage('BarcodeDetector non disponible', 'error');
     } catch (err) {
       showMessage('Erreur: ' + (err?.message || String(err)), 'error');
     }
@@ -158,7 +164,7 @@ function ScannerPage({ orders, setOrders }) {
   useEffect(() => {
     if (!scanning) return;
     setFrameCount(0);
-    let stream, intervalId, stopped = false;
+    let stream, timerId, stopped = false;
 
     async function start() {
       const video = document.getElementById('ramassage-scanner-video');
@@ -170,7 +176,10 @@ function ScannerPage({ orders, setOrders }) {
         if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
         video.srcObject = stream;
         await video.play();
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => {
+          if (video.readyState >= 3) { r(); return; }
+          video.addEventListener('canplay', r, { once: true });
+        });
         if (stopped) return;
 
         if (!('BarcodeDetector' in window)) {
@@ -182,19 +191,34 @@ function ScannerPage({ orders, setOrders }) {
         const detector = new window.BarcodeDetector({
           formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'],
         });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        intervalId = setInterval(async () => {
-          if (stopped || video.readyState < 2 || !video.videoWidth) return;
-          setFrameCount(n => n + 1);
-          try {
-            const barcodes = await detector.detect(video);
-            if (barcodes.length > 0 && !stopped) {
+        async function tick() {
+          if (stopped) return;
+          if (video.readyState >= 3 && video.videoWidth > 0) {
+            setFrameCount(n => n + 1);
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            try {
+              const barcodes = await detector.detect(canvas);
+              if (barcodes.length > 0 && !stopped) {
+                stopped = true;
+                processScannedCodeRef.current(barcodes[0].rawValue);
+                return;
+              }
+            } catch (err) {
               stopped = true;
-              clearInterval(intervalId);
-              processScannedCodeRef.current(barcodes[0].rawValue);
+              showMessage('BD: ' + (err?.message || String(err)), 'error');
+              setScanning(false);
+              return;
             }
-          } catch {}
-        }, 200);
+          }
+          if (!stopped) timerId = setTimeout(tick, 300);
+        }
+
+        timerId = setTimeout(tick, 300);
       } catch (err) {
         if (stopped) return;
         const msg = String(err?.message || err || '');
@@ -208,11 +232,10 @@ function ScannerPage({ orders, setOrders }) {
       }
     }
 
-    const timer = setTimeout(start, 100);
+    start();
     return () => {
       stopped = true;
-      clearTimeout(timer);
-      clearInterval(intervalId);
+      clearTimeout(timerId);
       try { stream?.getTracks().forEach(t => t.stop()); } catch {}
       const v = document.getElementById('ramassage-scanner-video');
       if (v) v.srcObject = null;
