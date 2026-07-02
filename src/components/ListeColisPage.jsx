@@ -1157,30 +1157,57 @@ function ScanModal({ orders, onFound, onClose }) {
         if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
         video.srcObject = stream;
         await video.play();
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => {
+          if (video.readyState >= 3) { r(); return; }
+          video.addEventListener('canplay', r, { once: true });
+        });
         if (stopped) return;
 
-        if (!('BarcodeDetector' in window)) {
-          setMsg({ text: 'BarcodeDetector non disponible', error: true });
-          setScanning(false);
-          return;
-        }
+        const track = stream.getVideoTracks()[0];
+        try {
+          const caps = track.getCapabilities?.() || {};
+          if (caps.focusMode?.includes('continuous')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          }
+        } catch {}
 
-        const detector = new window.BarcodeDetector({
-          formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'],
-        });
+        // BarcodeDetector peut exister mais retourner toujours 0 (module MLKit absent) → jsQR en parallèle
+        const detector = 'BarcodeDetector' in window
+          ? new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'] })
+          : null;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         intervalId = setInterval(async () => {
-          if (stopped || video.readyState < 2 || !video.videoWidth) return;
-          try {
-            const barcodes = await detector.detect(video);
-            if (barcodes.length > 0 && !stopped) {
+          if (stopped || video.readyState < 3 || !video.videoWidth) return;
+          const vw = video.videoWidth, vh = video.videoHeight;
+          const side = Math.floor(Math.min(vw, vh) * 0.8);
+          const sx = Math.floor((vw - side) / 2), sy = Math.floor((vh - side) / 2);
+          canvas.width = side;
+          canvas.height = side;
+          ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
+
+          if (detector) {
+            try {
+              const barcodes = await detector.detect(canvas);
+              if (barcodes.length > 0 && !stopped) {
+                stopped = true;
+                clearInterval(intervalId);
+                processCodeRef.current(barcodes[0].rawValue);
+                return;
+              }
+            } catch {}
+          }
+          if (!stopped) {
+            const imgData = ctx.getImageData(0, 0, side, side);
+            const code = jsQR(imgData.data, side, side, { inversionAttempts: 'attemptBoth' });
+            if (code && code.data && !stopped) {
               stopped = true;
               clearInterval(intervalId);
-              processCodeRef.current(barcodes[0].rawValue);
+              processCodeRef.current(code.data);
             }
-          } catch {}
-        }, 200);
+          }
+        }, 250);
       } catch (err) {
         if (stopped) return;
         const msg = String(err?.message || err || '');

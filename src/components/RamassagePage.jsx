@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import jsQR from 'jsqr';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -9,8 +10,6 @@ function ScannerPage({ orders, setOrders }) {
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null);
   const [frameCount, setFrameCount] = useState(0);
-  const scannerRef = useRef(null);
-  const fileInputRef = useRef(null);
   const msgTimerRef = useRef(null);
   const scannedIdsRef = useRef(new Set());
   const navigate = useNavigate();
@@ -117,40 +116,6 @@ function ScannerPage({ orders, setOrders }) {
     showMessage(`${order.recipient?.name || code} ajouté au bon ${livreur}`);
   }, [orders, setOrders]);
 
-  async function handlePhotoCapture(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    showMessage('Analyse...', 'success');
-    try {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
-      URL.revokeObjectURL(url);
-
-      if ('BarcodeDetector' in window) {
-        const detector = new window.BarcodeDetector({
-          formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'],
-        });
-        try {
-          const barcodes = await detector.detect(img);
-          if (barcodes.length > 0) {
-            processScannedCode(barcodes[0].rawValue);
-            return;
-          }
-          showMessage(`BD: 0 codes trouvés (${img.naturalWidth}x${img.naturalHeight})`, 'error');
-        } catch (err) {
-          showMessage('BD erreur: ' + (err?.message || String(err)), 'error');
-        }
-        return;
-      }
-
-      showMessage('BarcodeDetector non disponible', 'error');
-    } catch (err) {
-      showMessage('Erreur: ' + (err?.message || String(err)), 'error');
-    }
-  }
-
   async function handleTraiter() {
     const input = manualInput.trim();
     if (!input) return;
@@ -182,15 +147,19 @@ function ScannerPage({ orders, setOrders }) {
         });
         if (stopped) return;
 
-        if (!('BarcodeDetector' in window)) {
-          showMessage('BarcodeDetector non disponible', 'error');
-          setScanning(false);
-          return;
-        }
+        // autofocus continu si supporté (crucial pour les QR de près)
+        const track = stream.getVideoTracks()[0];
+        try {
+          const caps = track.getCapabilities?.() || {};
+          if (caps.focusMode?.includes('continuous')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          }
+        } catch {}
 
-        const detector = new window.BarcodeDetector({
-          formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'],
-        });
+        // BarcodeDetector peut exister mais retourner toujours 0 (module MLKit absent) → jsQR en parallèle
+        const detector = 'BarcodeDetector' in window
+          ? new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'] })
+          : null;
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -198,27 +167,38 @@ function ScannerPage({ orders, setOrders }) {
           if (stopped) return;
           if (video.readyState >= 3 && video.videoWidth > 0) {
             setFrameCount(n => n + 1);
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            try {
-              const barcodes = await detector.detect(canvas);
-              if (barcodes.length > 0 && !stopped) {
+            // recadrer le centre (zone du cadre blanc) — plus fiable et plus rapide pour jsQR
+            const vw = video.videoWidth, vh = video.videoHeight;
+            const side = Math.floor(Math.min(vw, vh) * 0.8);
+            const sx = Math.floor((vw - side) / 2), sy = Math.floor((vh - side) / 2);
+            canvas.width = side;
+            canvas.height = side;
+            ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
+
+            if (detector) {
+              try {
+                const barcodes = await detector.detect(canvas);
+                if (barcodes.length > 0 && !stopped) {
+                  stopped = true;
+                  processScannedCodeRef.current(barcodes[0].rawValue);
+                  return;
+                }
+              } catch {}
+            }
+            if (!stopped) {
+              const imgData = ctx.getImageData(0, 0, side, side);
+              const code = jsQR(imgData.data, side, side, { inversionAttempts: 'attemptBoth' });
+              if (code && code.data && !stopped) {
                 stopped = true;
-                processScannedCodeRef.current(barcodes[0].rawValue);
+                processScannedCodeRef.current(code.data);
                 return;
               }
-            } catch (err) {
-              stopped = true;
-              showMessage('BD: ' + (err?.message || String(err)), 'error');
-              setScanning(false);
-              return;
             }
           }
-          if (!stopped) timerId = setTimeout(tick, 300);
+          if (!stopped) timerId = setTimeout(tick, 250);
         }
 
-        timerId = setTimeout(tick, 300);
+        timerId = setTimeout(tick, 250);
       } catch (err) {
         if (stopped) return;
         const msg = String(err?.message || err || '');
@@ -355,21 +335,6 @@ function ScannerPage({ orders, setOrders }) {
               <QrCode size={18} />
               Scanner QR Code (live)
             </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center"
-            >
-              <QrCode size={18} />
-              📷 Prendre une photo
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handlePhotoCapture}
-            />
             <div>
               <p className="text-sm text-gray-500 mb-2">Ou saisir manuellement :</p>
               <div className="flex gap-2">
