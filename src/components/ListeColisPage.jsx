@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import jsQR from 'jsqr';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
@@ -1145,44 +1145,27 @@ function ScanModal({ orders, onFound, onClose }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let stream;
-    let intervalId;
+    let controls;
     let stopped = false;
 
     async function start() {
+      const video = document.getElementById('colis-scanner-video');
+      if (!video) return;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
-        const video = document.getElementById('colis-scanner-video');
-        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream;
-        scannerRef.current = stream;
-        await video.play();
-
-        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
-        const detector = 'BarcodeDetector' in window ? new window.BarcodeDetector({ formats }) : null;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        intervalId = setInterval(async () => {
-          if (stopped || !stream?.active || video.readyState < 2 || !video.videoWidth) return;
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-          const qr = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
-          if (qr?.data) { clearInterval(intervalId); processCodeRef.current(qr.data); return; }
-
-          if (detector) {
-            try {
-              const results = await detector.detect(canvas);
-              if (results.length > 0) { clearInterval(intervalId); processCodeRef.current(results[0].rawValue); }
-            } catch {}
+        const reader = new BrowserMultiFormatReader();
+        controls = await reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: 'environment' } } },
+          video,
+          (result, err) => {
+            if (stopped) return;
+            if (result) {
+              stopped = true;
+              controls?.stop();
+              processCodeRef.current(result.getText());
+            }
           }
-        }, 250);
+        );
+        if (!stopped) scannerRef.current = controls;
       } catch (err) {
         if (stopped) return;
         const reason = err?.name === 'NotAllowedError'
@@ -1199,8 +1182,7 @@ function ScanModal({ orders, onFound, onClose }) {
     return () => {
       stopped = true;
       clearTimeout(timer);
-      clearInterval(intervalId);
-      if (stream) stream.getTracks().forEach(t => t.stop());
+      try { controls?.stop(); } catch {}
       scannerRef.current = null;
     };
   }, [scanning]);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import jsQR from 'jsqr';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -108,44 +108,27 @@ function ScannerRetourPage({ orders, setOrders }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let stream;
-    let intervalId;
+    let controls;
     let stopped = false;
 
     async function start() {
+      const video = document.getElementById('retour-scanner-video');
+      if (!video) return;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
-        const video = document.getElementById('retour-scanner-video');
-        if (!video) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream;
-        scannerRef.current = stream;
-        await video.play();
-
-        const formats = ['code_128', 'qr_code', 'ean_13', 'code_39', 'data_matrix', 'pdf417'];
-        const detector = 'BarcodeDetector' in window ? new window.BarcodeDetector({ formats }) : null;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        intervalId = setInterval(async () => {
-          if (stopped || !stream?.active || video.readyState < 2 || !video.videoWidth) return;
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-          const qr = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
-          if (qr?.data) { clearInterval(intervalId); processScannedCodeRef.current(qr.data); return; }
-
-          if (detector) {
-            try {
-              const results = await detector.detect(canvas);
-              if (results.length > 0) { clearInterval(intervalId); processScannedCodeRef.current(results[0].rawValue); }
-            } catch {}
+        const reader = new BrowserMultiFormatReader();
+        controls = await reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: 'environment' } } },
+          video,
+          (result, err) => {
+            if (stopped) return;
+            if (result) {
+              stopped = true;
+              controls?.stop();
+              processScannedCodeRef.current(result.getText());
+            }
           }
-        }, 250);
+        );
+        if (!stopped) scannerRef.current = controls;
       } catch (err) {
         if (stopped) return;
         const reason = err?.name === 'NotAllowedError'
@@ -162,17 +145,14 @@ function ScannerRetourPage({ orders, setOrders }) {
     return () => {
       stopped = true;
       clearTimeout(timer);
-      clearInterval(intervalId);
-      if (stream) stream.getTracks().forEach(t => t.stop());
+      try { controls?.stop(); } catch {}
       scannerRef.current = null;
     };
   }, [scanning]);
 
   function stopScanner() {
-    if (scannerRef.current) {
-      scannerRef.current.getTracks().forEach(t => t.stop());
-      scannerRef.current = null;
-    }
+    try { scannerRef.current?.stop?.(); } catch {}
+    scannerRef.current = null;
     setScanning(false);
   }
 
