@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BrowserMultiFormatReader, BrowserCodeReader } from '@zxing/browser';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -108,31 +108,55 @@ function ScannerRetourPage({ orders, setOrders }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let controls;
+    let stream;
+    let intervalId;
     let stopped = false;
 
     async function start() {
       const video = document.getElementById('retour-scanner-video');
-      if (!video) return;
+      if (!video || stopped) return;
       try {
-        const reader = new BrowserMultiFormatReader();
-        const devices = await BrowserCodeReader.listVideoInputDevices();
-        const backCam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
-        controls = await reader.decodeFromVideoDevice(
-          backCam?.deviceId,
-          video,
-          (result, err) => {
-            if (stopped) return;
-            if (result) {
-              stopped = true;
-              controls?.stop();
-              processScannedCodeRef.current(result.getText());
-            } else if (err && err.name !== 'NotFoundException') {
-              showMessage('Erreur scan: ' + (err.name || err.message), 'error');
-            }
-          }
-        );
-        if (!stopped) scannerRef.current = controls;
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
+        video.srcObject = stream;
+        await video.play();
+
+        if ('BarcodeDetector' in window) {
+          const detector = new window.BarcodeDetector({
+            formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'aztec', 'data_matrix'],
+          });
+          intervalId = setInterval(async () => {
+            if (stopped || video.readyState < 2 || video.paused) return;
+            try {
+              const barcodes = await detector.detect(video);
+              if (barcodes.length > 0 && !stopped) {
+                stopped = true;
+                clearInterval(intervalId);
+                processScannedCodeRef.current(barcodes[0].rawValue);
+              }
+            } catch {}
+          }, 200);
+        } else {
+          const canvas = document.createElement('canvas');
+          const ctx2d = canvas.getContext('2d');
+          const reader = new BrowserMultiFormatReader();
+          intervalId = setInterval(async () => {
+            if (stopped || video.readyState < 2 || video.paused) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx2d.drawImage(video, 0, 0);
+            try {
+              const result = reader.decodeFromCanvas(canvas);
+              if (result && !stopped) {
+                stopped = true;
+                clearInterval(intervalId);
+                processScannedCodeRef.current(result.getText());
+              }
+            } catch {}
+          }, 250);
+        }
       } catch (err) {
         if (stopped) return;
         const reason = err?.name === 'NotAllowedError'
@@ -149,14 +173,15 @@ function ScannerRetourPage({ orders, setOrders }) {
     return () => {
       stopped = true;
       clearTimeout(timer);
-      try { controls?.stop(); } catch {}
+      clearInterval(intervalId);
+      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+      const v = document.getElementById('retour-scanner-video');
+      if (v) v.srcObject = null;
       scannerRef.current = null;
     };
   }, [scanning]);
 
   function stopScanner() {
-    try { scannerRef.current?.stop?.(); } catch {}
-    scannerRef.current = null;
     setScanning(false);
   }
 
