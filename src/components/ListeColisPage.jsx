@@ -2191,7 +2191,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           onFound={(id) => {
             setSelected(prev => [...new Set([...prev, id])]);
             setShowScanner(false);
-            toast.success('Colis sélectionné !');
+            const ord = colis.find(o => o.id === id);
+            if (ord) setEditOrderFull(ord);
+            toast.success('Colis trouvé !');
           }}
           onClose={() => setShowScanner(false)}
         />

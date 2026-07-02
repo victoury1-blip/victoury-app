@@ -131,6 +131,35 @@ export default function AnalyticsPage({ orders = [] }) {
       }));
   }, [filtered]);
 
+  const refusData = useMemo(() => {
+    const REFUS = new Set(['refuse', 'annule', 'retour']);
+    const DONE = new Set(['livre', 'refuse', 'annule', 'retour']);
+    function build(keyFn) {
+      const map = {};
+      filtered.forEach(o => {
+        if (!DONE.has(o.status)) return;
+        const key = keyFn(o);
+        if (!key) return;
+        if (!map[key]) map[key] = { total: 0, refus: 0 };
+        map[key].total++;
+        if (REFUS.has(o.status)) map[key].refus++;
+      });
+      return Object.entries(map)
+        .filter(([, d]) => d.total >= 2)
+        .map(([nom, d]) => ({ nom, total: d.total, refus: d.refus, taux: Math.round((d.refus / d.total) * 100) }))
+        .sort((a, b) => b.taux - a.taux || b.refus - a.refus)
+        .slice(0, 6);
+    }
+    return {
+      villes: build(o => o.recipient?.city),
+      produits: build(o => o.products?.[0]?.name || o.product?.name),
+      societes: build(o => {
+        const d = o.recipient?.delivery;
+        return typeof d === 'string' ? d : d?.nom;
+      }),
+    };
+  }, [filtered]);
+
   function exportExcel() {
     const STATUS_LABELS = {
       nouveau: 'À confirmer', en_suivi: 'En suivi', reporter: 'Reporté',
@@ -319,6 +348,45 @@ export default function AnalyticsPage({ orders = [] }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {(refusData.villes.length > 0 || refusData.produits.length > 0 || refusData.societes.length > 0) && (
+        <div>
+          <h2 className="text-base font-semibold text-gray-700 mb-3">Taux de refus / retour</h2>
+          <p className="text-xs text-gray-400 mb-3">Refusé + Annulé + Retour sur le total des commandes terminées (livrées incluses)</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { title: 'Par ville', rows: refusData.villes },
+              { title: 'Par produit', rows: refusData.produits },
+              { title: 'Par société', rows: refusData.societes },
+            ].map(({ title, rows }) => (
+              <div key={title} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+                </div>
+                {rows.length === 0 ? (
+                  <p className="text-gray-400 text-xs text-center py-6">Aucune donnée</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={r.nom} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-2.5 text-gray-800 text-xs font-medium truncate max-w-[120px]">{r.nom}</td>
+                          <td className="px-2 py-2.5 text-center text-gray-400 text-xs whitespace-nowrap">{r.refus}/{r.total}</td>
+                          <td className="px-4 py-2.5 text-right">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${r.taux >= 50 ? 'bg-red-100 text-red-600' : r.taux >= 25 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                              {r.taux}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
