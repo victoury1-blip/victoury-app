@@ -1991,13 +1991,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     {(o.status === 'refuse' || o.status === 'annule') && (
                       <button
                         onClick={() => toggleRecu(o.id)}
-                        className={`mt-1 text-[10px] px-2 py-0.5 rounded font-bold text-white transition-colors ${
+                        className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white transition-colors ${
                           recuIds.has(o.id)
                             ? 'bg-green-600 hover:bg-green-700'
                             : 'bg-red-800 hover:bg-red-900'
                         }`}
                       >
-                        {recuIds.has(o.id) ? 'Reçus ▾' : 'Non-reçus ▾'}
+                        {recuIds.has(o.id) ? 'Reçus' : 'Non-reçus'}
+                        <span className="text-[8px]">▼</span>
                       </button>
                     )}
                   </td>
