@@ -55,16 +55,20 @@ function ScannerRetourPage({ orders, setOrders }) {
   }
 
   const processScannedCode = useCallback((code) => {
-    if (scannedIdsRef.current.has(code)) {
-      playError();
-      showMessage(`⚠️ Code ${code} déjà scanné !`, 'error');
-      return;
-    }
-
-    const order = orders.find(o => o.id === code || o.trackingNumber === code);
+    const order = orders.find(o =>
+      o.id === code || o.trackingNumber === code ||
+      String(o.id).toLowerCase() === String(code).toLowerCase() ||
+      String(o.trackingNumber || '').toLowerCase() === String(code).toLowerCase()
+    );
     if (!order) {
       playError();
       showMessage(`Code ${code} non trouvé`, 'error');
+      return;
+    }
+
+    if (scannedIdsRef.current.has(order.id)) {
+      playError();
+      showMessage(`⚠️ ${order.recipient?.name || code} déjà scanné !`, 'error');
       return;
     }
 
@@ -75,7 +79,7 @@ function ScannerRetourPage({ orders, setOrders }) {
       return;
     }
 
-    scannedIdsRef.current.add(code);
+    scannedIdsRef.current.add(order.id);
     playBeep();
 
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, recu: true } : o));

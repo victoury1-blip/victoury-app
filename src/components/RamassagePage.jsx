@@ -56,12 +56,6 @@ function ScannerPage({ orders, setOrders }) {
 
   const processScannedCode = useCallback((code) => {
     setScanning(false);
-    if (scannedIdsRef.current.has(code)) {
-      playError();
-      showMessage(`⚠️ Code ${code} déjà scanné !`, 'error');
-      return;
-    }
-
     const order = orders.find(o =>
       o.id === code || o.trackingNumber === code ||
       String(o.id).toLowerCase() === code.toLowerCase() ||
@@ -70,6 +64,12 @@ function ScannerPage({ orders, setOrders }) {
     if (!order) {
       playError();
       showMessage(`Lu: "${code}" — non trouvé`, 'error');
+      return;
+    }
+
+    if (scannedIdsRef.current.has(order.id)) {
+      playError();
+      showMessage(`⚠️ ${order.recipient?.name || code} déjà scanné !`, 'error');
       return;
     }
 
@@ -85,7 +85,7 @@ function ScannerPage({ orders, setOrders }) {
       return;
     }
 
-    scannedIdsRef.current.add(code);
+    scannedIdsRef.current.add(order.id);
     const livreur = order.recipient?.delivery || 'Sans livreur';
     playBeep();
 
