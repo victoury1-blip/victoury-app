@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import jsQR from 'jsqr';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -128,24 +128,41 @@ function ScannerPage({ orders, setOrders }) {
   useEffect(() => {
     if (!scanning) return;
     setFrameCount(0);
-    let qr;
+    let stream;
+    let intervalId;
     let stopped = false;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     async function start() {
-      if (stopped || !document.getElementById('ramassage-qr-reader')) return;
+      const video = document.getElementById('ramassage-scanner-video');
+      if (!video || stopped) return;
       try {
-        qr = new Html5Qrcode('ramassage-qr-reader');
-        await qr.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 220, height: 220 } },
-          (text) => {
-            if (stopped) return;
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
+        video.srcObject = stream;
+        video.play();
+        await new Promise(r => { video.oncanplay = r; });
+        // wait for autofocus
+        await new Promise(r => setTimeout(r, 1500));
+        if (stopped) return;
+
+        intervalId = setInterval(() => {
+          if (stopped || video.readyState < 3 || !video.videoWidth) return;
+          setFrameCount(n => n + 1);
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+          if (code && !stopped) {
             stopped = true;
-            processScannedCodeRef.current(text);
-          },
-          () => { setFrameCount(n => n + 1); }
-        );
-        scannerRef.current = qr;
+            clearInterval(intervalId);
+            processScannedCodeRef.current(code.data);
+          }
+        }, 300);
       } catch (err) {
         if (stopped) return;
         const msg = String(err?.message || err || '');
@@ -163,7 +180,10 @@ function ScannerPage({ orders, setOrders }) {
     return () => {
       stopped = true;
       clearTimeout(timer);
-      try { qr?.stop().catch(() => {}); } catch {}
+      clearInterval(intervalId);
+      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+      const v = document.getElementById('ramassage-scanner-video');
+      if (v) v.srcObject = null;
       scannerRef.current = null;
     };
   }, [scanning]);
@@ -397,7 +417,7 @@ function ScannerPage({ orders, setOrders }) {
               </button>
             </div>
             <div className="relative bg-black overflow-hidden" style={{ height: 300 }}>
-              <div id="ramassage-qr-reader" className="w-full h-full" />
+              <video id="ramassage-scanner-video" className="w-full h-full object-cover" playsInline muted />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="relative w-48 h-48">
                   <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl" />

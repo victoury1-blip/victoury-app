@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import jsQR from 'jsqr';
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
@@ -1145,24 +1145,39 @@ function ScanModal({ orders, onFound, onClose }) {
 
   useEffect(() => {
     if (!scanning) return;
-    let qr;
+    let stream;
+    let intervalId;
     let stopped = false;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     async function start() {
-      if (stopped || !document.getElementById('colis-qr-reader')) return;
+      const video = document.getElementById('colis-scanner-video');
+      if (!video || stopped) return;
       try {
-        qr = new Html5Qrcode('colis-qr-reader');
-        await qr.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
-          (text) => {
-            if (stopped) return;
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
+        video.srcObject = stream;
+        video.play();
+        await new Promise(r => { video.oncanplay = r; });
+        await new Promise(r => setTimeout(r, 1500));
+        if (stopped) return;
+
+        intervalId = setInterval(() => {
+          if (stopped || video.readyState < 3 || !video.videoWidth) return;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+          if (code && !stopped) {
             stopped = true;
-            processCodeRef.current(text);
-          },
-          () => {}
-        );
-        scannerRef.current = qr;
+            clearInterval(intervalId);
+            processCodeRef.current(code.data);
+          }
+        }, 300);
       } catch (err) {
         if (stopped) return;
         const msg = String(err?.message || err || '');
@@ -1180,7 +1195,10 @@ function ScanModal({ orders, onFound, onClose }) {
     return () => {
       stopped = true;
       clearTimeout(timer);
-      try { qr?.stop().catch(() => {}); } catch {}
+      clearInterval(intervalId);
+      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+      const v = document.getElementById('colis-scanner-video');
+      if (v) v.srcObject = null;
       scannerRef.current = null;
     };
   }, [scanning]);
@@ -1215,7 +1233,7 @@ function ScanModal({ orders, onFound, onClose }) {
           ) : (
             <div className="rounded-xl overflow-hidden">
               <div className="relative bg-black overflow-hidden" style={{ height: 240 }}>
-                <div id="colis-qr-reader" className="w-full h-full" />
+                <video id="colis-scanner-video" className="w-full h-full object-cover" playsInline muted />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="relative w-40 h-40">
                     <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-white rounded-tl" />
