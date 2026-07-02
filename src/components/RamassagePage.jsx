@@ -66,13 +66,24 @@ function ScannerPage({ orders, setOrders }) {
       return;
     }
 
+    if (order.status === 'expedier') {
+      playError();
+      showMessage(`${order.recipient?.name || code} — déjà expédié`, 'error');
+      return;
+    }
+
+    if (order.status !== 'att_ramassage') {
+      playError();
+      showMessage(`${order.recipient?.name || code} — statut "${order.status}" non ramassable`, 'error');
+      return;
+    }
+
     scannedIdsRef.current.add(code);
     const livreur = order.recipient?.delivery || 'Sans livreur';
     playBeep();
 
-    if (order.status !== 'expedier') {
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'expedier' } : o));
-    }
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'expedier' } : o));
+    supabase.from('orders').update({ status: 'expedier' }).eq('id', order.id).then(() => {});
 
     setBonsSession(prev => {
       const existing = prev[livreur] || { colis: [], created_at: new Date().toISOString() };

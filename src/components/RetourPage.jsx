@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const RETOUR_STATUSES = new Set(['echange', 'reçue', 'annule', 'refuse']);
 
 function ScannerRetourPage({ orders, setOrders }) {
   const [manualInput, setManualInput] = useState('');
@@ -68,14 +67,18 @@ function ScannerRetourPage({ orders, setOrders }) {
       return;
     }
 
+    const ACCEPTED = new Set(['retour', 'annule', 'echange', 'refuse']);
+    if (!ACCEPTED.has(order.status)) {
+      playError();
+      showMessage(`${order.recipient?.name || code} — statut "${order.status}" non accepté en retour`, 'error');
+      return;
+    }
+
     scannedIdsRef.current.add(code);
     playBeep();
 
-    const isEchange = order.echange === true || order.status === 'change';
-    const newStatus = isEchange ? 'echange_recu' : 'retour_recu';
-    const statusLabel = isEchange ? 'Échange reçu' : 'Retour reçu';
-
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: newStatus } : o));
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, recu: true } : o));
+    supabase.from('orders').update({ recu: true }).eq('id', order.id).then(() => {});
 
     setColisRetour(prev => {
       if (prev.find(c => c.id === order.id)) return prev;
@@ -88,12 +91,11 @@ function ScannerRetourPage({ orders, setOrders }) {
         price: order.price || 0,
         product: order.products?.[0]?.name || order.product?.name || '',
         time: new Date().toLocaleTimeString('fr-MA'),
-        previousStatus: order.status,
-        type: isEchange ? 'echange' : 'retour',
+        status: order.status,
       }];
     });
 
-    showMessage(`${order.recipient?.name || code} — ${statusLabel}`);
+    showMessage(`${order.recipient?.name || code} — reçu ✓ (${order.status})`);
   }, [orders, setOrders]);
 
   async function handleTraiter() {
