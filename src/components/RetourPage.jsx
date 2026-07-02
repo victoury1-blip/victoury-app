@@ -98,7 +98,8 @@ function ScannerRetourPage({ orders, setOrders }) {
         price: order.price || 0,
         product: order.products?.[0]?.name || order.product?.name || '',
         time: new Date().toLocaleTimeString('fr-MA'),
-        status: order.status,
+        previousStatus: order.status,
+        company: order.recipient?.delivery || 'Sans société',
       }];
     });
 
@@ -213,16 +214,18 @@ function ScannerRetourPage({ orders, setOrders }) {
     scannedIdsRef.current.delete(colisId);
   }
 
-  async function saveBonRetour() {
-    if (colisRetour.length === 0) return;
+  async function saveBonRetour(company) {
+    const colis = colisRetour.filter(c => c.company === company);
+    if (colis.length === 0) return;
 
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
     const rand = Math.floor(1000 + Math.random() * 9000);
     const bon = {
       id: `BRT-${dateStr}-${rand}`,
-      colis_ids: colisRetour.map(c => c.id),
-      colis_count: colisRetour.length,
+      livreur: company,
+      colis_ids: colis.map(c => c.id),
+      colis_count: colis.length,
       status: 'en_cours',
       created_at: now.toISOString(),
       note: '',
@@ -234,10 +237,23 @@ function ScannerRetourPage({ orders, setOrders }) {
       return;
     }
 
-    setColisRetour([]);
-    scannedIdsRef.current.clear();
-    showMessage(`Bon ${bon.id} créé (${bon.colis_count} colis)`);
+    setColisRetour(prev => prev.filter(c => c.company !== company));
+    colis.forEach(c => scannedIdsRef.current.delete(c.id));
+    showMessage(`Bon ${bon.id} créé pour ${company} (${bon.colis_count} colis)`);
   }
+
+  async function saveAllBonsRetour() {
+    const companies = [...new Set(colisRetour.map(c => c.company))];
+    for (const company of companies) {
+      await saveBonRetour(company);
+    }
+  }
+
+  const colisByCompany = colisRetour.reduce((acc, c) => {
+    (acc[c.company] = acc[c.company] || []).push(c);
+    return acc;
+  }, {});
+  const companyKeys = Object.keys(colisByCompany);
 
   return (
     <div className="p-6">
@@ -319,62 +335,79 @@ function ScannerRetourPage({ orders, setOrders }) {
           </div>
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
           {colisRetour.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
               <RotateCcw size={40} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-400 text-sm">Scannez des colis retournés pour créer un bon de retour</p>
+              <p className="text-gray-400 text-sm">Scannez des colis retournés pour créer un bon de retour par société</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <RotateCcw size={16} className="text-orange-600" />
-                  <h3 className="font-semibold text-gray-700">Colis retournés</h3>
-                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">{colisRetour.length} colis</span>
+            <>
+              {companyKeys.length > 1 && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveAllBonsRetour}
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+                  >
+                    Enregistrer tous les bons ({companyKeys.length})
+                  </button>
                 </div>
-                <button
-                  onClick={saveBonRetour}
-                  className="text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg font-medium transition"
-                >
-                  Enregistrer le bon
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ID</th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Client</th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Ville</th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Montant</th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Produit</th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Ancien statut</th>
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Heure</th>
-                      <th className="px-3 py-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {colisRetour.map(c => (
-                      <tr key={c.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 font-medium text-orange-600 text-xs">{c.trackingNumber || c.id}</td>
-                        <td className="px-3 py-2 text-gray-700 text-xs">{c.recipient}</td>
-                        <td className="px-3 py-2 text-gray-600 text-xs">{c.city}</td>
-                        <td className="px-3 py-2 text-gray-700 text-xs font-medium">{c.price} DH</td>
-                        <td className="px-3 py-2 text-gray-600 text-xs">{c.product}</td>
-                        <td className="px-3 py-2"><span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">{c.previousStatus}</span></td>
-                        <td className="px-3 py-2 text-gray-400 text-xs">{c.time}</td>
-                        <td className="px-3 py-2">
-                          <button onClick={() => removeFromList(c.id)} className="text-red-400 hover:text-red-600">
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              )}
+              {companyKeys.map(company => {
+                const colis = colisByCompany[company];
+                return (
+                  <div key={company} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <RotateCcw size={16} className="text-orange-600" />
+                        <h3 className="font-semibold text-gray-700">{company}</h3>
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">{colis.length} colis</span>
+                      </div>
+                      <button
+                        onClick={() => saveBonRetour(company)}
+                        className="text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg font-medium transition"
+                      >
+                        Enregistrer le bon
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-100">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">ID</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Client</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Ville</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Montant</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Produit</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Ancien statut</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Heure</th>
+                            <th className="px-3 py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {colis.map(c => (
+                            <tr key={c.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium text-orange-600 text-xs">{c.trackingNumber || c.id}</td>
+                              <td className="px-3 py-2 text-gray-700 text-xs">{c.recipient}</td>
+                              <td className="px-3 py-2 text-gray-600 text-xs">{c.city}</td>
+                              <td className="px-3 py-2 text-gray-700 text-xs font-medium">{c.price} DH</td>
+                              <td className="px-3 py-2 text-gray-600 text-xs">{c.product}</td>
+                              <td className="px-3 py-2"><span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">{c.previousStatus}</span></td>
+                              <td className="px-3 py-2 text-gray-400 text-xs">{c.time}</td>
+                              <td className="px-3 py-2">
+                                <button onClick={() => removeFromList(c.id)} className="text-red-400 hover:text-red-600">
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
@@ -494,8 +527,9 @@ function BonRetourDetailPage({ orders }) {
         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
           <h2 className="font-semibold text-gray-700">Informations du bon</h2>
         </div>
-        <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div><span className="text-gray-500">Référence:</span><p className="font-semibold text-gray-800">{bon.id}</p></div>
+          <div><span className="text-gray-500">Société:</span><p className="font-semibold text-gray-800">{bon.livreur || '-'}</p></div>
           <div><span className="text-gray-500">Nb. Colis:</span><p className="font-semibold text-gray-800">{bon.colis_count}</p></div>
           <div><span className="text-gray-500">Date:</span><p className="font-semibold text-gray-800">{new Date(bon.created_at).toLocaleString('fr-MA')}</p></div>
           <div><span className="text-gray-500">Statut:</span><p><span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[bon.status] || 'bg-gray-100 text-gray-600'}`}>{statusLabels[bon.status] || bon.status}</span></p></div>
@@ -599,6 +633,7 @@ function BonsRetourListPage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Référence</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Société</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Nb. Colis</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Statut</th>
@@ -609,6 +644,7 @@ function BonsRetourListPage() {
                 {bons.map(bon => (
                   <tr key={bon.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-orange-600">{bon.id}</td>
+                    <td className="px-4 py-3 text-gray-700">{bon.livreur || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{new Date(bon.created_at).toLocaleString('fr-MA')}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{bon.colis_count} colis</span>
