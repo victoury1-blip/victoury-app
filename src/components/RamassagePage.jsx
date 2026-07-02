@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -120,6 +121,8 @@ function ScannerPage({ orders, setOrders }) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    const hasBD = 'BarcodeDetector' in window;
+    showMessage(`Analyse... (BD:${hasBD ? 'oui' : 'non'})`, 'success');
     try {
       const bitmap = await createImageBitmap(file);
       const canvas = document.createElement('canvas');
@@ -128,21 +131,47 @@ function ScannerPage({ orders, setOrders }) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(bitmap, 0, 0);
 
-      // try jsQR
+      // 1. BarcodeDetector on ImageBitmap (MLKit on Android)
+      if (hasBD) {
+        try {
+          const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'] });
+          const barcodes = await detector.detect(bitmap);
+          if (barcodes.length > 0) { processScannedCode(barcodes[0].rawValue); return; }
+        } catch {}
+      }
+
+      // 2. jsQR raw
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
       if (code) { processScannedCode(code.data); return; }
 
-      // try BarcodeDetector
-      if ('BarcodeDetector' in window) {
-        const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix'] });
-        const barcodes = await detector.detect(bitmap);
-        if (barcodes.length > 0) { processScannedCode(barcodes[0].rawValue); return; }
-      }
+      // 3. ZXing on canvas
+      try {
+        const result = new BrowserMultiFormatReader().decodeFromCanvas(canvas);
+        if (result) { processScannedCode(result.getText()); return; }
+      } catch {}
 
-      showMessage('Code non détecté sur la photo — réessayez', 'error');
-    } catch {
-      showMessage('Erreur lecture photo', 'error');
+      // 4. jsQR with grayscale+threshold
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const bin = gray < 140 ? 0 : 255;
+        d[i] = d[i + 1] = d[i + 2] = bin;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const imgData2 = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code2 = jsQR(imgData2.data, imgData2.width, imgData2.height, { inversionAttempts: 'attemptBoth' });
+      if (code2) { processScannedCode(code2.data); return; }
+
+      // 5. ZXing on preprocessed canvas
+      try {
+        const result2 = new BrowserMultiFormatReader().decodeFromCanvas(canvas);
+        if (result2) { processScannedCode(result2.getText()); return; }
+      } catch {}
+
+      showMessage(`Non détecté (BD:${hasBD ? 'oui' : 'non'}) — QR non standard?`, 'error');
+    } catch (err) {
+      showMessage('Erreur: ' + (err?.message || String(err)), 'error');
     }
   }
 
