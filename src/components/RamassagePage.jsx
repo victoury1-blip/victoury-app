@@ -138,7 +138,7 @@ function ScannerPage({ orders, setOrders }) {
           ctx.drawImage(video, 0, 0);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-          const qr = jsQR(imageData.data, imageData.width, imageData.height);
+          const qr = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
           if (qr?.data) { clearInterval(intervalId); processScannedCodeRef.current(qr.data); return; }
 
           if (detector) {
@@ -415,12 +415,10 @@ function ScannerPage({ orders, setOrders }) {
                   <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr" />
                   <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl" />
                   <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br" />
+                  <div className="absolute left-0 right-0 h-0.5 bg-red-400 opacity-80 animate-scan-line" style={{ top: '50%' }} />
                 </div>
               </div>
-              {'BarcodeDetector' in window
-                ? <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70">Pointez vers le code-barres</p>
-                : <p className="absolute bottom-2 left-0 right-0 text-center text-amber-300 text-xs">Détection auto indisponible</p>
-              }
+              <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70">Pointez vers le code-barres</p>
             </div>
             <div className="p-4 flex gap-2">
               <button

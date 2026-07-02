@@ -1173,7 +1173,7 @@ function ScanModal({ orders, onFound, onClose }) {
           ctx.drawImage(video, 0, 0);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-          const qr = jsQR(imageData.data, imageData.width, imageData.height);
+          const qr = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
           if (qr?.data) { clearInterval(intervalId); processCodeRef.current(qr.data); return; }
 
           if (detector) {
