@@ -137,11 +137,23 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       }
       const { headers: h, rows: r } = parseCSV(text);
       if (!h.length) { toast.error('Fichier non reconnu.'); return; }
-      setPendingData({ headers: h, rows: r });
-      setMappingOpen(true);
+      // Détection automatique des colonnes — pas d'étape de mapping manuelle
+      setColMap({});
+      setHeaders(h);
+      setRows(r);
+      const gsData = { headers: h, rows: r, colMap: {} };
+      localStorage.setItem('gs_import', JSON.stringify(gsData));
+      cloudSet('gs_import', gsData);
+      toast.success(`${r.length} ligne(s) chargée(s) — colonnes détectées automatiquement.`);
     };
     reader.readAsText(file, 'UTF-8');
     e.target.value = '';
+  }
+
+  /* Ajustement manuel (secours) si une colonne est mal détectée */
+  function openMapping() {
+    setPendingData({ headers, rows });
+    setMappingOpen(true);
   }
 
   function applyMapping(mapping) {
@@ -390,6 +402,10 @@ export default function SheetImportSection({ orders = [], setOrders }) {
           <button onClick={() => importToColis(filtered)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition">
             <Truck size={13} /> Importer vers Colis ({filtered.length})
+          </button>
+          <button onClick={openMapping} title="Ajuster les colonnes si une est mal détectée"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-200 transition">
+            Colonnes
           </button>
           <button onClick={() => fileRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition">
