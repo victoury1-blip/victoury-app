@@ -341,10 +341,13 @@ function getLivreurFraisFromList(fraisList, city, status) {
   return row.livre ?? null;
 }
 
+const normName = (s) => String(s || '').toLowerCase().trim();
+
 function getLivreurFrais(livreurName, city, status, fraisCache, livreursList) {
   try {
     const list = livreursList || JSON.parse(localStorage.getItem('livreurs') || '[]');
-    const liv = list.find(l => l.nom === livreurName);
+    const target = normName(livreurName);
+    const liv = list.find(l => normName(l.nom) === target);
     if (!liv) return null;
     const fraisList = fraisCache?.[liv.id] || JSON.parse(localStorage.getItem(`frais_${liv.id}`) || '[]');
     return getLivreurFraisFromList(fraisList, city, status);
@@ -407,10 +410,17 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   }, []);
 
   const eligible = useMemo(() => orders.filter(o =>
-    ELIGIBLE_STATUSES.includes(o.status) && (o.validated || o.trackingNumber) && (livreur ? (o.recipient?.delivery || '') === livreur : true)
+    ELIGIBLE_STATUSES.includes(o.status) && (o.validated || o.trackingNumber) && (livreur ? normName(o.recipient?.delivery) === normName(livreur) : true)
   ), [orders, livreur]);
 
-  const livreurs = [...new Set(orders.map(o => o.recipient?.delivery).filter(Boolean))];
+  const livreurs = useMemo(() => {
+    const seen = new Map();
+    orders.map(o => o.recipient?.delivery).filter(Boolean).forEach(n => {
+      const k = normName(n);
+      if (!seen.has(k)) seen.set(k, n);
+    });
+    return [...seen.values()];
+  }, [orders]);
 
   function getFraisForOrder(o) {
     const auto = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache, livreursList);
