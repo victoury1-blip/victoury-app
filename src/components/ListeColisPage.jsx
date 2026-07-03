@@ -760,17 +760,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           </button>
-          <button onClick={() => exportColisCSV(colis)} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Exporter CSV">
+          <button onClick={() => exportColisCSV(colis)} className="p-2 rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Exporter CSV">
             <Download size={14} />
           </button>
           <button onClick={() => {
             const toPrint = selected.length > 0 ? colis.filter(o => selected.includes(o.id)) : colis;
             if (toPrint.length === 0) return;
             openLabelPage(toPrint);
-          }} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer étiquettes">
+          }} className="p-2 rounded-lg border border-rose-100 bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Imprimer étiquettes">
             <Printer size={14} />
           </button>
-          <button onClick={() => setShowScanner(true)} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-blue-600" title="Scanner un colis">
+          <button onClick={() => setShowScanner(true)} className="p-2 rounded-lg border border-violet-100 bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors" title="Scanner un colis">
             <ScanLine size={14} />
           </button>
         </>)}

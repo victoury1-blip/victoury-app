@@ -685,19 +685,19 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           >
             <Filter size={14} />
           </button>
-          <button onClick={() => window.print()} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Imprimer">
+          <button onClick={() => window.print()} className="p-2 rounded-lg border border-sky-100 bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors" title="Imprimer">
             <Printer size={14} />
           </button>
-          <button onClick={() => exportOrdersCSV(filtered)} className="p-2 rounded-md bg-green-500 text-white hover:bg-green-600" title="Exporter CSV">
+          <button onClick={() => exportOrdersCSV(filtered)} className="p-2 rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Exporter CSV">
             <Upload size={14} />
           </button>
-          <button onClick={() => exportToExcel(filtered, `commandes_${activeTab}_${new Date().toISOString().slice(0,10)}`)} className="p-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700" title="Exporter Excel">
+          <button onClick={() => exportToExcel(filtered, `commandes_${activeTab}_${new Date().toISOString().slice(0,10)}`)} className="p-2 rounded-lg border border-teal-100 bg-teal-50 text-teal-600 hover:bg-teal-100 transition-colors" title="Exporter Excel">
             <Download size={14} />
           </button>
-          <button onClick={() => exportToPDF(filtered, `commandes_${activeTab}`)} className="p-2 rounded-md bg-red-500 text-white hover:bg-red-600" title="Exporter PDF">
+          <button onClick={() => exportToPDF(filtered, `commandes_${activeTab}`)} className="p-2 rounded-lg border border-rose-100 bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Exporter PDF">
             <Printer size={14} />
           </button>
-          <button className="p-2 rounded-md bg-gray-500 text-white hover:bg-gray-600" title="Paramètres">
+          <button className="p-2 rounded-lg border border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors" title="Paramètres">
             <Settings size={14} />
           </button>
           <button
