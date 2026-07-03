@@ -66,6 +66,8 @@ The `mapRow(o)` helper in `App.jsx` converts a raw Supabase row to the app's ord
 | `src/contexts/StatusContext.jsx` | Status list with Supabase realtime sync |
 | `src/lib/permissions.jsx` | `PermissionsProvider` + `usePermissions` hook |
 | `src/lib/scanUtils.ts` | Shared scan business rules (`findOrderByCode`, `checkRamassageScan`, `checkRetourScan`) — TypeScript, unit-tested |
+| `src/lib/sheetStatus.js` | `mapToAppStatus` — CSV status label → app status (FR/AR/EN), unit-tested |
+| `src/lib/sheetDetect.js` | `hasHeaderRow`, `detectColumns` — content-based CSV column auto-detection (works without headers), unit-tested |
 | `src/hooks/useBarcodeScanner.js` | Shared continuous camera scanner (BarcodeDetector + jsQR fallback) used by Ramassage, Retour and colis ScanModal |
 | `src/components/colis/` | Pieces split out of ListeColisPage: SheetImportSection, DeliveryStatusModal, ScanModal |
 | `src/components/orders/` | Pieces split out of OrdersPage: StatusBadge, HistoryModal, CustomerHistoryModal, StatusChangeModal, NewOrderModal |

@@ -4,6 +4,7 @@ import { cloudGet, cloudSet } from '../../lib/cloudSettings';
 import { normalizePhone } from '../PhoneChip';
 import { useToast } from '../Toast';
 import { mapToAppStatus } from '../../lib/sheetStatus';
+import { hasHeaderRow, detectColumns } from '../../lib/sheetDetect';
 
 
 /* ── Google Sheets status config ── */
@@ -87,8 +88,12 @@ function parseCSV(text) {
     return result;
   }
 
-  const headers = splitCSVLine(lines[0]);
-  const rows = lines.slice(1).filter(l => l.trim()).map((line, idx) => {
+  const firstCells = splitCSVLine(lines[0]);
+  const headerful = hasHeaderRow(firstCells);
+  // Sans ligne d'entêtes : on génère col1..colN et la 1ère ligne devient une donnée
+  const headers = headerful ? firstCells : firstCells.map((_, i) => `col${i + 1}`);
+  const dataLines = headerful ? lines.slice(1) : lines;
+  const rows = dataLines.filter(l => l.trim()).map((line, idx) => {
     const vals = splitCSVLine(line);
     const obj = { _id: `gs-${Date.now()}-${idx}`, _status: '' };
     headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
@@ -137,11 +142,13 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       }
       const { headers: h, rows: r } = parseCSV(text);
       if (!h.length) { toast.error('Fichier non reconnu.'); return; }
-      // Détection automatique des colonnes — pas d'étape de mapping manuelle
-      setColMap({});
+      // Détection automatique des colonnes par le contenu (marche même sans entêtes)
+      const auto = detectColumns(h, r);
+      const map = Object.fromEntries(Object.entries(auto).filter(([, v]) => v));
+      setColMap(map);
       setHeaders(h);
       setRows(r);
-      const gsData = { headers: h, rows: r, colMap: {} };
+      const gsData = { headers: h, rows: r, colMap: map };
       localStorage.setItem('gs_import', JSON.stringify(gsData));
       cloudSet('gs_import', gsData);
       toast.success(`${r.length} ligne(s) chargée(s) — colonnes détectées automatiquement.`);
