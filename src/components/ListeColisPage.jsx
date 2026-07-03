@@ -618,8 +618,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     return orders.filter((o) => {
       const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
       if (!inPipeline) return false;
-      // vue active masque les archivées ; vue archives ne montre qu'elles
-      if (showArchived ? !isArchived(o) : isArchived(o)) return false;
+      // La recherche traverse tout (actifs + archives). Sans recherche : vue active masque
+      // les archivées, vue archives ne montre qu'elles.
+      if (!q && (showArchived ? !isArchived(o) : isArchived(o))) return false;
       const matchSearch = !q ||
         o.id.toLowerCase().includes(q) ||
         o.recipient.name.toLowerCase().includes(q) ||
