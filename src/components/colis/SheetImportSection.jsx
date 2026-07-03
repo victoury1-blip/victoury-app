@@ -133,11 +133,11 @@ export default function SheetImportSection({ orders = [], setOrders }) {
 
   /* Télécharge un modèle CSV avec les bons entêtes + 2 exemples */
   function downloadTemplate() {
-    const headers = ['code','nom','phone','adresse','prix','ville','produit','date','taille','note livraison','note interne','confirmation','statut livraison'];
+    const headers = ['code','nom','phone','adresse','prix','ville','produit','livreur','date','taille','note livraison','note interne','confirmation','statut livraison'];
     const examples = [
-      ['MIMA3001','Yassmine Kzaz','0652758903','Hay Anza rue 12','250','Agadir','Ensemble Sport Noir','2026-05-16','XL','Appeler avant livraison','msg','confirme','livre'],
-      ['MIMA3002','Ahmed Alaoui','0661472363','Bd Zerktouni imm 4','300','Casablanca','Pack Sport Bleu','2026-05-16','L','par WhatsApp','','confirme','retour'],
-      ['MIMA3003','Salma Bennani','0709015213','Quartier Riad','199','Rabat','Ensemble Sport Rouge','2026-05-17','M','','client pas dispo','annule',''],
+      ['MIMA3001','Yassmine Kzaz','0652758903','Hay Anza rue 12','250','Agadir','Ensemble Sport Noir','Ozon Express','2026-05-16','XL','Appeler avant livraison','msg','confirme','livre'],
+      ['MIMA3002','Ahmed Alaoui','0661472363','Bd Zerktouni imm 4','300','Casablanca','Pack Sport Bleu','Karim','2026-05-16','L','par WhatsApp','','confirme','retour'],
+      ['MIMA3003','Salma Bennani','0709015213','Quartier Riad','199','Rabat','Ensemble Sport Rouge','Ozon Express','2026-05-17','M','','client pas dispo','annule',''],
     ];
     const esc = (v) => /[",;\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
     const csv = '﻿' + [headers, ...examples].map(r => r.map(esc).join(',')).join('\n');
@@ -223,6 +223,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   const CODE_KEYS = ['code','id','ref','reference','référence','code denvoi','code_denvoi','tracking'];
   const STATUS_KEYS = ['statut','status','etat','état','situation','etatcommande','statutcommande','statutlivraison'];
   const NOTE_LIV_KEYS = ['notelivraison','notedelivraison','notelivreur','remarquelivraison','commentairelivraison','noteliv'];
+  const LIVREUR_KEYS = ['livreur','livreu','societe','société','company','transporteur','coursier','livraisonpar','delivery'];
 
   const norm = (h) => h.toLowerCase().replace(/[^a-zàâéèêëïîôùûüç0-9]/g, '');
   const findCol = (field, keys) => {
@@ -247,6 +248,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     return low === 'note' || ['noteinterne','remarqueinterne','observation','commentaire','remarque'].some(k => low.includes(k));
   });
   const codeCol = findCol('code', CODE_KEYS);
+  // Livreur / société de livraison (pour le calcul des frais dans les factures)
+  const livreurCol = findCol('livreur', LIVREUR_KEYS);
   // Statut de livraison (prioritaire) : mapping manuel > "statut livraison" > statut générique
   const statusCol = colMap['status'] || pickStatusHeader(headers);
   // Colonne de confirmation (repli si le statut de livraison est vide) : confirmé/annulé/échange…
@@ -275,10 +278,11 @@ export default function SheetImportSection({ orders = [], setOrders }) {
         || importStatus;
       const noteInterne = (noteIntCol && row[noteIntCol]) || '';
       const noteLivraison = (noteLivCol && row[noteLivCol]) || '';
+      const livreur = (livreurCol && row[livreurCol]) || null;
       const ts = new Date().toLocaleString('fr-MA');
       newOrders.push({
         id: code,
-        recipient: { name, phone, city, address, delivery: null },
+        recipient: { name, phone, city, address, delivery: livreur },
         product: { name: product, size: '', color: '', qty: 1, stock: 0 },
         products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
         price,
@@ -330,6 +334,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     { key: 'city',    label: 'Ville',        icon: '🏙️' },
     { key: 'price',   label: 'Prix',         icon: '💰' },
     { key: 'product', label: 'Produit',      icon: '📦' },
+    { key: 'livreur', label: 'Livreur',      icon: '🚚' },
     { key: 'status',  label: 'Statut',       icon: '🏷️' },
     { key: 'note',    label: 'Note interne', icon: '📝' },
   ];
