@@ -65,6 +65,9 @@ The `mapRow(o)` helper in `App.jsx` converts a raw Supabase row to the app's ord
 | `src/data/statuses.js` | Order status definitions |
 | `src/contexts/StatusContext.jsx` | Status list with Supabase realtime sync |
 | `src/lib/permissions.jsx` | `PermissionsProvider` + `usePermissions` hook |
+| `src/lib/scanUtils.ts` | Shared scan business rules (`findOrderByCode`, `checkRamassageScan`, `checkRetourScan`) — TypeScript, unit-tested |
+| `src/hooks/useBarcodeScanner.js` | Shared continuous camera scanner (BarcodeDetector + jsQR fallback) used by Ramassage, Retour and colis ScanModal |
+| `src/components/colis/` | Pieces split out of ListeColisPage: SheetImportSection, DeliveryStatusModal, ScanModal |
 
 ### Custom Hooks
 
@@ -77,6 +80,7 @@ The `mapRow(o)` helper in `App.jsx` converts a raw Supabase row to the app's ord
 | `useAutoSync()` | Flush offline mutation queue on reconnect |
 | `useNotifications()` | In-app notification state |
 | `useOrderNotifications()` | Browser Push Notification API — `notifyNewOrder(order)` |
+| `useBarcodeScanner(active, videoId, onCode, onError)` | Continuous barcode scanning on a `<video>` element |
 
 ### Order History
 
@@ -117,6 +121,14 @@ Orders and Colis tables use `border-separate border-spacing-y-1` on the body `<t
 ### App Badge
 
 `App.jsx` calls `navigator.setAppBadge(count)` whenever orders change to show the count of `nouveau` status orders on the PWA app icon. Works on Android Chrome/Edge with the app installed. Clears automatically when no pending orders.
+
+## TypeScript & CI
+
+TypeScript is enabled incrementally (`tsconfig.json`, `allowJs`). New logic modules should be `.ts`. `npm run typecheck` runs `tsc --noEmit`; GitHub Actions CI (`.github/workflows/ci.yml`) runs typecheck + tests + build on every push to main.
+
+## Reçu flag
+
+`orders.recu` (boolean column) is the source of truth for "colis reçu" (set by the Retour scanner and the Liste des Colis badge). The legacy `victoury_recu_ids` localStorage/cloud list is kept as fallback for old data.
 
 ## Environment Variables
 
