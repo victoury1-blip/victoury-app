@@ -52,6 +52,19 @@ export function hasHeaderRow(cells) {
   return hits >= 2 && !cells.some(c => looksLikePhone(c));
 }
 
+const normHdr = (h) => String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+const isStatusHdr = (l) => l.includes('statut') || l.includes('status') || l.includes('etat') || l.includes('situation');
+
+/**
+ * Choisit la colonne d'entête de statut : privilégie "statut livraison",
+ * puis un statut générique (hors confirmation). Une colonne de confirmation
+ * seule est ignorée (on retombe alors sur le statut d'import par défaut).
+ */
+export function pickStatusHeader(headers) {
+  return headers.find(h => { const l = normHdr(h); return isStatusHdr(l) && l.includes('livr'); })
+      || headers.find(h => { const l = normHdr(h); return isStatusHdr(l) && !l.includes('confirm'); });
+}
+
 /**
  * Détecte le rôle de chaque colonne par le CONTENU (marche même sans entêtes).
  * @param headers liste des clés de colonnes (entêtes réels ou synthétiques col1..colN)

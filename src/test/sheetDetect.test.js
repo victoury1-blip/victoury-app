@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { looksLikePhone, looksLikePrice, hasHeaderRow, detectColumns } from '../lib/sheetDetect';
+import { looksLikePhone, looksLikePrice, hasHeaderRow, detectColumns, pickStatusHeader } from '../lib/sheetDetect';
+
+describe('pickStatusHeader', () => {
+  it('préfère "statut livraison" à "statut confirmation"', () => {
+    expect(pickStatusHeader(['code','nom','statut confirmation','statut livraison'])).toBe('statut livraison');
+  });
+  it('évite la colonne de confirmation seule', () => {
+    expect(pickStatusHeader(['code','statut confirmation','ville'])).toBe(undefined);
+  });
+  it('accepte un statut générique', () => {
+    expect(pickStatusHeader(['code','statut','ville'])).toBe('statut');
+    expect(pickStatusHeader(['code','état','ville'])).toBe('état');
+  });
+});
 
 describe('looksLikePhone', () => {
   it('accepte les numéros marocains', () => {

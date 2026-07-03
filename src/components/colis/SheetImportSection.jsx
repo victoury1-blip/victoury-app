@@ -4,7 +4,7 @@ import { cloudGet, cloudSet } from '../../lib/cloudSettings';
 import { normalizePhone } from '../PhoneChip';
 import { useToast } from '../Toast';
 import { mapToAppStatus } from '../../lib/sheetStatus';
-import { hasHeaderRow, detectColumns } from '../../lib/sheetDetect';
+import { hasHeaderRow, detectColumns, pickStatusHeader } from '../../lib/sheetDetect';
 
 
 /* ── Google Sheets status config ── */
@@ -99,7 +99,7 @@ function parseCSV(text) {
     headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
     return obj;
   });
-  return { headers, rows };
+  return { headers, rows, headerful };
 }
 
 
@@ -140,11 +140,12 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       if (text.includes('\t') && !text.includes(',') && !text.includes(';')) {
         text = text.split('\n').map(l => l.split('\t').map(c => c.includes(',') ? `"${c}"` : c).join(',')).join('\n');
       }
-      const { headers: h, rows: r } = parseCSV(text);
+      const { headers: h, rows: r, headerful } = parseCSV(text);
       if (!h.length) { toast.error('Fichier non reconnu.'); return; }
-      // Détection automatique des colonnes par le contenu (marche même sans entêtes)
-      const auto = detectColumns(h, r);
-      const map = Object.fromEntries(Object.entries(auto).filter(([, v]) => v));
+      // Avec entêtes : on se fie aux noms de colonnes. Sans entêtes : détection par le contenu.
+      const map = headerful
+        ? {}
+        : Object.fromEntries(Object.entries(detectColumns(h, r)).filter(([, v]) => v));
       setColMap(map);
       setHeaders(h);
       setRows(r);
@@ -225,7 +226,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     return low === 'note' || ['noteinterne','remarqueinterne','observation','commentaire','remarque'].some(k => low.includes(k));
   });
   const codeCol = findCol('code', CODE_KEYS);
-  const statusCol = findCol('status', STATUS_KEYS);
+  // Statut : mapping manuel > "statut livraison" > statut générique (hors confirmation)
+  const statusCol = colMap['status'] || pickStatusHeader(headers);
 
 
   function importToColis(rowsToImport) {
