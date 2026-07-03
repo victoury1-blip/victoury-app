@@ -174,6 +174,8 @@ export default function App() {
     }
     const handler = () => processSyncQueue();
     window.addEventListener('online', handler);
+    // rejouer aussi au démarrage si des mutations sont restées en attente d'une session précédente
+    if (navigator.onLine) processSyncQueue();
     return () => window.removeEventListener('online', handler);
   }, []);
 
@@ -573,6 +575,12 @@ export default function App() {
       tracking_number: o.trackingNumber || null,
       is_deleted: false,
     }));
+    // Hors ligne : mettre les nouvelles commandes en file d'attente (rejouées au retour du réseau)
+    if (!navigator.onLine) {
+      await saveOrdersOffline(newOrders);
+      for (const o of newOrders) await queueSync('update', o);
+      return;
+    }
     // pas d'ignoreDuplicates : on écrase une éventuelle ligne soft-deleted pour la réactiver
     const { error } = await supabase.from('orders').upsert(rows, { onConflict: 'id' });
     if (error) throw new Error(error.message);
