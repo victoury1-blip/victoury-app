@@ -92,6 +92,19 @@ function DashboardSkeleton() {
 const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, iconBg, trend }) {
   const numericTarget = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^\d.]/g, '')) || 0;
   const animated = useCountUp(numericTarget);
+
+  // Flash vert quand la valeur augmente (nouvelle commande en temps réel)
+  const prevRef = React.useRef(numericTarget);
+  const [bump, setBump] = React.useState(false);
+  React.useEffect(() => {
+    if (numericTarget > prevRef.current) {
+      setBump(true);
+      const t = setTimeout(() => setBump(false), 1300);
+      prevRef.current = numericTarget;
+      return () => clearTimeout(t);
+    }
+    prevRef.current = numericTarget;
+  }, [numericTarget]);
   const displayValue = typeof value === 'number'
     ? Math.round(animated).toLocaleString('fr-MA')
     : String(value).replace(/[\d,.]+/, Math.round(animated).toLocaleString('fr-MA'));
@@ -106,7 +119,7 @@ const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, ico
   ) : null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow animate-fade-in">
+    <div className={`bg-white rounded-2xl shadow-sm border p-5 flex flex-col gap-3 hover:shadow-md transition-all duration-500 animate-fade-in ${bump ? 'border-emerald-300 ring-2 ring-emerald-200 bg-emerald-50/40' : 'border-gray-100'}`}>
       <div className="flex items-start justify-between">
         <div className={`${iconBg} p-3 rounded-xl`}>
           <Icon size={20} className="text-white" />
@@ -398,9 +411,18 @@ export default function Dashboard({ orders = [], isLoading = false }) {
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Vue d'ensemble de votre activité</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Vue d'ensemble de votre activité</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full shrink-0" title="Les données se mettent à jour en temps réel">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+          En direct
+        </span>
       </div>
 
       {/* Alerts */}
