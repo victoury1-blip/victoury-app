@@ -5,6 +5,7 @@ import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, Ro
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { printBon } from '../lib/printBon';
+import { findOrderByCode, checkRetourScan } from '../lib/scanUtils';
 
 
 function ScannerRetourPage({ orders, setOrders }) {
@@ -57,11 +58,7 @@ function ScannerRetourPage({ orders, setOrders }) {
   }
 
   const processScannedCode = useCallback((code) => {
-    const order = orders.find(o =>
-      o.id === code || o.trackingNumber === code ||
-      String(o.id).toLowerCase() === String(code).toLowerCase() ||
-      String(o.trackingNumber || '').toLowerCase() === String(code).toLowerCase()
-    );
+    const order = findOrderByCode(orders, code);
     if (!order) {
       playError();
       showMessage(`Code ${code} non trouvé`, 'error');
@@ -74,8 +71,7 @@ function ScannerRetourPage({ orders, setOrders }) {
       return;
     }
 
-    const ACCEPTED = new Set(['retour', 'annule', 'echange', 'refuse']);
-    if (!ACCEPTED.has(order.status)) {
+    if (!checkRetourScan(order).ok) {
       playError();
       showMessage(`${order.recipient?.name || code} — statut "${order.status}" non accepté en retour`, 'error');
       return;

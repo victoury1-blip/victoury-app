@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck, Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { printBon } from '../lib/printBon';
+import { findOrderByCode, checkRamassageScan } from '../lib/scanUtils';
 
 function ScannerPage({ orders, setOrders }) {
   const [manualInput, setManualInput] = useState('');
@@ -56,11 +57,7 @@ function ScannerPage({ orders, setOrders }) {
   }
 
   const processScannedCode = useCallback((code) => {
-    const order = orders.find(o =>
-      o.id === code || o.trackingNumber === code ||
-      String(o.id).toLowerCase() === code.toLowerCase() ||
-      String(o.trackingNumber || '').toLowerCase() === code.toLowerCase()
-    );
+    const order = findOrderByCode(orders, code);
     if (!order) {
       playError();
       showMessage(`Lu: "${code}" — non trouvé`, 'error');
@@ -73,15 +70,15 @@ function ScannerPage({ orders, setOrders }) {
       return;
     }
 
-    if (order.status === 'expedier') {
+    const check = checkRamassageScan(order);
+    if (!check.ok) {
       playError();
-      showMessage(`${order.recipient?.name || code} — déjà expédié`, 'error');
-      return;
-    }
-
-    if (order.status !== 'att_ramassage') {
-      playError();
-      showMessage(`${order.recipient?.name || code} — statut "${order.status}" non ramassable`, 'error');
+      showMessage(
+        check.reason === 'deja_expedier'
+          ? `${order.recipient?.name || code} — déjà expédié`
+          : `${order.recipient?.name || code} — statut "${order.status}" non ramassable`,
+        'error'
+      );
       return;
     }
 

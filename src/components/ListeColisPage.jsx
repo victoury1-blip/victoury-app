@@ -11,6 +11,7 @@ import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import PhoneChip, { normalizePhone } from './PhoneChip';
 import { useToast } from './Toast';
+import { findOrderByCode } from '../lib/scanUtils';
 
 /* ── Google Sheets status config ── */
 const SHEET_STATUSES = [
@@ -1130,10 +1131,8 @@ function ScanModal({ orders, onFound, onClose }) {
   const inputRef = useRef(null);
 
   const processCode = useCallback((code) => {
-    const trimmed = (code || '').trim();
-    if (!trimmed) return;
-    const order = orders.find(o => o.id === trimmed || o.trackingNumber === trimmed || o.ozoneTracking === trimmed);
-    if (!order) { setMsg({ text: `Non trouvé: ${trimmed}`, error: true }); return; }
+    const order = findOrderByCode(orders, code);
+    if (!order) { setMsg({ text: `Non trouvé: ${String(code || '').trim()}`, error: true }); return; }
     try { new (window.AudioContext || window.webkitAudioContext)().createOscillator(); } catch {}
     onFound(order.id);
     setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });
