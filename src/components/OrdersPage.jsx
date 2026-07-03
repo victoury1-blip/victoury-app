@@ -801,7 +801,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [saveFilterName, setSaveFilterName] = useState('');
   const [savedFilterDropdown, setSavedFilterDropdown] = useState(false);
   const savedFilterRef = useRef(null);
-  function persistSavedFilters(list) { localStorage.setItem('victoury_saved_filters', JSON.stringify(list)); setSavedFilters(list); }
+  useEffect(() => {
+    cloudGet('victoury_saved_filters').then(remote => {
+      if (Array.isArray(remote) && remote.length > 0) setSavedFilters(remote);
+    }).catch(() => {});
+  }, []);
+  function persistSavedFilters(list) { localStorage.setItem('victoury_saved_filters', JSON.stringify(list)); cloudSet('victoury_saved_filters', list); setSavedFilters(list); }
   function handleSaveFilter() {
     const name = saveFilterName.trim();
     if (!name) return;
