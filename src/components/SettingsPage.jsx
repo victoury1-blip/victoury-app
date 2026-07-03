@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { supabase } from '../lib/supabase';
 import {
@@ -66,6 +66,48 @@ function Modal({ open, onClose, title, icon, iconBg, children }) {
 
 export default function SettingsPage({ onWooOrdersImported, orders = [], setOrders }) {
   const [openModal, setOpenModal] = useState(null);
+  const backupInputRef = useRef(null);
+
+  /* ── Sauvegarde complète : commandes + tous les réglages locaux ── */
+  function exportBackup() {
+    const dump = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      dump[k] = localStorage.getItem(k);
+    }
+    const data = { _app: 'victoury', _version: 1, _exportedAt: new Date().toISOString(), ordersCount: orders.length, orders, localStorage: dump };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    a.href = url;
+    a.download = `victoury_backup_${ts}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function restoreBackup(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (data._app !== 'victoury' || !data.localStorage) {
+        alert('Fichier de sauvegarde invalide.');
+        return;
+      }
+      const when = data._exportedAt ? new Date(data._exportedAt).toLocaleString('fr-MA') : '?';
+      if (!window.confirm(`Restaurer les réglages de la sauvegarde du ${when} ?\n(livreurs, produits, factures, frais, configuration)\nLes commandes sur le cloud ne sont pas écrasées.`)) return;
+      // ne pas restaurer la liste noire des suppressions (évite de ressusciter/masquer par erreur)
+      const skip = new Set(['deleted_order_ids']);
+      Object.entries(data.localStorage).forEach(([k, v]) => { if (!skip.has(k) && typeof v === 'string') localStorage.setItem(k, v); });
+      alert('Réglages restaurés. L\'application va se recharger.');
+      window.location.reload();
+    } catch (err) {
+      alert('Erreur de lecture du fichier : ' + (err?.message || err));
+    }
+  }
+
   const [ozoneSyncState, setOzoneSyncState] = useState({ status: 'idle', message: '', count: 0 });
   const [ozoneTrackInput, setOzoneTrackInput] = useState('');
   const [ozoneTrackResult, setOzoneTrackResult] = useState(null);
@@ -456,6 +498,30 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         </div>
       </div>
 
+
+      {/* Sauvegarde & Restauration */}
+      <div className="mb-5 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-green-50 to-white px-5 pt-5 pb-4">
+          <div className="inline-flex p-2.5 rounded-xl bg-green-100 mb-3"><Save size={22} className="text-green-600" /></div>
+          <h3 className="font-bold text-gray-800 text-base">Sauvegarde &amp; Restauration</h3>
+          <p className="text-xs text-gray-500 mt-1 leading-relaxed">Exportez toutes vos données (commandes, factures, produits, livreurs, frais, réglages) dans un seul fichier à garder en lieu sûr. Sécurité totale contre la perte de données.</p>
+        </div>
+        <div className="px-5 pb-4 pt-3 border-t border-gray-50 flex flex-wrap gap-2">
+          <button
+            onClick={exportBackup}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition"
+          >
+            <Save size={12} /> Télécharger une sauvegarde ({orders.length} commandes)
+          </button>
+          <button
+            onClick={() => backupInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-green-300 text-green-700 hover:bg-green-50 text-xs font-semibold rounded-lg transition"
+          >
+            <Upload size={12} /> Restaurer les réglages
+          </button>
+          <input ref={backupInputRef} type="file" accept=".json,application/json" className="hidden" onChange={restoreBackup} />
+        </div>
+      </div>
 
       {/* Cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
