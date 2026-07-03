@@ -295,7 +295,11 @@ export default function App() {
           setOrders(prev => prev.filter(x => x.id !== o.id));
           return;
         }
-        setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ...mapRow(o) } : x));
+        // réactivation : retirer de la liste noire et ajouter si absent
+        deletedIdsRef.current.delete(o.id);
+        setOrders(prev => prev.some(x => x.id === o.id)
+          ? prev.map(x => x.id === o.id ? { ...x, ...mapRow(o) } : x)
+          : [mapRow(o), ...prev]);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, ({ old }) => {
         setOrders(prev => prev.filter(x => x.id !== old.id));
@@ -546,9 +550,13 @@ export default function App() {
   /* ── Supabase helpers ── */
   async function saveOrdersToSupabase(newOrders) {
     if (!newOrders.length) return;
-    const filtered = newOrders.filter(o => !deletedIdsRef.current.has(o.id));
-    if (!filtered.length) return;
-    const rows = filtered.map((o) => ({
+    // Résurrection : recréer une commande dont l'id avait été supprimé la réactive
+    let unblocked = false;
+    newOrders.forEach(o => { if (deletedIdsRef.current.delete(o.id)) unblocked = true; });
+    if (unblocked) {
+      try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
+    }
+    const rows = newOrders.map((o) => ({
       id: o.id,
       recipient: o.recipient,
       product: o.product,
@@ -565,7 +573,8 @@ export default function App() {
       tracking_number: o.trackingNumber || null,
       is_deleted: false,
     }));
-    const { error } = await supabase.from('orders').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+    // pas d'ignoreDuplicates : on écrase une éventuelle ligne soft-deleted pour la réactiver
+    const { error } = await supabase.from('orders').upsert(rows, { onConflict: 'id' });
     if (error) throw new Error(error.message);
   }
 
