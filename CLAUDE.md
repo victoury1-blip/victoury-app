@@ -68,6 +68,10 @@ The `mapRow(o)` helper in `App.jsx` converts a raw Supabase row to the app's ord
 | `src/lib/scanUtils.ts` | Shared scan business rules (`findOrderByCode`, `checkRamassageScan`, `checkRetourScan`) — TypeScript, unit-tested |
 | `src/hooks/useBarcodeScanner.js` | Shared continuous camera scanner (BarcodeDetector + jsQR fallback) used by Ramassage, Retour and colis ScanModal |
 | `src/components/colis/` | Pieces split out of ListeColisPage: SheetImportSection, DeliveryStatusModal, ScanModal |
+| `src/components/orders/` | Pieces split out of OrdersPage: StatusBadge, HistoryModal, CustomerHistoryModal, StatusChangeModal, NewOrderModal |
+| `src/lib/dateUtils.js` | `getSysTz` / `now` — timezone-aware timestamp |
+| `src/lib/victId.js` | VICTxxxx id counter (`initVictCounter`, `recalcVictCounter`, `generateVictId`) |
+| `src/lib/orderHistory.js` | `getUserDisplayName`, `recordHistory` — order status change logging |
 
 ### Custom Hooks
 
