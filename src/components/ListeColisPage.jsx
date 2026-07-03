@@ -683,70 +683,6 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     </div>
   );
 
-  function printColisParLivreur(data) {
-    const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const STATUS_LABELS = {
-      nouveau:'À confirmer', en_suivi:'En suivi', reporter:'Reporté', confirme:'Confirmé',
-      livre:'Livré', refuse:'Refusé', annule:'Annulé', att_ramassage:'Att. ramassage',
-      expedier:'Expédié', recu_livreur:'Reçu livreur', change:'Échange', pas_rep_lv:'Pas rép. LV',
-    };
-    const grouped = {};
-    data.forEach(o => {
-      const d = o.recipient?.delivery;
-      const nom = (typeof d === 'string' ? d : d?.nom) || 'Sans livreur';
-      if (!grouped[nom]) grouped[nom] = [];
-      grouped[nom].push(o);
-    });
-    const sections = Object.entries(grouped).map(([nom, items]) => {
-      const rows = items.map(o => `
-        <tr>
-          <td>${esc(o.trackingNumber || o.id)}</td>
-          <td>${esc(o.recipient?.name)}</td>
-          <td>${esc(o.recipient?.city)}</td>
-          <td>${esc(o.product?.name)}</td>
-          <td>${esc(STATUS_LABELS[o.status] || o.status)}</td>
-          <td style="text-align:right;font-weight:600">${parseFloat(o.price||0).toLocaleString('fr-MA')} DH</td>
-        </tr>`).join('');
-      const total = items.reduce((s,o) => s + (parseFloat(o.price)||0), 0);
-      const livre = items.filter(o => o.status==='livre').length;
-      const refuse = items.filter(o => o.status==='refuse').length;
-      return `
-        <div class="section">
-          <h2>🚚 ${esc(nom)} <span class="count">(${items.length} colis)</span></h2>
-          <table>
-            <thead><tr><th>ID / Tracking</th><th>Client</th><th>Ville</th><th>Produit</th><th>État</th><th>Prix</th></tr></thead>
-            <tbody>${rows}
-              <tr class="total-row"><td colspan="5">TOTAL (${items.length} colis) — Livré: ${livre} — Refusé: ${refuse}</td><td style="text-align:right">${total.toLocaleString('fr-MA')} DH</td></tr>
-            </tbody>
-          </table>
-        </div>`;
-    }).join('');
-    const today = new Date().toLocaleDateString('fr-MA');
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Colis par livreur — ${today}</title>
-    <style>
-      body { font-family: Arial, sans-serif; padding: 24px; font-size: 12px; color: #1e293b; }
-      h1 { font-size: 20px; color: #1e3a8a; margin-bottom: 4px; }
-      .date { color:#6b7280; margin-bottom: 24px; font-size: 11px; }
-      .section { margin-bottom: 32px; page-break-inside: avoid; }
-      h2 { font-size: 15px; color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 6px; margin-bottom: 8px; }
-      .count { font-size: 12px; color: #6b7280; font-weight: normal; }
-      table { width:100%; border-collapse:collapse; }
-      th { background:#1e3a8a; color:#fff; padding:7px 8px; text-align:left; font-size:11px; }
-      td { padding:6px 8px; border-bottom:1px solid #e5e7eb; }
-      tr:nth-child(even) td { background:#f8fafc; }
-      .total-row td { font-weight:bold; background:#f1f5f9; }
-      @media print { .section { page-break-inside: avoid; } }
-    </style></head><body>
-    <h1>📦 Colis par livreur</h1>
-    <div class="date">Date: ${today} — Total: ${data.length} colis</div>
-    ${sections}
-    <script>window.onload=()=>window.print();</script>
-    </body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) { toast.error('Popup bloqué — autorisez les popups pour imprimer.'); return; }
-    w.document.write(html);
-    w.document.close();
-  }
 
   function exportColisCSV(data) {
     const header = ['ID','Tracking','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
@@ -808,9 +744,6 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           </button>
           <button onClick={() => exportColisCSV(colis)} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50" title="Exporter CSV">
             <Download size={14} />
-          </button>
-          <button onClick={() => printColisParLivreur(selected.length > 0 ? colis.filter(o => selected.includes(o.id)) : colis)} className="p-2 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-red-600" title="PDF par livreur">
-            <Printer size={14} />
           </button>
           <button onClick={() => {
             const toPrint = selected.length > 0 ? colis.filter(o => selected.includes(o.id)) : colis;
