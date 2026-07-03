@@ -97,6 +97,7 @@ function mapRow(o) {
     ozoneTracking: o.ozone_tracking || null,
     ozoneLastStatus: o.ozone_last_status || null,
     manuallyModified: o.manually_modified || false,
+    recu: o.recu || false,
   };
 }
 

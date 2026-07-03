@@ -511,20 +511,22 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   }, []);
 
   function toggleRecu(orderId) {
-    setRecuIds(prev => {
-      const next = new Set(prev);
-      const removing = next.has(orderId);
-      if (removing) { next.delete(orderId); } else { next.add(orderId); }
-      localStorage.setItem('victoury_recu_ids', JSON.stringify([...next]));
-      // fusionner avec le cloud avant d'écrire pour ne pas écraser les scans d'autres appareils
-      cloudGet('victoury_recu_ids').then(cloud => {
-        const merged = new Set([...(Array.isArray(cloud) ? cloud : []), ...next]);
-        if (removing) merged.delete(orderId);
-        localStorage.setItem('victoury_recu_ids', JSON.stringify([...merged]));
-        cloudSet('victoury_recu_ids', [...merged]);
-      }).catch(() => cloudSet('victoury_recu_ids', [...next]));
-      return next;
-    });
+    const current = orders.find(o => o.id === orderId);
+    const removing = (current?.recu || recuIds.has(orderId));
+    const next = new Set(recuIds);
+    if (removing) { next.delete(orderId); } else { next.add(orderId); }
+    setRecuIds(next);
+    localStorage.setItem('victoury_recu_ids', JSON.stringify([...next]));
+    // fusionner avec le cloud avant d'écrire pour ne pas écraser les scans d'autres appareils
+    cloudGet('victoury_recu_ids').then(cloud => {
+      const merged = new Set([...(Array.isArray(cloud) ? cloud : []), ...next]);
+      if (removing) merged.delete(orderId);
+      localStorage.setItem('victoury_recu_ids', JSON.stringify([...merged]));
+      cloudSet('victoury_recu_ids', [...merged]);
+    }).catch(() => cloudSet('victoury_recu_ids', [...next]));
+    // source de vérité : colonne recu de la table orders (synchro realtime)
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, recu: !removing } : o));
+    supabase.from('orders').update({ recu: !removing }).eq('id', orderId).then(() => {});
   }
 
   function sendLivreurInfo(order) {
@@ -1095,12 +1097,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                       <button
                         onClick={() => toggleRecu(o.id)}
                         className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white transition-colors ${
-                          recuIds.has(o.id)
+                          (o.recu || recuIds.has(o.id))
                             ? 'bg-green-600 hover:bg-green-700'
                             : 'bg-red-800 hover:bg-red-900'
                         }`}
                       >
-                        {recuIds.has(o.id) ? 'Reçus' : 'Non-reçus'}
+                        {(o.recu || recuIds.has(o.id)) ? 'Reçus' : 'Non-reçus'}
                         <span className="text-[8px]">▼</span>
                       </button>
                     )}

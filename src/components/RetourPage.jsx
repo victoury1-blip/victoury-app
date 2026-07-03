@@ -81,7 +81,13 @@ function ScannerRetourPage({ orders, setOrders }) {
     playBeep();
 
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, recu: true } : o));
-    // marquer "Reçu" — même stockage que le badge de la Liste des Colis
+    // source de vérité : colonne recu de la table orders (synchro realtime entre appareils)
+    supabase.from('orders').update({ recu: true }).eq('id', order.id).then(({ error }) => {
+      if (error && !/column|recu/i.test(error.message)) {
+        showMessage(`⚠️ ${order.id}: non synchronisé (${error.message})`, 'error');
+      }
+    });
+    // compat : ancien stockage du badge de la Liste des Colis
     // (fusion avec le cloud pour ne pas écraser les scans d'autres appareils)
     try {
       const ids = new Set(JSON.parse(localStorage.getItem('victoury_recu_ids') || '[]'));
