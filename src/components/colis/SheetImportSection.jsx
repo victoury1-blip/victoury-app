@@ -299,6 +299,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     { key: 'city',    label: 'Ville',        icon: '🏙️' },
     { key: 'price',   label: 'Prix',         icon: '💰' },
     { key: 'product', label: 'Produit',      icon: '📦' },
+    { key: 'status',  label: 'Statut',       icon: '🏷️' },
+    { key: 'note',    label: 'Note interne', icon: '📝' },
   ];
 
   const IMPORT_STATUSES = [

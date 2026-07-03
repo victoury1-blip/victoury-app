@@ -62,3 +62,22 @@ describe('detectColumns (CSV sans entêtes)', () => {
     expect(cols.product).toBe('col7');
   });
 });
+
+describe('detectColumns avec colonne source (WhatsApp) + statut livraison', () => {
+  // code | nom | adresse | ville | tel | prix | SOURCE | produit | statut(livraison)
+  const headers = ['c1','c2','c3','c4','c5','c6','c7','c8','c9'];
+  const rows = [
+    { c1:'MIMA3333', c2:'Soukaina', c3:'Abwab sala',      c4:'Sale',      c5:'0651425830', c6:'180', c7:'WHATSAPP', c8:'ENSEMBLE nike bleu',        c9:'' },
+    { c1:'MIMA3323', c2:'Rihab',    c3:'chari3 lmassira', c4:'Azemmour',  c5:'0706409564', c6:'250', c7:'WHATSAPP', c8:'Ensemble Sport 2 pieces NOIR', c9:'Retour' },
+    { c1:'MIMA3320', c2:'Zineb',    c3:'boulevard test',  c4:'Casablanca',c5:'0709015213', c6:'250', c7:'WHATSAPP', c8:'Ensemble Sport rouge',        c9:'Livré' },
+  ];
+  const cols = detectColumns(headers, rows);
+
+  it('ne prend PAS la colonne source comme produit', () => {
+    expect(cols.product).not.toBe('c7');
+    expect(cols.product).toBe('c8');
+  });
+  it('détecte la colonne de statut de livraison', () => {
+    expect(cols.status).toBe('c9');
+  });
+});

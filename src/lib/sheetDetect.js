@@ -22,6 +22,15 @@ export function looksLikeDate(v) {
 
 const CITY_HINTS = ['casa','casablanca','rabat','fes','fès','marrakech','marrakesh','agadir','tanger','tanger','meknes','meknès','oujda','tetouan','tétouan','safi','kenitra','kénitra','jadida','beni mellal','béni','nador','sale','salé','temara','témara','mohammedia','khouribga','settat','berrechid','taza','nador','larache','guelmim','errachidia','ouarzazate','tiznit','essaouira','berkane','khemisset','taourirt','sidi','ain','oulad','douar','hay'];
 
+const SOURCE_HINTS = ['whatsapp','facebook','instagram','tiktok','messenger','shopify','organic','manuel','manual','sheet','google','wa','fb','ig','snapchat','youtube','site web','siteweb','store','boutique'];
+
+/** Canal / source de commande (à ne pas confondre avec le produit). */
+export function looksLikeSource(v) {
+  const s = String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (!s) return false;
+  return SOURCE_HINTS.some(k => s === k || s.includes(k));
+}
+
 export function looksLikeCity(v) {
   const s = String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   if (!s || s.length < 3) return false;
@@ -81,19 +90,26 @@ export function detectColumns(headers, rows) {
 
   // 1) Champs "forts" détectables par le contenu
   const phone = pick(h => frac(h, looksLikePhone), 0.5);
-  const status = pick(h => frac(h, v => mapToAppStatus(v) !== null), 0.5);
+  // statut : privilégier une colonne de statuts de LIVRAISON (livré/retour/annulé/refusé/échange),
+  // sinon toute colonne de statut reconnu (ex. confirmé)
+  const DELIV = new Set(['livre', 'refuse', 'annule', 'change', 'retour_recu', 'expedier']);
+  const status = pick(h => frac(h, v => DELIV.has(mapToAppStatus(v))), 0.3)
+              || pick(h => frac(h, v => mapToAppStatus(v) !== null), 0.5);
   const code = pick(h => frac(h, v => /^[a-z0-9][a-z0-9\-_]{3,}$/i.test(String(v).trim()) && /\d/.test(String(v))), 0.5);
   const price = pick(h => frac(h, looksLikePrice), 0.5);
   const city = pick(h => frac(h, looksLikeCity), 0.35);
 
-  // 2) Colonnes textuelles restantes → nom, adresse, produit dans l'ordre du fichier
-  //    (agencement d'export le plus courant). On ignore dates, tailles, colonnes vides.
-  const textCols = headers.filter(h => !used.has(h) && wordy(h) >= 0.5 && avgLen(h) >= 3 && frac(h, looksLikeDate) < 0.5);
+  // 2) Colonnes textuelles restantes → nom, adresse, produit dans l'ordre du fichier.
+  //    On ignore dates, tailles, colonnes de canal/source (WhatsApp, Facebook…) et vides.
+  const textCols = headers.filter(h =>
+    !used.has(h) && wordy(h) >= 0.5 && avgLen(h) >= 3 &&
+    frac(h, looksLikeDate) < 0.5 && frac(h, looksLikeSource) < 0.5
+  );
   const name = textCols[0];
   const address = textCols[1];
   const product = textCols[2];
   [name, address, product].forEach(h => h && used.add(h));
-  const note = pick(h => (avgLen(h) >= 8 ? 0.4 : 0), 0.35);
+  const note = pick(h => (avgLen(h) >= 8 && frac(h, looksLikeSource) < 0.5 && frac(h, looksLikeDate) < 0.5 ? 0.4 : 0), 0.35);
 
   return { code, name, phone, city, address, price, product, status, note };
 }
