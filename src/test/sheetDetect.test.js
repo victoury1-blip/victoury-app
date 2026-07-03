@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { looksLikePhone, looksLikePrice, hasHeaderRow, detectColumns, pickStatusHeader } from '../lib/sheetDetect';
 
+describe('modèle CSV Victoury (entêtes)', () => {
+  const headers = ['code','nom','phone','adresse','ville','prix','date','taille','note interne','note livraison','statut confirmation','statut livraison'];
+  it('la ligne de titres est reconnue comme entête', () => {
+    expect(hasHeaderRow(headers)).toBe(true);
+  });
+  it('une ligne de données n\'est PAS prise pour un entête', () => {
+    expect(hasHeaderRow(['MIMA3001','Yassmine','0652758903','Hay Anza','Agadir','250'])).toBe(false);
+  });
+  it('le statut livraison est choisi (pas la confirmation)', () => {
+    expect(pickStatusHeader(headers)).toBe('statut livraison');
+  });
+});
+
 describe('pickStatusHeader', () => {
   it('préfère "statut livraison" à "statut confirmation"', () => {
     expect(pickStatusHeader(['code','nom','statut confirmation','statut livraison'])).toBe('statut livraison');

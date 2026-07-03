@@ -131,6 +131,25 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     });
   }, []);
 
+  /* Télécharge un modèle CSV avec les bons entêtes + 2 exemples */
+  function downloadTemplate() {
+    const headers = ['code','nom','phone','adresse','ville','prix','date','taille','note interne','note livraison','statut confirmation','statut livraison'];
+    const examples = [
+      ['MIMA3001','Yassmine Kzaz','0652758903','Hay Anza rue 12','Agadir','250','2026-05-16','XL','Ensemble Sport Noir','Appeler avant livraison','confirme','livre'],
+      ['MIMA3002','Ahmed Alaoui','0661472363','Bd Zerktouni imm 4','Casablanca','300','2026-05-16','L','Pack Sport Bleu','','confirme','retour'],
+      ['MIMA3003','Salma Bennani','0709015213','Quartier Riad','Rabat','199','2026-05-17','M','Ensemble Sport Rouge','Client pas dispo le matin','confirme',''],
+    ];
+    const esc = (v) => /[",;\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
+    const csv = '﻿' + [headers, ...examples].map(r => r.map(esc).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'victoury_modele_commandes.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -377,12 +396,22 @@ export default function SheetImportSection({ orders = [], setOrders }) {
           <FileSpreadsheet size={48} className="text-green-400 mb-4" />
           <p className="text-gray-600 font-semibold text-lg mb-2">Importer depuis Google Sheets</p>
           <p className="text-gray-400 text-sm mb-6">Exportez votre feuille en CSV puis importez-la ici</p>
-          <button onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
-            <Upload size={15} /> Importer fichier CSV
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+              <Upload size={15} /> Importer fichier CSV
+            </button>
+            <button onClick={downloadTemplate}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white text-green-700 border border-green-300 rounded-lg text-sm font-semibold hover:bg-green-50 transition">
+              <FileSpreadsheet size={15} /> Télécharger le modèle
+            </button>
+          </div>
           <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
-          <p className="text-gray-400 text-xs mt-4">Dans Google Sheets : Fichier → Télécharger → CSV</p>
+          <div className="text-gray-400 text-xs mt-5 max-w-md space-y-1">
+            <p><strong>1.</strong> Téléchargez le modèle et remplissez vos commandes (gardez la 1ʳᵉ ligne des titres).</p>
+            <p><strong>2.</strong> Dans Google Sheets : Fichier → Télécharger → CSV.</p>
+            <p><strong>3.</strong> Importez le fichier ici — tout sera reconnu automatiquement.</p>
+          </div>
         </div>
       </>
     );
@@ -410,6 +439,10 @@ export default function SheetImportSection({ orders = [], setOrders }) {
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
         </div>
         <div className="flex gap-2 ml-auto">
+          <button onClick={downloadTemplate} title="Télécharger le modèle CSV"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-green-700 border border-green-300 rounded-lg text-xs font-semibold hover:bg-green-50 transition">
+            <FileSpreadsheet size={13} /> Modèle
+          </button>
           <button onClick={() => importToColis(filtered)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition">
             <Truck size={13} /> Importer vers Colis ({filtered.length})
