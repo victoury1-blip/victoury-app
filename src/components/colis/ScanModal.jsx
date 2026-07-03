@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import jsQR from 'jsqr';
 import { X, ScanLine } from 'lucide-react';
 import { findOrderByCode } from '../../lib/scanUtils';
+import useBarcodeScanner from '../../hooks/useBarcodeScanner';
 
 export default function ScanModal({ orders, onFound, onClose }) {
   const [msg, setMsg] = useState(null);
@@ -20,102 +20,10 @@ export default function ScanModal({ orders, onFound, onClose }) {
   const processCodeRef = useRef(processCode);
   useEffect(() => { processCodeRef.current = processCode; }, [processCode]);
 
-  useEffect(() => {
-    if (!scanning) return;
-    let stream, intervalId, stopped = false;
-
-    async function start() {
-      const video = document.getElementById('colis-scanner-video');
-      if (!video || stopped) return;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        });
-        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream;
-        await video.play();
-        await new Promise(r => {
-          if (video.readyState >= 3) { r(); return; }
-          video.addEventListener('canplay', r, { once: true });
-        });
-        if (stopped) return;
-
-        const track = stream.getVideoTracks()[0];
-        try {
-          const caps = track.getCapabilities?.() || {};
-          if (caps.focusMode?.includes('continuous')) {
-            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-          }
-        } catch {}
-
-        // BarcodeDetector peut exister mais retourner toujours 0 (module MLKit absent) → jsQR en parallèle
-        const detector = 'BarcodeDetector' in window
-          ? new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'] })
-          : null;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        // scan continu : la caméra reste ouverte, cooldown pour ne pas relire le même code
-        let lastCode = '', lastAt = 0;
-        function onDetected(raw) {
-          const now = Date.now();
-          if (raw === lastCode && now - lastAt < 4000) return;
-          if (now - lastAt < 1200) return;
-          lastCode = raw;
-          lastAt = now;
-          processCodeRef.current(raw);
-        }
-
-        intervalId = setInterval(async () => {
-          if (stopped || video.readyState < 3 || !video.videoWidth) return;
-          const vw = video.videoWidth, vh = video.videoHeight;
-          const side = Math.floor(Math.min(vw, vh) * 0.8);
-          const sx = Math.floor((vw - side) / 2), sy = Math.floor((vh - side) / 2);
-          canvas.width = side;
-          canvas.height = side;
-          ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
-
-          let found = false;
-          if (detector) {
-            try {
-              const barcodes = await detector.detect(canvas);
-              if (barcodes.length > 0 && !stopped) {
-                found = true;
-                onDetected(barcodes[0].rawValue);
-              }
-            } catch {}
-          }
-          if (!found && !stopped) {
-            const imgData = ctx.getImageData(0, 0, side, side);
-            const code = jsQR(imgData.data, side, side, { inversionAttempts: 'attemptBoth' });
-            if (code && code.data && !stopped) {
-              onDetected(code.data);
-            }
-          }
-        }, 250);
-      } catch (err) {
-        if (stopped) return;
-        const msg = String(err?.message || err || '');
-        const reason = msg.includes('NotAllowed') || err?.name === 'NotAllowedError'
-          ? 'Permission caméra refusée'
-          : msg.includes('NotFound') ? 'Aucune caméra détectée'
-          : msg.includes('NotReadable') ? 'Caméra occupée par une autre app'
-          : `Erreur caméra: ${msg || 'inconnue'}`;
-        setMsg({ text: reason, error: true });
-        setScanning(false);
-      }
-    }
-
-    const timer = setTimeout(start, 100);
-    return () => {
-      stopped = true;
-      clearTimeout(timer);
-      clearInterval(intervalId);
-      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-      const v = document.getElementById('colis-scanner-video');
-      if (v) v.srcObject = null;
-    };
-  }, [scanning]);
+  useBarcodeScanner(scanning, 'colis-scanner-video', 
+    (code) => processCodeRef.current(code),
+    (reason) => { setMsg({ text: reason, error: true }); setScanning(false); }
+  );
 
   function stopScanner() {
     setScanning(false);

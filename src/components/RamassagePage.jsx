@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import jsQR from 'jsqr';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, FileText, Truck, Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { printBon } from '../lib/printBon';
 import { findOrderByCode, checkRamassageScan } from '../lib/scanUtils';
+import useBarcodeScanner from '../hooks/useBarcodeScanner';
 
 function ScannerPage({ orders, setOrders }) {
   const [manualInput, setManualInput] = useState('');
   const [bonsSession, setBonsSession] = useState({});
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null);
-  const [frameCount, setFrameCount] = useState(0);
   const msgTimerRef = useRef(null);
   const scannedIdsRef = useRef(new Set());
   const navigate = useNavigate();
@@ -125,110 +124,10 @@ function ScannerPage({ orders, setOrders }) {
   const processScannedCodeRef = useRef(processScannedCode);
   useEffect(() => { processScannedCodeRef.current = processScannedCode; }, [processScannedCode]);
 
-  useEffect(() => {
-    if (!scanning) return;
-    setFrameCount(0);
-    let stream, timerId, stopped = false;
-
-    async function start() {
-      const video = document.getElementById('ramassage-scanner-video');
-      if (!video || stopped) return;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        });
-        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream;
-        await video.play();
-        await new Promise(r => {
-          if (video.readyState >= 3) { r(); return; }
-          video.addEventListener('canplay', r, { once: true });
-        });
-        if (stopped) return;
-
-        // autofocus continu si supporté (crucial pour les QR de près)
-        const track = stream.getVideoTracks()[0];
-        try {
-          const caps = track.getCapabilities?.() || {};
-          if (caps.focusMode?.includes('continuous')) {
-            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-          }
-        } catch {}
-
-        // BarcodeDetector peut exister mais retourner toujours 0 (module MLKit absent) → jsQR en parallèle
-        const detector = 'BarcodeDetector' in window
-          ? new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'code_39', 'aztec', 'data_matrix', 'pdf417'] })
-          : null;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        // scan continu : la caméra reste ouverte, cooldown pour ne pas relire le même code
-        let lastCode = '', lastAt = 0;
-        function onDetected(raw) {
-          const now = Date.now();
-          if (raw === lastCode && now - lastAt < 4000) return;
-          if (now - lastAt < 1200) return;
-          lastCode = raw;
-          lastAt = now;
-          processScannedCodeRef.current(raw);
-        }
-
-        async function tick() {
-          if (stopped) return;
-          if (video.readyState >= 3 && video.videoWidth > 0) {
-            setFrameCount(n => n + 1);
-            // recadrer le centre (zone du cadre blanc) — plus fiable et plus rapide pour jsQR
-            const vw = video.videoWidth, vh = video.videoHeight;
-            const side = Math.floor(Math.min(vw, vh) * 0.8);
-            const sx = Math.floor((vw - side) / 2), sy = Math.floor((vh - side) / 2);
-            canvas.width = side;
-            canvas.height = side;
-            ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
-
-            let found = false;
-            if (detector) {
-              try {
-                const barcodes = await detector.detect(canvas);
-                if (barcodes.length > 0 && !stopped) {
-                  found = true;
-                  onDetected(barcodes[0].rawValue);
-                }
-              } catch {}
-            }
-            if (!found && !stopped) {
-              const imgData = ctx.getImageData(0, 0, side, side);
-              const code = jsQR(imgData.data, side, side, { inversionAttempts: 'attemptBoth' });
-              if (code && code.data && !stopped) {
-                onDetected(code.data);
-              }
-            }
-          }
-          if (!stopped) timerId = setTimeout(tick, 250);
-        }
-
-        timerId = setTimeout(tick, 250);
-      } catch (err) {
-        if (stopped) return;
-        const msg = String(err?.message || err || '');
-        const reason = msg.includes('NotAllowed') || err?.name === 'NotAllowedError'
-          ? 'Permission caméra refusée — Paramètres → Apps → Chrome → Autorisations → Caméra'
-          : msg.includes('NotFound') ? 'Aucune caméra détectée'
-          : msg.includes('NotReadable') ? 'Caméra occupée par une autre app'
-          : `Erreur caméra: ${msg || 'inconnue'}`;
-        showMessage(reason, 'error');
-        setScanning(false);
-      }
-    }
-
-    start();
-    return () => {
-      stopped = true;
-      clearTimeout(timerId);
-      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-      const v = document.getElementById('ramassage-scanner-video');
-      if (v) v.srcObject = null;
-    };
-  }, [scanning]);
+  useBarcodeScanner(scanning, 'ramassage-scanner-video', 
+    (code) => processScannedCodeRef.current(code),
+    (reason) => { showMessage(reason, 'error'); setScanning(false); }
+  );
 
   function stopScanner() {
     setScanning(false);
@@ -475,7 +374,7 @@ function ScannerPage({ orders, setOrders }) {
                 </div>
               </div>
               <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs opacity-70 pointer-events-none">
-                {frameCount > 0 ? '🔍 Scan continu — passez au colis suivant' : 'Pointez vers le code-barres'}
+                🔍 Scan continu — passez au colis suivant
               </p>
               {message && (
                 <div className={`absolute top-2 left-2 right-2 px-3 py-2 rounded-lg text-xs font-semibold text-center pointer-events-none ${message.type === 'error' ? 'bg-red-600/95 text-white' : 'bg-green-600/95 text-white'}`}>
