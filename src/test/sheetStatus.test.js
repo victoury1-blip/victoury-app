@@ -27,6 +27,12 @@ describe('mapToAppStatus', () => {
     expect(mapToAppStatus('Confirmé')).toBe('confirme');
     expect(mapToAppStatus('Expédié')).toBe('expedier');
   });
+  it('detecte Reçu (par livreur) et Pas de réponse abrégé', () => {
+    expect(mapToAppStatus('RECU')).toBe('recu_livreur');
+    expect(mapToAppStatus('reçu')).toBe('recu_livreur');
+    expect(mapToAppStatus('PAS.R.1')).toBe('pas_reponse');
+    expect(mapToAppStatus('EN ATTENTE')).toBe('en_attente');
+  });
   it('detecte statuts arabes', () => {
     expect(mapToAppStatus('تم التسليم')).toBe('livre');
     expect(mapToAppStatus('ملغى')).toBe('annule');

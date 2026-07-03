@@ -133,11 +133,11 @@ export default function SheetImportSection({ orders = [], setOrders }) {
 
   /* Télécharge un modèle CSV avec les bons entêtes + 2 exemples */
   function downloadTemplate() {
-    const headers = ['code','nom','phone','adresse','ville','prix','date','taille','note interne','note livraison','statut confirmation','statut livraison'];
+    const headers = ['code','nom','phone','adresse','prix','ville','produit','date','taille','note livraison','note interne','confirmation','statut livraison'];
     const examples = [
-      ['MIMA3001','Yassmine Kzaz','0652758903','Hay Anza rue 12','Agadir','250','2026-05-16','XL','Ensemble Sport Noir','Appeler avant livraison','confirme','livre'],
-      ['MIMA3002','Ahmed Alaoui','0661472363','Bd Zerktouni imm 4','Casablanca','300','2026-05-16','L','Pack Sport Bleu','','confirme','retour'],
-      ['MIMA3003','Salma Bennani','0709015213','Quartier Riad','Rabat','199','2026-05-17','M','Ensemble Sport Rouge','Client pas dispo le matin','confirme',''],
+      ['MIMA3001','Yassmine Kzaz','0652758903','Hay Anza rue 12','250','Agadir','Ensemble Sport Noir','2026-05-16','XL','Appeler avant livraison','msg','confirme','livre'],
+      ['MIMA3002','Ahmed Alaoui','0661472363','Bd Zerktouni imm 4','300','Casablanca','Pack Sport Bleu','2026-05-16','L','par WhatsApp','','confirme','retour'],
+      ['MIMA3003','Salma Bennani','0709015213','Quartier Riad','199','Rabat','Ensemble Sport Rouge','2026-05-17','M','','client pas dispo','annule',''],
     ];
     const esc = (v) => /[",;\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
     const csv = '﻿' + [headers, ...examples].map(r => r.map(esc).join(',')).join('\n');
@@ -245,8 +245,13 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     return low === 'note' || ['noteinterne','remarqueinterne','observation','commentaire','remarque'].some(k => low.includes(k));
   });
   const codeCol = findCol('code', CODE_KEYS);
-  // Statut : mapping manuel > "statut livraison" > statut générique (hors confirmation)
+  // Statut de livraison (prioritaire) : mapping manuel > "statut livraison" > statut générique
   const statusCol = colMap['status'] || pickStatusHeader(headers);
+  // Colonne de confirmation (repli si le statut de livraison est vide) : confirmé/annulé/échange…
+  const confirmCol = headers.find(h => {
+    const low = norm(h);
+    return h !== statusCol && (low.includes('confirm') || low === 'statutcommande' || low === 'situation');
+  });
 
 
   function importToColis(rowsToImport) {
@@ -261,8 +266,11 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const address = (addressCol && row[addressCol]) || '';
       const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
       const product = (productCol && row[productCol]) || '';
-      // Statut : détecté depuis la colonne CSV, sinon choix manuel de la ligne, sinon statut global
-      const rowStatus = (statusCol && mapToAppStatus(row[statusCol])) || mapToAppStatus(row._status) || importStatus;
+      // Statut : livraison (prioritaire) → confirmation (repli) → choix manuel → statut global
+      const rowStatus = (statusCol && mapToAppStatus(row[statusCol]))
+        || (confirmCol && mapToAppStatus(row[confirmCol]))
+        || mapToAppStatus(row._status)
+        || importStatus;
       const noteInterne = (noteIntCol && row[noteIntCol]) || '';
       const noteLivraison = (noteLivCol && row[noteLivCol]) || '';
       const ts = new Date().toLocaleString('fr-MA');

@@ -11,10 +11,11 @@ export function mapToAppStatus(raw) {
   if (has('annul', 'cancel', 'الغاء', 'ملغ')) return 'annule';
   if (has('echang', 'change', 'exchange', 'تبديل')) return 'change';
   if (has('retour', 'return', 'ارجاع', 'مرجع', 'رجع')) return 'retour_recu';
+  if (has('recu', 'reçu', 'received', 'توصل')) return 'recu_livreur';
   if (has('confirm', 'مؤكد', 'تاكيد')) return 'confirme';
   if (has('expedi', 'expédi', 'shipped', 'شحن', 'مرسل')) return 'expedier';
   if (has('ramass', 'pickup', 'جمع')) return 'att_ramassage';
-  if (has('pas rep', 'pas de rep', 'no answer', 'injoign', 'لم يرد', 'مايجاوب')) return 'pas_reponse';
+  if (has('pas rep', 'pas de rep', 'pas.r', 'pasr', 'p.r.', 'no answer', 'injoign', 'لم يرد', 'مايجاوب')) return 'pas_reponse';
   if (has('attente', 'pending', 'انتظار')) return 'en_attente';
   if (has('suivi', 'follow')) return 'en_suivi';
   if (has('nouveau', 'new', 'جديد')) return 'nouveau';
