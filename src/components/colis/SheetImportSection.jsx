@@ -183,11 +183,13 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   const PRICE_KEYS = ['prix','price','montant','total','cod','amount'];
   const CODE_KEYS = ['code','id','ref','reference','référence','code denvoi','code_denvoi','tracking'];
   const STATUS_KEYS = ['statut','status','etat','état','situation','etatcommande','statutcommande','statutlivraison'];
+  const NOTE_LIV_KEYS = ['notelivraison','notedelivraison','notelivreur','remarquelivraison','commentairelivraison','noteliv'];
 
+  const norm = (h) => h.toLowerCase().replace(/[^a-zàâéèêëïîôùûüç0-9]/g, '');
   const findCol = (field, keys) => {
     if (colMap[field]) return colMap[field];
     return headers.find(h => {
-      const low = h.toLowerCase().replace(/[^a-zàâéèêëïîôùûüç0-9]/g, '');
+      const low = norm(h);
       return keys.some(k => low === k || low.includes(k));
     });
   };
@@ -196,6 +198,13 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   const cityCol = findCol('city', CITY_KEYS);
   const addressCol = findCol('address', ADDRESS_KEYS);
   const priceCol = findCol('price', PRICE_KEYS);
+  // Note de livraison (spécifique) détectée en premier, puis note interne (le reste)
+  const noteLivCol = findCol('note_livraison', NOTE_LIV_KEYS);
+  const noteIntCol = colMap['note'] || headers.find(h => {
+    if (h === noteLivCol) return false;
+    const low = norm(h);
+    return low === 'note' || ['noteinterne','remarqueinterne','observation','commentaire','remarque'].some(k => low.includes(k));
+  });
   const codeCol = findCol('code', CODE_KEYS);
   const statusCol = findCol('status', STATUS_KEYS);
 
@@ -214,6 +223,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const product = (productCol && row[productCol]) || '';
       // Statut : détecté depuis la colonne CSV, sinon choix manuel de la ligne, sinon statut global
       const rowStatus = (statusCol && mapToAppStatus(row[statusCol])) || mapToAppStatus(row._status) || importStatus;
+      const noteInterne = (noteIntCol && row[noteIntCol]) || '';
+      const noteLivraison = (noteLivCol && row[noteLivCol]) || '';
       const ts = new Date().toLocaleString('fr-MA');
       newOrders.push({
         id: code,
@@ -222,7 +233,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
         products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
         price,
         status: rowStatus,
-        note: '',
+        note: noteInterne,
+        noteLivraison,
         dateAdded: ts,
         dateUpdated: ts,
         validated: true,
