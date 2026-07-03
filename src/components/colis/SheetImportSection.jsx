@@ -3,6 +3,7 @@ import { Search, X, ChevronDown, Upload, FileSpreadsheet, Trash2, Phone, Truck }
 import { cloudGet, cloudSet } from '../../lib/cloudSettings';
 import { normalizePhone } from '../PhoneChip';
 import { useToast } from '../Toast';
+import { mapToAppStatus } from '../../lib/sheetStatus';
 
 
 /* ── Google Sheets status config ── */
@@ -96,6 +97,7 @@ function parseCSV(text) {
   return { headers, rows };
 }
 
+
 export default function SheetImportSection({ orders = [], setOrders }) {
   const toast = useToast();
   const [headers, setHeaders] = useState([]);
@@ -180,6 +182,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   const ADDRESS_KEYS = ['adresse','address','rue','quartier'];
   const PRICE_KEYS = ['prix','price','montant','total','cod','amount'];
   const CODE_KEYS = ['code','id','ref','reference','référence','code denvoi','code_denvoi','tracking'];
+  const STATUS_KEYS = ['statut','status','etat','état','situation','etatcommande','statutcommande','statutlivraison'];
 
   const findCol = (field, keys) => {
     if (colMap[field]) return colMap[field];
@@ -194,6 +197,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   const addressCol = findCol('address', ADDRESS_KEYS);
   const priceCol = findCol('price', PRICE_KEYS);
   const codeCol = findCol('code', CODE_KEYS);
+  const statusCol = findCol('status', STATUS_KEYS);
 
 
   function importToColis(rowsToImport) {
@@ -208,6 +212,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const address = (addressCol && row[addressCol]) || '';
       const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
       const product = (productCol && row[productCol]) || '';
+      // Statut : détecté depuis la colonne CSV, sinon choix manuel de la ligne, sinon statut global
+      const rowStatus = (statusCol && mapToAppStatus(row[statusCol])) || mapToAppStatus(row._status) || importStatus;
       const ts = new Date().toLocaleString('fr-MA');
       newOrders.push({
         id: code,
@@ -215,7 +221,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
         product: { name: product, size: '', color: '', qty: 1, stock: 0 },
         products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
         price,
-        status: importStatus,
+        status: rowStatus,
         note: '',
         dateAdded: ts,
         dateUpdated: ts,
