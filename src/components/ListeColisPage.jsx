@@ -622,10 +622,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       }
       if (af.dateFrom || af.dateTo) {
         const d = parseFrDate(o.dateAdded);
-        if (d) {
-          if (af.dateFrom && d < new Date(af.dateFrom)) return false;
-          if (af.dateTo && d > new Date(af.dateTo)) return false;
-        }
+        if (!d) return false;
+        if (af.dateFrom && d < new Date(af.dateFrom + 'T00:00:00')) return false;
+        if (af.dateTo && d > new Date(af.dateTo + 'T23:59:59')) return false;
       }
       return true;
     });
@@ -820,20 +819,39 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                   </div>
                 </div>
               </div>
+              {/* Raccourcis de période */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                <span className="text-xs text-gray-500 font-semibold mr-1">Période :</span>
+                {[
+                  { label: "Aujourd'hui", days: 0 },
+                  { label: '7 jours', days: 6 },
+                  { label: '30 jours', days: 29 },
+                  { label: 'Ce mois', month: true },
+                ].map(preset => (
+                  <button key={preset.label}
+                    onClick={() => {
+                      const to = new Date();
+                      const from = preset.month
+                        ? new Date(to.getFullYear(), to.getMonth(), 1)
+                        : new Date(to.getTime() - preset.days * 86400000);
+                      const iso = (d) => d.toISOString().slice(0, 10);
+                      setFilterForm(p => ({ ...p, dateFrom: iso(from), dateTo: iso(to) }));
+                    }}
+                    className="px-2.5 py-1 rounded-full border border-gray-300 text-xs text-gray-700 hover:bg-blue-50 hover:border-blue-300 transition">
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
-                {/* Date d'ajout */}
+                {/* Du (date d'ajout) */}
                 <div>
-                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date d'ajout</label>
-                  <div className="flex gap-1">
-                    <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" placeholder="Sélectionner une plage" />
-                  </div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Du</label>
+                  <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" />
                 </div>
-                {/* Date de mise à jour */}
+                {/* Au (date d'ajout) */}
                 <div>
-                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date de mise à jour</label>
-                  <div className="flex gap-1">
-                    <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="flex-1 bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" placeholder="Sélectionner une plage" />
-                  </div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Au</label>
+                  <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" />
                 </div>
                 {/* Buttons */}
                 <div className="col-span-2 flex items-end justify-end gap-2">
