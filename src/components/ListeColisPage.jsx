@@ -10,6 +10,7 @@ import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import PhoneChip, { normalizePhone } from './PhoneChip';
 import { useToast } from './Toast';
+import Toggle from './Toggle';
 import { findOrderByCode } from '../lib/scanUtils';
 import DeliveryStatusModal, { DELIVERY_STATUSES } from './colis/DeliveryStatusModal';
 import ScanModal from './colis/ScanModal';
@@ -1064,15 +1065,13 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     <div className="mt-1"><span className="font-medium text-gray-600">Date mise à jour:</span><br />{o.dateUpdated}</div>
                   </td>
 
-                  {/* Validé — green dot = active in pipeline, click to deactivate */}
+                  {/* Validé — interrupteur vert ; le désactiver renvoie la commande en Confirmé */}
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => deactivateOrder(o.id)}
-                      title="Désactiver → retour Confirmé"
-                      className="inline-flex items-center justify-center w-6 h-6 rounded-full hover:ring-2 hover:ring-green-300 transition-all"
-                    >
-                      <span className="w-4 h-4 rounded-full bg-green-400 shadow shadow-green-200 inline-block" />
-                    </button>
+                    <Toggle
+                      checked={o.validated !== false}
+                      loading={false}
+                      onChange={(next) => { if (!next) deactivateOrder(o.id); }}
+                    />
                   </td>
 
                   {/* Action */}
