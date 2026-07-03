@@ -229,7 +229,9 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     if (colMap[field]) return colMap[field];
     return headers.find(h => {
       const low = norm(h);
-      return keys.some(k => low === k || low.includes(k));
+      // clés courtes (cod, id, tel…) : correspondance EXACTE seulement,
+      // sinon "cod" attraperait "code", "id" attraperait plein de choses
+      return keys.some(k => low === k || (k.length >= 4 && low.includes(k)));
     });
   };
   const phoneCol = findCol('phone', PHONE_KEYS);
