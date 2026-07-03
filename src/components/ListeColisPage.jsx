@@ -405,6 +405,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   const debouncedSearch = useDebounce(search, 300);
   const [pgPage, setPgPage] = useState(1);
   const [pgPer, setPgPer] = useState(10);
+  const [showArchived, setShowArchived] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
@@ -601,12 +602,24 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
   }
 
   /* Show only orders in the colis pipeline */
+  // Archive : commande terminée (livrée / retour ou échange reçu) et âgée de +45 jours
+  const ARCHIVE_DAYS = 45;
+  const ARCHIVE_STATES = ['livre', 'retour_recu', 'echange_recu'];
+  const isArchived = (o) => {
+    if (!ARCHIVE_STATES.includes(o.status)) return false;
+    const d = parseFrDate(o.dateAdded);
+    if (!d) return false;
+    return (Date.now() - d.getTime()) > ARCHIVE_DAYS * 86400000;
+  };
+
   const colis = useMemo(() => {
     const q = debouncedSearch.toLowerCase();
     const af = appliedFilter;
     return orders.filter((o) => {
       const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
       if (!inPipeline) return false;
+      // vue active masque les archivées ; vue archives ne montre qu'elles
+      if (showArchived ? !isArchived(o) : isArchived(o)) return false;
       const matchSearch = !q ||
         o.id.toLowerCase().includes(q) ||
         o.recipient.name.toLowerCase().includes(q) ||
@@ -628,7 +641,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       }
       return true;
     });
-  }, [orders, debouncedSearch, appliedFilter]);
+  }, [orders, debouncedSearch, appliedFilter, showArchived]);
+
+  const archivedCount = useMemo(() => orders.reduce((n, o) => {
+    const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
+    return n + (inPipeline && isArchived(o) ? 1 : 0);
+  }, 0), [orders]);
 
   const maxPage = Math.max(1, Math.ceil(colis.length / pgPer));
   useEffect(() => {
@@ -706,8 +724,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
     <div className="flex flex-col h-full">
       {/* Header with tabs */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4">
-        <span className="font-bold text-gray-700 text-base">Liste des colis</span>
+        <span className="font-bold text-gray-700 text-base">{showArchived ? 'Archives' : 'Liste des colis'}</span>
         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">{colis.length}</span>
+        {(showArchived || archivedCount > 0) && (
+          <button
+            onClick={() => { setShowArchived(v => !v); setPgPage(1); }}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition ${showArchived ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+            title="Commandes livrées de plus de 45 jours"
+          >
+            📦 {showArchived ? 'Retour aux colis actifs' : `Archives (${archivedCount})`}
+          </button>
+        )}
         {tab === 'colis' && (
           <div className="relative flex items-center flex-1 max-w-xs">
             <input
