@@ -11,7 +11,6 @@ import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import PhoneChip, { normalizePhone } from './PhoneChip';
 import { useToast } from './Toast';
 import { findOrderByCode } from '../lib/scanUtils';
-import SheetImportSection from './colis/SheetImportSection';
 import DeliveryStatusModal, { DELIVERY_STATUSES } from './colis/DeliveryStatusModal';
 import ScanModal from './colis/ScanModal';
 function isLight(hex) {
@@ -400,7 +399,7 @@ const isCasa = (city) => {
 };
 
 export default function ListeColisPage({ orders, setOrders, isLoading }) {
-  const [tab, setTab] = useState('colis');
+  const [tab] = useState('colis');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
   const [pgPage, setPgPage] = useState(1);
@@ -708,16 +707,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
       {/* Header with tabs */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4">
         <span className="font-bold text-gray-700 text-base">Liste des colis</span>
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-          <button onClick={() => setTab('colis')}
-            className={`px-4 py-1.5 rounded-md text-sm font-semibold transition ${tab === 'colis' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-            📦 Colis <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">{colis.length}</span>
-          </button>
-          <button onClick={() => setTab('sheet')}
-            className={`px-4 py-1.5 rounded-md text-sm font-semibold transition ${tab === 'sheet' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-            📊 Google Sheets
-          </button>
-        </div>
+        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">{colis.length}</span>
         {tab === 'colis' && (
           <div className="relative flex items-center flex-1 max-w-xs">
             <input
@@ -904,10 +894,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
         );
       })()}
 
-      {tab === 'sheet' && <SheetImportSection orders={orders} setOrders={setOrders} />}
-
       {/* Table */}
-      <div className={`flex-1 overflow-auto px-4 pb-4 ${tab === 'sheet' ? 'hidden' : ''}`}>
+      <div className="flex-1 overflow-auto px-4 pb-4">
       <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
         <table className="w-full text-sm border-collapse min-w-[900px] hidden md:table">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">

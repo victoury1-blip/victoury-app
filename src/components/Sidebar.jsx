@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Archive, Store,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown, Activity,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
-  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User,
+  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -26,6 +26,7 @@ const NAV_ITEMS = [
     ],
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
+  { path: '/import-sheets', label: 'Google Sheets', icon: FileSpreadsheet, perm: 'liste_colis' },
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
   { path: '/chic-affiliate', label: 'Chic Affiliate', icon: Store },
   {

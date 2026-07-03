@@ -12,6 +12,7 @@ const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
 const EtatsPage = React.lazy(() => import('./components/EtatsPage'));
 const LivraisonPage = React.lazy(() => import('./components/LivraisonPage'));
 const ListeColisPage = React.lazy(() => import('./components/ListeColisPage'));
+const GoogleSheetsPage = React.lazy(() => import('./components/GoogleSheetsPage'));
 const StockPage = React.lazy(() => import('./components/StockPage'));
 const ChicAffiliatePage = React.lazy(() => import('./components/ChicAffiliatePage'));
 const FacturesPage = React.lazy(() => import('./components/FacturesPage'));
@@ -672,6 +673,7 @@ export default function App() {
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />
+          <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/chic-affiliate" element={<ChicAffiliatePage />} />
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
