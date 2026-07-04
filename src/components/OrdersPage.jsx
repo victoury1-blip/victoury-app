@@ -852,9 +852,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         );
       })()}
 
-      {/* Table */}
+      {/* Table (desktop uniquement) */}
       <div className="flex-1 overflow-auto px-4 pb-4">
-        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm min-w-[900px]">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm min-w-[900px] hidden md:block">
         <table className="w-full text-sm border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
@@ -1109,7 +1109,23 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 </div>
               </div>
               {/* Bottom: actions */}
-              <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-gray-50">
+              <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-gray-50">
+                <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Toggle
+                    checked={!!order.validated}
+                    loading={false}
+                    onChange={() => {
+                      if (order.validated) return;
+                      const livreur = (order.recipient?.delivery || '').toLowerCase();
+                      if (livreur.includes('ozon')) { openOzone(order); }
+                      else {
+                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage' } : o));
+                        addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
+                      }
+                    }}
+                  />
+                  Validé
+                </label>
                 <div className="flex items-center gap-1.5">
                   {isChicOrder(order) && !order.chicForwarded && (
                     <button
