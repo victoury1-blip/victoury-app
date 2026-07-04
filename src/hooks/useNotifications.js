@@ -1,14 +1,4 @@
-import { useEffect, useRef } from 'react';
-
-const KNOWN_KEY = 'victoury_known_nouveau';
-
-function getKnownIds() {
-  try { return new Set(JSON.parse(localStorage.getItem(KNOWN_KEY) || '[]')); } catch { return new Set(); }
-}
-
-function saveKnownIds(ids) {
-  localStorage.setItem(KNOWN_KEY, JSON.stringify([...ids]));
-}
+import { useEffect } from 'react';
 
 export function requestPermission() {
   if (!('Notification' in window)) return Promise.resolve('denied');
@@ -16,69 +6,27 @@ export function requestPermission() {
   return Notification.requestPermission();
 }
 
-async function syncBadge(nouveauOrders, nouveauIds) {
-  try {
-    const reg = await navigator.serviceWorker?.ready;
-    if (!reg) return;
-
-    const existing = await reg.getNotifications();
-    const activeIds = new Set(existing.map(n => n.tag?.replace('badge-', '')).filter(Boolean));
-
-    // Close notifications for orders no longer nouveau
-    for (const n of existing) {
-      const id = n.tag?.replace('badge-', '');
-      if (id && !nouveauIds.has(id)) n.close();
-    }
-
-    // Add silent notifications for new nouveau orders (for Samsung badge count)
-    for (const order of nouveauOrders) {
-      if (!activeIds.has(order.id)) {
-        reg.showNotification('VICTOURY', {
-          tag: `badge-${order.id}`,
-          icon: '/pwa-192x192.png',
-          badge: '/pwa-192x192.png',
-          silent: true,
-          body: `${order.recipient?.name || order.id} — ${order.price || 0} DH`,
-        });
-      }
-    }
-  } catch {}
-
-  if ('setAppBadge' in navigator) {
-    if (nouveauIds.size > 0) navigator.setAppBadge(nouveauIds.size).catch(() => {});
-    else navigator.clearAppBadge().catch(() => {});
-  }
-}
-
+/**
+ * Gère UNIQUEMENT le compteur (pastille) sur l'icône de l'app via l'API Badging.
+ * Aucune notification visible n'est créée ici : celles-ci n'apparaissent que
+ * lorsqu'une nouvelle commande arrive réellement (voir notifyNewOrder dans App.jsx).
+ * On nettoie aussi d'anciennes notifications "badge-*" que d'anciennes versions
+ * avaient pu laisser dans le tiroir.
+ */
 export default function useNotifications(orders) {
-  const initRef = useRef(false);
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then(reg => reg.getNotifications())
+        .then(list => list.forEach(n => { if (n.tag?.startsWith('badge-')) n.close(); }))
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
-    if (!orders || !orders.length) return;
-
-    const nouveauOrders = orders.filter(o => o.status === 'nouveau');
-    const nouveauIds = new Set(nouveauOrders.map(o => o.id));
-
-    if (!('Notification' in window) || Notification.permission !== 'granted') {
-      if ('setAppBadge' in navigator) {
-        if (nouveauIds.size > 0) navigator.setAppBadge(nouveauIds.size).catch(() => {});
-        else navigator.clearAppBadge().catch(() => {});
-      }
-      if (!initRef.current) initRef.current = true;
-      return;
-    }
-
-    syncBadge(nouveauOrders, nouveauIds);
-
-    if (!initRef.current) {
-      initRef.current = true;
-      const known = getKnownIds();
-      for (const o of nouveauOrders) known.add(o.id);
-      saveKnownIds(known);
-    }
-
-    const known = getKnownIds();
-    const cleaned = new Set([...known].filter(id => nouveauIds.has(id)));
-    saveKnownIds(cleaned);
+    if (!('setAppBadge' in navigator)) return;
+    const count = (orders || []).filter(o => o.status === 'nouveau').length;
+    if (count > 0) navigator.setAppBadge(count).catch(() => {});
+    else navigator.clearAppBadge().catch(() => {});
   }, [orders]);
 }
