@@ -854,8 +854,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
       {/* Table */}
       <div className="flex-1 overflow-auto px-4 pb-4">
-        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <table className="w-full text-sm border-collapse min-w-[900px]">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm min-w-[900px]">
+        <table className="w-full text-sm border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 w-8">
@@ -878,7 +878,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           </thead>
         </table>
         <div style={paged.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
-        <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px]">
+        <table className="w-full text-sm border-separate border-spacing-y-1">
           <tbody>
             {filtered.length === 0 && (
               <tr>
