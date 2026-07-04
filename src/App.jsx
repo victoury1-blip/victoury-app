@@ -675,7 +675,7 @@ export default function App() {
     <PermissionsProvider session={session}>
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       <Sidebar orders={orders} session={session} />
-      <main className="flex-1 overflow-auto flex flex-col">
+      <main className="flex-1 min-w-0 overflow-auto flex flex-col">
         {offline && (
           <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 flex items-center gap-2 text-xs text-yellow-800 shrink-0">
             <span>📡 وضع بدون إنترنت — التغييرات غادي تتزامن ملي ترجع الشبكة</span>
@@ -688,7 +688,7 @@ export default function App() {
             <button onClick={() => { setWooError(null); setDbError(null); }} className="ml-2 text-red-400 hover:text-red-600 font-bold">✕</button>
           </div>
         )}
-        <div className="flex-1 overflow-auto" ref={scrollContainerRef}>
+        <div className="flex-1 min-w-0 overflow-auto" ref={scrollContainerRef}>
         <ScrollToTop scrollRef={scrollContainerRef} />
         <ErrorBoundary>
         <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
