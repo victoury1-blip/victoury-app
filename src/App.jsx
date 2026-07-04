@@ -552,13 +552,14 @@ export default function App() {
   /* ── Supabase helpers ── */
   async function saveOrdersToSupabase(newOrders) {
     if (!newOrders.length) return;
-    // Résurrection : recréer une commande dont l'id avait été supprimé la réactive
-    let unblocked = false;
-    newOrders.forEach(o => { if (deletedIdsRef.current.delete(o.id)) unblocked = true; });
-    if (unblocked) {
+    // Résurrection : seules les commandes dont l'id était supprimé doivent écraser leur ligne.
+    // Les autres NE doivent PAS écraser une commande active existante (protège les statuts).
+    const resurrectIds = new Set();
+    newOrders.forEach(o => { if (deletedIdsRef.current.delete(o.id)) resurrectIds.add(o.id); });
+    if (resurrectIds.size) {
       try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
     }
-    const rows = newOrders.map((o) => ({
+    const toRow = (o) => ({
       id: o.id,
       recipient: o.recipient,
       product: o.product,
@@ -574,16 +575,25 @@ export default function App() {
       note_livraison: o.noteLivraison || '',
       tracking_number: o.trackingNumber || null,
       is_deleted: false,
-    }));
+    });
     // Hors ligne : mettre les nouvelles commandes en file d'attente (rejouées au retour du réseau)
     if (!navigator.onLine) {
       await saveOrdersOffline(newOrders);
       for (const o of newOrders) await queueSync('update', o);
       return;
     }
-    // pas d'ignoreDuplicates : on écrase une éventuelle ligne soft-deleted pour la réactiver
-    const { error } = await supabase.from('orders').upsert(rows, { onConflict: 'id' });
-    if (error) throw new Error(error.message);
+    const fresh = newOrders.filter(o => !resurrectIds.has(o.id)).map(toRow);
+    const resurrected = newOrders.filter(o => resurrectIds.has(o.id)).map(toRow);
+    // fresh : ignoreDuplicates protège une éventuelle commande active portant le même id
+    if (fresh.length) {
+      const { error } = await supabase.from('orders').upsert(fresh, { onConflict: 'id', ignoreDuplicates: true });
+      if (error) throw new Error(error.message);
+    }
+    // resurrected : écrase la ligne soft-deleted pour la réactiver
+    if (resurrected.length) {
+      const { error } = await supabase.from('orders').upsert(resurrected, { onConflict: 'id' });
+      if (error) throw new Error(error.message);
+    }
   }
 
   async function deleteOrderFromSupabase(orderId) {
