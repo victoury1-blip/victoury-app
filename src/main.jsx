@@ -11,8 +11,10 @@ async function clearCachesAndReload() {
     await Promise.all(keys.map(k => caches.delete(k)));
   } catch {}
   try {
+    // désenregistrer complètement le SW : garantit de sortir d'une boucle
+    // "mise à jour" causée par un service worker défectueux
     const regs = await navigator.serviceWorker?.getRegistrations?.() || [];
-    await Promise.all(regs.map(r => r.update()));
+    await Promise.all(regs.map(r => r.unregister()));
   } catch {}
   location.reload();
 }
