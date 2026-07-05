@@ -852,9 +852,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         );
       })()}
 
-      {/* Table (desktop uniquement) */}
+      {/* Table (grands écrans uniquement) */}
       <div className="flex-1 overflow-auto px-4 pb-4">
-        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm min-w-[900px] hidden md:block">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm min-w-[900px] hidden lg:block">
         <table className="w-full text-sm border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
@@ -1066,8 +1066,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         </div>
         </div>
 
-        {/* Mobile Card View */}
-        <div className="md:hidden">
+        {/* Vue carte (mobile + écrans moyens) */}
+        <div className="lg:hidden">
           {filtered.length === 0 && (
             <div className="text-center py-16 text-gray-400 flex flex-col items-center gap-2">
               <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
