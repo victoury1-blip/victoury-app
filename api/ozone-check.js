@@ -158,22 +158,41 @@ export default async function handler(req, res) {
     const checkHtml = await checkRes.text();
     const loggedIn = checkHtml.includes('VICTOURY') || checkHtml.includes('Nouveau Colis') || checkHtml.includes('parcel_phone');
 
+    // Diagnostic complet (fonctionne même si le login échoue)
+    if (req.query.debug && !loggedIn) {
+      return res.json({ debug: true, loggedIn: false, checkStatus: checkRes.status, checkSnippet: checkHtml.slice(0, 1500), cookies: allCookies.length });
+    }
+
     if (loggedIn) {
       const safePhone = encodeURIComponent(phone);
-      const r = await fetch(`${BASE}/V2/BlackList/SearchAjax?Phone=${safePhone}`, {
-        headers: {
-          'User-Agent': UA,
-          'Cookie': allCookies.join('; '),
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'text/html, application/json, */*',
-          'Referer': `${BASE}/parcels?action=add`,
-        },
-      });
-      const html = await r.text();
+      // essaie GET puis POST (Ozon peut exiger l'un ou l'autre)
+      async function search(method) {
+        const opts = {
+          method,
+          headers: {
+            'User-Agent': UA,
+            'Cookie': allCookies.join('; '),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html, application/json, */*',
+            'Referer': `${BASE}/parcels?action=add`,
+          },
+        };
+        let u = `${BASE}/V2/BlackList/SearchAjax?Phone=${safePhone}`;
+        if (method === 'POST') {
+          u = `${BASE}/V2/BlackList/SearchAjax`;
+          opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+          opts.body = `Phone=${safePhone}`;
+        }
+        const rr = await fetch(u, opts);
+        return { status: rr.status, text: await rr.text() };
+      }
+      let sr = await search('GET');
+      if (!sr.text.trim()) sr = await search('POST');
+      const html = sr.text;
 
       // Mode debug : renvoie la réponse brute d'Ozon pour diagnostiquer le parsing
       if (req.query.debug) {
-        return res.json({ debug: true, loggedIn, length: html.length, raw: html.slice(0, 4000) });
+        return res.json({ debug: true, loggedIn, searchStatus: sr.status, length: html.length, raw: html.slice(0, 4000) });
       }
 
       if (html.trim()) {
