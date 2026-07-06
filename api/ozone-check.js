@@ -171,12 +171,23 @@ export default async function handler(req, res) {
       });
       const html = await r.text();
 
+      // Mode debug : renvoie la réponse brute d'Ozon pour diagnostiquer le parsing
+      if (req.query.debug) {
+        return res.json({ debug: true, loggedIn, length: html.length, raw: html.slice(0, 4000) });
+      }
+
       if (html.trim()) {
-        const livMatch = html.match(/Livr[ée]*\s*:\s*(\d+)/i);
-        const retMatch = html.match(/Retourn[ée]*\s*:\s*(\d+)/i);
+        // tolérant aux variantes de libellés/espaces d'Ozon
+        const livMatch = html.match(/Livr[ée]*\s*:?\s*(\d+)/i);
+        const retMatch = html.match(/Retourn[ée]*\s*:?\s*(\d+)/i);
         const delivered = livMatch ? parseInt(livMatch[1], 10) : 0;
         const returned = retMatch ? parseInt(retMatch[1], 10) : 0;
-        const exists = delivered > 0 || returned > 0 || html.toLowerCase().includes('existe');
+        const low = html.toLowerCase();
+        // le numéro figure dans la réponse => il existe déjà chez Ozon
+        const digits = phone.replace(/\D/g, '');
+        const phoneAppears = digits.length >= 8 && html.replace(/\D/g, '').includes(digits);
+        const exists = delivered > 0 || returned > 0 || phoneAppears
+          || low.includes('existe') || low.includes('blacklist') || low.includes('déjà');
         return res.json({ exists, delivered, returned, total: delivered + returned, source: 'ozone' });
       }
 
