@@ -163,6 +163,20 @@ export default async function handler(req, res) {
       return res.json({ debug: true, loggedIn: false, checkStatus: checkRes.status, checkSnippet: checkHtml.slice(0, 1500), cookies: allCookies.length });
     }
 
+    // Trouver le vrai endpoint de vérification du téléphone dans le JS de la page
+    if (req.query.findurl) {
+      const hits = [];
+      // URLs contenant des mots-clés pertinents
+      const urlRe = /["'`](\/[A-Za-z0-9_\-\/?=&.]*(?:earch|lacklist|hone|lient|istor|heck|jax)[A-Za-z0-9_\-\/?=&.]*)["'`]/gi;
+      let m;
+      while ((m = urlRe.exec(checkHtml)) !== null && hits.length < 40) hits.push(m[1]);
+      // extraits autour de "Phone" pour voir le nom du paramètre
+      const around = [];
+      const kwRe = /[\s\S]{0,60}(SearchAjax|BlackList|GetClient|CheckPhone|client_phone|parcel_phone)[\s\S]{0,80}/gi;
+      while ((m = kwRe.exec(checkHtml)) !== null && around.length < 12) around.push(m[0].replace(/\s+/g, ' ').trim());
+      return res.json({ debug: 'findurl', loggedIn, urls: [...new Set(hits)], around });
+    }
+
     if (loggedIn) {
       const safePhone = encodeURIComponent(phone);
       // essaie GET puis POST (Ozon peut exiger l'un ou l'autre)
