@@ -1126,7 +1126,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   />
                   Validé
                 </label>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2 ml-auto">
                   {isChicOrder(order) && !order.chicForwarded && (
                     <button
                       onClick={() => forwardToChic(order)}
@@ -1141,17 +1141,17 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   )}
                   <button
                     onClick={() => openEdit(order)}
-                    className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                    className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
                     title="Modifier"
                   >
-                    <Pencil size={13} />
+                    <Pencil size={15} />
                   </button>
                   <button
                     onClick={() => setHistoryOrder(order)}
-                    className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                    className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                     title="Historique"
                   >
-                    <History size={13} />
+                    <History size={15} />
                   </button>
                   <button
                     onClick={() => {
@@ -1164,10 +1164,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                         onDeleteOrder?.(order.id);
                       }
                     }}
-                    className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                    className="p-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
                     title="Supprimer"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={15} />
                   </button>
                 </div>
               </div>
