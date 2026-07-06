@@ -267,11 +267,20 @@ export default function Sidebar({ orders = [], session }) {
       {/* Logo */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
         {(!collapsed || isMobile) && (() => {
+          let inner;
           try {
             const cfg = JSON.parse(localStorage.getItem('victoury_app_config') || '{}');
-            if (cfg.appLogo) return <img src={cfg.appLogo} alt="" className="h-12 object-contain" />;
-            return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">{cfg.appName || 'VICTOURY'}</span>;
-          } catch { return <span className="text-xl font-black tracking-widest text-gray-900 uppercase">VICTOURY</span>; }
+            inner = cfg.appLogo
+              ? <img src={cfg.appLogo} alt="" className="h-12 object-contain" />
+              : <span className="text-xl font-black tracking-widest text-gray-900 uppercase">{cfg.appName || 'VICTOURY'}</span>;
+          } catch {
+            inner = <span className="text-xl font-black tracking-widest text-gray-900 uppercase">VICTOURY</span>;
+          }
+          return (
+            <a href="https://victoury-maroc.com" target="_blank" rel="noopener noreferrer" title="Aller sur victoury-maroc.com" className="hover:opacity-80 transition-opacity">
+              {inner}
+            </a>
+          );
         })()}
         {isMobile ? (
           <button onClick={() => setMobileOpen(false)} className="p-1 rounded hover:bg-gray-100 text-gray-500">
