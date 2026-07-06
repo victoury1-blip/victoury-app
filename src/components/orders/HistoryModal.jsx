@@ -20,6 +20,14 @@ export default function HistoryModal({ order, onClose }) {
   const displayHist = hist.length > 0 ? hist : [
     { timestamp: order.dateAdded || '—', status: order.status, user: 'Création' }
   ];
+  // Trie du plus récent au plus ancien à partir de la vraie date (jj/mm/aaaa hh:mm),
+  // car le tri texte mélange juillet (06/07) avec juin (22/06).
+  const parseTs = (s) => {
+    const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ T]*(\d{1,2})?:?(\d{1,2})?/);
+    if (!m) return 0;
+    return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime();
+  };
+  const sortedHist = [...displayHist].sort((a, b) => parseTs(b.timestamp) - parseTs(a.timestamp));
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg">
@@ -47,7 +55,7 @@ export default function HistoryModal({ order, onClose }) {
               {displayHist.length === 0 && (
                 <tr><td colSpan={3} className="px-6 py-6 text-center text-gray-400 text-xs">Aucun historique disponible</td></tr>
               )}
-              {[...displayHist].reverse().map((h, i) => (
+              {sortedHist.map((h, i) => (
                 <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-6 py-2.5 text-xs text-gray-700">{h.timestamp}</td>
                   <td className="px-6 py-2.5">
