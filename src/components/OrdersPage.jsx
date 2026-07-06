@@ -671,7 +671,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             <Search size={16} />
           </button>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 shrink-0 flex-nowrap">
           <button
             onClick={() => setFilterOpen(o => !o)}
             className={`p-2 rounded-md border text-sm font-medium transition-colors ${
