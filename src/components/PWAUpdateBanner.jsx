@@ -1,17 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
+// Clé de garde : posée juste avant le reload de mise à jour.
+// Elle empêche la bannière de réapparaître en boucle après le rechargement,
+// car le nouveau service worker qui prend le contrôle redéclenche
+// « controllerchange » — ce qui, sinon, réafficherait la bannière indéfiniment.
+const JUST_UPDATED = 'pwa_just_updated';
+
 export default function PWAUpdateBanner() {
   const [needRefresh, setNeedRefresh] = useState(false);
-  const [reg, setReg] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    navigator.serviceWorker.ready.then(r => setReg(r));
+    // On vient de faire « Mettre à jour » : on ignore le premier
+    // controllerchange qui suit et on n'affiche pas la bannière.
+    let justUpdated = false;
+    try { justUpdated = sessionStorage.getItem(JUST_UPDATED) === '1'; } catch {}
+    if (justUpdated) {
+      try { sessionStorage.removeItem(JUST_UPDATED); } catch {}
+    }
+
+    // S'il n'y a aucun contrôleur au chargement (toute première installation
+    // du SW), le premier controllerchange est une installation initiale et non
+    // une mise à jour : on ne doit pas afficher la bannière.
+    const hadNoController = !navigator.serviceWorker.controller;
 
     const onCtrlChange = () => {
+      // Le tout premier controllerchange après une mise à jour manuelle
+      // (ou quand il n'y avait aucun contrôleur au départ) ne doit pas
+      // rouvrir la bannière : la nouvelle version est déjà chargée.
+      if (justUpdated) { justUpdated = false; return; }
+      if (hadNoController) return;
       setNeedRefresh(true);
     };
     navigator.serviceWorker.addEventListener('controllerchange', onCtrlChange);
@@ -29,6 +50,9 @@ export default function PWAUpdateBanner() {
 
   async function forceUpdate() {
     setBusy(true);
+    // Marque qu'on met à jour volontairement, pour que le controllerchange
+    // déclenché par le nouveau SW après le reload ne relance pas la bannière.
+    try { sessionStorage.setItem(JUST_UPDATED, '1'); } catch {}
     // 1) vider les caches, 2) désenregistrer le SW (pour ne plus servir l'ancienne version),
     // 3) recharger : garantit de récupérer la nouvelle version.
     try { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); } catch {}
