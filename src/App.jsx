@@ -123,13 +123,40 @@ export default function App() {
   useNotifications(orders);
   const { notifyNewOrder } = useOrderNotifications();
 
+  const [notifPerm, setNotifPerm] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
+
+  // Android Chrome ignore Notification.requestPermission() appelé au chargement :
+  // il exige un geste utilisateur. On demande donc l'autorisation au premier
+  // tap sur l'écran. Sans autorisation « granted », setAppBadge() échoue en
+  // silence et le « 1 » n'apparaît jamais sur l'icône de l'app.
+  useEffect(() => {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission !== 'default') { setNotifPerm(Notification.permission); return; }
+    const ask = () => {
+      try {
+        Notification.requestPermission().then(p => setNotifPerm(p)).catch(() => {});
+      } catch {}
+      window.removeEventListener('pointerdown', ask);
+      window.removeEventListener('keydown', ask);
+    };
+    window.addEventListener('pointerdown', ask, { once: true });
+    window.addEventListener('keydown', ask, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', ask);
+      window.removeEventListener('keydown', ask);
+    };
+  }, []);
+
   useEffect(() => {
     if (!('setAppBadge' in navigator)) return;
     const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi','retour_recu','echange_recu']);
     const count = orders.filter(o => !COLIS_PIPE.has(o.status) && o.status === 'nouveau').length;
+    // Dépend aussi de notifPerm : sur Android le badge n'est appliqué qu'une
+    // fois l'autorisation de notification accordée, donc on ré-applique dès
+    // qu'elle passe à « granted ».
     if (count > 0) navigator.setAppBadge(count).catch(() => {});
     else navigator.clearAppBadge().catch(() => {});
-  }, [orders]);
+  }, [orders, notifPerm]);
 
   useEffect(() => {
     const on = () => setOffline(false);
