@@ -120,7 +120,6 @@ export default function App() {
   const location = useLocation();
 
   useAutoSync(session);
-  useNotifications(orders);
   const { notifyNewOrder } = useOrderNotifications();
 
   const [notifPerm, setNotifPerm] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
@@ -147,16 +146,10 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!('setAppBadge' in navigator)) return;
-    const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','dem_suivi','injoignable','manque_stock','en_suivi','retour_recu','echange_recu']);
-    const count = orders.filter(o => !COLIS_PIPE.has(o.status) && o.status === 'nouveau').length;
-    // Dépend aussi de notifPerm : sur Android le badge n'est appliqué qu'une
-    // fois l'autorisation de notification accordée, donc on ré-applique dès
-    // qu'elle passe à « granted ».
-    if (count > 0) navigator.setAppBadge(count).catch(() => {});
-    else navigator.clearAppBadge().catch(() => {});
-  }, [orders, notifPerm]);
+  // Le compteur sur l'icône (Badging API + notification silencieuse de secours
+  // pour Android/Samsung) est géré par useNotifications, qui se ré-applique dès
+  // que l'autorisation passe à « granted ».
+  useNotifications(orders, notifPerm);
 
   useEffect(() => {
     const on = () => setOffline(false);
