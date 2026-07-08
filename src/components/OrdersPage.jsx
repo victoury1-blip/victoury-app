@@ -580,7 +580,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   function handleOzoneSuccess(orderId, ozoneTracking) {
     setOrders((prev) =>
       prev.map((o) =>
-        o.id === orderId ? { ...o, validated: true, trackingNumber: o.trackingNumber || ozoneTracking, ozoneTracking: ozoneTracking, status: 'att_ramassage' } : o
+        o.id === orderId ? { ...o, validated: true, trackingNumber: ozoneTracking || o.trackingNumber, ozoneTracking: ozoneTracking, status: 'att_ramassage' } : o
       )
     );
     addToast('success', `Colis créé — ${ozoneTracking}`, 'Commande déplacée vers En suivi');
@@ -601,9 +601,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       const livreurNote = `Livreur: ${prev.recipient?.delivery?.nom || '—'} → ${updated.recipient?.delivery?.nom || '—'}`;
       recordHistory(updated.id, updated.status, currentUser, null, livreurNote);
     }
-    if (!updated.trackingNumber) {
-      updated.trackingNumber = updated.id;
-    }
+    // Ne pas figer l'ID de commande comme numéro de suivi : l'affichage utilise
+    // déjà `trackingNumber || id` en repli. Sinon ce placeholder (WC-xxxx)
+    // masque le vrai numéro de suivi Ozon lors de la création du colis.
     setModifiedIds(prev => new Set([...prev, updated.id]));
     setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
     setModalOpen(false);
