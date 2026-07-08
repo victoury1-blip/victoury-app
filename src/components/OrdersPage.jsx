@@ -41,7 +41,7 @@ import { fetchChicProductDetails, fetchChicProducts, createChicOrder, getChicCon
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { now } from '../lib/dateUtils';
-import { initVictCounter, recalcVictCounter } from '../lib/victId';
+import { initVictCounter, recalcVictCounter, generateVictId } from '../lib/victId';
 import { recordHistory } from '../lib/orderHistory';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
@@ -142,7 +142,11 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     selected.forEach(id => recordHistory(id, newStatus, currentUser));
     setOrders(prev => prev.map(o => {
       if (!selected.includes(o.id)) return o;
-      return { ...o, status: newStatus, dateUpdated: ts };
+      const hasVict = /^VICT\d+$/i.test(o.trackingNumber || '');
+      const trackingNumber = (newStatus === 'confirme' && !hasVict)
+        ? generateVictId()
+        : o.trackingNumber;
+      return { ...o, status: newStatus, trackingNumber, dateUpdated: ts };
     }));
     setShowStatus(false);
     setSelected([]);
@@ -1226,7 +1230,14 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              return { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
+              // À la confirmation, attribuer un numéro de suivi VICT (celui envoyé
+              // à Ozon) si la commande n'en a pas déjà un — les commandes
+              // WooCommerce (WC-xxxx) reçoivent ainsi un vrai code VICT.
+              const hasVict = /^VICT\d+$/i.test(o.trackingNumber || '');
+              const trackingNumber = (newStatus === 'confirme' && !hasVict)
+                ? generateVictId()
+                : o.trackingNumber;
+              return { ...o, status: newStatus, trackingNumber, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
             }));
             setStatusDropdown(null);
             const changedOrder = orders.find(o => o.id === orderId);
