@@ -227,6 +227,28 @@ function harvestProduct(root) {
   return out;
 }
 
+/* Diagnostic de la LISTE des produits : montre comment les produits sont liés
+   (URL, data-attributs) pour extraire le chicId de façon fiable. */
+export async function diagnoseChicList() {
+  const res = await fetch(proxyUrl('/affiliate/products', 'html'));
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  const { html } = await res.json();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const anchors = [...doc.querySelectorAll('a')].map(a => a.getAttribute('href') || '').filter(h => /product/i.test(h));
+  const productLinks = [...new Set(anchors)].slice(0, 15);
+  const dataIds = [...html.matchAll(/data-(?:product-)?id=["'](\d+)["']/gi)].map(m => m[0]).slice(0, 10);
+  const numericPaths = [...new Set([...html.matchAll(/\/affiliate\/products\/(\d+)/g)].map(m => m[0]))].slice(0, 10);
+  const firstCardIdx = html.search(/choisir|product|carte|card|ajouter au panier|voir/i);
+  return {
+    htmlLength: html.length,
+    anchorsWithProduct: productLinks,
+    dataIdAttrs: dataIds,
+    numericProductPaths: numericPaths,
+    htmlSample: html.slice(Math.max(0, firstCardIdx - 100), firstCardIdx + 500).replace(/\s+/g, ' '),
+  };
+}
+
 export async function fetchChicProductDetails(chicProductId) {
   const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }

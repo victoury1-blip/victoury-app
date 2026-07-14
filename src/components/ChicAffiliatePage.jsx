@@ -8,7 +8,7 @@ import HistoryModal from './orders/HistoryModal';
 import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
-  discoverChicApi, diagnoseChicProduct,
+  discoverChicApi, diagnoseChicProduct, diagnoseChicList,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 
@@ -45,6 +45,19 @@ function ConfigPanel({ onTest }) {
     try {
       const d = await diagnoseChicProduct(diagId.trim());
       setDiagResult(d);
+    } catch (e) {
+      setDiagResult({ error: e.message });
+    } finally {
+      setDiagLoading(false);
+    }
+  }
+
+  async function runListDiag() {
+    save(config);
+    setDiagLoading(true);
+    setDiagResult(null);
+    try {
+      setDiagResult(await diagnoseChicList());
     } catch (e) {
       setDiagResult({ error: e.message });
     } finally {
@@ -179,7 +192,15 @@ function ConfigPanel({ onTest }) {
                 className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition disabled:opacity-50"
               >
                 {diagLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-                Diagnostiquer
+                Produit
+              </button>
+              <button
+                onClick={runListDiag}
+                disabled={diagLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm font-semibold rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
+              >
+                {diagLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                Liste
               </button>
             </div>
             {diagResult && (
