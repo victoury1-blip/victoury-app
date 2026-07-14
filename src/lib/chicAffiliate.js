@@ -244,9 +244,9 @@ export async function createChicOrder(orderData) {
 
 /* ── API officielle (Clé CHIC_...) ──
    Appelle un chemin /api/... de chic-affiliate.com avec la clé API du profil. */
-export async function chicApi(path, { method = 'GET', body, host, auth } = {}) {
+export async function chicApi(path, { method = 'GET', body, host, auth, keyOverride } = {}) {
   const config = getChicConfig();
-  const key = (config?.apiKey || '').trim();
+  const key = (keyOverride || config?.apiKey || '').trim();
   if (!key) throw new Error('Clé API non configurée');
   const params = new URLSearchParams({ path });
   if (host) params.set('host', host);
@@ -266,19 +266,27 @@ export async function discoverChicApi(onProgress) {
   const hosts = ['www.chic-affiliate.com', 'api.chic-affiliate.com'];
   const auths = ['bearer', 'xkey', 'plain', 'query'];
 
-  /* Phase 1 — /api/user est la seule route confirmée (401 = existe) */
+  /* Phase 1 — /api/user est la seule route confirmée (401 = existe).
+     urlanding stocke la clé SANS le préfixe « CHIC_ » : on teste les deux
+     formes de la clé pour chaque combinaison host × méthode d'auth. */
+  const rawKey = (getChicConfig()?.apiKey || '').trim();
+  const keyForms = [...new Set([rawKey, rawKey.replace(/^CHIC_/i, ''), rawKey.startsWith('CHIC_') ? rawKey : `CHIC_${rawKey}`])].filter(Boolean);
   let best = null;
-  for (const host of hosts) {
-    for (const auth of auths) {
-      onProgress?.(`auth: ${host} / ${auth}`);
-      try {
-        const r = await chicApi('/api/user', { host, auth });
-        results.push({ path: `[${host} · ${auth}] /api/user`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
-        if (r.status >= 200 && r.status < 300 && !best) best = { host, auth };
-      } catch (e) {
-        results.push({ path: `[${host} · ${auth}] /api/user`, status: 0, sample: e.message });
+  for (const keyOverride of keyForms) {
+    const kLabel = keyOverride.startsWith('CHIC_') ? 'avec CHIC_' : 'sans CHIC_';
+    for (const host of hosts) {
+      for (const auth of auths) {
+        onProgress?.(`auth: ${host} / ${auth} / ${kLabel}`);
+        try {
+          const r = await chicApi('/api/user', { host, auth, keyOverride });
+          results.push({ path: `[${host} · ${auth} · ${kLabel}] /api/user`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
+          if (r.status >= 200 && r.status < 300 && !best) best = { host, auth, keyOverride };
+        } catch (e) {
+          results.push({ path: `[${host} · ${auth} · ${kLabel}] /api/user`, status: 0, sample: e.message });
+        }
       }
     }
+    if (best) break;
   }
 
   /* Phase 2 — chemins candidats (y compris ceux propres à urlanding) */
