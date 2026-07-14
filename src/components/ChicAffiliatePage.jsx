@@ -571,7 +571,7 @@ function ProductsTab() {
 }
 
 /* ── Orders Tab ── */
-function OrdersTab() {
+function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -579,7 +579,37 @@ function OrdersTab() {
   const [endDate, setEndDate] = useState('');
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
+  const [syncMsg, setSyncMsg] = useState(null);
   const PAGE_SIZE = 50;
+
+  /* Synchronise les statuts : si Chic indique « Livré » pour une commande
+     envoyée (match par téléphone + nom de produit), on passe la commande
+     Victoury à « Livrée » (elle rejoint alors l'onglet Factures). */
+  function syncStatuses() {
+    const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+    const base = s => norm(s).split(/\s*[-–—/|]\s*/)[0].trim();
+    const phoneKey = s => (s || '').replace(/\D/g, '').slice(-9);
+    const byPhone = new Map();
+    orders.forEach(c => {
+      const k = phoneKey(c.Recipient_phone);
+      if (!k) return;
+      if (!byPhone.has(k)) byPhone.set(k, []);
+      byPhone.get(k).push(c);
+    });
+    let livrees = 0, retours = 0;
+    setVictouryOrders?.(prev => prev.map(o => {
+      if (o.status !== 'chic_envoye') return o;
+      const cands = byPhone.get(phoneKey(o.recipient?.phone)) || [];
+      const b = base(o.product?.name);
+      const match = cands.find(c => { const cb = base(c.product?.name); return cb && (cb === b || cb.includes(b) || b.includes(cb)); }) || cands[0];
+      if (!match) return o;
+      const st = stripHtml(match.status || '').toLowerCase();
+      if (st.includes('livr')) { livrees++; return { ...o, status: 'chic_livre', dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }; }
+      if (st.includes('retour') || st.includes('return')) { retours++; }
+      return o;
+    }));
+    setSyncMsg(`${livrees} commande(s) passée(s) à « Livrée »${retours ? ` · ${retours} en retour (non modifiées)` : ''}. ${orders.length ? '' : 'Cliquez d\'abord sur « Charger ».'}`);
+  }
 
   const load = useCallback(async (start = 0) => {
     setLoading(true);
@@ -650,8 +680,12 @@ function OrdersTab() {
         <button onClick={() => { setPage(0); load(0); }} className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">
           <RefreshCw size={14} /> Charger
         </button>
+        <button onClick={syncStatuses} disabled={!orders.length} title="Passe les commandes envoyées à « Livrée » selon le statut Chic" className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition disabled:opacity-50">
+          <CheckCircle2 size={14} /> Synchroniser les statuts
+        </button>
       </div>
 
+      {syncMsg && <div className="text-sm text-green-700 bg-green-50 p-3 rounded-lg"><CheckCircle2 size={14} className="inline mr-1" />{syncMsg}</div>}
       {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg"><AlertCircle size={14} className="inline mr-1" />{error}</div>}
 
       {loading ? (
@@ -1503,7 +1537,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
       {/* Content */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         {tab === 'products' ? <ProductsTab />
-          : tab === 'orders' ? <OrdersTab />
+          : tab === 'orders' ? <OrdersTab victouryOrders={orders} setVictouryOrders={setOrders} />
           : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} />
           : tab === 'factures' ? <ChicFacturesTab orders={orders} setOrders={setOrders} />
           : <SendOrderTab />}
