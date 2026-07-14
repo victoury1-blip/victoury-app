@@ -251,6 +251,25 @@ function ProductsTab() {
       return new Set(prods.filter(p => p.source === 'chic-affiliate').map(p => p.name?.toLowerCase()).filter(Boolean));
     } catch { return new Set(); }
   });
+  /* Produits Chic masqués localement (pour ne garder que ceux utilisés). */
+  const [hiddenIds, setHiddenIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('chic_hidden_ids') || '[]')); } catch { return new Set(); }
+  });
+  const [showHidden, setShowHidden] = useState(false);
+  function persistHidden(next) {
+    localStorage.setItem('chic_hidden_ids', JSON.stringify([...next]));
+    setHiddenIds(new Set(next));
+  }
+  function hideProduct(p) {
+    const key = p.chicId || p.name;
+    if (!key) return;
+    if (!window.confirm(`Masquer « ${p.name} » de la liste ?\n(Il reste chez Chic, vous pourrez le réafficher.)`)) return;
+    const next = new Set(hiddenIds); next.add(key); persistHidden(next);
+  }
+  function unhideProduct(p) {
+    const next = new Set(hiddenIds); next.delete(p.chicId || p.name); persistHidden(next);
+  }
+  const isHidden = p => hiddenIds.has(p.chicId || p.name);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -379,9 +398,10 @@ function ProductsTab() {
     alert(`✅ ${success} produits importés${fail ? `, ${fail} erreurs` : ''} !`);
   }
 
-  const filtered = products.filter(p =>
-    !search || (p.name || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = products
+    .filter(p => !search || (p.name || '').toLowerCase().includes(search.toLowerCase()))
+    .filter(p => showHidden ? true : !isHidden(p));
+  const hiddenCount = products.filter(isHidden).length;
 
   function isImported(p) {
     if (p.chicId && importedIds.has(p.chicId)) return true;
@@ -416,6 +436,12 @@ function ProductsTab() {
         </button>
       )}
       </div>
+
+      {hiddenCount > 0 && (
+        <button onClick={() => setShowHidden(v => !v)} className="text-xs text-gray-500 hover:text-gray-700 underline">
+          {showHidden ? `Cacher les ${hiddenCount} produit(s) masqué(s)` : `Afficher les ${hiddenCount} produit(s) masqué(s)`}
+        </button>
+      )}
 
       {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg"><AlertCircle size={14} className="inline mr-1" />{error}</div>}
 
@@ -456,19 +482,24 @@ function ProductsTab() {
                       <td className="px-3 py-2">{purchase.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2 text-green-600 font-medium">{profit.toFixed(2)} Dhs</td>
                       <td className="px-3 py-2">
-                        {isImported(p) ? (
-                          <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium">
-                            <Check size={12} /> Importé
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => importProduct(p)}
-                            disabled={importing === (p.chicId || p.name)}
-                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                          >
-                            {importing === (p.chicId || p.name) ? <><Loader2 size={12} className="animate-spin" /> Chargement...</> : <><Download size={12} /> Importer</>}
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {isImported(p) ? (
+                            <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium">
+                              <Check size={12} /> Importé
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => importProduct(p)}
+                              disabled={importing === (p.chicId || p.name)}
+                              className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                            >
+                              {importing === (p.chicId || p.name) ? <><Loader2 size={12} className="animate-spin" /> Chargement...</> : <><Download size={12} /> Importer</>}
+                            </button>
+                          )}
+                          {isHidden(p)
+                            ? <button onClick={() => unhideProduct(p)} title="Réafficher" className="p-1.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 transition"><RefreshCw size={13} /></button>
+                            : <button onClick={() => hideProduct(p)} title="Masquer / supprimer de la liste" className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 transition"><Trash2 size={13} /></button>}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -497,19 +528,24 @@ function ProductsTab() {
                       <span>Achat: {purchase.toFixed(2)} Dhs</span>
                       <span className="text-green-600 font-medium">+{profit.toFixed(2)}</span>
                     </div>
-                    {isImported(p) ? (
-                      <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium w-fit">
-                        <Check size={12} /> Importé
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => importProduct(p)}
-                        disabled={importing === (p.chicId || p.name)}
-                        className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                      >
-                        {importing === (p.chicId || p.name) ? <><Loader2 size={12} className="animate-spin" /> Chargement...</> : <><Download size={12} /> Importer</>}
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {isImported(p) ? (
+                        <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium w-fit">
+                          <Check size={12} /> Importé
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => importProduct(p)}
+                          disabled={importing === (p.chicId || p.name)}
+                          className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                        >
+                          {importing === (p.chicId || p.name) ? <><Loader2 size={12} className="animate-spin" /> Chargement...</> : <><Download size={12} /> Importer</>}
+                        </button>
+                      )}
+                      {isHidden(p)
+                        ? <button onClick={() => unhideProduct(p)} title="Réafficher" className="p-1.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200"><RefreshCw size={13} /></button>
+                        : <button onClick={() => hideProduct(p)} title="Masquer" className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200"><Trash2 size={13} /></button>}
+                    </div>
                   </div>
                 </div>
               );
