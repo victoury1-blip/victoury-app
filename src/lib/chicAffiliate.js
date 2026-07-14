@@ -134,6 +134,88 @@ export async function fetchChicProducts() {
   return { data: products, recordsTotal: products.length };
 }
 
+/* Extrait le JSON embarqué d'une page Inertia/Laravel : les tailles, couleurs
+   et images ne sont PAS dans le HTML brut mais dans data-page="{...}" (ou une
+   variable JS). On le parse et on cherche récursivement les données produit. */
+function extractInertiaData(html) {
+  let json = null;
+  const m = html.match(/data-page="([^"]+)"/);
+  if (m) {
+    const decoded = m[1]
+      .replace(/&quot;/g, '"').replace(/&#34;/g, '"')
+      .replace(/&#039;/g, "'").replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    try { json = JSON.parse(decoded); } catch {}
+  }
+  if (!json) {
+    const m2 = html.match(/(?:window\.__(?:INITIAL_STATE|DATA|NUXT)__|__INERTIA__)\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/);
+    if (m2) { try { json = JSON.parse(m2[1]); } catch {} }
+  }
+  return json;
+}
+
+/* Cherche récursivement dans l'objet Inertia le nœud produit et en tire
+   tailles / couleurs / images. Robuste aux noms de clés variables. */
+function harvestProduct(root) {
+  const out = { sizes: [], colors: [], images: [], description: '', cities: [], token: '', productId: '' };
+  if (!root || typeof root !== 'object') return out;
+  const seen = new Set();
+  const norm = s => String(s || '').toUpperCase().trim();
+
+  const walk = (node) => {
+    if (!node || typeof node !== 'object' || seen.has(node)) return;
+    seen.add(node);
+    for (const [key, val] of Object.entries(node)) {
+      const k = key.toLowerCase();
+      // Tailles
+      if (/(^|_)(sizes?|tailles?)$/.test(k) && Array.isArray(val)) {
+        val.forEach(v => {
+          const s = norm(typeof v === 'object' ? (v.name || v.label || v.value || v.size || v.taille) : v);
+          if (s && !out.sizes.includes(s)) out.sizes.push(s);
+        });
+      }
+      // Couleurs
+      if (/(^|_)(colou?rs?|couleurs?)$/.test(k) && Array.isArray(val)) {
+        val.forEach(v => {
+          if (typeof v === 'object' && v) {
+            const id = v.id ?? v.color_id ?? v.value;
+            const label = v.name || v.label || v.title || '';
+            const bg = v.code || v.hex || v.color || v.value_hex || v.background || '';
+            if (id != null) out.colors.push({ id: String(id), label: label || colorNameFromCss(bg), bg });
+          } else if (v != null) {
+            out.colors.push({ id: String(v), label: '', bg: '' });
+          }
+        });
+      }
+      // Images / galerie
+      if (/(images?|photos?|gallery|galerie)/.test(k)) {
+        const arr = Array.isArray(val) ? val : (typeof val === 'string' ? [val] : []);
+        arr.forEach(v => {
+          let u = typeof v === 'object' ? (v.url || v.src || v.path || v.image || v.name) : v;
+          if (typeof u === 'string' && u) {
+            if (!/^https?:\/\//.test(u)) u = `https://www.chic-affiliate.com/${u.replace(/^\//, '')}`;
+            if (!out.images.includes(u)) out.images.push(u);
+          }
+        });
+      }
+      // Villes
+      if (/(cities|villes)/.test(k) && Array.isArray(val)) {
+        val.forEach(v => {
+          if (typeof v === 'object' && v) {
+            const id = v.id ?? v.value; const name = v.name || v.label || v.ville;
+            if (id != null && name) out.cities.push({ id: String(id), name: String(name) });
+          }
+        });
+      }
+      if (/description/.test(k) && typeof val === 'string' && val.length > out.description.length) out.description = val;
+      if ((k === 'id' || k === 'product_id') && (typeof val === 'number' || typeof val === 'string') && !out.productId) out.productId = String(val);
+      if (typeof val === 'object') walk(val);
+    }
+  };
+  walk(root);
+  return out;
+}
+
 export async function fetchChicProductDetails(chicProductId) {
   const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
@@ -141,10 +223,15 @@ export async function fetchChicProductDetails(chicProductId) {
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
 
-  const token = doc.querySelector('input[name="_token"]')?.value || '';
+  const token = doc.querySelector('input[name="_token"]')?.value
+    || doc.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   const productId = doc.querySelector('input[name="product_id"]')?.value || chicProductId;
 
-  const sizes = [];
+  /* Source prioritaire : le JSON Inertia embarqué (données produit fiables). */
+  const inertia = extractInertiaData(html);
+  const fromJson = inertia ? harvestProduct(inertia) : null;
+
+  const sizes = fromJson?.sizes ? [...fromJson.sizes] : [];
   doc.querySelectorAll('input[name="size"], button[data-size], .size-option').forEach(el => {
     const val = el.value || el.getAttribute('data-size') || el.textContent?.trim();
     if (val) sizes.push(val);
@@ -161,8 +248,8 @@ export async function fetchChicProductDetails(chicProductId) {
     });
   }
 
-  const colors = [];
-  doc.querySelectorAll('input[name="color"], [data-color-id]').forEach(el => {
+  const colors = fromJson?.colors ? [...fromJson.colors] : [];
+  if (colors.length === 0) doc.querySelectorAll('input[name="color"], [data-color-id]').forEach(el => {
     const id = el.value || el.getAttribute('data-color-id');
     const label = el.getAttribute('title') || el.getAttribute('data-color-name') || '';
     /* La pastille (fond coloré) peut être sur l'input, son label parent ou un
@@ -190,9 +277,9 @@ export async function fetchChicProductDetails(chicProductId) {
     }
   }
 
-  const cities = [];
+  const cities = fromJson?.cities ? [...fromJson.cities] : [];
   const villeSelect = doc.querySelector('select[name="ville"], #ville');
-  if (villeSelect) {
+  if (cities.length === 0 && villeSelect) {
     villeSelect.querySelectorAll('option').forEach(opt => {
       const val = opt.value;
       const text = opt.textContent?.trim();
@@ -200,8 +287,8 @@ export async function fetchChicProductDetails(chicProductId) {
     });
   }
 
-  const images = [];
-  doc.querySelectorAll('.product-gallery img, .swiper img, .carousel img, [class*="slider"] img, [class*="gallery"] img').forEach(img => {
+  const images = fromJson?.images ? [...fromJson.images] : [];
+  if (images.length === 0) doc.querySelectorAll('.product-gallery img, .swiper img, .carousel img, [class*="slider"] img, [class*="gallery"] img').forEach(img => {
     const src = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('src') || '';
     const fullSrc = src.startsWith('//') ? `https:${src}` : src.startsWith('/') ? `https://www.chic-affiliate.com${src}` : src;
     if (fullSrc && fullSrc.includes('http') && !images.includes(fullSrc)) images.push(fullSrc);
@@ -215,11 +302,41 @@ export async function fetchChicProductDetails(chicProductId) {
   }
 
   const descEl = doc.querySelector('.description, [class*="description"], .product-description');
-  const description = descEl?.textContent?.trim() || '';
+  const description = fromJson?.description || descEl?.textContent?.trim() || '';
 
-  const proxyImages = images.map(u => `/api/chic-image?url=${encodeURIComponent(u)}`);
+  const proxyImages = images.map(u => u.startsWith('/api/') ? u : `/api/chic-image?url=${encodeURIComponent(u)}`);
 
-  return { token, productId, sizes, colors, cities, images: proxyImages, description };
+  return {
+    token, productId: fromJson?.productId || productId,
+    sizes, colors, cities, images: proxyImages, description,
+    _diag: { inertiaFound: !!inertia, jsonSizes: fromJson?.sizes?.length || 0, jsonColors: fromJson?.colors?.length || 0, jsonImages: fromJson?.images?.length || 0 },
+  };
+}
+
+/* Diagnostic : renvoie ce que le parseur voit réellement sur la page produit
+   (JSON Inertia présent ? clés de haut niveau ? extrait HTML autour de taille
+   et couleur) pour corriger le parsing si des variantes manquent encore. */
+export async function diagnoseChicProduct(chicProductId) {
+  const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  const { html } = await res.json();
+  const inertia = extractInertiaData(html);
+  const harvested = inertia ? harvestProduct(inertia) : null;
+  const topKeys = inertia?.props ? Object.keys(inertia.props) : (inertia ? Object.keys(inertia) : []);
+  const around = (kw) => {
+    const i = html.toLowerCase().indexOf(kw.toLowerCase());
+    return i < 0 ? '(absent)' : html.slice(i, i + 220).replace(/\s+/g, ' ');
+  };
+  return {
+    htmlLength: html.length,
+    inertiaFound: !!inertia,
+    topLevelKeys: topKeys,
+    harvested: harvested && { sizes: harvested.sizes, colors: harvested.colors.map(c => `${c.id}:${c.label || c.bg}`), images: harvested.images.length, cities: harvested.cities.length },
+    htmlAroundTaille: around('taille'),
+    htmlAroundCouleur: around('couleur'),
+    htmlAroundColor: around('color'),
+  };
 }
 
 export async function createChicOrder(orderData) {

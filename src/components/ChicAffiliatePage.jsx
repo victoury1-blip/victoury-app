@@ -7,7 +7,7 @@ import {
 import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
-  discoverChicApi,
+  discoverChicApi, diagnoseChicProduct,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 
@@ -32,6 +32,24 @@ function ConfigPanel({ onTest }) {
   const [testing, setTesting] = useState(false);
   const [apiResults, setApiResults] = useState(null);
   const [apiTesting, setApiTesting] = useState(false);
+  const [diagId, setDiagId] = useState('');
+  const [diagResult, setDiagResult] = useState(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  async function runDiag() {
+    if (!diagId.trim()) return;
+    save(config);
+    setDiagLoading(true);
+    setDiagResult(null);
+    try {
+      const d = await diagnoseChicProduct(diagId.trim());
+      setDiagResult(d);
+    } catch (e) {
+      setDiagResult({ error: e.message });
+    } finally {
+      setDiagLoading(false);
+    }
+  }
 
   async function testApiKey() {
     save(config);
@@ -142,6 +160,33 @@ function ConfigPanel({ onTest }) {
               <p className="text-gray-500 pt-1 font-sans">Vert = endpoint fonctionnel · Orange = existe mais refuse la clé · Gris = introuvable</p>
             </div>
           )}
+
+          {/* Diagnostic produit : voir ce que le parseur lit (tailles/couleurs) */}
+          <div className="border-t border-gray-100 pt-3">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Diagnostic produit (ID Chic, ex : 203)</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={diagId}
+                onChange={e => setDiagId(e.target.value)}
+                placeholder="203"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+              />
+              <button
+                onClick={runDiag}
+                disabled={diagLoading || !diagId.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition disabled:opacity-50"
+              >
+                {diagLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                Diagnostiquer
+              </button>
+            </div>
+            {diagResult && (
+              <pre className="mt-2 text-[11px] bg-gray-900 text-green-300 rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-72 overflow-y-auto">
+{JSON.stringify(diagResult, null, 2)}
+              </pre>
+            )}
+          </div>
           {testResult && (
             <div className={`text-xs p-2 rounded-lg ${testResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
               {testResult.ok ? <CheckCircle2 size={12} className="inline mr-1" /> : <AlertCircle size={12} className="inline mr-1" />}
