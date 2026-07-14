@@ -726,11 +726,148 @@ function SiteOrderEditModal({ order, onClose, onSave }) {
   );
 }
 
+/* Formulaire d'envoi vers Chic, calqué sur chic-affiliate.com : nom du produit,
+   boutons de taille, pastilles de couleur, ville (liste Chic) — pré-rempli
+   depuis la commande du site. L'utilisateur confirme puis envoie. */
+function SendToChicModal({ order, chicProduct, onClose, onSent }) {
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [form, setForm] = useState({
+    size: '', color: '', quantity: order.product?.qty || 1, price: order.price || '',
+    recipient: order.recipient?.name || '', phone: order.recipient?.phone || '',
+    villeId: '', address: order.recipient?.address || '', comment: order.note || '',
+  });
+
+  const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const d = await fetchChicProductDetails(chicProduct.chicId);
+        if (!alive) return;
+        setDetails(d);
+        const wantSize = (order.product?.size || '').toUpperCase().trim();
+        const size = (d.sizes || []).find(s => s.toUpperCase() === wantSize) || d.sizes?.[0] || '';
+        const cityN = norm(order.recipient?.city);
+        const city = (d.cities || []).find(c => norm(c.name) === cityN)
+          || (d.cities || []).find(c => norm(c.name).includes(cityN) || cityN.includes(norm(c.name)));
+        setForm(f => ({ ...f, size, color: d.colors?.[0]?.id || '', villeId: city?.id || '' }));
+      } catch (e) {
+        if (alive) setError(e.message);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [chicProduct.chicId]);
+
+  async function submit() {
+    if (!details?.token) { setError('Produit non chargé'); return; }
+    if (!form.recipient || !form.phone || !form.villeId || !form.address) { setError('Remplissez nom, téléphone, ville et adresse'); return; }
+    setSending(true); setError(null);
+    try {
+      await createChicOrder({
+        token: details.token, productId: details.productId,
+        size: form.size, color: form.color, quantity: form.quantity,
+        recipientPrice: form.price, recipient: form.recipient, phone: form.phone,
+        villeId: form.villeId, fraisLivraison: '', address: form.address, comment: form.comment,
+      });
+      onSent(order.id);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const field = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-300';
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+          <div>
+            <h2 className="font-bold text-gray-900">Envoyer à Chic Affiliate</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{chicProduct.name} · {order.id}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 px-6 py-10 justify-center"><Loader2 size={16} className="animate-spin" /> Chargement du produit Chic…</div>
+        ) : (
+          <div className="px-6 py-4 space-y-4">
+            {/* Taille */}
+            {details?.sizes?.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Choisir la taille</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {details.sizes.map(s => (
+                    <button key={s} type="button" onClick={() => setForm(f => ({ ...f, size: s }))}
+                      className={`px-3 py-1.5 text-xs rounded-lg border ${form.size === s ? 'bg-green-600 text-white border-green-600' : 'border-gray-200 hover:bg-gray-50'}`}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Couleur */}
+            {details?.colors?.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Choisir la couleur</label>
+                <div className="flex gap-2 flex-wrap items-center">
+                  {details.colors.map(c => (
+                    <button key={c.id} type="button" title={c.label || `#${c.id}`} onClick={() => setForm(f => ({ ...f, color: c.id }))}
+                      className={`w-8 h-8 rounded-full border-2 transition ${form.color === c.id ? 'border-green-600 scale-110' : 'border-gray-300'}`}
+                      style={{ backgroundColor: c.bg || '#ddd' }} />
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="block text-xs font-semibold text-gray-600 mb-1">Quantité</label><input type="number" min="1" className={field} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} /></div>
+              <div><label className="block text-xs font-semibold text-gray-600 mb-1">Prix de vente (DH)</label><input type="number" className={field} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} /></div>
+            </div>
+
+            <h3 className="text-sm font-semibold text-gray-700 border-t pt-3">Informations client</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="block text-xs font-semibold text-gray-600 mb-1">Nom du client *</label><input className={field} value={form.recipient} onChange={e => setForm(f => ({ ...f, recipient: e.target.value }))} /></div>
+              <div><label className="block text-xs font-semibold text-gray-600 mb-1">Téléphone *</label><input className={field} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+            </div>
+
+            <h3 className="text-sm font-semibold text-gray-700 border-t pt-3">Livraison</h3>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Ville *</label>
+              <select className={field} value={form.villeId} onChange={e => setForm(f => ({ ...f, villeId: e.target.value }))}>
+                <option value="">— Sélectionnez —</option>
+                {(details?.cities || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {!details?.cities?.length && <p className="text-xs text-orange-600 mt-1">Liste des villes indisponible — reconnectez-vous si besoin.</p>}
+            </div>
+            <div><label className="block text-xs font-semibold text-gray-600 mb-1">Adresse de livraison *</label><textarea rows={2} className={field} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>
+            <div><label className="block text-xs font-semibold text-gray-600 mb-1">Commentaire</label><textarea rows={2} className={field} value={form.comment} onChange={e => setForm(f => ({ ...f, comment: e.target.value }))} /></div>
+
+            {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded-lg"><AlertCircle size={13} className="inline mr-1" />{error}</div>}
+          </div>
+        )}
+
+        <div className="px-6 py-3 border-t border-gray-100 flex justify-end gap-2 sticky bottom-0 bg-white">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
+          <button onClick={submit} disabled={sending || loading}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50">
+            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Envoyer à Chic
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
-  const [sending, setSending] = useState(null); /* order id en cours d'envoi */
   const [result, setResult] = useState(null);   /* { id, ok, msg } */
   const [editOrder, setEditOrder] = useState(null);
   const [historyOrder, setHistoryOrder] = useState(null);
+  const [sendModal, setSendModal] = useState(null); /* { order, chicProduct } */
 
   function deleteOrder(o) {
     if (!window.confirm(`Supprimer la commande ${o.id} ?`)) return;
@@ -745,11 +882,10 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     <div className="flex items-center gap-1">
       {o.status !== 'chic_envoye' && (
         <button
-          onClick={() => sendToChic(o)}
-          disabled={sending === o.id}
-          className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+          onClick={() => openSend(o)}
+          className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition"
         >
-          {sending === o.id ? <><Loader2 size={12} className="animate-spin" /> Envoi...</> : <><Send size={12} /> Envoyer à Chic</>}
+          <Send size={12} /> Envoyer à Chic
         </button>
       )}
       <button onClick={() => setEditOrder(o)} title="Modifier" className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition"><Pencil size={13} /></button>
@@ -789,56 +925,24 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     return null;
   }
 
-  async function sendToChic(order) {
-    setSending(order.id);
+  /* Ouvre le formulaire Chic pré-rempli. Si le produit n'est pas importé, on
+     le signale (il faut d'abord l'importer dans l'onglet Produits). */
+  function openSend(order) {
     setResult(null);
-    try {
-      const chicProd = findChicProduct(order);
-      if (!chicProd) throw new Error('Produit Chic introuvable — importez-le d\'abord dans l\'onglet Produits');
-
-      const details = await fetchChicProductDetails(chicProd.chicId);
-      if (!details?.token) throw new Error('Impossible de charger le produit sur Chic (reconnectez-vous)');
-
-      /* Ville : correspondance par nom (sans accents) */
-      const cityName = norm(order.recipient?.city);
-      const city = (details.cities || []).find(c => norm(c.name) === cityName)
-        || (details.cities || []).find(c => norm(c.name).includes(cityName) || cityName.includes(norm(c.name)));
-      if (!city) throw new Error(`Ville "${order.recipient?.city || '—'}" introuvable chez Chic — envoyez via l'onglet Envoyer`);
-
-      /* Taille : celle de la commande si dispo chez Chic, sinon la première */
-      const wantedSize = (order.product?.size || (order.products || [])[0]?.size || '').toUpperCase().trim();
-      const size = (details.sizes || []).find(s => s.toUpperCase() === wantedSize) || details.sizes?.[0] || '';
-
-      /* Couleur : par libellé si connu, sinon la première */
-      const wantedColor = norm(order.product?.color || (order.products || [])[0]?.color);
-      const colorMatch = (details.colors || []).find(c => wantedColor && norm(c.label) === wantedColor);
-      const color = (colorMatch || details.colors?.[0])?.id || '';
-
-      const qty = order.product?.qty || 1;
-
-      await createChicOrder({
-        token: details.token,
-        productId: details.productId,
-        size, color,
-        quantity: qty,
-        recipientPrice: order.price || '',
-        recipient: order.recipient?.name || '',
-        phone: order.recipient?.phone || '',
-        villeId: city.id,
-        fraisLivraison: '',
-        address: order.recipient?.address || order.recipient?.city || '',
-        comment: order.note || '',
-      });
-
-      setOrders?.(prev => prev.map(o => o.id === order.id
-        ? { ...o, status: 'chic_envoye', dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }
-        : o));
-      setResult({ id: order.id, ok: true, msg: `Commande ${order.id} envoyée à Chic Affiliate ✅` });
-    } catch (e) {
-      setResult({ id: order.id, ok: false, msg: e.message });
-    } finally {
-      setSending(null);
+    const chicProduct = findChicProduct(order);
+    if (!chicProduct) {
+      setResult({ id: order.id, ok: false, msg: `Produit Chic introuvable pour « ${order.product?.name || order.id} » — importez-le d'abord dans l'onglet Produits` });
+      return;
     }
+    setSendModal({ order, chicProduct });
+  }
+
+  function onSent(orderId) {
+    setOrders?.(prev => prev.map(o => o.id === orderId
+      ? { ...o, status: 'chic_envoye', dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }
+      : o));
+    setSendModal(null);
+    setResult({ id: orderId, ok: true, msg: `Commande ${orderId} envoyée à Chic Affiliate ✅` });
   }
 
   return (
@@ -916,6 +1020,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
         {!siteOrders.length && <p className="text-center py-8 text-gray-400 text-sm">Aucune commande du site sur des produits Chic</p>}
       </div>
 
+      {sendModal && <SendToChicModal order={sendModal.order} chicProduct={sendModal.chicProduct} onClose={() => setSendModal(null)} onSent={onSent} />}
       {editOrder && <SiteOrderEditModal order={editOrder} onClose={() => setEditOrder(null)} onSave={saveEdit} />}
       {historyOrder && <HistoryModal order={historyOrder} onClose={() => setHistoryOrder(null)} />}
     </div>
