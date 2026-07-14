@@ -588,6 +588,179 @@ function OrdersTab() {
   );
 }
 
+/* ── Commandes du site (victoury-maroc.com) sur des produits Chic ──
+   Ces commandes arrivent avec le statut chic_nouveau (routées hors « À Confirmer »
+   par App.jsx) et s'envoient à Chic Affiliate en un clic : produit, taille,
+   couleur et ville sont résolus automatiquement. */
+function SiteOrdersTab({ orders = [], setOrders }) {
+  const [sending, setSending] = useState(null); /* order id en cours d'envoi */
+  const [result, setResult] = useState(null);   /* { id, ok, msg } */
+
+  const siteOrders = orders.filter(o => o.status === 'chic_nouveau' || o.status === 'chic_envoye');
+  const norm = s => (s || '').toString().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ').trim();
+
+  function findChicProduct(order) {
+    const prods = loadProducts().filter(p => p.source === 'chic-affiliate' && p.chicId);
+    const names = [order.product?.name, ...(order.products || []).map(p => p.name)].filter(Boolean);
+    for (const name of names) {
+      const n = norm(name);
+      const hit = prods.find(p => norm(p.name) === n)
+        || prods.find(p => norm(p.name).includes(n) || n.includes(norm(p.name)));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  async function sendToChic(order) {
+    setSending(order.id);
+    setResult(null);
+    try {
+      const chicProd = findChicProduct(order);
+      if (!chicProd) throw new Error('Produit Chic introuvable — importez-le d\'abord dans l\'onglet Produits');
+
+      const details = await fetchChicProductDetails(chicProd.chicId);
+      if (!details?.token) throw new Error('Impossible de charger le produit sur Chic (reconnectez-vous)');
+
+      /* Ville : correspondance par nom (sans accents) */
+      const cityName = norm(order.recipient?.city);
+      const city = (details.cities || []).find(c => norm(c.name) === cityName)
+        || (details.cities || []).find(c => norm(c.name).includes(cityName) || cityName.includes(norm(c.name)));
+      if (!city) throw new Error(`Ville "${order.recipient?.city || '—'}" introuvable chez Chic — envoyez via l'onglet Envoyer`);
+
+      /* Taille : celle de la commande si dispo chez Chic, sinon la première */
+      const wantedSize = (order.product?.size || (order.products || [])[0]?.size || '').toUpperCase().trim();
+      const size = (details.sizes || []).find(s => s.toUpperCase() === wantedSize) || details.sizes?.[0] || '';
+
+      /* Couleur : par libellé si connu, sinon la première */
+      const wantedColor = norm(order.product?.color || (order.products || [])[0]?.color);
+      const colorMatch = (details.colors || []).find(c => wantedColor && norm(c.label) === wantedColor);
+      const color = (colorMatch || details.colors?.[0])?.id || '';
+
+      const qty = order.product?.qty || 1;
+
+      await createChicOrder({
+        token: details.token,
+        productId: details.productId,
+        size, color,
+        quantity: qty,
+        recipientPrice: order.price || '',
+        recipient: order.recipient?.name || '',
+        phone: order.recipient?.phone || '',
+        villeId: city.id,
+        fraisLivraison: '',
+        address: order.recipient?.address || order.recipient?.city || '',
+        comment: order.note || '',
+      });
+
+      setOrders?.(prev => prev.map(o => o.id === order.id
+        ? { ...o, status: 'chic_envoye', dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }
+        : o));
+      setResult({ id: order.id, ok: true, msg: `Commande ${order.id} envoyée à Chic Affiliate ✅` });
+    } catch (e) {
+      setResult({ id: order.id, ok: false, msg: e.message });
+    } finally {
+      setSending(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {result && (
+        <div className={`text-sm p-3 rounded-lg ${result.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+          {result.ok ? <CheckCircle2 size={14} className="inline mr-1" /> : <AlertCircle size={14} className="inline mr-1" />}
+          {result.msg}
+        </div>
+      )}
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
+              <th className="px-3 py-2">N°</th>
+              <th className="px-3 py-2">Client</th>
+              <th className="px-3 py-2">Téléphone</th>
+              <th className="px-3 py-2">Ville</th>
+              <th className="px-3 py-2">Produit</th>
+              <th className="px-3 py-2">Taille</th>
+              <th className="px-3 py-2">Prix</th>
+              <th className="px-3 py-2">Statut</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {siteOrders.map(o => (
+              <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="px-3 py-2 font-mono text-xs">{o.id}</td>
+                <td className="px-3 py-2">{o.recipient?.name || '—'}</td>
+                <td className="px-3 py-2 font-mono text-xs">{o.recipient?.phone || '—'}</td>
+                <td className="px-3 py-2">{o.recipient?.city || '—'}</td>
+                <td className="px-3 py-2">{o.product?.name || '—'}</td>
+                <td className="px-3 py-2">{o.product?.size || '—'}</td>
+                <td className="px-3 py-2 font-semibold">{(o.price || 0).toFixed(2)} DH</td>
+                <td className="px-3 py-2">
+                  {o.status === 'chic_envoye'
+                    ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Envoyée</span>
+                    : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Nouvelle</span>}
+                </td>
+                <td className="px-3 py-2">
+                  {o.status !== 'chic_envoye' && (
+                    <button
+                      onClick={() => sendToChic(o)}
+                      disabled={sending === o.id}
+                      className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                    >
+                      {sending === o.id ? <><Loader2 size={12} className="animate-spin" /> Envoi...</> : <><Send size={12} /> Envoyer à Chic</>}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!siteOrders.length && (
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Aucune commande du site sur des produits Chic</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-2">
+        {siteOrders.map(o => (
+          <div key={o.id} className="bg-white border border-gray-200 rounded-lg p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs text-gray-500">{o.id}</span>
+              {o.status === 'chic_envoye'
+                ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Envoyée</span>
+                : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Nouvelle</span>}
+            </div>
+            <div className="font-medium text-sm text-gray-800">{o.recipient?.name || '—'}</div>
+            <div className="text-xs text-gray-600 flex flex-wrap gap-x-3">
+              <span>{o.recipient?.phone}</span>
+              <span>{o.recipient?.city}</span>
+              <span>{o.product?.name} {o.product?.size ? `/ ${o.product.size}` : ''}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-800">{(o.price || 0).toFixed(2)} DH</span>
+              {o.status !== 'chic_envoye' && (
+                <button
+                  onClick={() => sendToChic(o)}
+                  disabled={sending === o.id}
+                  className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                >
+                  {sending === o.id ? <><Loader2 size={12} className="animate-spin" /> Envoi...</> : <><Send size={12} /> Envoyer à Chic</>}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        {!siteOrders.length && <p className="text-center py-8 text-gray-400 text-sm">Aucune commande du site sur des produits Chic</p>}
+      </div>
+    </div>
+  );
+}
+
 /* ── Send Order to Chic ── */
 function SendOrderTab() {
   const [chicProducts, setChicProducts] = useState([]);
@@ -771,8 +944,9 @@ function SendOrderTab() {
 }
 
 /* ── Main Page ── */
-export default function ChicAffiliatePage() {
+export default function ChicAffiliatePage({ orders = [], setOrders }) {
   const [tab, setTab] = useState('products');
+  const siteCount = orders.filter(o => o.status === 'chic_nouveau').length;
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -805,6 +979,15 @@ export default function ChicAffiliatePage() {
           <ShoppingCart size={14} /> Commandes
         </button>
         <button
+          onClick={() => setTab('site')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'site' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+        >
+          <ShoppingCart size={14} /> Commandes Site
+          {siteCount > 0 && (
+            <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center">{siteCount}</span>
+          )}
+        </button>
+        <button
           onClick={() => setTab('send')}
           className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'send' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
@@ -814,7 +997,10 @@ export default function ChicAffiliatePage() {
 
       {/* Content */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
-        {tab === 'products' ? <ProductsTab /> : tab === 'orders' ? <OrdersTab /> : <SendOrderTab />}
+        {tab === 'products' ? <ProductsTab />
+          : tab === 'orders' ? <OrdersTab />
+          : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} />
+          : <SendOrderTab />}
       </div>
     </div>
   );

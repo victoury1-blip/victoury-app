@@ -153,6 +153,10 @@ export async function pushProductToWoo(product) {
 
   if (product.description) body.description = product.description;
 
+  /* Couleurs (produits Chic Affiliate) : deviennent un attribut de variation
+     pour que le site propose taille ET couleur, comme sur chic-affiliate.com. */
+  const colorOpts = [...new Set((product.colors || []).map(c => (c.label || '').trim()).filter(Boolean))];
+
   if (isVariable) {
     body.attributes = [{
       name: 'Taille',
@@ -161,6 +165,15 @@ export async function pushProductToWoo(product) {
       variation: true,
       options: variations.map(v => v.taille),
     }];
+    if (colorOpts.length > 0) {
+      body.attributes.push({
+        name: 'Couleur',
+        position: 1,
+        visible: true,
+        variation: true,
+        options: colorOpts,
+      });
+    }
   }
 
   const res = await fetch(wooUrl('/products'), {
@@ -177,13 +190,22 @@ export async function pushProductToWoo(product) {
   const created = await res.json();
 
   if (isVariable) {
-    const varBatch = variations.map(v => ({
-      regular_price: String(v.compareAt || v.prix || 0),
-      sale_price: String(v.prix || 0),
-      manage_stock: true,
-      stock_quantity: v.stock || 0,
-      attributes: [{ name: 'Taille', option: v.taille }],
-    }));
+    /* Avec couleurs : une variation par combinaison taille × couleur. */
+    const varBatch = variations.flatMap(v => {
+      const base = {
+        regular_price: String(v.compareAt || v.prix || 0),
+        sale_price: String(v.prix || 0),
+        manage_stock: true,
+        stock_quantity: v.stock || 0,
+      };
+      if (colorOpts.length === 0) {
+        return [{ ...base, attributes: [{ name: 'Taille', option: v.taille }] }];
+      }
+      return colorOpts.map(color => ({
+        ...base,
+        attributes: [{ name: 'Taille', option: v.taille }, { name: 'Couleur', option: color }],
+      }));
+    });
 
     const batchRes = await fetch(wooUrl(`/products/${created.id}/variations/batch`), {
       method: 'POST',

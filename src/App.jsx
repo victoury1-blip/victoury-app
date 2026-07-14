@@ -419,6 +419,21 @@ export default function App() {
           }
           return '';
         };
+        /* Produits importés de Chic Affiliate : leurs commandes site ne passent pas
+           par « À Confirmer » mais par l'onglet Commandes Site de la page Chic. */
+        let chicNames = new Set();
+        try {
+          const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
+          const normName = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+          chicNames = new Set(prods.filter(p => p.source === 'chic-affiliate').map(p => normName(p.name)).filter(Boolean));
+        } catch {}
+        const isChicProduct = (name) => {
+          const n = (name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+          if (!n) return false;
+          if (chicNames.has(n)) return true;
+          for (const c of chicNames) { if (c && (n.includes(c) || c.includes(n))) return true; }
+          return false;
+        };
         /* Map each WC order individually — bad order is skipped, not crashes the whole poll */
         const mapped = [];
         for (const o of data) {
@@ -448,7 +463,7 @@ export default function App() {
               },
               products: products.length > 0 ? products : null,
               price: parseFloat(o.total) || 0,
-              status: 'nouveau',
+              status: products.some(p => isChicProduct(p.name)) || isChicProduct(firstItem.name) ? 'chic_nouveau' : 'nouveau',
               note: o.customer_note || '',
               dateAdded: new Date(o.date_created).toLocaleString('fr-MA'),
               dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
@@ -722,7 +737,7 @@ export default function App() {
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
-          <Route path="/chic-affiliate" element={<ChicAffiliatePage />} />
+          <Route path="/chic-affiliate" element={<ChicAffiliatePage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
           <Route path="/ramassage/scanner" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/ramassage/bons" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
