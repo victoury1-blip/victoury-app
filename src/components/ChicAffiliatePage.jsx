@@ -910,8 +910,11 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     return n.trim();
   };
 
-  function findChicProduct(order) {
-    const prods = loadProducts().filter(p => p.source === 'chic-affiliate' && p.chicId);
+  /* Cherche le produit Chic correspondant. requireChicId=false permet de
+     détecter un produit importé SANS identifiant (ancien import) pour donner
+     un message précis (« réimportez-le »). */
+  function findChicProduct(order, requireChicId = true) {
+    const prods = loadProducts().filter(p => p.source === 'chic-affiliate' && (!requireChicId || p.chicId));
     const names = [order.product?.name, ...(order.products || []).map(p => p.name)].filter(Boolean);
     for (const name of names) {
       const full = norm(name);
@@ -931,7 +934,12 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     setResult(null);
     const chicProduct = findChicProduct(order);
     if (!chicProduct) {
-      setResult({ id: order.id, ok: false, msg: `Produit Chic introuvable pour « ${order.product?.name || order.id} » — importez-le d'abord dans l'onglet Produits` });
+      /* Importé mais sans chicId (ancien import) ? -> demander la réimportation. */
+      const noId = findChicProduct(order, false);
+      const msg = noId
+        ? `« ${noId.name} » est importé mais sans identifiant Chic (ancien import). Supprimez-le du Stock et réimportez-le depuis l'onglet Produits.`
+        : `Produit Chic introuvable pour « ${order.product?.name || order.id} » — importez-le d'abord dans l'onglet Produits.`;
+      setResult({ id: order.id, ok: false, msg });
       return;
     }
     setSendModal({ order, chicProduct });
