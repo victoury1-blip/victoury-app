@@ -12,6 +12,15 @@ import {
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 
+/* Statuts propres aux commandes Chic (pipeline site -> livraison -> facture). */
+const CHIC_ORDER_STATUSES = [
+  { key: 'chic_nouveau', label: 'Nouvelle', cls: 'bg-purple-100 text-purple-700' },
+  { key: 'chic_envoye', label: 'Envoyée', cls: 'bg-blue-100 text-blue-700' },
+  { key: 'chic_livre', label: 'Livrée', cls: 'bg-green-100 text-green-700' },
+  { key: 'chic_facture', label: 'Facturée', cls: 'bg-gray-800 text-white' },
+];
+const chicStatusMeta = (k) => CHIC_ORDER_STATUSES.find(s => s.key === k) || CHIC_ORDER_STATUSES[0];
+
 /* ── Status badge ── */
 function StatusBadge({ raw }) {
   const text = stripHtml(raw).trim();
@@ -891,10 +900,23 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
   const [sendModal, setSendModal] = useState(null); /* { order, chicProduct } */
 
   function deleteOrder(o) {
-    if (!window.confirm(`Supprimer la commande ${o.id} ?`)) return;
+    if (!window.confirm(`Supprimer la commande ${o.id} de Victoury ?\n\n(La commande déjà envoyée reste chez Chic Affiliate — supprimez-la depuis leur tableau si besoin.)`)) return;
     onDeleteOrder?.(o.id);
     setOrders?.(prev => prev.filter(x => x.id !== o.id));
   }
+  function setStatus(id, status) {
+    setOrders?.(prev => prev.map(o => o.id === id
+      ? { ...o, status, dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true } : o));
+  }
+  const StatusSelect = ({ o }) => (
+    <select
+      value={o.status}
+      onChange={e => setStatus(o.id, e.target.value)}
+      className={`text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer ${chicStatusMeta(o.status).cls}`}
+    >
+      {CHIC_ORDER_STATUSES.map(s => <option key={s.key} value={s.key} className="bg-white text-gray-800">{s.label}</option>)}
+    </select>
+  );
   function saveEdit(updated) {
     setOrders?.(prev => prev.map(o => o.id === updated.id ? { ...updated, manuallyModified: true } : o));
     setEditOrder(null);
@@ -915,6 +937,8 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     </div>
   );
 
+  /* Commandes Site = pipeline actif (avant facturation). Livrées/Facturées
+     passent dans l'onglet Factures. */
   const siteOrders = orders.filter(o => o.status === 'chic_nouveau' || o.status === 'chic_envoye');
   const norm = s => (s || '').toString().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -1009,11 +1033,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
                 <td className="px-3 py-2">{o.product?.name || '—'}</td>
                 <td className="px-3 py-2">{o.product?.size || '—'}</td>
                 <td className="px-3 py-2 font-semibold">{(o.price || 0).toFixed(2)} DH</td>
-                <td className="px-3 py-2">
-                  {o.status === 'chic_envoye'
-                    ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Envoyée</span>
-                    : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Nouvelle</span>}
-                </td>
+                <td className="px-3 py-2"><StatusSelect o={o} /></td>
                 <td className="px-3 py-2"><ActionButtons o={o} /></td>
               </tr>
             ))}
@@ -1030,9 +1050,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
           <div key={o.id} className="bg-white border border-gray-200 rounded-lg p-3 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs text-gray-500">{o.id}</span>
-              {o.status === 'chic_envoye'
-                ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Envoyée</span>
-                : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Nouvelle</span>}
+              <StatusSelect o={o} />
             </div>
             <div className="font-medium text-sm text-gray-800">{o.recipient?.name || '—'}</div>
             <div className="text-xs text-gray-600 flex flex-wrap gap-x-3">
@@ -1238,11 +1256,135 @@ function SendOrderTab() {
   );
 }
 
+/* ── Factures Chic Affiliate ──
+   Regroupe les commandes Livrées/Facturées, calcule ventes/revendeur/bénéfice,
+   permet de marquer « Facturée » et d'imprimer — comme les Factures Victoury. */
+function ChicFacturesTab({ orders = [], setOrders }) {
+  const list = orders.filter(o => o.status === 'chic_livre' || o.status === 'chic_facture');
+  const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+
+  const rows = React.useMemo(() => {
+    const prods = loadProducts().filter(p => p.source === 'chic-affiliate');
+    const base = (name) => norm(name).split(/\s*[-–—/|]\s*/)[0].trim();
+    return list.map(o => {
+      const b = base(o.product?.name);
+      const prod = prods.find(p => norm(p.name) === b || base(p.name) === b || norm(p.name).includes(b));
+      const qty = o.product?.qty || 1;
+      const vente = o.price || 0;
+      const revendeur = (prod?.purchasePrice || 0) * qty;
+      return { o, qty, vente, revendeur, benefice: vente - revendeur, prodName: prod?.name || o.product?.name || '—' };
+    });
+  }, [list]);
+
+  const totals = rows.reduce((a, r) => ({
+    ventes: a.ventes + r.vente, revendeur: a.revendeur + r.revendeur, benefice: a.benefice + r.benefice,
+  }), { ventes: 0, revendeur: 0, benefice: 0 });
+
+  function facturer(id) {
+    setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status: 'chic_facture', manuallyModified: true } : o));
+  }
+  function facturerTout() {
+    const ids = new Set(rows.filter(r => r.o.status === 'chic_livre').map(r => r.o.id));
+    if (!ids.size) return;
+    setOrders?.(prev => prev.map(o => ids.has(o.id) ? { ...o, status: 'chic_facture', manuallyModified: true } : o));
+  }
+  function imprimer() {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const rowsHtml = rows.map(r => `<tr>
+      <td>${r.o.id}</td><td>${r.o.recipient?.name || '—'}</td><td>${r.prodName}</td>
+      <td>${r.o.product?.size || '—'}</td><td>${r.qty}</td>
+      <td style="text-align:right">${r.vente.toFixed(2)}</td>
+      <td style="text-align:right">${r.revendeur.toFixed(2)}</td>
+      <td style="text-align:right;font-weight:bold">${r.benefice.toFixed(2)}</td></tr>`).join('');
+    w.document.write(`<html><head><title>Facture Chic Affiliate</title><style>
+      body{font-family:Arial,sans-serif;padding:24px;color:#111}
+      h1{font-size:20px}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}
+      th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f3f4f6}
+      tfoot td{font-weight:bold;background:#f9fafb}</style></head><body>
+      <h1>Facture — Chic Affiliate</h1>
+      <p>Date : ${new Date().toLocaleDateString('fr-MA')} · ${rows.length} commande(s)</p>
+      <table><thead><tr><th>N°</th><th>Client</th><th>Produit</th><th>Taille</th><th>Qté</th>
+      <th>Vente (DH)</th><th>Revendeur (DH)</th><th>Bénéfice (DH)</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot><tr><td colspan="5">TOTAL</td>
+      <td style="text-align:right">${totals.ventes.toFixed(2)}</td>
+      <td style="text-align:right">${totals.revendeur.toFixed(2)}</td>
+      <td style="text-align:right">${totals.benefice.toFixed(2)}</td></tr></tfoot></table>
+      </body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><p className="text-xs text-gray-500">Commandes</p><p className="text-lg font-bold text-gray-900">{rows.length}</p></div>
+        <div className="bg-blue-50 rounded-xl p-3 border border-blue-100"><p className="text-xs text-blue-600">Ventes</p><p className="text-lg font-bold text-blue-700">{totals.ventes.toFixed(2)} DH</p></div>
+        <div className="bg-amber-50 rounded-xl p-3 border border-amber-100"><p className="text-xs text-amber-600">Prix revendeur</p><p className="text-lg font-bold text-amber-700">{totals.revendeur.toFixed(2)} DH</p></div>
+        <div className="bg-green-50 rounded-xl p-3 border border-green-100"><p className="text-xs text-green-600">Bénéfice</p><p className="text-lg font-bold text-green-700">{totals.benefice.toFixed(2)} DH</p></div>
+      </div>
+
+      <div className="flex gap-2 justify-end">
+        {rows.some(r => r.o.status === 'chic_livre') && (
+          <button onClick={facturerTout} className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-900">
+            <Check size={14} /> Tout facturer
+          </button>
+        )}
+        {rows.length > 0 && (
+          <button onClick={imprimer} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+            🖨️ Imprimer
+          </button>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
+              <th className="px-3 py-2">N°</th><th className="px-3 py-2">Client</th><th className="px-3 py-2">Produit</th>
+              <th className="px-3 py-2">Taille</th><th className="px-3 py-2">Vente</th><th className="px-3 py-2">Revendeur</th>
+              <th className="px-3 py-2">Bénéfice</th><th className="px-3 py-2">Statut</th><th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.o.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="px-3 py-2 font-mono text-xs">{r.o.id}</td>
+                <td className="px-3 py-2">{r.o.recipient?.name || '—'}</td>
+                <td className="px-3 py-2">{r.prodName}</td>
+                <td className="px-3 py-2">{r.o.product?.size || '—'}</td>
+                <td className="px-3 py-2 font-semibold">{r.vente.toFixed(2)}</td>
+                <td className="px-3 py-2 text-amber-700">{r.revendeur.toFixed(2)}</td>
+                <td className="px-3 py-2 text-green-700 font-semibold">{r.benefice.toFixed(2)}</td>
+                <td className="px-3 py-2">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${chicStatusMeta(r.o.status).cls}`}>{chicStatusMeta(r.o.status).label}</span>
+                </td>
+                <td className="px-3 py-2">
+                  {r.o.status === 'chic_livre'
+                    ? <button onClick={() => facturer(r.o.id)} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-900"><Check size={12} /> Facturer</button>
+                    : <span className="text-xs text-gray-400">✓ Facturée</span>}
+                </td>
+              </tr>
+            ))}
+            {!rows.length && (
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Aucune commande livrée. Passez une commande à « Livrée » dans Commandes Site.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Page ── */
 export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrder }) {
   const [tab, setTab] = useState('products');
   const [sessionExpired, setSessionExpired] = useState(false);
   const siteCount = orders.filter(o => o.status === 'chic_nouveau').length;
+  const factureCount = orders.filter(o => o.status === 'chic_livre').length;
 
   useEffect(() => {
     const onExpired = () => setSessionExpired(true);
@@ -1306,6 +1448,15 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           )}
         </button>
         <button
+          onClick={() => setTab('factures')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'factures' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+        >
+          <Package size={14} /> Factures
+          {factureCount > 0 && (
+            <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">{factureCount}</span>
+          )}
+        </button>
+        <button
           onClick={() => setTab('send')}
           className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'send' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
@@ -1318,6 +1469,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
         {tab === 'products' ? <ProductsTab />
           : tab === 'orders' ? <OrdersTab />
           : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} />
+          : tab === 'factures' ? <ChicFacturesTab orders={orders} setOrders={setOrders} />
           : <SendOrderTab />}
       </div>
     </div>
