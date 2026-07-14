@@ -837,8 +837,14 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
   const [form, setForm] = useState({
     size: '', color: '', quantity: order.product?.qty || 1, price: order.price || '',
     recipient: order.recipient?.name || '', phone: order.recipient?.phone || '',
-    villeId: '', address: order.recipient?.address || '', comment: order.note || '',
+    villeId: '', fraisLivraison: '', address: order.recipient?.address || '', comment: order.note || '',
   });
+
+  /* Frais auto-remplis selon la ville choisie (comme sur chic-affiliate.com). */
+  const setVille = (villeId) => {
+    const c = (details?.cities || []).find(x => String(x.id) === String(villeId));
+    setForm(f => ({ ...f, villeId, fraisLivraison: c?.frais != null && c.frais !== 0 ? String(c.frais) : f.fraisLivraison }));
+  };
 
   const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 
@@ -854,7 +860,7 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
         const cityN = norm(order.recipient?.city);
         const city = (d.cities || []).find(c => norm(c.name) === cityN)
           || (d.cities || []).find(c => norm(c.name).includes(cityN) || cityN.includes(norm(c.name)));
-        setForm(f => ({ ...f, size, color: d.colors?.[0]?.id || '', villeId: city?.id || '' }));
+        setForm(f => ({ ...f, size, color: d.colors?.[0]?.id || '', villeId: city?.id || '', fraisLivraison: city?.frais ? String(city.frais) : '' }));
       } catch (e) {
         if (alive) setError(e.message);
       } finally {
@@ -873,9 +879,9 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
         token: details.token, productId: details.productId,
         size: form.size, color: form.color, quantity: form.quantity,
         recipientPrice: form.price, recipient: form.recipient, phone: form.phone,
-        villeId: form.villeId, fraisLivraison: '', address: form.address, comment: form.comment,
+        villeId: form.villeId, fraisLivraison: form.fraisLivraison || '', address: form.address, comment: form.comment,
       });
-      onSent(order.id);
+      onSent(order.id, { fraisLivraison: parseFloat(form.fraisLivraison) || 0, price: parseFloat(form.price) || order.price });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -936,13 +942,19 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
             </div>
 
             <h3 className="text-sm font-semibold text-gray-700 border-t pt-3">Livraison</h3>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Ville *</label>
-              <select className={field} value={form.villeId} onChange={e => setForm(f => ({ ...f, villeId: e.target.value }))}>
-                <option value="">— Sélectionnez —</option>
-                {(details?.cities || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              {!details?.cities?.length && <p className="text-xs text-orange-600 mt-1">Liste des villes indisponible — reconnectez-vous si besoin.</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Ville *</label>
+                <select className={field} value={form.villeId} onChange={e => setVille(e.target.value)}>
+                  <option value="">— Sélectionnez —</option>
+                  {(details?.cities || []).map(c => <option key={c.id} value={c.id}>{c.name}{c.frais ? ` (${c.frais} DH)` : ''}</option>)}
+                </select>
+                {!details?.cities?.length && <p className="text-xs text-orange-600 mt-1">Liste des villes indisponible — reconnectez-vous si besoin.</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Tarif de livraison (DH)</label>
+                <input type="number" className={field} value={form.fraisLivraison} onChange={e => setForm(f => ({ ...f, fraisLivraison: e.target.value }))} placeholder="auto" />
+              </div>
             </div>
             <div><label className="block text-xs font-semibold text-gray-600 mb-1">Adresse de livraison *</label><textarea rows={2} className={field} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>
             <div><label className="block text-xs font-semibold text-gray-600 mb-1">Commentaire</label><textarea rows={2} className={field} value={form.comment} onChange={e => setForm(f => ({ ...f, comment: e.target.value }))} /></div>
@@ -1060,9 +1072,9 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     setSendModal({ order, chicProduct });
   }
 
-  function onSent(orderId) {
+  function onSent(orderId, extra = {}) {
     setOrders?.(prev => prev.map(o => o.id === orderId
-      ? { ...o, status: 'chic_envoye', dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }
+      ? { ...o, status: 'chic_envoye', chicFrais: extra.fraisLivraison ?? o.chicFrais, price: extra.price ?? o.price, dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }
       : o));
     setSendModal(null);
     setResult({ id: orderId, ok: true, msg: `Commande ${orderId} envoyée à Chic Affiliate ✅` });
@@ -1342,13 +1354,14 @@ function ChicFacturesTab({ orders = [], setOrders }) {
       const qty = o.product?.qty || 1;
       const vente = o.price || 0;
       const revendeur = (prod?.purchasePrice || 0) * qty;
-      return { o, qty, vente, revendeur, benefice: vente - revendeur, prodName: prod?.name || o.product?.name || '—' };
+      const frais = o.chicFrais || 0;
+      return { o, qty, vente, revendeur, frais, benefice: vente - revendeur - frais, prodName: prod?.name || o.product?.name || '—' };
     });
   }, [list]);
 
   const totals = rows.reduce((a, r) => ({
-    ventes: a.ventes + r.vente, revendeur: a.revendeur + r.revendeur, benefice: a.benefice + r.benefice,
-  }), { ventes: 0, revendeur: 0, benefice: 0 });
+    ventes: a.ventes + r.vente, revendeur: a.revendeur + r.revendeur, frais: a.frais + r.frais, benefice: a.benefice + r.benefice,
+  }), { ventes: 0, revendeur: 0, frais: 0, benefice: 0 });
 
   function facturer(id) {
     setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status: 'chic_facture', manuallyModified: true } : o));
@@ -1366,6 +1379,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
       <td>${r.o.product?.size || '—'}</td><td>${r.qty}</td>
       <td style="text-align:right">${r.vente.toFixed(2)}</td>
       <td style="text-align:right">${r.revendeur.toFixed(2)}</td>
+      <td style="text-align:right">${r.frais.toFixed(2)}</td>
       <td style="text-align:right;font-weight:bold">${r.benefice.toFixed(2)}</td></tr>`).join('');
     w.document.write(`<html><head><title>Facture Chic Affiliate</title><style>
       body{font-family:Arial,sans-serif;padding:24px;color:#111}
@@ -1375,11 +1389,12 @@ function ChicFacturesTab({ orders = [], setOrders }) {
       <h1>Facture — Chic Affiliate</h1>
       <p>Date : ${new Date().toLocaleDateString('fr-MA')} · ${rows.length} commande(s)</p>
       <table><thead><tr><th>N°</th><th>Client</th><th>Produit</th><th>Taille</th><th>Qté</th>
-      <th>Vente (DH)</th><th>Revendeur (DH)</th><th>Bénéfice (DH)</th></tr></thead>
+      <th>Vente (DH)</th><th>Revendeur (DH)</th><th>Frais (DH)</th><th>Bénéfice (DH)</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
       <tfoot><tr><td colspan="5">TOTAL</td>
       <td style="text-align:right">${totals.ventes.toFixed(2)}</td>
       <td style="text-align:right">${totals.revendeur.toFixed(2)}</td>
+      <td style="text-align:right">${totals.frais.toFixed(2)}</td>
       <td style="text-align:right">${totals.benefice.toFixed(2)}</td></tr></tfoot></table>
       </body></html>`);
     w.document.close();
@@ -1390,11 +1405,12 @@ function ChicFacturesTab({ orders = [], setOrders }) {
   return (
     <div className="space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><p className="text-xs text-gray-500">Commandes</p><p className="text-lg font-bold text-gray-900">{rows.length}</p></div>
         <div className="bg-blue-50 rounded-xl p-3 border border-blue-100"><p className="text-xs text-blue-600">Ventes</p><p className="text-lg font-bold text-blue-700">{totals.ventes.toFixed(2)} DH</p></div>
         <div className="bg-amber-50 rounded-xl p-3 border border-amber-100"><p className="text-xs text-amber-600">Prix revendeur</p><p className="text-lg font-bold text-amber-700">{totals.revendeur.toFixed(2)} DH</p></div>
-        <div className="bg-green-50 rounded-xl p-3 border border-green-100"><p className="text-xs text-green-600">Bénéfice</p><p className="text-lg font-bold text-green-700">{totals.benefice.toFixed(2)} DH</p></div>
+        <div className="bg-rose-50 rounded-xl p-3 border border-rose-100"><p className="text-xs text-rose-600">Frais livraison</p><p className="text-lg font-bold text-rose-700">{totals.frais.toFixed(2)} DH</p></div>
+        <div className="bg-green-50 rounded-xl p-3 border border-green-100"><p className="text-xs text-green-600">Bénéfice net</p><p className="text-lg font-bold text-green-700">{totals.benefice.toFixed(2)} DH</p></div>
       </div>
 
       <div className="flex gap-2 justify-end">
@@ -1416,7 +1432,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
             <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
               <th className="px-3 py-2">N°</th><th className="px-3 py-2">Client</th><th className="px-3 py-2">Produit</th>
               <th className="px-3 py-2">Taille</th><th className="px-3 py-2">Vente</th><th className="px-3 py-2">Revendeur</th>
-              <th className="px-3 py-2">Bénéfice</th><th className="px-3 py-2">Statut</th><th className="px-3 py-2">Actions</th>
+              <th className="px-3 py-2">Frais</th><th className="px-3 py-2">Bénéfice</th><th className="px-3 py-2">Statut</th><th className="px-3 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1428,6 +1444,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
                 <td className="px-3 py-2">{r.o.product?.size || '—'}</td>
                 <td className="px-3 py-2 font-semibold">{r.vente.toFixed(2)}</td>
                 <td className="px-3 py-2 text-amber-700">{r.revendeur.toFixed(2)}</td>
+                <td className="px-3 py-2 text-rose-700">{r.frais.toFixed(2)}</td>
                 <td className="px-3 py-2 text-green-700 font-semibold">{r.benefice.toFixed(2)}</td>
                 <td className="px-3 py-2">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${chicStatusMeta(r.o.status).cls}`}>{chicStatusMeta(r.o.status).label}</span>
@@ -1440,7 +1457,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
               </tr>
             ))}
             {!rows.length && (
-              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Aucune commande livrée. Passez une commande à « Livrée » dans Commandes Site.</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Aucune commande livrée. Passez une commande à « Livrée » dans Commandes Site.</td></tr>
             )}
           </tbody>
         </table>

@@ -220,7 +220,8 @@ function harvestProduct(root) {
         val.forEach(v => {
           if (typeof v === 'object' && v) {
             const id = v.id ?? v.value; const name = v.name || v.label || v.ville;
-            if (id != null && name) out.cities.push({ id: String(id), name: String(name) });
+            const frais = parseFloat(String(v.frais ?? v.tarif ?? v.shipping ?? v.livraison ?? v.price ?? '').replace(/[^\d.]/g, '')) || 0;
+            if (id != null && name) out.cities.push({ id: String(id), name: String(name), frais });
           }
         });
       }
@@ -315,14 +316,34 @@ export async function fetchChicProductDetails(chicProductId) {
     }
   }
 
+  /* Villes + frais de livraison (« Tarif » qui s'auto-remplit à la sélection).
+     Le frais peut être un data-attribut de l'option ou dans une map JS
+     (villeId -> tarif) présente dans la page. */
   const cities = fromJson?.cities ? [...fromJson.cities] : [];
-  const villeSelect = doc.querySelector('select[name="ville"], #ville');
+  const villeSelect = doc.querySelector('select[name="ville"], #ville, select[name="ville_id"]');
+  const readFrais = (opt) => {
+    for (const a of ['data-frais', 'data-tarif', 'data-price', 'data-shipping', 'data-livraison', 'data-frais-livraison', 'data-delivery', 'data-cost']) {
+      const v = opt.getAttribute(a);
+      if (v && /\d/.test(v)) return parseFloat(v.replace(/[^\d.]/g, '')) || 0;
+    }
+    return 0;
+  };
   if (cities.length === 0 && villeSelect) {
     villeSelect.querySelectorAll('option').forEach(opt => {
       const val = opt.value;
       const text = opt.textContent?.trim();
-      if (val && text && val !== '') cities.push({ id: val, name: text });
+      if (val && text && val !== '') cities.push({ id: val, name: text, frais: readFrais(opt) });
     });
+  }
+  /* Map JS villeId -> frais (ex: cityShipping = {"6":37,...} / frais_livraison). */
+  if (cities.length && cities.every(c => !c.frais)) {
+    const mapMatch = html.match(/(?:frais|tarif|shipping|livraison|delivery)[^={]{0,20}=\s*(\{[^;]{2,4000}?\})/i);
+    if (mapMatch) {
+      try {
+        const map = JSON.parse(mapMatch[1]);
+        cities.forEach(c => { const f = map[c.id] ?? map[String(c.id)]; if (f != null) c.frais = parseFloat(String(f).replace(/[^\d.]/g, '')) || 0; });
+      } catch {}
+    }
   }
 
   const images = fromJson?.images ? [...fromJson.images] : [];
@@ -371,8 +392,11 @@ export async function diagnoseChicProduct(chicProductId) {
     inertiaFound: !!inertia,
     topLevelKeys: topKeys,
     harvested: harvested && { sizes: harvested.sizes, colors: harvested.colors.map(c => `${c.id}:${c.label || c.bg}`), images: harvested.images.length, cities: harvested.cities.length },
+    citiesSample: (harvested?.cities || []).slice(0, 3).map(c => `${c.id}:${c.name}=${c.frais}`),
     htmlAroundTaille: around('choisir la taille'),
     htmlAroundCouleur: around('choisir la couleur'),
+    htmlAroundVille: around('ville', 900),
+    htmlAroundFrais: around('tarif de livraison', 500),
   };
 }
 
