@@ -242,6 +242,40 @@ export async function createChicOrder(orderData) {
   throw new Error('Erreur lors de la création de la commande');
 }
 
+/* ── API officielle (Clé CHIC_...) ──
+   Appelle un chemin /api/... de chic-affiliate.com avec la clé API du profil. */
+export async function chicApi(path, { method = 'GET', body } = {}) {
+  const config = getChicConfig();
+  const key = (config?.apiKey || '').trim();
+  if (!key) throw new Error('Clé API non configurée');
+  const opts = { method, headers: { 'x-chic-key': key } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(`/api/chic-api?path=${encodeURIComponent(path)}`, opts);
+  return res.json();
+}
+
+/* Sonde une liste de chemins candidats pour découvrir les endpoints réels de
+   l'API Chic (non documentée publiquement — utilisée par urlanding). */
+export async function discoverChicApi() {
+  const candidates = [
+    '/api/user', '/api/me', '/api/profile',
+    '/api/products', '/api/v1/products', '/api/affiliate/products',
+    '/api/orders', '/api/v1/orders', '/api/affiliate/orders',
+    '/api/cities', '/api/v1/cities', '/api/villes',
+    '/api/order/store', '/api/orders/store',
+  ];
+  const results = [];
+  for (const path of candidates) {
+    try {
+      const r = await chicApi(path);
+      results.push({ path, status: r.status, sample: JSON.stringify(r.body).slice(0, 220) });
+    } catch (e) {
+      results.push({ path, status: 0, sample: e.message });
+    }
+  }
+  return results;
+}
+
 export async function fetchChicCounts() {
   const params = new URLSearchParams({
     draw: '1',

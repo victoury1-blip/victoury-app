@@ -7,6 +7,7 @@ import {
 import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
+  discoverChicApi,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 
@@ -26,9 +27,25 @@ function StatusBadge({ raw }) {
 /* ── Config Panel ── */
 function ConfigPanel({ onTest }) {
   const [open, setOpen] = useState(false);
-  const [config, setConfig] = useState(() => getChicConfig() || { xsrfToken: '', sessionCookie: '' });
+  const [config, setConfig] = useState(() => getChicConfig() || { xsrfToken: '', sessionCookie: '', apiKey: '' });
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
+  const [apiResults, setApiResults] = useState(null);
+  const [apiTesting, setApiTesting] = useState(false);
+
+  async function testApiKey() {
+    save(config);
+    setApiTesting(true);
+    setApiResults(null);
+    try {
+      const results = await discoverChicApi();
+      setApiResults(results);
+    } catch (e) {
+      setApiResults([{ path: '—', status: 0, sample: e.message }]);
+    } finally {
+      setApiTesting(false);
+    }
+  }
 
   function save(c) {
     setConfig(c);
@@ -87,14 +104,44 @@ function ConfigPanel({ onTest }) {
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
           </div>
-          <button
-            onClick={testConnection}
-            disabled={testing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-          >
-            {testing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-            Tester la connexion
-          </button>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Clé API (profil Chic → «&nbsp;Clé API&nbsp;», commence par CHIC_)</label>
+            <input
+              type="text"
+              value={config.apiKey || ''}
+              onChange={e => save({ ...config, apiKey: e.target.value.trim() })}
+              placeholder="CHIC_xxxxxxxxxxxxxxxx"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={testConnection}
+              disabled={testing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              {testing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+              Tester la connexion
+            </button>
+            <button
+              onClick={testApiKey}
+              disabled={apiTesting || !(config.apiKey || '').trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
+            >
+              {apiTesting ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+              Tester la Clé API
+            </button>
+          </div>
+          {apiResults && (
+            <div className="text-xs bg-gray-50 border border-gray-200 rounded-lg p-2 space-y-1 max-h-64 overflow-y-auto font-mono">
+              {apiResults.map(r => (
+                <div key={r.path} className={r.status >= 200 && r.status < 300 ? 'text-green-700 font-bold' : r.status === 401 || r.status === 403 ? 'text-orange-600' : 'text-gray-400'}>
+                  [{r.status}] {r.path} — {r.sample}
+                </div>
+              ))}
+              <p className="text-gray-500 pt-1 font-sans">Vert = endpoint fonctionnel · Orange = existe mais refuse la clé · Gris = introuvable</p>
+            </div>
+          )}
           {testResult && (
             <div className={`text-xs p-2 rounded-lg ${testResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
               {testResult.ok ? <CheckCircle2 size={12} className="inline mr-1" /> : <AlertCircle size={12} className="inline mr-1" />}
