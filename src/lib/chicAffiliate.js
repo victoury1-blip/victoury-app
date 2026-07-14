@@ -103,33 +103,44 @@ export async function fetchChicProducts() {
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const products = [];
-  const cards = doc.querySelectorAll('.card, .product-card, [class*="product"]');
-  if (cards.length > 0) {
-    cards.forEach(card => {
+  const seen = new Set();
+
+  /* Approche fiable : partir des liens produit (/affiliate/products/ID). Le
+     chicId est INDISPENSABLE (sans lui, pas de détails ni d'envoi) — l'ancien
+     code le manquait, d'où des Réf « CHIC-<timestamp> » et 0 couleur. */
+  const priceRe = /[\d.,]+\s*(?:MAD|DH|Dhs)/gi;
+  doc.querySelectorAll('a[href*="/affiliate/products/"]').forEach(link => {
+    const href = link.getAttribute('href') || '';
+    const chicId = href.match(/\/affiliate\/products\/(\d+)/)?.[1] || '';
+    if (!chicId || seen.has(chicId)) return;
+    const card = link.closest('.card, [class*="product"], li, tr') || link.parentElement || link;
+    let name = card.querySelector('h5, h4, h3, .product-name, .card-title')?.textContent?.trim() || '';
+    if (!name) name = (link.getAttribute('title') || link.textContent || '').trim().split('\n')[0].trim();
+    const prices = (card.textContent || '').match(priceRe) || [];
+    const imgEl = card.querySelector('img');
+    const img = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-lazy-src') || imgEl?.getAttribute('data-original') || imgEl?.getAttribute('src') || '';
+    const rawImg = img.startsWith('//') ? `https:${img}` : img.startsWith('/') ? `https://www.chic-affiliate.com${img}` : img;
+    const proxyImg = rawImg ? `/api/chic-image?url=${encodeURIComponent(rawImg)}` : '';
+    seen.add(chicId);
+    products.push({ name: name || `Produit ${chicId}`, chicId, salePrice: prices[0] || '', resellerPrice: prices[1] || '', image: proxyImg });
+  });
+
+  /* Repli : ancienne détection par cartes (si aucun lien trouvé). */
+  if (products.length === 0) {
+    doc.querySelectorAll('.card, .product-card, [class*="product"]').forEach(card => {
       const name = card.querySelector('h5, h4, h3, .product-name, .card-title')?.textContent?.trim() || '';
-      const texts = card.textContent || '';
-      const prices = texts.match(/[\d,.]+\s*MAD/g) || [];
+      const prices = (card.textContent || '').match(priceRe) || [];
       const imgEl = card.querySelector('img');
-      const img = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-lazy-src') || imgEl?.getAttribute('data-original') || imgEl?.getAttribute('src') || '';
+      const img = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
       const rawImg = img.startsWith('//') ? `https:${img}` : img.startsWith('/') ? `https://www.chic-affiliate.com${img}` : img;
-      const proxyImg = rawImg ? `/api/chic-image?url=${encodeURIComponent(rawImg)}` : '';
       const link = card.querySelector('a[href*="/affiliate/products/"]');
-      const href = link?.getAttribute('href') || '';
-      const chicId = href.match(/\/products\/(\d+)/)?.[1] || '';
-      if (name) {
-        products.push({
-          name,
-          chicId,
-          salePrice: prices[0] || '',
-          resellerPrice: prices[1] || '',
-          image: proxyImg,
-        });
-      }
+      const chicId = (link?.getAttribute('href') || '').match(/\/products\/(\d+)/)?.[1] || '';
+      if (name) products.push({ name, chicId, salePrice: prices[0] || '', resellerPrice: prices[1] || '', image: rawImg ? `/api/chic-image?url=${encodeURIComponent(rawImg)}` : '' });
     });
   }
+
   if (products.length === 0) {
-    const allText = doc.body?.innerHTML || '';
-    return { data: [], recordsTotal: 0, html: allText.slice(0, 2000) };
+    return { data: [], recordsTotal: 0, html: (doc.body?.innerHTML || '').slice(0, 2000) };
   }
   return { data: products, recordsTotal: products.length };
 }
