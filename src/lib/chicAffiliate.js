@@ -324,18 +324,17 @@ export async function diagnoseChicProduct(chicProductId) {
   const inertia = extractInertiaData(html);
   const harvested = inertia ? harvestProduct(inertia) : null;
   const topKeys = inertia?.props ? Object.keys(inertia.props) : (inertia ? Object.keys(inertia) : []);
-  const around = (kw) => {
+  const around = (kw, len = 1400) => {
     const i = html.toLowerCase().indexOf(kw.toLowerCase());
-    return i < 0 ? '(absent)' : html.slice(i, i + 220).replace(/\s+/g, ' ');
+    return i < 0 ? '(absent)' : html.slice(i, i + len).replace(/\s+/g, ' ');
   };
   return {
     htmlLength: html.length,
     inertiaFound: !!inertia,
     topLevelKeys: topKeys,
     harvested: harvested && { sizes: harvested.sizes, colors: harvested.colors.map(c => `${c.id}:${c.label || c.bg}`), images: harvested.images.length, cities: harvested.cities.length },
-    htmlAroundTaille: around('taille'),
-    htmlAroundCouleur: around('couleur'),
-    htmlAroundColor: around('color'),
+    htmlAroundTaille: around('choisir la taille'),
+    htmlAroundCouleur: around('choisir la couleur'),
   };
 }
 
