@@ -737,7 +737,7 @@ export default function App() {
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} />} />
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
-          <Route path="/chic-affiliate" element={<ChicAffiliatePage orders={orders} setOrders={setOrdersWithSync} />} />
+          <Route path="/chic-affiliate" element={<ChicAffiliatePage orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
           <Route path="/ramassage/scanner" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/ramassage/bons" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />

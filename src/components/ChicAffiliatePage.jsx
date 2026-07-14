@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Store, Settings, Search, ChevronDown, ChevronRight, RefreshCw,
   Download, Loader2, AlertCircle, CheckCircle2, Check, Package, ShoppingCart,
-  Send,
+  Send, Pencil, Trash2, Clock, X,
 } from 'lucide-react';
+import HistoryModal from './orders/HistoryModal';
 import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
@@ -684,9 +685,78 @@ function OrdersTab() {
    Ces commandes arrivent avec le statut chic_nouveau (routées hors « À Confirmer »
    par App.jsx) et s'envoient à Chic Affiliate en un clic : produit, taille,
    couleur et ville sont résolus automatiquement. */
-function SiteOrdersTab({ orders = [], setOrders }) {
+function SiteOrderEditModal({ order, onClose, onSave }) {
+  const r = order.recipient || {};
+  const [form, setForm] = useState({
+    name: r.name || '', phone: r.phone || '', city: r.city || '', address: r.address || '',
+    price: order.price || '', size: order.product?.size || '', qty: order.product?.qty || 1,
+  });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const field = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Modifier {order.id}</h2>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+        </div>
+        <div className="px-6 py-4 grid grid-cols-2 gap-3">
+          <div className="col-span-2"><label className="block text-xs font-semibold text-gray-600 mb-1">Nom du client</label><input className={field} value={form.name} onChange={e => set('name', e.target.value)} /></div>
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Téléphone</label><input className={field} value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Ville</label><input className={field} value={form.city} onChange={e => set('city', e.target.value)} /></div>
+          <div className="col-span-2"><label className="block text-xs font-semibold text-gray-600 mb-1">Adresse</label><input className={field} value={form.address} onChange={e => set('address', e.target.value)} /></div>
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Prix (DH)</label><input type="number" className={field} value={form.price} onChange={e => set('price', e.target.value)} /></div>
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Taille</label><input className={field} value={form.size} onChange={e => set('size', e.target.value)} /></div>
+          <div><label className="block text-xs font-semibold text-gray-600 mb-1">Quantité</label><input type="number" min="1" className={field} value={form.qty} onChange={e => set('qty', e.target.value)} /></div>
+        </div>
+        <div className="px-6 py-3 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
+          <button
+            onClick={() => onSave({
+              ...order,
+              recipient: { ...r, name: form.name, phone: form.phone, city: form.city, address: form.address },
+              price: parseFloat(form.price) || 0,
+              product: { ...(order.product || {}), size: form.size, qty: parseInt(form.qty, 10) || 1 },
+            })}
+            className="px-4 py-2 text-sm bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"
+          >Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
   const [sending, setSending] = useState(null); /* order id en cours d'envoi */
   const [result, setResult] = useState(null);   /* { id, ok, msg } */
+  const [editOrder, setEditOrder] = useState(null);
+  const [historyOrder, setHistoryOrder] = useState(null);
+
+  function deleteOrder(o) {
+    if (!window.confirm(`Supprimer la commande ${o.id} ?`)) return;
+    onDeleteOrder?.(o.id);
+    setOrders?.(prev => prev.filter(x => x.id !== o.id));
+  }
+  function saveEdit(updated) {
+    setOrders?.(prev => prev.map(o => o.id === updated.id ? { ...updated, manuallyModified: true } : o));
+    setEditOrder(null);
+  }
+  const ActionButtons = ({ o }) => (
+    <div className="flex items-center gap-1">
+      {o.status !== 'chic_envoye' && (
+        <button
+          onClick={() => sendToChic(o)}
+          disabled={sending === o.id}
+          className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+        >
+          {sending === o.id ? <><Loader2 size={12} className="animate-spin" /> Envoi...</> : <><Send size={12} /> Envoyer à Chic</>}
+        </button>
+      )}
+      <button onClick={() => setEditOrder(o)} title="Modifier" className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition"><Pencil size={13} /></button>
+      <button onClick={() => setHistoryOrder(o)} title="Historique" className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition"><Clock size={13} /></button>
+      <button onClick={() => deleteOrder(o)} title="Supprimer" className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200 transition"><Trash2 size={13} /></button>
+    </div>
+  );
 
   const siteOrders = orders.filter(o => o.status === 'chic_nouveau' || o.status === 'chic_envoye');
   const norm = s => (s || '').toString().toLowerCase()
@@ -811,17 +881,7 @@ function SiteOrdersTab({ orders = [], setOrders }) {
                     ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Envoyée</span>
                     : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Nouvelle</span>}
                 </td>
-                <td className="px-3 py-2">
-                  {o.status !== 'chic_envoye' && (
-                    <button
-                      onClick={() => sendToChic(o)}
-                      disabled={sending === o.id}
-                      className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                    >
-                      {sending === o.id ? <><Loader2 size={12} className="animate-spin" /> Envoi...</> : <><Send size={12} /> Envoyer à Chic</>}
-                    </button>
-                  )}
-                </td>
+                <td className="px-3 py-2"><ActionButtons o={o} /></td>
               </tr>
             ))}
             {!siteOrders.length && (
@@ -849,20 +909,15 @@ function SiteOrdersTab({ orders = [], setOrders }) {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-800">{(o.price || 0).toFixed(2)} DH</span>
-              {o.status !== 'chic_envoye' && (
-                <button
-                  onClick={() => sendToChic(o)}
-                  disabled={sending === o.id}
-                  className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                >
-                  {sending === o.id ? <><Loader2 size={12} className="animate-spin" /> Envoi...</> : <><Send size={12} /> Envoyer à Chic</>}
-                </button>
-              )}
+              <ActionButtons o={o} />
             </div>
           </div>
         ))}
         {!siteOrders.length && <p className="text-center py-8 text-gray-400 text-sm">Aucune commande du site sur des produits Chic</p>}
       </div>
+
+      {editOrder && <SiteOrderEditModal order={editOrder} onClose={() => setEditOrder(null)} onSave={saveEdit} />}
+      {historyOrder && <HistoryModal order={historyOrder} onClose={() => setHistoryOrder(null)} />}
     </div>
   );
 }
@@ -1050,7 +1105,7 @@ function SendOrderTab() {
 }
 
 /* ── Main Page ── */
-export default function ChicAffiliatePage({ orders = [], setOrders }) {
+export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrder }) {
   const [tab, setTab] = useState('products');
   const [sessionExpired, setSessionExpired] = useState(false);
   const siteCount = orders.filter(o => o.status === 'chic_nouveau').length;
@@ -1128,7 +1183,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders }) {
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         {tab === 'products' ? <ProductsTab />
           : tab === 'orders' ? <OrdersTab />
-          : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} />
+          : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} />
           : <SendOrderTab />}
       </div>
     </div>
