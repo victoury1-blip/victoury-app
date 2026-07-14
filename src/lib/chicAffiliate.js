@@ -63,6 +63,20 @@ function proxyUrl(path, mode) {
   return `/api/chic-proxy?${params}`;
 }
 
+/* Signale à l'UI que la session Chic a expiré (cookies périmés) pour afficher
+   la bannière de reconnexion. Renvoie true si c'est bien un 401/session. */
+export function isSessionError(err) {
+  const m = (err?.message || String(err || '')).toLowerCase();
+  return m.includes('401') || m.includes('session') || m.includes('reconnect');
+}
+function flagSession(res, payload) {
+  if (res.status === 401 || payload?.error?.toLowerCase?.().includes('session')) {
+    try { window.dispatchEvent(new CustomEvent('chic-session-expired')); } catch {}
+    return true;
+  }
+  return false;
+}
+
 export async function fetchChicOrders(startDate, endDate, start = 0, length = 50) {
   const params = new URLSearchParams({
     draw: '1',
@@ -77,12 +91,14 @@ export async function fetchChicOrders(startDate, endDate, start = 0, length = 50
   if (endDate) params.set('endDate', endDate);
 
   const res = await fetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   return res.json();
 }
 
 export async function fetchChicProducts() {
   const res = await fetch(proxyUrl('/affiliate/products', 'html'));
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -120,6 +136,7 @@ export async function fetchChicProducts() {
 
 export async function fetchChicProductDetails(chicProductId) {
   const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -236,9 +253,10 @@ export async function createChicOrder(orderData) {
     body: body.toString(),
   });
 
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   const data = await res.json();
   if (data.success) return data;
-  if (data.error) throw new Error(data.error);
+  if (data.error) { if (isSessionError({ message: data.error })) flagSession({ status: 401 }); throw new Error(data.error); }
   throw new Error('Erreur lors de la création de la commande');
 }
 

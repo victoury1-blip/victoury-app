@@ -993,7 +993,14 @@ function SendOrderTab() {
 /* ── Main Page ── */
 export default function ChicAffiliatePage({ orders = [], setOrders }) {
   const [tab, setTab] = useState('products');
+  const [sessionExpired, setSessionExpired] = useState(false);
   const siteCount = orders.filter(o => o.status === 'chic_nouveau').length;
+
+  useEffect(() => {
+    const onExpired = () => setSessionExpired(true);
+    window.addEventListener('chic-session-expired', onExpired);
+    return () => window.removeEventListener('chic-session-expired', onExpired);
+  }, []);
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -1008,8 +1015,24 @@ export default function ChicAffiliatePage({ orders = [], setOrders }) {
         </div>
       </div>
 
+      {/* Bannière de reconnexion (cookies Chic expirés) */}
+      {sessionExpired && (
+        <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+          <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold text-red-700">Session Chic Affiliate expirée</p>
+            <p className="text-red-600 mt-0.5 text-xs leading-relaxed">
+              Les cookies de connexion ont expiré. Ouvrez <b>chic-affiliate.com</b> (connecté) →
+              F12 → Application → Cookies → recopiez <b>XSRF-TOKEN</b> et <b>laravel_session</b>
+              dans « Configuration Chic Affiliate » ci-dessous, puis « Tester la connexion ».
+            </p>
+          </div>
+          <button onClick={() => setSessionExpired(false)} className="text-red-400 hover:text-red-600 text-xs font-medium shrink-0">Masquer</button>
+        </div>
+      )}
+
       {/* Config */}
-      <ConfigPanel />
+      <ConfigPanel onTest={(ok) => { if (ok) setSessionExpired(false); }} />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit">
