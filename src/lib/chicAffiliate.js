@@ -244,31 +244,59 @@ export async function createChicOrder(orderData) {
 
 /* ── API officielle (Clé CHIC_...) ──
    Appelle un chemin /api/... de chic-affiliate.com avec la clé API du profil. */
-export async function chicApi(path, { method = 'GET', body } = {}) {
+export async function chicApi(path, { method = 'GET', body, host, auth } = {}) {
   const config = getChicConfig();
   const key = (config?.apiKey || '').trim();
   if (!key) throw new Error('Clé API non configurée');
+  const params = new URLSearchParams({ path });
+  if (host) params.set('host', host);
+  if (auth) params.set('auth', auth);
   const opts = { method, headers: { 'x-chic-key': key } };
   if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-  const res = await fetch(`/api/chic-api?path=${encodeURIComponent(path)}`, opts);
+  const res = await fetch(`/api/chic-api?${params}`, opts);
   return res.json();
 }
 
-/* Sonde une liste de chemins candidats pour découvrir les endpoints réels de
-   l'API Chic (non documentée publiquement — utilisée par urlanding). */
-export async function discoverChicApi() {
-  const candidates = [
-    '/api/user', '/api/me', '/api/profile',
-    '/api/products', '/api/v1/products', '/api/affiliate/products',
-    '/api/orders', '/api/v1/orders', '/api/affiliate/orders',
-    '/api/cities', '/api/v1/cities', '/api/villes',
-    '/api/order/store', '/api/orders/store',
-  ];
+/* Sonde les endpoints réels de l'API Chic (non documentée publiquement —
+   utilisée par urlanding). Phase 1 : trouver la combinaison host + méthode
+   d'authentification que /api/user accepte. Phase 2 : sonder les chemins
+   candidats avec la meilleure combinaison. */
+export async function discoverChicApi(onProgress) {
   const results = [];
+  const hosts = ['www.chic-affiliate.com', 'api.chic-affiliate.com'];
+  const auths = ['bearer', 'xkey', 'plain', 'query'];
+
+  /* Phase 1 — /api/user est la seule route confirmée (401 = existe) */
+  let best = null;
+  for (const host of hosts) {
+    for (const auth of auths) {
+      onProgress?.(`auth: ${host} / ${auth}`);
+      try {
+        const r = await chicApi('/api/user', { host, auth });
+        results.push({ path: `[${host} · ${auth}] /api/user`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
+        if (r.status >= 200 && r.status < 300 && !best) best = { host, auth };
+      } catch (e) {
+        results.push({ path: `[${host} · ${auth}] /api/user`, status: 0, sample: e.message });
+      }
+    }
+  }
+
+  /* Phase 2 — chemins candidats (y compris ceux propres à urlanding) */
+  const candidates = [
+    '/api/products', '/api/orders', '/api/cities',
+    '/api/urlanding/products', '/api/urlanding/orders', '/api/urlanding/user',
+    '/api/landing/products', '/api/landing/orders',
+    '/api/external/products', '/api/external/orders', '/api/external/order',
+    '/api/integration/products', '/api/integration/orders',
+    '/api/affiliate/user', '/api/v2/products', '/api/store/order',
+    '/api/orders/create', '/api/order', '/api/product/list', '/api/orders/list',
+  ];
+  const combo = best || { host: 'www.chic-affiliate.com', auth: 'bearer' };
   for (const path of candidates) {
+    onProgress?.(path);
     try {
-      const r = await chicApi(path);
-      results.push({ path, status: r.status, sample: JSON.stringify(r.body).slice(0, 220) });
+      const r = await chicApi(path, combo);
+      results.push({ path: `[${combo.host} · ${combo.auth}] ${path}`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
     } catch (e) {
       results.push({ path, status: 0, sample: e.message });
     }
