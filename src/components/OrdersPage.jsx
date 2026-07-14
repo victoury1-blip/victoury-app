@@ -999,8 +999,13 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     loading={false}
                     onChange={() => {
                       if (order.validated) return;
-                      const livreur = (order.recipient?.delivery || '').toLowerCase();
-                      if (livreur.includes('ozon')) {
+                      const livreur = (order.recipient?.delivery || '').trim();
+                      // Bloquer le passage vers la Liste des Colis sans livreur.
+                      if (!livreur) {
+                        addToast('error', 'Aucun livreur', `Impossible de valider ${order.id} : assignez un livreur d'abord`);
+                        return;
+                      }
+                      if (livreur.toLowerCase().includes('ozon')) {
                         openOzone(order);
                       } else {
                         setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage' } : o));
@@ -1120,8 +1125,13 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     loading={false}
                     onChange={() => {
                       if (order.validated) return;
-                      const livreur = (order.recipient?.delivery || '').toLowerCase();
-                      if (livreur.includes('ozon')) { openOzone(order); }
+                      const livreur = (order.recipient?.delivery || '').trim();
+                      // Bloquer le passage vers la Liste des Colis sans livreur.
+                      if (!livreur) {
+                        addToast('error', 'Aucun livreur', `Impossible de valider ${order.id} : assignez un livreur d'abord`);
+                        return;
+                      }
+                      if (livreur.toLowerCase().includes('ozon')) { openOzone(order); }
                       else {
                         setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage' } : o));
                         addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
