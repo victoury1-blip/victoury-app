@@ -2,6 +2,39 @@ import { cloudSet } from './cloudSettings';
 
 const STORAGE_KEY = 'chic_config';
 
+/* Nom français approché d'une couleur CSS (hex ou rgb) — les pastilles de
+   couleur de chic-affiliate.com n'ont pas de libellé, seulement un fond. */
+const COLOR_PALETTE = [
+  ['Noir', 15, 15, 15], ['Blanc', 250, 250, 250], ['Gris', 128, 128, 128],
+  ['Rouge', 210, 30, 40], ['Bordeaux', 110, 0, 40], ['Rose', 250, 120, 170],
+  ['Orange', 255, 140, 0], ['Jaune', 250, 210, 40], ['Vert', 40, 140, 60],
+  ['Vert clair', 150, 230, 150], ['Bleu', 40, 90, 200], ['Bleu ciel', 135, 206, 235],
+  ['Bleu marine', 10, 20, 90], ['Violet', 130, 40, 160], ['Mauve', 190, 150, 220],
+  ['Marron', 120, 70, 30], ['Beige', 225, 205, 175], ['Kaki', 110, 130, 60],
+];
+export function colorNameFromCss(css) {
+  if (!css) return '';
+  let r, g, b;
+  const hex = css.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
+  if (hex) {
+    const h = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+    r = parseInt(h.slice(0, 2), 16); g = parseInt(h.slice(2, 4), 16); b = parseInt(h.slice(4, 6), 16);
+  } else {
+    const rgb = css.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (rgb) { r = +rgb[1]; g = +rgb[2]; b = +rgb[3]; }
+    else {
+      const named = { black: 'Noir', white: 'Blanc', green: 'Vert', red: 'Rouge', blue: 'Bleu', yellow: 'Jaune', pink: 'Rose', orange: 'Orange', purple: 'Violet', brown: 'Marron', gray: 'Gris', grey: 'Gris', beige: 'Beige', navy: 'Bleu marine' };
+      return named[css.trim().toLowerCase()] || '';
+    }
+  }
+  let best = '', bestD = Infinity;
+  for (const [name, pr, pg, pb] of COLOR_PALETTE) {
+    const d = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+    if (d < bestD) { bestD = d; best = name; }
+  }
+  return best;
+}
+
 export function stripHtml(str) {
   if (!str || typeof str !== 'string') return '';
   const doc = new DOMParser().parseFromString(str, 'text/html');
@@ -100,23 +133,39 @@ export async function fetchChicProductDetails(chicProductId) {
     if (val) sizes.push(val);
   });
   if (sizes.length === 0) {
-    const sizeText = html.match(/Choisir la taille[\s\S]*?<\/div>/i)?.[0] || '';
-    const sizeMatches = sizeText.match(/>(S|M|L|XL|XXL|2XL|3XL)</g);
-    if (sizeMatches) sizeMatches.forEach(m => sizes.push(m.replace('>', '')));
+    /* Le site affiche les tailles en casse mixte (« Xl », « 2xl », « 3xl ») :
+       la détection doit être insensible à la casse, sinon on retombe sur des
+       tailles par défaut fausses (S/M/L/XL). */
+    const section = html.match(/Choisir la taille[\s\S]{0,3000}?(?:Choisir la couleur|$)/i)?.[0] || html;
+    const sizeMatches = section.match(/>\s*(xs|s|m|l|x{1,3}l|[2-6]\s?xl)\s*</gi) || [];
+    sizeMatches.forEach(m => {
+      const v = m.replace(/[<>\s]/g, '').toUpperCase();
+      if (v && !sizes.includes(v)) sizes.push(v);
+    });
   }
 
   const colors = [];
   doc.querySelectorAll('input[name="color"], [data-color-id]').forEach(el => {
     const id = el.value || el.getAttribute('data-color-id');
     const label = el.getAttribute('title') || el.getAttribute('data-color-name') || '';
-    const bg = el.style?.backgroundColor || el.getAttribute('data-color') || '';
-    if (id) colors.push({ id, label, bg });
+    /* La pastille (fond coloré) peut être sur l'input, son label parent ou un
+       élément voisin — on cherche le premier style background disponible. */
+    let bg = el.style?.backgroundColor || el.getAttribute('data-color') || '';
+    if (!bg) {
+      const holder = el.closest('label') || el.parentElement;
+      const swatch = holder?.querySelector('[style*="background"]') || (holder?.getAttribute('style')?.includes('background') ? holder : null);
+      bg = swatch?.getAttribute('style')?.match(/background(?:-color)?\s*:\s*([^;"']+)/i)?.[1]?.trim() || '';
+    }
+    if (id) colors.push({ id, label: label || colorNameFromCss(bg), bg });
   });
   if (colors.length === 0) {
     const colorRegex = /name="color"[^>]*value="(\d+)"/g;
     let m;
     while ((m = colorRegex.exec(html)) !== null) {
-      colors.push({ id: m[1], label: '', bg: '' });
+      /* Style inline proche de l'input (dans les 300 caractères suivants) */
+      const around = html.slice(m.index, m.index + 300);
+      const bg = around.match(/background(?:-color)?\s*:\s*([^;"']+)/i)?.[1]?.trim() || '';
+      colors.push({ id: m[1], label: colorNameFromCss(bg), bg });
     }
     if (colors.length === 0) {
       const colorMatch = html.match(/color.*?value="(\d+)"/i);

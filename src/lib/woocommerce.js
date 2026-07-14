@@ -1,3 +1,5 @@
+import { colorNameFromCss } from './chicAffiliate';
+
 function getWooKeys() {
   try {
     const cfg = JSON.parse(localStorage.getItem('woo_config') || '{}');
@@ -140,11 +142,23 @@ export async function pushProductToWoo(product) {
 
   function resolveImg(url) {
     if (!url || url.startsWith('data:')) return null;
+    let original = url;
     if (url.includes('/api/chic-image?url=')) {
       const match = url.match(/[?&]url=([^&]+)/);
-      return match ? decodeURIComponent(match[1]) : null;
+      original = match ? decodeURIComponent(match[1]) : null;
     }
-    return url;
+    if (!original) return null;
+    /* Images Chic : WordPress refuse de télécharger une URL sans extension
+       dans le chemin, et chic-affiliate.com bloque le hotlink sans Referer.
+       On passe donc par notre proxy à chemin propre : /api/img/<b64>.jpg */
+    if (original.includes('chic-affiliate.com')) {
+      try {
+        const b64 = btoa(original).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const ext = (original.match(/\.(jpe?g|png|webp|gif)(?:\?|$)/i)?.[1] || 'jpg').toLowerCase();
+        return `${window.location.origin}/api/img/${b64}.${ext}`;
+      } catch { return original; }
+    }
+    return original;
   }
 
   const allImages = (product.images || (product.image ? [product.image] : []))
@@ -154,8 +168,12 @@ export async function pushProductToWoo(product) {
   if (product.description) body.description = product.description;
 
   /* Couleurs (produits Chic Affiliate) : deviennent un attribut de variation
-     pour que le site propose taille ET couleur, comme sur chic-affiliate.com. */
-  const colorOpts = [...new Set((product.colors || []).map(c => (c.label || '').trim()).filter(Boolean))];
+     pour que le site propose taille ET couleur, comme sur chic-affiliate.com.
+     Les pastilles Chic n'ont souvent pas de libellé : on déduit le nom du fond
+     CSS, sinon « Couleur N » — une couleur sans nom ne doit pas disparaître. */
+  const colorOpts = [...new Set((product.colors || []).map((c, i) =>
+    (c.label || '').trim() || colorNameFromCss(c.bg) || `Couleur ${i + 1}`
+  ))];
 
   if (isVariable) {
     body.attributes = [{
