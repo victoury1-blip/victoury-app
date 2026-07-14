@@ -693,13 +693,27 @@ function SiteOrdersTab({ orders = [], setOrders }) {
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ').trim();
 
+  /* Retire la ou les variantes accolées au nom (« - S », « - Bleu », « / M »,
+     « – 3XL ») pour matcher le nom de base du produit importé. */
+  const baseName = (name) => {
+    let n = norm(name);
+    // coupe tout ce qui suit le premier séparateur de variante
+    n = n.split(/\s*[-–—/|]\s*/)[0];
+    // retire une taille/couleur résiduelle en fin
+    n = n.replace(/\b(xs|s|m|l|x{1,3}l|[2-6]\s?xl|noir|blanc|rouge|vert|bleu|rose|jaune|gris|beige|marron|orange|violet)\b\s*$/i, '');
+    return n.trim();
+  };
+
   function findChicProduct(order) {
     const prods = loadProducts().filter(p => p.source === 'chic-affiliate' && p.chicId);
     const names = [order.product?.name, ...(order.products || []).map(p => p.name)].filter(Boolean);
     for (const name of names) {
-      const n = norm(name);
-      const hit = prods.find(p => norm(p.name) === n)
-        || prods.find(p => norm(p.name).includes(n) || n.includes(norm(p.name)));
+      const full = norm(name);
+      const base = baseName(name);
+      const hit = prods.find(p => norm(p.name) === full)
+        || prods.find(p => norm(p.name) === base)
+        || prods.find(p => { const pn = norm(p.name); return pn.includes(base) || base.includes(pn); })
+        || prods.find(p => { const pn = baseName(p.name); return pn && (pn === base || pn.includes(base) || base.includes(pn)); });
       if (hit) return hit;
     }
     return null;
