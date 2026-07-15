@@ -1366,6 +1366,9 @@ function ChicFacturesTab({ orders = [], setOrders }) {
   function facturer(id) {
     setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status: 'chic_facture', manuallyModified: true } : o));
   }
+  function setStatus(id, status) {
+    setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status, dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true } : o));
+  }
   function facturerTout() {
     const ids = new Set(rows.filter(r => r.o.status === 'chic_livre').map(r => r.o.id));
     if (!ids.size) return;
@@ -1430,7 +1433,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase">
-              <th className="px-3 py-2">N°</th><th className="px-3 py-2">Client</th><th className="px-3 py-2">Produit</th>
+              <th className="px-3 py-2">N°</th><th className="px-3 py-2">Client</th><th className="px-3 py-2">Ville</th><th className="px-3 py-2">Produit</th>
               <th className="px-3 py-2">Taille</th><th className="px-3 py-2">Vente</th><th className="px-3 py-2">Revendeur</th>
               <th className="px-3 py-2">Frais</th><th className="px-3 py-2">Bénéfice</th><th className="px-3 py-2">Statut</th><th className="px-3 py-2">Actions</th>
             </tr>
@@ -1440,6 +1443,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
               <tr key={r.o.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 font-mono text-xs">{r.o.id}</td>
                 <td className="px-3 py-2">{r.o.recipient?.name || '—'}</td>
+                <td className="px-3 py-2">{r.o.recipient?.city || '—'}</td>
                 <td className="px-3 py-2">{r.prodName}</td>
                 <td className="px-3 py-2">{r.o.product?.size || '—'}</td>
                 <td className="px-3 py-2 font-semibold">{r.vente.toFixed(2)}</td>
@@ -1447,17 +1451,26 @@ function ChicFacturesTab({ orders = [], setOrders }) {
                 <td className="px-3 py-2 text-rose-700">{r.frais.toFixed(2)}</td>
                 <td className="px-3 py-2 text-green-700 font-semibold">{r.benefice.toFixed(2)}</td>
                 <td className="px-3 py-2">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${chicStatusMeta(r.o.status).cls}`}>{chicStatusMeta(r.o.status).label}</span>
+                  <select
+                    value={r.o.status}
+                    onChange={e => setStatus(r.o.id, e.target.value)}
+                    className={`text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer ${chicStatusMeta(r.o.status).cls}`}
+                  >
+                    {CHIC_ORDER_STATUSES.map(s => <option key={s.key} value={s.key} className="bg-white text-gray-800">{s.label}</option>)}
+                  </select>
                 </td>
                 <td className="px-3 py-2">
-                  {r.o.status === 'chic_livre'
-                    ? <button onClick={() => facturer(r.o.id)} className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-900"><Check size={12} /> Facturer</button>
-                    : <span className="text-xs text-gray-400">✓ Facturée</span>}
+                  <div className="flex items-center gap-1">
+                    {r.o.status === 'chic_livre' && (
+                      <button onClick={() => facturer(r.o.id)} title="Facturer" className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-900"><Check size={12} /> Facturer</button>
+                    )}
+                    <button onClick={() => setStatus(r.o.id, 'chic_envoye')} title="Renvoyer vers Commandes Site" className="p-1.5 rounded bg-purple-100 text-purple-600 hover:bg-purple-200 transition"><RefreshCw size={13} /></button>
+                  </div>
                 </td>
               </tr>
             ))}
             {!rows.length && (
-              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Aucune commande livrée. Passez une commande à « Livrée » dans Commandes Site.</td></tr>
+              <tr><td colSpan={11} className="text-center py-8 text-gray-400">Aucune commande livrée. Passez une commande à « Livrée » dans Commandes Site.</td></tr>
             )}
           </tbody>
         </table>
