@@ -256,6 +256,31 @@ export async function diagnoseChicList() {
   };
 }
 
+/* Cherche dans dashboard.js comment le Tarif de livraison est récupéré à la
+   sélection d'une ville (endpoint AJAX + paramètres) pour l'automatiser. */
+export async function diagnoseChicJs() {
+  const res = await fetch(proxyUrl('/js/dashboard.js?ver=0.3', 'html'));
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  const { html: js } = await res.json();
+  const around = (kw, len = 320) => {
+    const out = []; let i = -1; const low = js.toLowerCase();
+    while ((i = low.indexOf(kw.toLowerCase(), i + 1)) !== -1 && out.length < 4) {
+      out.push(js.slice(Math.max(0, i - 60), i + len).replace(/\s+/g, ' '));
+    }
+    return out;
+  };
+  const urls = [...new Set([...js.matchAll(/["'`](\/[A-Za-z0-9_\-\/]*(?:tarif|frais|ville|city|shipping|livraison|price)[A-Za-z0-9_\-\/?=&.]*)["'`]/gi)].map(m => m[1]))].slice(0, 20);
+  return {
+    jsLength: js.length,
+    candidateUrls: urls,
+    aroundTarif: around('tarif'),
+    aroundFrais: around('frais'),
+    aroundAjax: around('ajax').concat(around('$.get')).concat(around('fetch(')).slice(0, 6),
+    aroundVilleChange: around('ville').filter(s => /change|select|val\(|ajax|get|post|fetch/i.test(s)).slice(0, 4),
+  };
+}
+
 export async function fetchChicProductDetails(chicProductId) {
   const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }

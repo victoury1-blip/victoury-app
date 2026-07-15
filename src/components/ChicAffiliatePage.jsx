@@ -8,7 +8,7 @@ import HistoryModal from './orders/HistoryModal';
 import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
-  discoverChicApi, diagnoseChicProduct, diagnoseChicList,
+  discoverChicApi, diagnoseChicProduct, diagnoseChicList, diagnoseChicJs,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 
@@ -88,6 +88,19 @@ function ConfigPanel({ onTest }) {
     setDiagResult(null);
     try {
       setDiagResult(await diagnoseChicList());
+    } catch (e) {
+      setDiagResult({ error: e.message });
+    } finally {
+      setDiagLoading(false);
+    }
+  }
+
+  async function runJsDiag() {
+    save(config);
+    setDiagLoading(true);
+    setDiagResult(null);
+    try {
+      setDiagResult(await diagnoseChicJs());
     } catch (e) {
       setDiagResult({ error: e.message });
     } finally {
@@ -231,6 +244,14 @@ function ConfigPanel({ onTest }) {
               >
                 {diagLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                 Liste
+              </button>
+              <button
+                onClick={runJsDiag}
+                disabled={diagLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-700 text-white text-sm font-semibold rounded-lg hover:bg-amber-800 transition disabled:opacity-50"
+              >
+                {diagLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                JS (frais)
               </button>
             </div>
             {diagResult && (
