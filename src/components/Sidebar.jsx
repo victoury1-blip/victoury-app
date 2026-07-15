@@ -379,7 +379,8 @@ export default function Sidebar({ orders = [], session }) {
         <Menu size={20} />
       </button>
 
-      {/* Profil : chip fixe en haut à droite (menu utilisateur) */}
+      {/* Profil : chip fixe en haut à droite — uniquement sur le Tableau de bord */}
+      {(location.pathname === '/dashboard' || location.pathname === '/') && (
       <button
         onClick={() => setShowProfile(true)}
         className="fixed top-2.5 right-3 z-40 flex items-center gap-2 bg-white border border-gray-200 rounded-full shadow-sm pl-1 pr-3 py-1 hover:shadow transition"
@@ -394,6 +395,7 @@ export default function Sidebar({ orders = [], session }) {
         )}
         <span className="text-sm font-medium text-gray-700 max-w-[140px] truncate hidden sm:block">{profile.name || currentModerator?.name || 'Admin'}</span>
       </button>
+      )}
 
       {/* Mobile: overlay sidebar */}
       {mobileOpen && (
