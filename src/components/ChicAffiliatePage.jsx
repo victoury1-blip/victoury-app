@@ -21,6 +21,19 @@ const CHIC_ORDER_STATUSES = [
 ];
 const chicStatusMeta = (k) => CHIC_ORDER_STATUSES.find(s => s.key === k) || CHIC_ORDER_STATUSES[0];
 
+/* Mémoire locale des frais de livraison par ville : Chic charge le tarif via
+   AJAX (absent du HTML), donc on retient ce que l'utilisateur saisit et on
+   le repropose automatiquement pour la même ville les fois suivantes. */
+const CITY_FRAIS_KEY = 'chic_city_frais';
+const cityKey = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+function getCityFraisMap() { try { return JSON.parse(localStorage.getItem(CITY_FRAIS_KEY) || '{}'); } catch { return {}; } }
+function rememberCityFrais(cityName, frais) {
+  const k = cityKey(cityName); const f = parseFloat(frais);
+  if (!k || !f) return;
+  try { const m = getCityFraisMap(); m[k] = f; localStorage.setItem(CITY_FRAIS_KEY, JSON.stringify(m)); } catch {}
+}
+function recallCityFrais(cityName) { const v = getCityFraisMap()[cityKey(cityName)]; return v != null ? String(v) : ''; }
+
 /* ── Status badge ── */
 function StatusBadge({ raw }) {
   const text = stripHtml(raw).trim();
@@ -840,10 +853,12 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
     villeId: '', fraisLivraison: '', address: order.recipient?.address || '', comment: order.note || '',
   });
 
-  /* Frais auto-remplis selon la ville choisie (comme sur chic-affiliate.com). */
+  /* Frais auto-remplis : d'abord ceux fournis par Chic (rares), sinon la
+     valeur mémorisée localement pour cette ville. */
   const setVille = (villeId) => {
     const c = (details?.cities || []).find(x => String(x.id) === String(villeId));
-    setForm(f => ({ ...f, villeId, fraisLivraison: c?.frais != null && c.frais !== 0 ? String(c.frais) : f.fraisLivraison }));
+    const frais = (c?.frais ? String(c.frais) : '') || recallCityFrais(c?.name) || '';
+    setForm(f => ({ ...f, villeId, fraisLivraison: frais || f.fraisLivraison }));
   };
 
   const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
@@ -860,7 +875,8 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
         const cityN = norm(order.recipient?.city);
         const city = (d.cities || []).find(c => norm(c.name) === cityN)
           || (d.cities || []).find(c => norm(c.name).includes(cityN) || cityN.includes(norm(c.name)));
-        setForm(f => ({ ...f, size, color: d.colors?.[0]?.id || '', villeId: city?.id || '', fraisLivraison: city?.frais ? String(city.frais) : '' }));
+        const frais0 = (city?.frais ? String(city.frais) : '') || recallCityFrais(city?.name) || '';
+        setForm(f => ({ ...f, size, color: d.colors?.[0]?.id || '', villeId: city?.id || '', fraisLivraison: frais0 }));
       } catch (e) {
         if (alive) setError(e.message);
       } finally {
@@ -881,6 +897,9 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
         recipientPrice: form.price, recipient: form.recipient, phone: form.phone,
         villeId: form.villeId, fraisLivraison: form.fraisLivraison || '', address: form.address, comment: form.comment,
       });
+      /* Retenir le frais saisi pour cette ville (auto-remplissage futur). */
+      const cityName = (details.cities || []).find(c => String(c.id) === String(form.villeId))?.name;
+      rememberCityFrais(cityName, form.fraisLivraison);
       onSent(order.id, { fraisLivraison: parseFloat(form.fraisLivraison) || 0, price: parseFloat(form.price) || order.price });
     } catch (e) {
       setError(e.message);
