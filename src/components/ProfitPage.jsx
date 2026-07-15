@@ -91,6 +91,24 @@ export default function ProfitPage({ orders = [] }) {
     setDateFrom(firstDay); setDateTo(lastDay);
     setApplied({ dateFrom: firstDay, dateTo: lastDay });
   }
+  const iso = d => d.toISOString().slice(0, 10);
+  function setPreset(type) {
+    const n = new Date();
+    let from, to;
+    if (type === 'semaine') {
+      const day = (n.getDay() + 6) % 7; // lundi = 0
+      from = new Date(n); from.setDate(n.getDate() - day);
+      to = new Date(from); to.setDate(from.getDate() + 6);
+    } else if (type === 'mois') {
+      from = new Date(n.getFullYear(), n.getMonth(), 1);
+      to = new Date(n.getFullYear(), n.getMonth() + 1, 0);
+    } else { // année
+      from = new Date(n.getFullYear(), 0, 1);
+      to = new Date(n.getFullYear(), 11, 31);
+    }
+    const f = iso(from), t = iso(to);
+    setDateFrom(f); setDateTo(t); setApplied({ dateFrom: f, dateTo: t });
+  }
 
   const { products: stockProducts } = useProducts();
 
@@ -208,6 +226,9 @@ export default function ProfitPage({ orders = [] }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button onClick={() => setPreset('semaine')} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Cette semaine</button>
+          <button onClick={() => setPreset('mois')} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Ce mois</button>
+          <button onClick={() => setPreset('annee')} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Cette année</button>
           <button onClick={apply} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900">Filtrer</button>
           <button onClick={reset} className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
             <RefreshCw size={13} /> Réinitialiser
