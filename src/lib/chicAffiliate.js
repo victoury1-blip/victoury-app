@@ -420,8 +420,23 @@ export async function diagnoseChicProduct(chicProductId) {
     citiesSample: (harvested?.cities || []).slice(0, 3).map(c => `${c.id}:${c.name}=${c.frais}`),
     htmlAroundTaille: around('choisir la taille'),
     htmlAroundCouleur: around('choisir la couleur'),
-    htmlAroundVille: around('ville', 900),
-    htmlAroundFrais: around('tarif de livraison', 500),
+    ...(() => {
+      /* Analyse des <script> inline pour trouver la logique ville -> tarif. */
+      const js = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
+      const jsAround = (kw, len = 400) => {
+        const out = []; let i = -1; const low = js.toLowerCase();
+        while ((i = low.indexOf(kw.toLowerCase(), i + 1)) !== -1 && out.length < 4) out.push(js.slice(Math.max(0, i - 80), i + len).replace(/\s+/g, ' '));
+        return out;
+      };
+      const urls = [...new Set([...js.matchAll(/["'`](\/[A-Za-z0-9_\-\/]*(?:tarif|frais|ville|city|shipping|livraison)[A-Za-z0-9_\-\/?=&.]*)["'`]/gi)].map(m => m[1]))].slice(0, 15);
+      return {
+        jsLen: js.length,
+        jsUrls: urls,
+        jsTarif: jsAround('tarif_livraison').concat(jsAround('tarif')).slice(0, 4),
+        jsFrais: jsAround('frais'),
+        jsVilleChange: jsAround('#ville').concat(jsAround("'ville'")).concat(jsAround('ville"')).filter(s => /change|ajax|get\(|post\(|fetch|val\(|data/i.test(s)).slice(0, 4),
+      };
+    })(),
   };
 }
 
