@@ -670,6 +670,24 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
 
   useEffect(() => { load(page * PAGE_SIZE); }, [page, load]);
 
+  /* Masquage local des commandes Chic (nettoyage de la liste, réversible). */
+  const [hiddenOrders, setHiddenOrders] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('chic_hidden_orders') || '[]')); } catch { return new Set(); }
+  });
+  const [showHiddenOrders, setShowHiddenOrders] = useState(false);
+  function hideOrder(id) {
+    const next = new Set(hiddenOrders); next.add(String(id));
+    localStorage.setItem('chic_hidden_orders', JSON.stringify([...next]));
+    setHiddenOrders(next);
+  }
+  function unhideOrder(id) {
+    const next = new Set(hiddenOrders); next.delete(String(id));
+    localStorage.setItem('chic_hidden_orders', JSON.stringify([...next]));
+    setHiddenOrders(next);
+  }
+  const visibleOrders = orders.filter(o => showHiddenOrders || !hiddenOrders.has(String(o.id)));
+  const hiddenCount = orders.filter(o => hiddenOrders.has(String(o.id))).length;
+
   function importOrder(o) {
     try {
       const existing = JSON.parse(localStorage.getItem('victoury_products') || '[]');
@@ -728,6 +746,11 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
         </button>
       </div>
 
+      {hiddenCount > 0 && (
+        <button onClick={() => setShowHiddenOrders(v => !v)} className="text-xs text-gray-500 hover:text-gray-700 underline">
+          {showHiddenOrders ? `Cacher les ${hiddenCount} commande(s) masquée(s)` : `Afficher les ${hiddenCount} commande(s) masquée(s)`}
+        </button>
+      )}
       {syncMsg && <div className="text-sm text-green-700 bg-green-50 p-3 rounded-lg"><CheckCircle2 size={14} className="inline mr-1" />{syncMsg}</div>}
       {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg"><AlertCircle size={14} className="inline mr-1" />{error}</div>}
 
@@ -757,8 +780,8 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
                 </tr>
               </thead>
               <tbody>
-                {orders.map(o => (
-                  <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
+                {visibleOrders.map(o => (
+                  <tr key={o.id} className={`border-b border-gray-100 hover:bg-gray-50 ${hiddenOrders.has(String(o.id)) ? 'opacity-50' : ''}`}>
                     <td className="px-3 py-2 font-mono text-xs">{o.id}</td>
                     <td className="px-3 py-2">{o.Recipient || '—'}</td>
                     <td className="px-3 py-2 font-mono text-xs">{o.Recipient_phone || '—'}</td>
@@ -769,13 +792,18 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
                     <td className="px-3 py-2"><StatusBadge raw={o.status} /></td>
                     <td className="px-3 py-2 text-xs text-gray-500">{o.created_at ? new Date(o.created_at).toLocaleDateString('fr-MA') : '—'}</td>
                     <td className="px-3 py-2">
-                      <button onClick={() => importOrder(o)} className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
-                        <Download size={12} /> Importer
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => importOrder(o)} className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
+                          <Download size={12} /> Importer
+                        </button>
+                        {hiddenOrders.has(String(o.id))
+                          ? <button onClick={() => unhideOrder(o.id)} title="Réafficher" className="p-1.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200"><RefreshCw size={13} /></button>
+                          : <button onClick={() => hideOrder(o.id)} title="Masquer / supprimer de la liste" className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200"><Trash2 size={13} /></button>}
+                      </div>
                     </td>
                   </tr>
                 ))}
-                {!orders.length && (
+                {!visibleOrders.length && (
                   <tr><td colSpan={10} className="text-center py-8 text-gray-400">Aucune commande</td></tr>
                 )}
               </tbody>
@@ -784,8 +812,8 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
-            {orders.map(o => (
-              <div key={o.id} className="bg-white border border-gray-200 rounded-lg p-3 space-y-1.5">
+            {visibleOrders.map(o => (
+              <div key={o.id} className={`bg-white border border-gray-200 rounded-lg p-3 space-y-1.5 ${hiddenOrders.has(String(o.id)) ? 'opacity-50' : ''}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-gray-500">#{o.id}</span>
                   <StatusBadge raw={o.status} />
@@ -798,13 +826,18 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-800">{stripHtml(o.sale_price || '')}</span>
-                  <button onClick={() => importOrder(o)} className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
-                    <Download size={12} /> Importer
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => importOrder(o)} className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
+                      <Download size={12} /> Importer
+                    </button>
+                    {hiddenOrders.has(String(o.id))
+                      ? <button onClick={() => unhideOrder(o.id)} title="Réafficher" className="p-1.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200"><RefreshCw size={13} /></button>
+                      : <button onClick={() => hideOrder(o.id)} title="Masquer" className="p-1.5 rounded bg-red-100 text-red-600 hover:bg-red-200"><Trash2 size={13} /></button>}
+                  </div>
                 </div>
               </div>
             ))}
-            {!orders.length && <p className="text-center py-8 text-gray-400 text-sm">Aucune commande</p>}
+            {!visibleOrders.length && <p className="text-center py-8 text-gray-400 text-sm">Aucune commande</p>}
           </div>
 
           {/* Pagination */}
