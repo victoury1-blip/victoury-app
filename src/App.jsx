@@ -31,6 +31,7 @@ const clearSyncQueue = async (...a) => (await _offlineStore()).clearSyncQueue(..
 const deleteOrderOffline = async (...a) => (await _offlineStore()).deleteOrderOffline(...a);
 import { cloudGet, cloudSet } from './lib/cloudSettings';
 import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
+import { logAlert } from './lib/errorLog';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
 import useOrderNotifications from './hooks/useOrderNotifications';
@@ -367,6 +368,8 @@ export default function App() {
 
   /* ── Error logger → Supabase error_logs table ── */
   function logError(source, message, details = {}) {
+    // Centre d'alertes local (visible immédiatement)
+    logAlert(source, message);
     supabase.from('error_logs').insert({ source, message, details }).then(({ error }) => {
       if (error) console.error('[logError] failed to write to error_logs:', error.message);
     });
@@ -602,13 +605,17 @@ export default function App() {
           const ts = new Date().toLocaleString('fr-MA');
           return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: ts, manuallyModified: true } : o);
         });
-      } catch { /* session expirée / réseau : silencieux */ }
+      } catch (e) {
+        logAlert('Sync Chic', `Échec de la synchro automatique : ${e?.message || 'erreur'}`);
+      }
     }
     syncChic();
     const interval = setInterval(syncChic, 5 * 60 * 1000);
     const onVis = () => { if (document.visibilityState === 'visible') syncChic(); };
     document.addEventListener('visibilitychange', onVis);
-    return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); };
+    const onChicExpired = () => logAlert('Chic Affiliate', 'Session expirée — reconnectez-vous (Configuration).');
+    window.addEventListener('chic-session-expired', onChicExpired);
+    return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('chic-session-expired', onChicExpired); };
   }, [session]);
 
   /* ── Show loading / login ── */

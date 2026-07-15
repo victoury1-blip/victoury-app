@@ -6,6 +6,7 @@ import {
   Star, AlertTriangle, Users, ArrowRight, ArrowUpRight, ArrowDownRight, Minus, Store,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AlertsCenter from './AlertsCenter';
 
 /* Photo de profil dans l'en-tête du Dashboard (clic -> ouvre la fiche profil
    gérée par la Sidebar via un événement). Reste en place, sans chevauchement. */
@@ -438,7 +439,10 @@ export default function Dashboard({ orders = [], isLoading = false }) {
           <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
           <p className="text-sm text-gray-500 mt-0.5">Vue d'ensemble de votre activité</p>
         </div>
-        <ProfilePhoto />
+        <div className="flex items-center gap-2 shrink-0">
+          <AlertsCenter />
+          <ProfilePhoto />
+        </div>
       </div>
 
       {/* Alerts */}
