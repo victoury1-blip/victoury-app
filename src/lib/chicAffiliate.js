@@ -281,6 +281,23 @@ export async function diagnoseChicJs() {
   };
 }
 
+/* Récupère le frais de livraison réel d'une ville via l'endpoint officiel de
+   Chic (découvert dans le JS de la page) : POST /affiliate/city/fees
+   { id, _token } -> { fees }. */
+export async function fetchChicCityFees(villeId, token) {
+  if (!villeId) return 0;
+  const body = new URLSearchParams({ id: String(villeId), _token: token || '' });
+  const res = await fetch(proxyUrl('/affiliate/city/fees'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+  const data = await res.json().catch(() => ({}));
+  const fees = data?.fees ?? data?.body?.fees ?? data?.tarif;
+  return parseFloat(String(fees ?? '').replace(/[^\d.]/g, '')) || 0;
+}
+
 export async function fetchChicProductDetails(chicProductId) {
   const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }

@@ -9,6 +9,7 @@ import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
   discoverChicApi, diagnoseChicProduct, diagnoseChicList, diagnoseChicJs,
+  fetchChicCityFees,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 
@@ -882,12 +883,18 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
     villeId: '', fraisLivraison: '', address: order.recipient?.address || '', comment: order.note || '',
   });
 
-  /* Frais auto-remplis : d'abord ceux fournis par Chic (rares), sinon la
-     valeur mémorisée localement pour cette ville. */
-  const setVille = (villeId) => {
+  /* Frais auto : mémoire locale d'abord, sinon appel à l'endpoint Chic
+     (/affiliate/city/fees) qui renvoie le tarif réel de la ville. */
+  const setVille = async (villeId) => {
     const c = (details?.cities || []).find(x => String(x.id) === String(villeId));
-    const frais = (c?.frais ? String(c.frais) : '') || recallCityFrais(c?.name) || '';
-    setForm(f => ({ ...f, villeId, fraisLivraison: frais || f.fraisLivraison }));
+    const known = (c?.frais ? String(c.frais) : '') || recallCityFrais(c?.name);
+    setForm(f => ({ ...f, villeId, fraisLivraison: known || f.fraisLivraison }));
+    if (!known && villeId && details?.token) {
+      try {
+        const fee = await fetchChicCityFees(villeId, details.token);
+        if (fee) { setForm(f => ({ ...f, fraisLivraison: String(fee) })); rememberCityFrais(c?.name, fee); }
+      } catch {}
+    }
   };
 
   const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
@@ -906,6 +913,13 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
           || (d.cities || []).find(c => norm(c.name).includes(cityN) || cityN.includes(norm(c.name)));
         const frais0 = (city?.frais ? String(city.frais) : '') || recallCityFrais(city?.name) || '';
         setForm(f => ({ ...f, size, color: d.colors?.[0]?.id || '', villeId: city?.id || '', fraisLivraison: frais0 }));
+        // Frais inconnu -> récupérer le tarif réel depuis Chic
+        if (!frais0 && city?.id && d.token) {
+          try {
+            const fee = await fetchChicCityFees(city.id, d.token);
+            if (fee) { setForm(f => ({ ...f, fraisLivraison: String(fee) })); rememberCityFrais(city.name, fee); }
+          } catch {}
+        }
       } catch (e) {
         if (alive) setError(e.message);
       } finally {
@@ -1532,8 +1546,11 @@ function ChicFacturesTab({ orders = [], setOrders }) {
    le frais de livraison par ville (mémorisé, réutilisé partout à l'envoi). */
 function ChicCitiesTab() {
   const [cities, setCities] = useState([]);
+  const [token, setToken] = useState('');
   const [map, setMap] = useState(getCityFraisMap());
   const [loading, setLoading] = useState(false);
+  const [fetchingAll, setFetchingAll] = useState(false);
+  const [progress, setProgress] = useState('');
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -1544,6 +1561,7 @@ function ChicCitiesTab() {
       if (!prod) throw new Error('Importez d\'abord un produit Chic (les villes proviennent d\'une fiche produit).');
       const d = await fetchChicProductDetails(prod.chicId);
       setCities(d.cities || []);
+      setToken(d.token || '');
       if (!d.cities?.length) setError('Aucune ville trouvée sur la fiche produit.');
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }
@@ -1552,6 +1570,24 @@ function ChicCitiesTab() {
   function onFrais(name, val) {
     setCityFraisValue(name, val);
     setMap(getCityFraisMap());
+  }
+
+  /* Récupère automatiquement le tarif de CHAQUE ville via /affiliate/city/fees. */
+  async function fetchAllFees() {
+    if (!token) { setError('Rechargez les villes (jeton manquant).'); return; }
+    setFetchingAll(true); setError(null);
+    let done = 0, ok = 0;
+    for (const c of cities) {
+      done++;
+      setProgress(`${done}/${cities.length} — ${c.name}`);
+      try {
+        const fee = await fetchChicCityFees(c.id, token);
+        if (fee) { setCityFraisValue(c.name, fee); ok++; }
+      } catch {}
+      setMap(getCityFraisMap());
+    }
+    setFetchingAll(false); setProgress('');
+    setError(null);
   }
 
   const filtered = cities.filter(c => !search || (c.name || '').toLowerCase().includes(search.toLowerCase()));
@@ -1568,6 +1604,11 @@ function ChicCitiesTab() {
         <button onClick={loadCities} disabled={loading} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
           {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Charger les villes
         </button>
+        {cities.length > 0 && (
+          <button onClick={fetchAllFees} disabled={fetchingAll} className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50">
+            {fetchingAll ? <><Loader2 size={14} className="animate-spin" /> {progress}</> : <><Download size={14} /> Récupérer tous les frais</>}
+          </button>
+        )}
       </div>
 
       {cities.length > 0 && (
