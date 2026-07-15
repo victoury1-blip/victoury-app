@@ -33,6 +33,14 @@ function rememberCityFrais(cityName, frais) {
   try { const m = getCityFraisMap(); m[k] = f; localStorage.setItem(CITY_FRAIS_KEY, JSON.stringify(m)); } catch {}
 }
 function recallCityFrais(cityName) { const v = getCityFraisMap()[cityKey(cityName)]; return v != null ? String(v) : ''; }
+function setCityFraisValue(cityName, val) {
+  const k = cityKey(cityName); if (!k) return;
+  try {
+    const m = getCityFraisMap(); const f = parseFloat(val);
+    if (val === '' || isNaN(f)) delete m[k]; else m[k] = f;
+    localStorage.setItem(CITY_FRAIS_KEY, JSON.stringify(m));
+  } catch {}
+}
 
 /* ── Status badge ── */
 function StatusBadge({ raw }) {
@@ -1498,6 +1506,89 @@ function ChicFacturesTab({ orders = [], setOrders }) {
   );
 }
 
+/* ── Villes & Frais ──
+   Charge la liste des villes depuis une fiche produit Chic et permet de saisir
+   le frais de livraison par ville (mémorisé, réutilisé partout à l'envoi). */
+function ChicCitiesTab() {
+  const [cities, setCities] = useState([]);
+  const [map, setMap] = useState(getCityFraisMap());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+
+  async function loadCities() {
+    setLoading(true); setError(null);
+    try {
+      const prod = loadProducts().find(p => p.source === 'chic-affiliate' && p.chicId);
+      if (!prod) throw new Error('Importez d\'abord un produit Chic (les villes proviennent d\'une fiche produit).');
+      const d = await fetchChicProductDetails(prod.chicId);
+      setCities(d.cities || []);
+      if (!d.cities?.length) setError('Aucune ville trouvée sur la fiche produit.');
+    } catch (e) { setError(e.message); } finally { setLoading(false); }
+  }
+  useEffect(() => { loadCities(); }, []);
+
+  function onFrais(name, val) {
+    setCityFraisValue(name, val);
+    setMap(getCityFraisMap());
+  }
+
+  const filtered = cities.filter(c => !search || (c.name || '').toLowerCase().includes(search.toLowerCase()));
+  const filledCount = cities.filter(c => map[cityKey(c.name)] != null).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher une ville..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        </div>
+        <button onClick={loadCities} disabled={loading} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Charger les villes
+        </button>
+      </div>
+
+      {cities.length > 0 && (
+        <p className="text-xs text-gray-500">{filledCount}/{cities.length} ville(s) avec un frais défini. Le frais saisi ici est réutilisé automatiquement à l'envoi.</p>
+      )}
+      {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg"><AlertCircle size={14} className="inline mr-1" />{error}</div>}
+
+      {loading ? (
+        <div className="flex flex-col gap-2 py-4 animate-pulse">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-10 w-full bg-gray-200 rounded-lg" />)}</div>
+      ) : (
+        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-xs text-gray-500 uppercase bg-gray-50">
+                <th className="px-4 py-2">Ville</th>
+                <th className="px-4 py-2 w-40">Frais de livraison (DH)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(c => (
+                <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="px-4 py-2 font-medium text-gray-800">{c.name}</td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      value={map[cityKey(c.name)] ?? ''}
+                      onChange={e => onFrais(c.name, e.target.value)}
+                      placeholder="—"
+                      className="w-28 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+                    />
+                  </td>
+                </tr>
+              ))}
+              {!filtered.length && <tr><td colSpan={2} className="text-center py-8 text-gray-400">{cities.length ? 'Aucune ville ne correspond.' : 'Cliquez sur « Charger les villes ».'}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Main Page ── */
 export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrder }) {
   const [tab, setTab] = useState('products');
@@ -1576,6 +1667,12 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           )}
         </button>
         <button
+          onClick={() => setTab('villes')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'villes' ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+        >
+          📍 Villes & Frais
+        </button>
+        <button
           onClick={() => setTab('send')}
           className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'send' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
@@ -1589,6 +1686,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           : tab === 'orders' ? <OrdersTab victouryOrders={orders} setVictouryOrders={setOrders} />
           : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} />
           : tab === 'factures' ? <ChicFacturesTab orders={orders} setOrders={setOrders} />
+          : tab === 'villes' ? <ChicCitiesTab />
           : <SendOrderTab />}
       </div>
     </div>
