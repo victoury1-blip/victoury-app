@@ -345,14 +345,22 @@ export default function Sidebar({ orders = [], session }) {
           }
 
           const active = isActive(item.path);
+          const itemBadge = item.path === '/chic-affiliate'
+            ? orders.filter(o => o.status === 'chic_nouveau').length
+            : 0;
           return (
             <button
               key={item.path}
               onClick={() => handleNav(item.path)}
-              className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${active ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`relative w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${active ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
             >
               <Icon size={16} className="shrink-0" />
-              {showLabel && <span>{item.label}</span>}
+              {showLabel && <span className="flex-1 text-left">{item.label}</span>}
+              {itemBadge > 0 && (
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${active ? 'bg-blue-600 text-white' : 'bg-red-500 text-white'} ${!showLabel ? 'absolute right-1 top-1' : ''}`}>
+                  {itemBadge}
+                </span>
+              )}
             </button>
           );
         })}
