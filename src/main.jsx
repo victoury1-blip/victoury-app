@@ -64,11 +64,16 @@ class RootErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.error) {
+      const msg = String(this.state.error?.message || this.state.error || '');
+      const isChunk = /Loading chunk|dynamically imported module|module script failed|Failed to fetch/i.test(msg);
       return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: 'sans-serif', padding: 24, textAlign: 'center' }}>
           <p style={{ fontSize: 40 }}>🔄</p>
-          <p style={{ fontWeight: 700, color: '#1E3A5F' }}>Une mise à jour est disponible</p>
+          <p style={{ fontWeight: 700, color: '#1E3A5F' }}>{isChunk ? 'Une mise à jour est disponible' : 'Une erreur est survenue'}</p>
           <p style={{ fontSize: 13, color: '#6b7280' }}>L'application doit être rechargée</p>
+          {!isChunk && (
+            <pre style={{ fontSize: 11, color: '#b91c1c', background: '#fef2f2', padding: 12, borderRadius: 8, maxWidth: 600, whiteSpace: 'pre-wrap', wordBreak: 'break-word', textAlign: 'left' }}>{msg.slice(0, 500)}</pre>
+          )}
           <button
             onClick={clearCachesAndReload}
             style={{ background: '#1E3A5F', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 32px', fontSize: 15, fontWeight: 700 }}
