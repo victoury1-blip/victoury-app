@@ -410,19 +410,13 @@ export default function Dashboard({ orders = [], isLoading = false }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full">
-      {/* Header */}
+      {/* Header — le badge « En direct » a été retiré ; la photo de profil
+          (chip fixe en haut à droite) occupe cet emplacement. */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
           <p className="text-sm text-gray-500 mt-0.5">Vue d'ensemble de votre activité</p>
         </div>
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full shrink-0" title="Les données se mettent à jour en temps réel">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-          </span>
-          En direct
-        </span>
       </div>
 
       {/* Alerts */}
