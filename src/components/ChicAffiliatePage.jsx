@@ -314,11 +314,14 @@ function ProductsTab() {
   }
   const isHidden = p => hiddenIds.has(p.chicId || p.name);
 
+  const reqIdRef = React.useRef(0);
   const load = useCallback(async () => {
+    const my = ++reqIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const data = await fetchChicProducts();
+      if (my !== reqIdRef.current) return; // réponse périmée
       const chicList = data.data || [];
       setProducts(chicList);
       setTotal(data.recordsTotal || 0);
@@ -362,7 +365,7 @@ function ProductsTab() {
       );
       if (already) {
         if (!importingAllRef.current) alert('Produit déjà importé');
-        return;
+        return true; // déjà présent = pas un échec
       }
       setImporting(p.chicId || p.name);
 
@@ -406,8 +409,10 @@ function ProductsTab() {
       if (p.chicId) setImportedIds(prev => new Set([...prev, p.chicId]));
       if (p.name) setImportedNames(prev => new Set([...prev, p.name.toLowerCase()]));
       if (!importingAllRef.current) alert(`✅ Produit importé avec ${allImages.length} images, ${details.colors.length} couleurs, ${sizes.length} tailles !`);
+      return true;
     } catch (e) {
-      alert('Erreur: ' + e.message);
+      if (!importingAllRef.current) alert('Erreur: ' + e.message);
+      return false;
     } finally {
       setImporting(null);
     }
@@ -428,12 +433,8 @@ function ProductsTab() {
     for (let i = 0; i < notImported.length; i++) {
       const p = notImported[i];
       setImportProgress(`${i + 1}/${notImported.length}: ${p.name || '...'}`);
-      try {
-        await importProduct(p);
-        success++;
-      } catch {
-        fail++;
-      }
+      const ok = await importProduct(p);
+      if (ok) success++; else fail++;
     }
     setImportingAll(false);
     importingAllRef.current = false;
@@ -654,17 +655,20 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
     setSyncMsg(`${livrees} commande(s) passée(s) à « Livrée »${retours ? ` · ${retours} en retour (non modifiées)` : ''}. ${orders.length ? '' : 'Cliquez d\'abord sur « Charger ».'}`);
   }
 
+  const reqIdRef = React.useRef(0);
   const load = useCallback(async (start = 0) => {
+    const my = ++reqIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const data = await fetchChicOrders(startDate, endDate, start, PAGE_SIZE);
+      if (my !== reqIdRef.current) return; // réponse périmée (date/page changée)
       setOrders(data.data || []);
       setTotal(data.recordsTotal || 0);
     } catch (e) {
-      setError(e.message);
+      if (my === reqIdRef.current) setError(e.message);
     } finally {
-      setLoading(false);
+      if (my === reqIdRef.current) setLoading(false);
     }
   }, [startDate, endDate]);
 
@@ -921,7 +925,9 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
   const setVille = async (villeId) => {
     const c = (details?.cities || []).find(x => String(x.id) === String(villeId));
     const known = (c?.frais ? String(c.frais) : '') || recallCityFrais(c?.name);
-    setForm(f => ({ ...f, villeId, fraisLivraison: known || f.fraisLivraison }));
+    // Effacer si inconnu (ne pas garder le frais de la ville précédente) ;
+    // l'appel asynchrone ci-dessous le remplira depuis Chic.
+    setForm(f => ({ ...f, villeId, fraisLivraison: known }));
     if (!known && villeId && details?.token) {
       try {
         const fee = await fetchChicCityFees(villeId, details.token);
@@ -1141,10 +1147,11 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     for (const name of names) {
       const full = norm(name);
       const base = baseName(name);
+      if (!base) continue;
       const hit = prods.find(p => norm(p.name) === full)
         || prods.find(p => norm(p.name) === base)
-        || prods.find(p => { const pn = norm(p.name); return pn.includes(base) || base.includes(pn); })
-        || prods.find(p => { const pn = baseName(p.name); return pn && (pn === base || pn.includes(base) || base.includes(pn)); });
+        || (base.length > 2 && prods.find(p => { const pn = norm(p.name); return pn.includes(base) || base.includes(pn); }))
+        || (base.length > 2 && prods.find(p => { const pn = baseName(p.name); return pn && pn.length > 2 && (pn === base || pn.includes(base) || base.includes(pn)); }));
       if (hit) return hit;
     }
     return null;
@@ -1445,7 +1452,13 @@ function ChicFacturesTab({ orders = [], setOrders }) {
     const base = (name) => norm(name).split(/\s*[-–—/|]\s*/)[0].trim();
     return list.map(o => {
       const b = base(o.product?.name);
-      const prod = prods.find(p => norm(p.name) === b || base(p.name) === b || norm(p.name).includes(b));
+      // b vide -> ne PAS matcher (sinon includes('') matche le 1er produit et
+      // fausse le prix revendeur). includes seulement si le nom est assez long.
+      const prod = !b ? null : (
+        prods.find(p => norm(p.name) === b)
+        || prods.find(p => base(p.name) === b)
+        || (b.length > 2 ? prods.find(p => norm(p.name).includes(b) || b.includes(norm(p.name))) : null)
+      );
       const qty = o.product?.qty || 1;
       const vente = o.price || 0;
       const revendeur = (prod?.purchasePrice || 0) * qty;

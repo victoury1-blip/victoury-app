@@ -7,7 +7,7 @@
 export default async function handler(req, res) {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'Missing url' });
-  if (!/^https:\/\/[a-z0-9.-]*urlanding\.com\//i.test(url)) {
+  if (!/^https:\/\/([a-z0-9-]+\.)*urlanding\.com\//i.test(url)) {
     return res.status(400).json({ error: 'Seuls les liens urlanding.com sont autorisés' });
   }
 

@@ -158,24 +158,8 @@ export default async function handler(req, res) {
     const checkHtml = await checkRes.text();
     const loggedIn = checkHtml.includes('VICTOURY') || checkHtml.includes('Nouveau Colis') || checkHtml.includes('parcel_phone');
 
-    // Diagnostic complet (fonctionne même si le login échoue)
-    if (req.query.debug && !loggedIn) {
-      return res.json({ debug: true, loggedIn: false, checkStatus: checkRes.status, checkSnippet: checkHtml.slice(0, 1500), cookies: allCookies.length });
-    }
-
-    // Trouver le vrai endpoint de vérification du téléphone dans le JS de la page
-    if (req.query.findurl) {
-      const hits = [];
-      // URLs contenant des mots-clés pertinents
-      const urlRe = /["'`](\/[A-Za-z0-9_\-\/?=&.]*(?:earch|lacklist|hone|lient|istor|heck|jax)[A-Za-z0-9_\-\/?=&.]*)["'`]/gi;
-      let m;
-      while ((m = urlRe.exec(checkHtml)) !== null && hits.length < 40) hits.push(m[1]);
-      // extraits autour de "Phone" pour voir le nom du paramètre
-      const around = [];
-      const kwRe = /[\s\S]{0,60}(SearchAjax|BlackList|GetClient|CheckPhone|client_phone|parcel_phone)[\s\S]{0,80}/gi;
-      while ((m = kwRe.exec(checkHtml)) !== null && around.length < 12) around.push(m[0].replace(/\s+/g, ' ').trim());
-      return res.json({ debug: 'findurl', loggedIn, urls: [...new Set(hits)], around });
-    }
+    // Les modes de diagnostic (debug/findurl) renvoyaient du HTML Ozon brut
+    // (données tierces potentielles) sans authentification : supprimés.
 
     if (loggedIn) {
       const safePhone = encodeURIComponent(phone);
@@ -203,11 +187,6 @@ export default async function handler(req, res) {
       let sr = await search('GET');
       if (!sr.text.trim()) sr = await search('POST');
       const html = sr.text;
-
-      // Mode debug : renvoie la réponse brute d'Ozon pour diagnostiquer le parsing
-      if (req.query.debug) {
-        return res.json({ debug: true, loggedIn, searchStatus: sr.status, length: html.length, raw: html.slice(0, 4000) });
-      }
 
       if (html.trim()) {
         // tolérant aux variantes de libellés/espaces d'Ozon

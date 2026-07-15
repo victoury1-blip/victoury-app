@@ -4,6 +4,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing path or session' });
   }
 
+  // Empêche l'évasion vers un autre hôte (SSRF / open-proxy) : le chemin doit
+  // commencer par un seul "/" suivi d'un caractère de chemin — pas de "//host",
+  // "/@host", "/\host" ni URL absolue.
+  if (!/^\/[A-Za-z0-9]/.test(path)) {
+    return res.status(400).json({ error: 'Chemin invalide' });
+  }
+
   const url = `https://www.chic-affiliate.com${path}`;
 
   try {

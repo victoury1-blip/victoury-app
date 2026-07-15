@@ -10,8 +10,10 @@ export default async function handler(req, res) {
     if (imageUrl.includes('%2F') || imageUrl.includes('%3A')) {
       try { imageUrl = decodeURIComponent(imageUrl); } catch {}
     }
-    if (!imageUrl.startsWith('http')) {
-      return res.status(400).json({ error: 'A valid URL was not provided.' });
+    // Restreint le proxy d'images à chic-affiliate.com (évite un SSRF vers un
+    // hôte arbitraire / des services internes).
+    if (!/^https?:\/\/(www\.)?chic-affiliate\.com\//i.test(imageUrl)) {
+      return res.status(400).json({ error: 'Hôte non autorisé' });
     }
     const response = await fetch(imageUrl, {
       headers: {
