@@ -170,7 +170,9 @@ export default function ProfitPage({ orders = [] }) {
     }
     return s + cost;
   }, 0);
-  const chicProfit = chicCA - chicCost;
+  // Frais de livraison Chic (mémorisés par commande à l'envoi).
+  const chicFrais = chicOrdersList.reduce((s, o) => s + (o.chicFrais || 0), 0);
+  const chicProfit = chicCA - chicCost - chicFrais;
 
   const selCls = 'border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
 
@@ -246,7 +248,7 @@ export default function ProfitPage({ orders = [] }) {
             <h2 className="font-bold text-gray-700 mb-3 text-sm flex items-center gap-2">
               <Store size={14} className="text-indigo-600" /> Profit Chic Affiliate
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
               <div className="bg-indigo-50 rounded-xl p-3">
                 <div className="text-[10px] font-semibold text-gray-500 uppercase">Commandes</div>
                 <div className="text-lg font-black text-indigo-700">{chicOrdersList.length}</div>
@@ -259,8 +261,12 @@ export default function ProfitPage({ orders = [] }) {
                 <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût Revendeur</div>
                 <div className="text-lg font-black text-red-600">{fmt(chicCost)}</div>
               </div>
+              <div className="bg-orange-50 rounded-xl p-3">
+                <div className="text-[10px] font-semibold text-gray-500 uppercase">Frais Livraison</div>
+                <div className="text-lg font-black text-orange-600">{fmt(chicFrais)}</div>
+              </div>
               <div className="bg-green-50 rounded-xl p-3">
-                <div className="text-[10px] font-semibold text-gray-500 uppercase">Bénéfice</div>
+                <div className="text-[10px] font-semibold text-gray-500 uppercase">Bénéfice net</div>
                 <div className={`text-lg font-black ${chicProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(chicProfit)}</div>
               </div>
             </div>
