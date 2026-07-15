@@ -379,7 +379,6 @@ export default function Sidebar({ orders = [], session }) {
           {(isMobile || !collapsed) && (
             <div className="flex-1 min-w-0 text-left">
               <span className="text-sm text-gray-700 font-medium block truncate">{profile.name || currentModerator?.name || 'Admin'}</span>
-              <span className="text-[10px] text-gray-400 block truncate">{session?.user?.email || ''}</span>
             </div>
           )}
         </button>
