@@ -39,6 +39,7 @@ export default function ProfitPage({ orders = [] }) {
   const [dateFrom, setDateFrom] = useState(firstDay);
   const [dateTo,   setDateTo]   = useState(lastDay);
   const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay });
+  const [activePreset, setActivePreset] = useState('mois');
 
   const [adTransfers, setAdTransfers] = useState(() => {
     try { return JSON.parse(localStorage.getItem('ad_transfers') || '[]'); } catch { return []; }
@@ -86,10 +87,11 @@ export default function ProfitPage({ orders = [] }) {
 
   function removeTransfer(id) { saveAdTransfers(adTransfers.filter(t => t.id !== id)); }
 
-  function apply() { setApplied({ dateFrom, dateTo }); }
+  function apply() { setApplied({ dateFrom, dateTo }); setActivePreset(null); }
   function reset() {
     setDateFrom(firstDay); setDateTo(lastDay);
     setApplied({ dateFrom: firstDay, dateTo: lastDay });
+    setActivePreset('mois');
   }
   const iso = d => d.toISOString().slice(0, 10);
   function setPreset(type) {
@@ -108,7 +110,11 @@ export default function ProfitPage({ orders = [] }) {
     }
     const f = iso(from), t = iso(to);
     setDateFrom(f); setDateTo(t); setApplied({ dateFrom: f, dateTo: t });
+    setActivePreset(type);
   }
+  const presetCls = (type) => activePreset === type
+    ? 'px-3 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white border border-blue-600'
+    : 'px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50';
 
   const { products: stockProducts } = useProducts();
 
@@ -220,15 +226,15 @@ export default function ProfitPage({ orders = [] }) {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Période :</label>
           <div className="flex items-center gap-2">
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={selCls} />
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setActivePreset(null); }} className={selCls} />
             <span className="text-gray-400 text-sm">–</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={selCls} />
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setActivePreset(null); }} className={selCls} />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setPreset('semaine')} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Cette semaine</button>
-          <button onClick={() => setPreset('mois')} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Ce mois</button>
-          <button onClick={() => setPreset('annee')} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Cette année</button>
+          <button onClick={() => setPreset('semaine')} className={presetCls('semaine')}>Cette semaine</button>
+          <button onClick={() => setPreset('mois')} className={presetCls('mois')}>Ce mois</button>
+          <button onClick={() => setPreset('annee')} className={presetCls('annee')}>Cette année</button>
           <button onClick={apply} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900">Filtrer</button>
           <button onClick={reset} className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
             <RefreshCw size={13} /> Réinitialiser
