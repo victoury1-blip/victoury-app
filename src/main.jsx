@@ -16,7 +16,17 @@ async function clearCachesAndReload() {
     const regs = await navigator.serviceWorker?.getRegistrations?.() || [];
     await Promise.all(regs.map(r => r.unregister()));
   } catch {}
-  location.reload();
+  // Recharger en contournant le cache HTTP du shell (index.html) : un simple
+  // reload peut resservir l'ancien index depuis le cache disque et redemander
+  // des chunks supprimés -> boucle. Le paramètre horaire force une vraie
+  // récupération réseau.
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set('_r', Date.now().toString());
+    location.replace(u.toString());
+  } catch {
+    location.reload();
+  }
 }
 
 // On chunk load error (stale SW cache after a deploy), clear caches and reload.
