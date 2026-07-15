@@ -565,6 +565,40 @@ export async function discoverChicApi(onProgress) {
   return results;
 }
 
+/* Calcule les mises à jour de statut à appliquer : pour chaque commande
+   Victoury « chic_envoye », si Chic la donne « Livré » (match téléphone +
+   nom de produit), renvoie { id, status:'chic_livre' }. Réutilisable pour la
+   synchro manuelle ET automatique. */
+export function computeChicStatusUpdates(chicOrders, victouryOrders) {
+  const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  const base = s => norm(s).split(/\s*[-–—/|]\s*/)[0].trim();
+  const phoneKey = s => (s || '').replace(/\D/g, '').slice(-9);
+  const byPhone = new Map();
+  for (const c of (chicOrders || [])) {
+    const k = phoneKey(c.Recipient_phone);
+    if (!k) continue;
+    if (!byPhone.has(k)) byPhone.set(k, []);
+    byPhone.get(k).push(c);
+  }
+  const updates = [];
+  for (const o of (victouryOrders || [])) {
+    if (o.status !== 'chic_envoye') continue;
+    const cands = byPhone.get(phoneKey(o.recipient?.phone)) || [];
+    const b = base(o.product?.name);
+    const match = cands.find(c => { const cb = base(c.product?.name); return cb && (cb === b || cb.includes(b) || b.includes(cb)); }) || cands[0];
+    if (!match) continue;
+    const st = stripHtml(match.status || '').toLowerCase();
+    if (st.includes('livr')) updates.push({ id: o.id, status: 'chic_livre' });
+  }
+  return updates;
+}
+
+/* Récupère les commandes Chic récentes (sans filtre de date) pour l'auto-synchro. */
+export async function fetchChicRecentOrders(length = 100) {
+  const data = await fetchChicOrders('', '', 0, length);
+  return data.data || [];
+}
+
 export async function fetchChicCounts() {
   const params = new URLSearchParams({
     draw: '1',

@@ -9,7 +9,7 @@ import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
   discoverChicApi, diagnoseChicProduct, diagnoseChicList, diagnoseChicJs,
-  fetchChicCityFees,
+  fetchChicCityFees, computeChicStatusUpdates,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 
@@ -630,29 +630,15 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
      envoyée (match par téléphone + nom de produit), on passe la commande
      Victoury à « Livrée » (elle rejoint alors l'onglet Factures). */
   function syncStatuses() {
-    const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
-    const base = s => norm(s).split(/\s*[-–—/|]\s*/)[0].trim();
-    const phoneKey = s => (s || '').replace(/\D/g, '').slice(-9);
-    const byPhone = new Map();
-    orders.forEach(c => {
-      const k = phoneKey(c.Recipient_phone);
-      if (!k) return;
-      if (!byPhone.has(k)) byPhone.set(k, []);
-      byPhone.get(k).push(c);
+    let count = 0;
+    setVictouryOrders?.(prev => {
+      const updates = computeChicStatusUpdates(orders, prev);
+      count = updates.length;
+      if (!updates.length) return prev;
+      const m = new Map(updates.map(u => [u.id, u.status]));
+      return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true } : o);
     });
-    let livrees = 0, retours = 0;
-    setVictouryOrders?.(prev => prev.map(o => {
-      if (o.status !== 'chic_envoye') return o;
-      const cands = byPhone.get(phoneKey(o.recipient?.phone)) || [];
-      const b = base(o.product?.name);
-      const match = cands.find(c => { const cb = base(c.product?.name); return cb && (cb === b || cb.includes(b) || b.includes(cb)); }) || cands[0];
-      if (!match) return o;
-      const st = stripHtml(match.status || '').toLowerCase();
-      if (st.includes('livr')) { livrees++; return { ...o, status: 'chic_livre', dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }; }
-      if (st.includes('retour') || st.includes('return')) { retours++; }
-      return o;
-    }));
-    setSyncMsg(`${livrees} commande(s) passée(s) à « Livrée »${retours ? ` · ${retours} en retour (non modifiées)` : ''}. ${orders.length ? '' : 'Cliquez d\'abord sur « Charger ».'}`);
+    setSyncMsg(`${count} commande(s) passée(s) à « Livrée ».${orders.length ? '' : ' Cliquez d\'abord sur « Charger ».'}`);
   }
 
   const reqIdRef = React.useRef(0);

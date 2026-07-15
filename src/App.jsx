@@ -30,6 +30,7 @@ const getPendingSync = async (...a) => (await _offlineStore()).getPendingSync(..
 const clearSyncQueue = async (...a) => (await _offlineStore()).clearSyncQueue(...a);
 const deleteOrderOffline = async (...a) => (await _offlineStore()).deleteOrderOffline(...a);
 import { cloudGet, cloudSet } from './lib/cloudSettings';
+import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
 import useOrderNotifications from './hooks/useOrderNotifications';
@@ -116,6 +117,8 @@ export default function App() {
   const wooConfigRef = useRef(null);
   const notifConfigRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const ordersRef = useRef(orders);
+  ordersRef.current = orders;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -704,6 +707,35 @@ export default function App() {
     });
     navigate('/commandes/a-confirmer');
   }
+
+  /* ── Auto-synchro des statuts Chic Affiliate ──
+     Passe les commandes « Envoyée » à « Livrée » quand Chic les marque
+     livrées, sans clic manuel. Ne tourne que si Chic est configuré et qu'il
+     existe des commandes en attente. */
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    async function syncChic() {
+      try {
+        if (!getChicConfig()?.sessionCookie) return;
+        if (!ordersRef.current.some(o => o.status === 'chic_envoye')) return;
+        const chicOrders = await fetchChicRecentOrders(100);
+        if (cancelled || !chicOrders.length) return;
+        setOrdersWithSync(prev => {
+          const updates = computeChicStatusUpdates(chicOrders, prev);
+          if (!updates.length) return prev;
+          const m = new Map(updates.map(u => [u.id, u.status]));
+          const ts = new Date().toLocaleString('fr-MA');
+          return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: ts, manuallyModified: true } : o);
+        });
+      } catch { /* session expirée / réseau : silencieux */ }
+    }
+    syncChic();
+    const interval = setInterval(syncChic, 5 * 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') syncChic(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); };
+  }, [session]);
 
   return (
     <ToastProvider>
