@@ -156,16 +156,26 @@ export default function ProfitPage({ orders = [] }) {
   const totalLivre = livresColis.length;
 
   const chicProducts = stockProducts.filter(p => p.source === 'chic-affiliate');
+  // Matching par nom de base (ignore les variantes « - L », « - Noir »…).
+  const cNorm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  const cBase = s => cNorm(s).split(/\s*[-–—/|]\s*/)[0].trim();
+  const chicMatch = (pname) => {
+    const b = cBase(pname); if (!b) return null;
+    return chicProducts.find(cp => cBase(cp.name) === b)
+      || (b.length > 2 ? chicProducts.find(cp => cBase(cp.name).includes(b) || b.includes(cBase(cp.name))) : null);
+  };
+  // Profit Chic = commandes livrées/facturées (ventes réalisées).
   const chicOrdersList = orders.filter(o => {
+    if (o.status !== 'chic_livre' && o.status !== 'chic_facture') return false;
     const prods = o.products?.length ? o.products : [o.product];
-    return prods.some(p => chicProducts.find(cp => cp.name === p?.name));
+    return prods.some(p => chicMatch(p?.name));
   });
   const chicCA = chicOrdersList.reduce((s, o) => s + (o.price || 0), 0);
   const chicCost = chicOrdersList.reduce((s, o) => {
     const prods = o.products?.length ? o.products : [o.product];
     let cost = 0;
     for (const p of prods) {
-      const sp = chicProducts.find(cp => cp.name === p?.name);
+      const sp = chicMatch(p?.name);
       if (sp) cost += (parseFloat(sp.purchasePrice) || 0) * (p.qty || 1);
     }
     return s + cost;
