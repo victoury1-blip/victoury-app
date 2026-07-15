@@ -366,23 +366,6 @@ export default function Sidebar({ orders = [], session }) {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className={`px-3 py-3 border-t border-gray-100 flex items-center ${!isMobile && collapsed ? 'justify-center' : 'gap-2'}`}>
-        <button onClick={() => setShowProfile(true)} className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80 transition">
-          {profile.avatar ? (
-            <img src={profile.avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-              {(profile.name || currentModerator?.name || 'V')[0]?.toUpperCase()}
-            </div>
-          )}
-          {(isMobile || !collapsed) && (
-            <div className="flex-1 min-w-0 text-left">
-              <span className="text-sm text-gray-700 font-medium block truncate">{profile.name || currentModerator?.name || 'Admin'}</span>
-            </div>
-          )}
-        </button>
-      </div>
     </>
   );
 
@@ -394,6 +377,22 @@ export default function Sidebar({ orders = [], session }) {
         className="fixed top-3 left-3 z-40 p-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 sm:hidden"
       >
         <Menu size={20} />
+      </button>
+
+      {/* Profil : chip fixe en haut à droite (menu utilisateur) */}
+      <button
+        onClick={() => setShowProfile(true)}
+        className="fixed top-2.5 right-3 z-40 flex items-center gap-2 bg-white border border-gray-200 rounded-full shadow-sm pl-1 pr-3 py-1 hover:shadow transition"
+        title="Profil"
+      >
+        {profile.avatar ? (
+          <img src={profile.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-gray-800 text-white flex items-center justify-center text-xs font-bold">
+            {(profile.name || currentModerator?.name || 'V')[0]?.toUpperCase()}
+          </div>
+        )}
+        <span className="text-sm font-medium text-gray-700 max-w-[140px] truncate hidden sm:block">{profile.name || currentModerator?.name || 'Admin'}</span>
       </button>
 
       {/* Mobile: overlay sidebar */}
