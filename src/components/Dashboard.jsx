@@ -6,6 +6,28 @@ import {
   Star, AlertTriangle, Users, ArrowRight, ArrowUpRight, ArrowDownRight, Minus, Store,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+/* Photo de profil dans l'en-tête du Dashboard (clic -> ouvre la fiche profil
+   gérée par la Sidebar via un événement). Reste en place, sans chevauchement. */
+function ProfilePhoto() {
+  let profile = {};
+  try { profile = JSON.parse(localStorage.getItem('victoury_profile') || '{}'); } catch {}
+  return (
+    <button
+      onClick={() => window.dispatchEvent(new Event('open-profile'))}
+      className="shrink-0 rounded-full shadow-md hover:shadow-lg transition ring-2 ring-white"
+      title="Profil"
+    >
+      {profile.avatar ? (
+        <img src={profile.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-gray-800 text-white flex items-center justify-center text-lg font-bold">
+          {(profile.name || 'V')[0]?.toUpperCase()}
+        </div>
+      )}
+    </button>
+  );
+}
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -410,13 +432,13 @@ export default function Dashboard({ orders = [], isLoading = false }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full">
-      {/* Header — le badge « En direct » a été retiré ; la photo de profil
-          (chip fixe en haut à droite) occupe cet emplacement. */}
+      {/* Header — la photo de profil occupe la place de l'ancien « En direct ». */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
           <p className="text-sm text-gray-500 mt-0.5">Vue d'ensemble de votre activité</p>
         </div>
+        <ProfilePhoto />
       </div>
 
       {/* Alerts */}

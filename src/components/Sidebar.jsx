@@ -249,6 +249,13 @@ export default function Sidebar({ orders = [], session }) {
   // Close mobile sidebar on route change
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
+  // Ouvre la fiche profil depuis un déclencheur externe (photo du Dashboard).
+  useEffect(() => {
+    const open = () => setShowProfile(true);
+    window.addEventListener('open-profile', open);
+    return () => window.removeEventListener('open-profile', open);
+  }, []);
+
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   const visibleItems = NAV_ITEMS.filter(item => {
@@ -378,23 +385,6 @@ export default function Sidebar({ orders = [], session }) {
       >
         <Menu size={20} />
       </button>
-
-      {/* Profil : chip fixe en haut à droite — uniquement sur le Tableau de bord */}
-      {(location.pathname === '/dashboard' || location.pathname === '/') && (
-      <button
-        onClick={() => setShowProfile(true)}
-        className="fixed top-3 right-4 z-40 rounded-full shadow-md hover:shadow-lg transition ring-2 ring-white"
-        title="Profil"
-      >
-        {profile.avatar ? (
-          <img src={profile.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-gray-800 text-white flex items-center justify-center text-lg font-bold">
-            {(profile.name || currentModerator?.name || 'V')[0]?.toUpperCase()}
-          </div>
-        )}
-      </button>
-      )}
 
       {/* Mobile: overlay sidebar */}
       {mobileOpen && (
