@@ -383,17 +383,16 @@ export default function Sidebar({ orders = [], session }) {
       {(location.pathname === '/dashboard' || location.pathname === '/') && (
       <button
         onClick={() => setShowProfile(true)}
-        className="fixed top-2.5 right-3 z-40 flex items-center gap-2 bg-white border border-gray-200 rounded-full shadow-sm pl-1 pr-3 py-1 hover:shadow transition"
+        className="fixed top-3 right-4 z-40 rounded-full shadow-md hover:shadow-lg transition ring-2 ring-white"
         title="Profil"
       >
         {profile.avatar ? (
-          <img src={profile.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
+          <img src={profile.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-gray-800 text-white flex items-center justify-center text-xs font-bold">
+          <div className="w-12 h-12 rounded-full bg-gray-800 text-white flex items-center justify-center text-lg font-bold">
             {(profile.name || currentModerator?.name || 'V')[0]?.toUpperCase()}
           </div>
         )}
-        <span className="text-sm font-medium text-gray-700 max-w-[140px] truncate hidden sm:block">{profile.name || currentModerator?.name || 'Admin'}</span>
       </button>
       )}
 
