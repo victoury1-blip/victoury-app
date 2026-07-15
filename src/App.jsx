@@ -583,6 +583,34 @@ export default function App() {
     return () => { clearTimeout(timer); clearInterval(interval); };
   }, [session, orders.length]);
 
+  /* ── Auto-synchro des statuts Chic Affiliate (avant tout return conditionnel) ──
+     Passe les commandes « Envoyée » à « Livrée » quand Chic les marque
+     livrées, sans clic manuel. */
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    async function syncChic() {
+      try {
+        if (!getChicConfig()?.sessionCookie) return;
+        if (!ordersRef.current.some(o => o.status === 'chic_envoye')) return;
+        const chicOrders = await fetchChicRecentOrders(100);
+        if (cancelled || !chicOrders.length) return;
+        setOrdersWithSync(prev => {
+          const updates = computeChicStatusUpdates(chicOrders, prev);
+          if (!updates.length) return prev;
+          const m = new Map(updates.map(u => [u.id, u.status]));
+          const ts = new Date().toLocaleString('fr-MA');
+          return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: ts, manuallyModified: true } : o);
+        });
+      } catch { /* session expirée / réseau : silencieux */ }
+    }
+    syncChic();
+    const interval = setInterval(syncChic, 5 * 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') syncChic(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); };
+  }, [session]);
+
   /* ── Show loading / login ── */
   if (session === undefined) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
   if (session === null) return <LoginPage />;
@@ -707,35 +735,6 @@ export default function App() {
     });
     navigate('/commandes/a-confirmer');
   }
-
-  /* ── Auto-synchro des statuts Chic Affiliate ──
-     Passe les commandes « Envoyée » à « Livrée » quand Chic les marque
-     livrées, sans clic manuel. Ne tourne que si Chic est configuré et qu'il
-     existe des commandes en attente. */
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    async function syncChic() {
-      try {
-        if (!getChicConfig()?.sessionCookie) return;
-        if (!ordersRef.current.some(o => o.status === 'chic_envoye')) return;
-        const chicOrders = await fetchChicRecentOrders(100);
-        if (cancelled || !chicOrders.length) return;
-        setOrdersWithSync(prev => {
-          const updates = computeChicStatusUpdates(chicOrders, prev);
-          if (!updates.length) return prev;
-          const m = new Map(updates.map(u => [u.id, u.status]));
-          const ts = new Date().toLocaleString('fr-MA');
-          return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: ts, manuallyModified: true } : o);
-        });
-      } catch { /* session expirée / réseau : silencieux */ }
-    }
-    syncChic();
-    const interval = setInterval(syncChic, 5 * 60 * 1000);
-    const onVis = () => { if (document.visibilityState === 'visible') syncChic(); };
-    document.addEventListener('visibilitychange', onVis);
-    return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); };
-  }, [session]);
 
   return (
     <ToastProvider>
