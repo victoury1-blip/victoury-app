@@ -1025,6 +1025,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
 
                   {/* État — click to change */}
                   <td className="px-4 py-3">
+                    <div className="flex flex-col items-start gap-1">
                     <button
                       onClick={() => setEditOrder(o)}
                       className="flex items-center gap-1 group"
@@ -1043,7 +1044,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     })() && (
                       <button
                         onClick={() => sendLivreurInfo(o)}
-                        className={`mt-1 text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
                           sentLivreurInfo.has(o.id)
                             ? 'bg-green-100 text-green-700 border-green-300'
                             : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
@@ -1057,7 +1058,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     {o.status === 'livre' && (
                       <button
                         onClick={() => toggleFacture(o.id)}
-                        className={`mt-1 text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
                           facturedIds.has(o.id)
                             ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
                             : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-700'
@@ -1069,7 +1070,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                     {(o.status === 'refuse' || o.status === 'annule') && (
                       <button
                         onClick={() => toggleRecu(o.id)}
-                        className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white transition-colors ${
+                        className={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white transition-colors ${
                           (o.recu || recuIds.has(o.id))
                             ? 'bg-green-600 hover:bg-green-700'
                             : 'bg-red-800 hover:bg-red-900'
@@ -1079,6 +1080,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
                         <span className="text-[8px]">▼</span>
                       </button>
                     )}
+                    </div>
                   </td>
 
                   {/* Note */}
