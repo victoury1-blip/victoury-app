@@ -298,10 +298,14 @@ function FraisPage({ livreur, onBack }) {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    // 1) Lecture locale immédiate (persiste même hors-ligne / avant le cloud).
+    const local = load(key, []);
+    if (Array.isArray(local) && local.length) setFrais(local);
+    setLoading(false);
+    // 2) Puis rafraîchir depuis le cloud (source de vérité multi-appareils).
     cloudGet(key).then(remote => {
       if (Array.isArray(remote) && remote.length) { setFrais(remote); save(key, remote); }
-      setLoading(false);
-    });
+    }).catch(() => {});
   }, [key]);
 
   function persist(data) { setFrais(data); save(key, data); cloudSet(key, data); }
