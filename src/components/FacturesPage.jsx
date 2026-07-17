@@ -269,7 +269,7 @@ function printFacture(f, toast) {
     * { box-sizing: border-box; }
     @page { size: A4 portrait; margin: 14mm; }
     html, body { background:#fff; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color:#1f2937; margin:0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color:#000; margin:0; }
     /* Conteneur au format A4 : centré à l'écran, plein cadre à l'impression. */
     .sheet { width: 190mm; max-width: 100%; margin: 12px auto; padding: 10mm; background:#fff; }
     @media print { .sheet { width:auto; margin:0; padding:0; box-shadow:none; } }
@@ -277,26 +277,24 @@ function printFacture(f, toast) {
     table { page-break-inside:auto; }
     tr { page-break-inside:avoid; page-break-after:auto; }
     thead { display:table-header-group; }
-    .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #1E3A5F; padding-bottom:14px; }
-    .brand .logo { font-size:26px; font-weight:900; letter-spacing:1px; color:#1E3A5F; }
-    .brand .sub { font-size:11px; color:#6b7280; margin-top:2px; }
-    .invbox { text-align:right; font-size:12px; line-height:1.7; }
-    .invbox .ref { font-size:15px; font-weight:800; color:#1E3A5F; }
+    .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:14px; }
+    .brand .logo { font-size:26px; font-weight:900; letter-spacing:1px; color:#000; }
+    .brand .sub { font-size:11px; color:#000; margin-top:2px; }
+    .invbox { text-align:right; font-size:12px; line-height:1.7; color:#000; }
+    .invbox .ref { font-size:15px; font-weight:800; color:#000; }
     .parties { display:flex; gap:16px; margin:18px 0; }
-    .party { flex:1; border:1px solid #e5e7eb; border-radius:8px; padding:10px 14px; font-size:11.5px; line-height:1.7; }
-    .party .t { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; font-weight:700; margin-bottom:3px; }
+    .party { flex:1; border:1px solid #000; padding:10px 14px; font-size:11.5px; line-height:1.7; }
+    .party .t { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#000; font-weight:700; margin-bottom:3px; }
     table { width:100%; border-collapse:collapse; margin-top:6px; }
-    th { background:#1E3A5F; color:#fff; padding:8px 9px; text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; }
-    td { padding:8px 9px; border:1px solid #e5e7eb; font-size:11.5px; }
+    th { background:#fff; color:#000; padding:8px 9px; text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; border:1px solid #000; }
+    td { padding:8px 9px; border:1px solid #000; font-size:11.5px; color:#000; }
     td.c { text-align:center; } td.r { text-align:right; }
-    .ph { font-size:10px; color:#9ca3af; }
-    tbody tr:nth-child(even) td { background:#f8fafc; }
-    .totbox { margin-top:18px; margin-left:auto; width:320px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; }
-    .totbox .row { display:flex; justify-content:space-between; padding:8px 14px; font-size:12px; border-bottom:1px solid #eef2f7; }
-    .totbox .row.net { background:#1E3A5F; color:#fff; font-weight:800; font-size:14px; border-bottom:none; }
-    .footer { margin-top:26px; text-align:center; color:#6b7280; font-size:11px; }
-    .footer .thanks { font-weight:700; color:#1E3A5F; margin-top:6px; }
-    @media print { @page { margin:14mm; } }
+    .ph { font-size:10px; color:#000; }
+    .totbox { margin-top:18px; margin-left:auto; width:60%; border:1px solid #000; border-collapse:collapse; }
+    .totbox .row { display:flex; justify-content:space-between; padding:8px 14px; font-size:12px; border-bottom:1px solid #000; color:#000; }
+    .totbox .row.net { font-weight:800; font-size:14px; border-bottom:none; }
+    .footer { margin-top:26px; text-align:center; color:#000; font-size:11px; }
+    .footer .thanks { font-weight:700; color:#000; margin-top:6px; }
   </style></head><body>
   <div class="sheet">
   <div class="head">
