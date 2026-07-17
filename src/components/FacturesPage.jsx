@@ -248,54 +248,91 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
 /* ─── PDF print ─── */
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function printFacture(f, toast) {
-  const rows = f.colis.map(c => `
+  const rows = f.colis.map((c, i) => {
+    const net = (c.status === 'livre' ? (c.prix || 0) : 0) - (c.fraisLivraison || 0);
+    return `
     <tr>
-      <td>${esc(c.orderId)}</td>
-      <td>${esc(statusLabel(c.status))}</td>
-      <td>${fmt(c.prix)} DH</td>
-      <td>${fmt(c.fraisLivraison)} DH</td>
-    </tr>`).join('');
+      <td class="c">${i + 1}</td>
+      <td><b>${esc(c.orderId)}</b>${c.phone ? `<div class="ph">${esc(c.phone)}</div>` : ''}</td>
+      <td>${esc(c.recipient || '—')}</td>
+      <td>${esc(c.city || '—')}</td>
+      <td class="c">${esc(statusLabel(c.status))}</td>
+      <td class="r">${fmt(c.prix)} DH</td>
+      <td class="r">${fmt(c.fraisLivraison)} DH</td>
+      <td class="r"><b>${fmt(net)} DH</b></td>
+    </tr>`;
+  }).join('');
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>${f.ref}</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 32px; font-size: 13px; }
-    h1 { font-size: 22px; color: #1e3a8a; margin-bottom: 4px; }
-    .meta { color:#555; margin-bottom: 24px; font-size: 12px; }
-    table { width:100%; border-collapse:collapse; margin-top:16px; }
-    th { background:#1e3a8a; color:#fff; padding:8px 10px; text-align:left; font-size:11px; }
-    td { padding:7px 10px; border-bottom:1px solid #e5e7eb; }
-    tr:nth-child(even) td { background:#f8fafc; }
-    .total-row td { font-weight:bold; background:#f1f5f9; }
-    .summary { margin-top:24px; display:flex; gap:24px; }
-    .summary div { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 18px; }
-    .summary .lbl { font-size:11px; color:#6b7280; }
-    .summary .val { font-size:18px; font-weight:bold; color:#1e293b; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
-    @media print { button { display:none; } }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; padding: 28px 34px; font-size: 12px; color:#1f2937; }
+    .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #1E3A5F; padding-bottom:14px; }
+    .brand .logo { font-size:26px; font-weight:900; letter-spacing:1px; color:#1E3A5F; }
+    .brand .sub { font-size:11px; color:#6b7280; margin-top:2px; }
+    .invbox { text-align:right; font-size:12px; line-height:1.7; }
+    .invbox .ref { font-size:15px; font-weight:800; color:#1E3A5F; }
+    .parties { display:flex; gap:16px; margin:18px 0; }
+    .party { flex:1; border:1px solid #e5e7eb; border-radius:8px; padding:10px 14px; font-size:11.5px; line-height:1.7; }
+    .party .t { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; font-weight:700; margin-bottom:3px; }
+    table { width:100%; border-collapse:collapse; margin-top:6px; }
+    th { background:#1E3A5F; color:#fff; padding:8px 9px; text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; }
+    td { padding:8px 9px; border:1px solid #e5e7eb; font-size:11.5px; }
+    td.c { text-align:center; } td.r { text-align:right; }
+    .ph { font-size:10px; color:#9ca3af; }
+    tbody tr:nth-child(even) td { background:#f8fafc; }
+    .totbox { margin-top:18px; margin-left:auto; width:320px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; }
+    .totbox .row { display:flex; justify-content:space-between; padding:8px 14px; font-size:12px; border-bottom:1px solid #eef2f7; }
+    .totbox .row.net { background:#1E3A5F; color:#fff; font-weight:800; font-size:14px; border-bottom:none; }
+    .footer { margin-top:26px; text-align:center; color:#6b7280; font-size:11px; }
+    .footer .thanks { font-weight:700; color:#1E3A5F; margin-top:6px; }
+    @media print { @page { margin:14mm; } }
   </style></head><body>
-  <h1>📄 Facture — ${esc(f.ref)}</h1>
-  <div class="meta">
-    Livreur: <strong>${esc(f.livreur || '—')}</strong> &nbsp;|&nbsp;
-    Date de création: <strong>${esc(f.dateCreation)}</strong> &nbsp;|&nbsp;
-    Statut: <strong>${esc(STATUT_LABEL[f.statut])}</strong>
-    ${f.datePaiement ? ` &nbsp;|&nbsp; Date paiement: <strong>${esc(f.datePaiement)}</strong>` : ''}
+  <div class="head">
+    <div class="brand">
+      <div class="logo">VICTOURY</div>
+      <div class="sub">Gestion des commandes &amp; livraisons</div>
+      <div class="sub">victoury-maroc.com</div>
+    </div>
+    <div class="invbox">
+      <div class="ref">Facture ${esc(f.ref)}</div>
+      <div>Date : <b>${esc(f.dateCreation)}</b></div>
+      <div>Colis : <b>${f.colis.length}</b></div>
+      <div>Statut : <b>${esc(STATUT_LABEL[f.statut] || f.statut || '')}</b></div>
+      ${f.datePaiement ? `<div>Payée le : <b>${esc(f.datePaiement)}</b></div>` : ''}
+    </div>
   </div>
+
+  <div class="parties">
+    <div class="party">
+      <div class="t">Livreur</div>
+      <div><b>${esc(f.livreur || '—')}</b></div>
+    </div>
+    <div class="party">
+      <div class="t">Récapitulatif</div>
+      <div>Livrés : <b>${f.colis.filter(c=>c.status==='livre').length}</b> · Refusés : <b>${f.colis.filter(c=>c.status==='refuse').length}</b> · Annulés : <b>${f.colis.filter(c=>c.status==='annule').length}</b></div>
+    </div>
+  </div>
+
   <table>
-    <thead><tr><th>Commande</th><th>Statut</th><th>Prix</th><th>Frais livraison</th></tr></thead>
-    <tbody>${rows}
-      <tr class="total-row">
-        <td colspan="2">TOTAL (${f.colis.length} colis)</td>
-        <td>${fmt(f.totalLivre)} DH</td>
-        <td>${fmt(f.totalFrais)} DH</td>
-      </tr>
-    </tbody>
+    <thead><tr>
+      <th class="c">N°</th><th>Commande</th><th>Client</th><th>Ville</th>
+      <th class="c">Statut</th><th class="r">Prix</th><th class="r">Frais</th><th class="r">Net</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
   </table>
-  <div class="summary">
-    <div><div class="lbl">Livré</div><div class="val">${f.colis.filter(c=>c.status==='livre').length}</div></div>
-    <div><div class="lbl">Refusé</div><div class="val">${f.colis.filter(c=>c.status==='refuse').length}</div></div>
-    <div><div class="lbl">Annulé</div><div class="val">${f.colis.filter(c=>c.status==='annule').length}</div></div>
-    <div><div class="lbl">Montant net</div><div class="val" style="color:#16a34a">${fmt(f.totalNet)} DH</div></div>
+
+  <div class="totbox">
+    <div class="row"><span>Total Colis livrés</span><b>${fmt(f.totalLivre)} DH</b></div>
+    <div class="row"><span>Total Frais</span><b>${fmt(f.totalFrais)} DH</b></div>
+    <div class="row"><span>Frais supplémentaire</span><b>0.00 DH</b></div>
+    <div class="row net"><span>TOTAL NET</span><span>${fmt(f.totalNet)} DH</span></div>
+  </div>
+
+  <div class="footer">
+    Sauf erreur ou omission.
+    <div class="thanks">VICTOURY vous remercie pour votre confiance 🤝</div>
   </div>
   <script>window.onload=()=>window.print();</script>
   </body></html>`;
