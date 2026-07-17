@@ -267,7 +267,16 @@ function printFacture(f, toast) {
   <title>${f.ref}</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; padding: 28px 34px; font-size: 12px; color:#1f2937; }
+    @page { size: A4 portrait; margin: 14mm; }
+    html, body { background:#fff; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color:#1f2937; margin:0; }
+    /* Conteneur au format A4 : centré à l'écran, plein cadre à l'impression. */
+    .sheet { width: 190mm; max-width: 100%; margin: 12px auto; padding: 10mm; background:#fff; }
+    @media print { .sheet { width:auto; margin:0; padding:0; box-shadow:none; } }
+    @media screen { .sheet { box-shadow: 0 2px 14px rgba(0,0,0,.12); } }
+    table { page-break-inside:auto; }
+    tr { page-break-inside:avoid; page-break-after:auto; }
+    thead { display:table-header-group; }
     .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #1E3A5F; padding-bottom:14px; }
     .brand .logo { font-size:26px; font-weight:900; letter-spacing:1px; color:#1E3A5F; }
     .brand .sub { font-size:11px; color:#6b7280; margin-top:2px; }
@@ -289,6 +298,7 @@ function printFacture(f, toast) {
     .footer .thanks { font-weight:700; color:#1E3A5F; margin-top:6px; }
     @media print { @page { margin:14mm; } }
   </style></head><body>
+  <div class="sheet">
   <div class="head">
     <div class="brand">
       <div class="logo">VICTOURY</div>
@@ -333,6 +343,7 @@ function printFacture(f, toast) {
   <div class="footer">
     Sauf erreur ou omission.
     <div class="thanks">VICTOURY vous remercie pour votre confiance 🤝</div>
+  </div>
   </div>
   <script>window.onload=()=>window.print();</script>
   </body></html>`;
