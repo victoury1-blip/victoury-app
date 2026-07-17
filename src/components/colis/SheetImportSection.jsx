@@ -250,6 +250,11 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   const codeCol = findCol('code', CODE_KEYS);
   // Livreur / société de livraison (pour le calcul des frais dans les factures)
   const livreurCol = findCol('livreur', LIVREUR_KEYS);
+  // Date de la commande (issue du Google Sheet) — affichée dans la colonne Date.
+  const dateCol = colMap['date'] || headers.find(h => {
+    const low = norm(h);
+    return low === 'date' || ['datecommande','datecommand','dateajout','dateorder','ordredate','jour'].some(k => low.includes(k));
+  });
   // Statut de livraison (prioritaire) : mapping manuel > "statut livraison" > statut générique
   const statusCol = colMap['status'] || pickStatusHeader(headers);
   // Colonne de confirmation (repli si le statut de livraison est vide) : confirmé/annulé/échange…
@@ -280,6 +285,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const noteLivraison = (noteLivCol && row[noteLivCol]) || '';
       const livreur = (livreurCol && row[livreurCol]) || null;
       const ts = new Date().toLocaleString('fr-MA');
+      // Date issue du Sheet si présente, sinon l'heure d'import.
+      const sheetDate = (dateCol && String(row[dateCol] || '').trim()) || '';
       newOrders.push({
         id: code,
         recipient: { name, phone, city, address, delivery: livreur },
@@ -289,7 +296,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
         status: rowStatus,
         note: noteInterne,
         noteLivraison,
-        dateAdded: ts,
+        dateAdded: sheetDate || ts,
         dateUpdated: ts,
         validated: true,
         trackingNumber: code,

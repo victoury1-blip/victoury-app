@@ -957,7 +957,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading }) {
           </thead>
         </table>
         <div className="hidden md:block" style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
-        <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px]">
+        <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px] [&_tbody_td]:align-top">
           <tbody>
             {colis.length === 0 ? (
               <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">
