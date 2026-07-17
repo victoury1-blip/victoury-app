@@ -444,18 +444,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       {mappingModal}
       {/* Subheader */}
       <div className="bg-white border-b px-4 py-2 flex flex-wrap items-center gap-2">
-        <div className="flex gap-1.5 flex-wrap">
-          {SHEET_STATUSES.map(s => (
-            <button key={s.value} onClick={() => setFilterStatus(f => f === s.value ? '' : s.value)}
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition ${filterStatus === s.value ? 'text-white' : 'bg-white'}`}
-              style={filterStatus === s.value
-                ? { backgroundColor: s.color, borderColor: s.color }
-                : { color: s.color, borderColor: s.color + '55', backgroundColor: s.color + '15' }}>
-              {s.label} <span className="opacity-75">({counts[s.value]})</span>
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1 max-w-xs ml-2">
+        <div className="relative flex-1 max-w-xs">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..."
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
