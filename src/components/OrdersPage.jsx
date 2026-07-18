@@ -563,10 +563,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   }
 
   function toggleAll() {
-    if (selected.length === filtered.length) {
-      setSelected([]);
+    const pageIds = paged.map((o) => o.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
+    if (allSelected) {
+      setSelected((prev) => prev.filter((id) => !pageIds.includes(id)));
     } else {
-      setSelected(filtered.map((o) => o.id));
+      setSelected((prev) => [...new Set([...prev, ...pageIds])]);
     }
   }
 
@@ -865,7 +867,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               <th className="px-4 py-3 w-8">
                 <input
                   type="checkbox"
-                  checked={filtered.length > 0 && selected.length === filtered.length}
+                  checked={paged.length > 0 && paged.every((o) => selected.includes(o.id))}
                   onChange={toggleAll}
                   className="w-4 h-4 rounded"
                 />
