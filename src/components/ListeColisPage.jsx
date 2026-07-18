@@ -249,6 +249,13 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis })
     setSelected([]);
   }
 
+  function bulkDelete() {
+    if (!selected.length) return;
+    if (!window.confirm(`Supprimer définitivement ${selected.length} colis ?`)) return;
+    [...selected].forEach(id => onDeleteOrder?.(id));
+    setSelected([]);
+  }
+
   function bulkExport() {
     const data = selectedOrders;
     const header = ['ID','Tracking','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
@@ -381,6 +388,12 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis })
         <Download size={13} /> Exporter
       </button>
 
+      {/* Supprimer */}
+      <button onClick={bulkDelete}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-semibold transition-colors">
+        <Trash2 size={13} /> Supprimer
+      </button>
+
       <div className="ml-auto">
         <button onClick={() => setSelected([])}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-500 text-gray-300 hover:bg-gray-700 rounded-lg text-xs font-semibold transition-colors">
@@ -399,7 +412,7 @@ const isCasa = (city) => {
   return ['casa','casablanca','كازا','كازابلانكا','الدارالبيضاء','الدار البيضاء','dar el beida','darelbeida'].some(k => c.includes(k.replace(/[\s\-]/g, '')));
 };
 
-export default function ListeColisPage({ orders, setOrders, isLoading }) {
+export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteOrder }) {
   const [tab] = useState('colis');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
