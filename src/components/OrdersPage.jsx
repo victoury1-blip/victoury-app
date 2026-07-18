@@ -861,7 +861,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       {/* Table (défilable horizontalement, comme Liste des Colis) */}
       <div className="flex-1 overflow-auto px-4 pb-4">
         <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full text-sm border-collapse min-w-[900px]">
+        <table className="w-full text-sm border-collapse min-w-[900px] [&_tbody_td]:align-top">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 w-8">
@@ -921,7 +921,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 <td className="px-4 py-4 min-w-[220px]">
                   <div className="text-sm font-bold text-orange-600 font-mono mb-1">{order.trackingNumber || order.id}</div>
                   <button onClick={() => setCustomerHistory(order.recipient.phone)} className="text-base font-bold text-gray-900 max-w-[220px] truncate hover:text-blue-600 hover:underline cursor-pointer text-left">{order.recipient.name}</button>
-                  <div className="text-sm text-gray-500 mt-0.5">{order.recipient.address}</div>
+                  <div className="text-sm text-gray-500 mt-0.5 break-words">{order.recipient.address}</div>
                   <div className="text-sm font-bold text-gray-800">{order.recipient.city}</div>
                   <PhoneChip phone={order.recipient.phone} allOrders={externalOrders} />
                   {order.recipient.delivery && (
@@ -935,7 +935,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 {/* Produits */}
                 <td className="px-4 py-4 min-w-[180px]">
                   {(order.products?.length > 0 ? order.products : [order.product]).map((p, i) => p && (
-                    <div key={i} className="text-sm leading-relaxed mb-0.5">
+                    <div key={i} className="text-sm leading-relaxed mb-0.5 break-words">
                       <span className="font-semibold text-gray-800">{p.name}</span>
                       {p.color && <span className="ml-1 text-sm font-semibold text-blue-600">{p.color}</span>}
                       {p.size && <span className="ml-1 text-sm text-gray-600">- {p.size}</span>}
