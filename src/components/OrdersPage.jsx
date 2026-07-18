@@ -661,7 +661,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         </div>
       )}
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 pl-16 sm:pl-6 flex items-center flex-wrap gap-x-3 gap-y-2">
         <span className="font-bold text-gray-700 text-base mr-2">{activeTabLabel}</span>
         <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{filtered.length}</span>
         <div className="relative flex items-center flex-1 max-w-xs">

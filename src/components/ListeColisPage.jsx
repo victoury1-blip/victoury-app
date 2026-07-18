@@ -737,7 +737,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   return (
     <div className="flex flex-col h-full">
       {/* Header with tabs */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 pl-16 sm:pl-6 flex items-center flex-wrap gap-x-3 gap-y-2">
         <span className="font-bold text-gray-700 text-base">{showArchived ? 'Archives' : 'Liste des colis'}</span>
         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">{colis.length}</span>
         {(showArchived || archivedCount > 0) && (
