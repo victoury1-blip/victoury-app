@@ -412,13 +412,31 @@ const isCasa = (city) => {
   return ['casa','casablanca','كازا','كازابلانكا','الدارالبيضاء','الدار البيضاء','dar el beida','darelbeida'].some(k => c.includes(k.replace(/[\s\-]/g, '')));
 };
 
-export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteOrder }) {
+export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteOrder, fetchDeletedOrders, restoreOrder }) {
   const [tab] = useState('colis');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
   const [pgPage, setPgPage] = useState(1);
   const [pgPer, setPgPer] = useState(10);
   const [showArchived, setShowArchived] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashOrders, setTrashOrders] = useState([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState(null);
+  async function openTrash() {
+    setShowTrash(true);
+    setTrashLoading(true);
+    try { setTrashOrders(await fetchDeletedOrders?.() || []); }
+    finally { setTrashLoading(false); }
+  }
+  async function handleRestore(id) {
+    setRestoringId(id);
+    try {
+      const ok = await restoreOrder?.(id);
+      if (ok) { setTrashOrders(prev => prev.filter(o => o.id !== id)); toast.success('Commande restaurée'); }
+      else toast.error('Échec de la restauration');
+    } finally { setRestoringId(null); }
+  }
   const [filterOpen, setFilterOpen] = useState(false);
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
@@ -791,6 +809,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
           </button>
           <button onClick={() => setShowScanner(true)} className="p-2 rounded-lg border border-violet-100 bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors" title="Scanner un colis">
             <ScanLine size={14} />
+          </button>
+          <button onClick={openTrash} className="p-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors" title="Corbeille — restaurer des commandes supprimées">
+            <Trash2 size={14} />
           </button>
         </>)}
       </div>
@@ -1242,6 +1263,43 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
           colis={colis}
           onDeleteOrder={onDeleteOrder}
         />
+      )}
+
+      {showTrash && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowTrash(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Trash2 size={18} className="text-gray-500" />
+                <h2 className="font-bold text-gray-900">Corbeille</h2>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-semibold">{trashOrders.length}</span>
+              </div>
+              <button onClick={() => setShowTrash(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X size={18} /></button>
+            </div>
+            <div className="overflow-y-auto p-3">
+              {trashLoading ? (
+                <div className="py-10 text-center text-gray-400 text-sm">Chargement…</div>
+              ) : trashOrders.length === 0 ? (
+                <div className="py-10 text-center text-gray-400 text-sm">Aucune commande supprimée.</div>
+              ) : trashOrders.map(o => (
+                <div key={o.id} className="flex items-center gap-3 px-3 py-2.5 border border-gray-100 rounded-xl mb-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-bold text-orange-600 font-mono">{o.trackingNumber || o.id}</div>
+                    <div className="text-sm font-semibold text-gray-800 truncate">{o.recipient?.name || '—'}</div>
+                    <div className="text-xs text-gray-500 truncate">{o.recipient?.city} · {Number(o.price || 0).toFixed(2)} DH · {o.dateAdded || ''}</div>
+                  </div>
+                  <button
+                    onClick={() => handleRestore(o.id)}
+                    disabled={restoringId === o.id}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    {restoringId === o.id ? '…' : 'Restaurer'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {editOrder && (

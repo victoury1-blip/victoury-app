@@ -680,6 +680,33 @@ export default function App() {
     await supabase.from('orders').update({ is_deleted: true }).eq('id', orderId);
   }
 
+  /* Corbeille : récupère les commandes soft-deleted (les plus récentes d'abord) */
+  async function fetchDeletedOrders() {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('is_deleted', true)
+      .order('date_updated', { ascending: false })
+      .limit(100);
+    if (error) { logError('Corbeille', error.message); return []; }
+    return (data || []).map(mapRow);
+  }
+
+  /* Restaure une commande supprimée : is_deleted=false + retrait de la liste noire */
+  async function restoreOrder(orderId) {
+    deletedIdsRef.current.delete(orderId);
+    try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ is_deleted: false })
+      .eq('id', orderId)
+      .select()
+      .single();
+    if (error) { logError('Restauration', error.message); return false; }
+    if (data) setOrders(prev => prev.some(o => o.id === orderId) ? prev : [mapRow(data), ...prev]);
+    return true;
+  }
+
   async function updateOrderInSupabase(order) {
     if (!navigator.onLine) {
       await queueSync('update', order);
@@ -772,7 +799,7 @@ export default function App() {
           <Route path="/analytics" element={<AnalyticsPage orders={orders} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
-          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} />} />
+          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} fetchDeletedOrders={fetchDeletedOrders} restoreOrder={restoreOrder} />} />
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/chic-affiliate" element={<ChicAffiliatePage orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
