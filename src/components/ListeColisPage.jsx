@@ -203,7 +203,7 @@ function StatusModal({ order, onClose, onSave }) {
 }
 
 /* ── Delivery status modal ── */
-function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis }) {
+function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, onDeleteOrder }) {
   const { statuses } = useStatuses();
   const [showStatus, setShowStatus] = useState(false);
   const [showLivreur, setShowLivreur] = useState(false);
@@ -1229,6 +1229,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
           orders={orders}
           setOrders={setOrders}
           colis={colis}
+          onDeleteOrder={onDeleteOrder}
         />
       )}
 
