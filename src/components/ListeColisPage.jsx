@@ -1131,6 +1131,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   {/* Note */}
                   <td className="px-4 py-3 max-w-[250px]">
                     {note && <span className="text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">Note interne:<br/>{note}</span>}
+                    {o.noteLivraison && (
+                      <span className={`text-sm text-red-600 font-semibold whitespace-pre-wrap break-words ${note ? 'block mt-2' : ''}`}>
+                        Note livraison:<br/>{o.noteLivraison}
+                      </span>
+                    )}
                   </td>
 
                   {/* LIV */}
