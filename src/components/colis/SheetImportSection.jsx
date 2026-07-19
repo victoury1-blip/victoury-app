@@ -255,13 +255,9 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     const low = norm(h);
     return low === 'date' || ['datecommande','datecommand','dateajout','dateorder','ordredate','jour'].some(k => low.includes(k));
   });
-  // Statut de livraison (prioritaire) : mapping manuel > "statut livraison" > statut générique
-  const statusCol = colMap['status'] || pickStatusHeader(headers);
-  // Colonne de confirmation (repli si le statut de livraison est vide) : confirmé/annulé/échange…
-  const confirmCol = headers.find(h => {
-    const low = norm(h);
-    return h !== statusCol && (low.includes('confirm') || low === 'statutcommande' || low === 'situation');
-  });
+  // Statut de LIVRAISON uniquement : mapping manuel > "statut livraison" > statut générique.
+  // La colonne de confirmation est ignorée — seule la livraison remonte dans la Liste des Colis.
+  const statusCol = pickStatusHeader(headers) || colMap['status'];
 
 
   function importToColis(rowsToImport) {
@@ -276,9 +272,9 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const address = (addressCol && row[addressCol]) || '';
       const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
       const product = (productCol && row[productCol]) || '';
-      // Statut : livraison (prioritaire) → confirmation (repli) → choix manuel → statut global
+      // Statut : uniquement la colonne LIVRAISON (celle qui remonte dans la Liste des Colis)
+      // → choix manuel → statut global. La colonne de confirmation est volontairement ignorée.
       const rowStatus = (statusCol && mapToAppStatus(row[statusCol]))
-        || (confirmCol && mapToAppStatus(row[confirmCol]))
         || mapToAppStatus(row._status)
         || importStatus;
       const noteInterne = (noteIntCol && row[noteIntCol]) || '';
