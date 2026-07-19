@@ -611,7 +611,13 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }
   function toggleAll() {
-    setSelected((prev) => prev.length === colis.length ? [] : colis.map((o) => o.id));
+    const pageIds = pagedColis.map((o) => o.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
+    if (allSelected) {
+      setSelected((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelected((prev) => [...new Set([...prev, ...pageIds])]);
+    }
   }
 
   /* Show only orders in the colis pipeline */
@@ -961,7 +967,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
                 <th className="px-4 py-3 w-8">
-                <input type="checkbox" checked={colis.length > 0 && selected.length === colis.length} onChange={toggleAll} className="w-4 h-4 rounded" />
+                <input type="checkbox" checked={pagedColis.length > 0 && pagedColis.every((o) => selected.includes(o.id))} onChange={toggleAll} className="w-4 h-4 rounded" />
               </th>
             {['Destinataire', 'Produits', 'Prix', 'État', 'Note', 'LIV', 'Date', 'Validé', 'Action'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
