@@ -1002,8 +1002,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         </button>
                       )}
                     </div>
-                    <div className="text-base font-bold text-gray-900 max-w-[220px] truncate">{o.recipient.name}</div>
-                    <div className="text-sm text-gray-500 mt-0.5">{o.recipient.address}</div>
+                    <div className="text-base font-bold text-gray-900 break-words">{o.recipient.name}</div>
+                    <div className="text-sm text-gray-500 mt-0.5 break-words">{o.recipient.address}</div>
                     <div className="text-sm font-bold text-gray-800">{o.recipient.city}</div>
                     <PhoneChip phone={o.recipient.phone} allOrders={orders} />
                     {delivery !== '—' && (
@@ -1023,7 +1023,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   {/* Produits */}
                   <td className="px-4 py-3 min-w-[160px]">
                     {(o.products?.length > 0 ? o.products : [o.product]).map((p, i) => p && (
-                      <div key={i} className="text-sm leading-snug mb-0.5">
+                      <div key={i} className="text-sm leading-snug mb-0.5 break-words">
                         <span className="font-medium text-gray-800">{p.name}</span>
                         {p.size && <span className="ml-1 text-xs text-gray-500">/ {p.size}</span>}
                         <span className="ml-1 text-xs text-gray-400">×{p.qty || 1}</span>
@@ -1098,7 +1098,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
 
                   {/* Note */}
                   <td className="px-4 py-3 max-w-[250px]">
-                    {note && <span className="text-sm text-gray-700 font-medium whitespace-pre-wrap">Note interne:<br/>{note}</span>}
+                    {note && <span className="text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">Note interne:<br/>{note}</span>}
                   </td>
 
                   {/* LIV */}
