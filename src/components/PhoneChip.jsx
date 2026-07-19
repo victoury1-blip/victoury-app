@@ -8,7 +8,11 @@ export function getPhoneColors() {
 }
 
 export function normalizePhone(p) {
-  return (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0');
+  let s = (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0');
+  // Google Sheets stocke le téléphone comme un nombre et supprime le 0 initial
+  // (ex: 0709015213 → 709015213). On le rétablit pour les numéros marocains.
+  if (/^[5-7]\d{8}$/.test(s)) s = '0' + s;
+  return s;
 }
 
 export default function PhoneChip({ phone, allOrders }) {
@@ -28,9 +32,9 @@ export default function PhoneChip({ phone, allOrders }) {
         className={`mt-1 text-sm font-bold hover:underline active:opacity-70 ${isKnown ? 'px-2 py-0.5 rounded' : 'text-gray-900'}`}
         style={style}
       >
-        {phone}
+        {np}
       </button>
-      {open && <ContactModal phone={phone} onClose={() => setOpen(false)} />}
+      {open && <ContactModal phone={np} onClose={() => setOpen(false)} />}
     </>
   );
 }
