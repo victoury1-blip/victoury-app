@@ -957,7 +957,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       {/* Table */}
       <div className="flex-1 overflow-auto px-4 pb-4">
       <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full text-sm border-collapse min-w-[900px] hidden md:table">
+        <table className="w-full text-sm border-collapse min-w-[900px] table">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
                 <th className="px-4 py-3 w-8">
@@ -969,7 +969,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
             </tr>
           </thead>
         </table>
-        <div className="hidden md:block" style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
+        <div className="block" style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
         <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px] [&_tbody_td]:align-top">
           <tbody>
             {colis.length === 0 ? (
@@ -1171,8 +1171,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
         </table>
         </div>
 
-        {/* Mobile card view */}
-        <div className="md:hidden">
+        {/* Mobile card view (désactivé — on garde le tableau sur mobile) */}
+        <div className="hidden">
           {colis.length === 0 ? (
             <div className="py-16 text-center text-gray-400 text-sm flex flex-col items-center gap-2">
               <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
