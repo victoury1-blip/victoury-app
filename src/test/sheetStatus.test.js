@@ -30,8 +30,16 @@ describe('mapToAppStatus', () => {
   it('detecte Reçu (par livreur) et Pas de réponse abrégé', () => {
     expect(mapToAppStatus('RECU')).toBe('recu_livreur');
     expect(mapToAppStatus('reçu')).toBe('recu_livreur');
-    expect(mapToAppStatus('PAS.R.1')).toBe('pas_reponse');
+    expect(mapToAppStatus('PAS.R.1')).toBe('pas_rep_1');
+    expect(mapToAppStatus('PAS R.2')).toBe('pas_rep_2');
     expect(mapToAppStatus('EN ATTENTE')).toBe('en_attente');
+  });
+  it('detecte les statuts des listes Google Sheets', () => {
+    expect(mapToAppStatus('INJOIGNABLE')).toBe('injoignable');
+    expect(mapToAppStatus('Reporté')).toBe('reporter');
+    expect(mapToAppStatus('OUT STOCK')).toBe('manque_stock');
+    expect(mapToAppStatus('CONFIRME OUT STOCK')).toBe('manque_stock');
+    expect(mapToAppStatus('Ramassé')).toBe('att_ramassage');
   });
   it('detecte statuts arabes', () => {
     expect(mapToAppStatus('تم التسليم')).toBe('livre');

@@ -405,7 +405,7 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis })
 }
 
 /* ── Main page ── */
-const COLIS_PIPELINE = ['ramasse','att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','dem_suivi','en_suivi','retour_recu','echange_recu'];
+const COLIS_PIPELINE = ['ramasse','att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','dem_suivi','en_suivi','retour_recu','echange_recu','reporter','manque_stock'];
 const isCasa = (city) => {
   if (!city) return false;
   const c = city.toLowerCase().replace(/[\s\-]/g, '');
