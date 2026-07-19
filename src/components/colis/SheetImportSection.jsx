@@ -272,11 +272,17 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const address = (addressCol && row[addressCol]) || '';
       const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
       const product = (productCol && row[productCol]) || '';
-      // Statut : uniquement la colonne LIVRAISON (celle qui remonte dans la Liste des Colis)
-      // → choix manuel → statut global. La colonne de confirmation est volontairement ignorée.
-      const rowStatus = (statusCol && mapToAppStatus(row[statusCol]))
+      // Statut : uniquement la colonne LIVRAISON (celle qui remonte dans la Liste des Colis).
+      // La colonne de confirmation est volontairement ignorée.
+      const rawLiv = statusCol ? String(row[statusCol] || '').trim() : '';
+      // « RECU » (colis retourné puis réceptionné) → statut Retour Reçu + drapeau reçu.
+      const isRecu = /re[çc]ue?/i.test(rawLiv);
+      // Livraison vide → En Attente. Sinon mapping livraison → manuel → statut global.
+      let rowStatus = (rawLiv && mapToAppStatus(rawLiv))
         || mapToAppStatus(row._status)
-        || importStatus;
+        || (rawLiv ? importStatus : 'en_attente');
+      let recuFlag = false;
+      if (isRecu) { rowStatus = 'retour_recu'; recuFlag = true; }
       const noteInterne = (noteIntCol && row[noteIntCol]) || '';
       const noteLivraison = (noteLivCol && row[noteLivCol]) || '';
       const livreur = (livreurCol && row[livreurCol]) || null;
@@ -290,6 +296,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
         products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
         price,
         status: rowStatus,
+        recu: recuFlag,
         note: noteInterne,
         noteLivraison,
         dateAdded: sheetDate || ts,

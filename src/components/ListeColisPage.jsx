@@ -1099,6 +1099,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         <span className="text-[8px]">▼</span>
                       </button>
                     )}
+                    {o.status === 'retour_recu' && (o.recu || recuIds.has(o.id)) && (
+                      <span className="inline-flex items-center whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white bg-green-600">
+                        Reçue
+                      </span>
+                    )}
                     </div>
                   </td>
 
