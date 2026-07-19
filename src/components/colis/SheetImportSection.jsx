@@ -251,10 +251,30 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   // Livreur / société de livraison (pour le calcul des frais dans les factures)
   const livreurCol = findCol('livreur', LIVREUR_KEYS);
   // Date de la commande (issue du Google Sheet) — affichée dans la colonne Date.
-  const dateCol = colMap['date'] || headers.find(h => {
+  // 1) par entête ; 2) repli par CONTENU (colonne dont les valeurs ressemblent à des dates)
+  //    car l'entête peut être absent / nommé autrement (arabe, "T0", etc.).
+  const isDateLike = (v) => {
+    const s = String(v || '').trim();
+    if (!s) return false;
+    return /^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/.test(s)   // 19/07/2026, 19-07-26…
+      || /^\d{4}[\/.\-]\d{1,2}[\/.\-]\d{1,2}/.test(s)        // 2026-07-19
+      || /\d{1,2}:\d{2}/.test(s) && /\d{1,2}[\/.\-]\d{1,2}/.test(s); // avec heure
+  };
+  let dateCol = colMap['date'] || headers.find(h => {
     const low = norm(h);
-    return low === 'date' || ['datecommande','datecommand','dateajout','dateorder','ordredate','jour'].some(k => low.includes(k));
+    return low === 'date' || ['datecommande','datecommand','dateajout','dateorder','ordredate','jour','tarikh'].some(k => low.includes(k));
   });
+  if (!dateCol) {
+    const sample = rows.slice(0, 40);
+    let best = null, bestFrac = 0;
+    for (const h of headers) {
+      let ok = 0, tot = 0;
+      for (const r of sample) { const v = r[h]; if (v === undefined || v === '') continue; tot++; if (isDateLike(v)) ok++; }
+      const frac = tot ? ok / tot : 0;
+      if (frac > 0.6 && frac > bestFrac) { bestFrac = frac; best = h; }
+    }
+    dateCol = best;
+  }
   // Statut de LIVRAISON uniquement : mapping manuel > "statut livraison" > statut générique.
   // La colonne de confirmation est ignorée — seule la livraison remonte dans la Liste des Colis.
   const statusCol = pickStatusHeader(headers) || colMap['status'];
