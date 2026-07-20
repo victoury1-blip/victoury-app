@@ -557,22 +557,44 @@ export default function App() {
         }
         if (!cfg.customerId || !cfg.apiKey) return;
         const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
+        // Recherche le statut Ozon d'un numéro de suivi (null si introuvable / erreur).
+        async function trackByNumber(tn) {
+          const body = new FormData();
+          body.append('tracking-number', tn);
+          const ac = new AbortController();
+          const t = setTimeout(() => ac.abort(), 10000);
+          try {
+            const res = await fetch(`${base}/tracking`, { method: 'POST', body, signal: ac.signal });
+            clearTimeout(t);
+            if (!res.ok) return null;
+            const json = await res.json();
+            const track = json?.['TRACKING'] || json || {};
+            if ((track['RESULT'] || '').toUpperCase() === 'ERROR') return null;
+            const last = track['LAST_TRACKING'] || track['LAST-TRACKING'] || {};
+            return last['STATUT'] || last['STATUS'] || '';
+          } catch { clearTimeout(t); return null; }
+        }
         const toSync = orders.filter(o => o.validated && (o.ozoneTracking || o.trackingNumber));
         for (const o of toSync) {
           const tn = o.ozoneTracking || o.trackingNumber || o.id;
           try {
-            const body = new FormData();
-            body.append('tracking-number', tn);
-            const ac = new AbortController();
-            const t = setTimeout(() => ac.abort(), 10000);
-            const res = await fetch(`${base}/tracking`, { method: 'POST', body, signal: ac.signal });
-            clearTimeout(t);
-            if (!res.ok) continue;
-            const json = await res.json();
-            const track = json?.['TRACKING'] || json || {};
-            if ((track['RESULT'] || '').toUpperCase() === 'ERROR') continue;
-            const last = track['LAST_TRACKING'] || track['LAST-TRACKING'] || {};
-            const status = last['STATUT'] || last['STATUS'] || '';
+            let status = await trackByNumber(tn);
+            // Le numéro de suivi a parfois perdu son 0 initial → réessayer avec le 0.
+            if (!status && /^\d+$/.test(tn) && !tn.startsWith('0')) status = await trackByNumber('0' + tn);
+            // Repli : introuvable par numéro de suivi → chercher chez Ozon par téléphone.
+            if (!status && o.recipient?.phone) {
+              try {
+                const bare = String(o.recipient.phone).replace(/\D/g, '');
+                if (bare.length >= 8) {
+                  const r = await fetch(`/api/ozone-check?phone=${encodeURIComponent(bare)}`);
+                  if (r.ok) {
+                    const d = await r.json();
+                    if (d.delivered > 0) status = 'Livré';
+                    else if (d.returned > 0) status = 'Retourné';
+                  }
+                }
+              } catch {}
+            }
             if (status && status !== o.ozoneLastStatus) {
               setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
               supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
