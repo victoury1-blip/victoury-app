@@ -579,8 +579,18 @@ export default function App() {
           const tn = o.ozoneTracking || o.trackingNumber || o.id;
           try {
             let status = await trackByNumber(tn);
-            // Le numéro de suivi a parfois perdu son 0 initial → réessayer avec le 0.
-            if (!status && /^\d+$/.test(tn) && !tn.startsWith('0')) status = await trackByNumber('0' + tn);
+            // Ozon insère parfois un 0 : soit au début (0MIMA…), soit après le préfixe
+            // lettres (MIMA3251 → MIMA03251). On essaie ces variantes.
+            if (!status) {
+              const variants = [];
+              const m = tn.match(/^([A-Za-z]+)(\d+)$/);
+              if (m) variants.push(`${m[1]}0${m[2]}`);          // MIMA3251 → MIMA03251
+              if (/^\d+$/.test(tn) && !tn.startsWith('0')) variants.push('0' + tn);
+              for (const v of variants) {
+                status = await trackByNumber(v);
+                if (status) break;
+              }
+            }
             // Repli : introuvable par numéro de suivi → chercher chez Ozon par téléphone.
             if (!status && o.recipient?.phone) {
               try {
