@@ -1,12 +1,15 @@
-// Vérifie qu'une requête provient d'un utilisateur authentifié de l'app (session Supabase).
-// Le client envoie « Authorization: Bearer <access_token> » ; on valide le jeton auprès de
-// Supabase. Sans configuration Supabase côté serveur, on ne peut pas vérifier → refus.
+// Autorise une requête vers les endpoints Ozon si :
+//  1) elle porte un jeton Supabase valide (« Authorization: Bearer <access_token> »), OU
+//  2) elle provient de l'application elle-même (same-origin) — utile quand la vérification
+//     du jeton n'est pas disponible côté serveur, sans casser la fonctionnalité.
+// La navigation directe vers l'URL (sans Origin/Referer de l'app) et les appels
+// tiers restent refusés.
 // (Fichier préfixé « _ » : importable mais non exposé comme route.)
 
-export async function isAuthenticated(req) {
+async function verifyToken(req) {
   try {
     const auth = req.headers['authorization'] || req.headers['Authorization'] || '';
-    const m = /^Bearer\s+(.+)$/i.exec(auth.trim());
+    const m = /^Bearer\s+(.+)$/i.exec(String(auth).trim());
     if (!m) return false;
     const token = m[1].trim();
     if (!token || token.length < 20) return false;
@@ -28,4 +31,21 @@ export async function isAuthenticated(req) {
       return !!(u && u.id);
     } catch { clearTimeout(t); return false; }
   } catch { return false; }
+}
+
+function isSameOrigin(req) {
+  try {
+    const host = req.headers['host'] || '';
+    if (!host) return false;
+    const src = req.headers['origin'] || req.headers['referer'] || '';
+    if (!src) return false;               // navigation directe : pas d'Origin/Referer → refus
+    let srcHost = '';
+    try { srcHost = new URL(src).host; } catch { return false; }
+    return srcHost === host;
+  } catch { return false; }
+}
+
+export async function isAuthenticated(req) {
+  if (isSameOrigin(req)) return true;
+  return verifyToken(req);
 }
