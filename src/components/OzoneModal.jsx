@@ -97,7 +97,13 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     const ctrl = new AbortController();
     const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone;
 
-    fetch(`/api/ozone-check?phone=${bare}`, { signal: ctrl.signal })
+    supabase.auth.getSession().then(({ data: sess }) => {
+      const token = sess?.session?.access_token;
+      return fetch(`/api/ozone-check?phone=${bare}`, {
+        signal: ctrl.signal,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    })
       .then(r => r.json())
       .then(data => {
         if (data.error) { setPhoneHistory(null); }

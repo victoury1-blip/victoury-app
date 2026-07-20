@@ -1,3 +1,5 @@
+import { isAuthenticated } from './_auth.js';
+
 const rateLimitMap = new Map();
 
 function rateLimit(ip, maxRequests = 10, windowMs = 60000) {
@@ -12,6 +14,8 @@ function rateLimit(ip, maxRequests = 10, windowMs = 60000) {
 }
 
 export default async function handler(req, res) {
+  if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
+
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
   if (rateLimit(clientIp)) {
     return res.status(429).json({ error: 'Trop de requêtes. Réessayez dans une minute.' });

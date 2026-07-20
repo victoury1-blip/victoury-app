@@ -623,7 +623,8 @@ export default function App() {
             const byCode = new Map();
             for (let i = 0; i < allCodes.length; i += 30) {
               const chunk = allCodes.slice(i, i + 30);
-              const r = await fetch(`/api/ozone-status?codes=${encodeURIComponent(chunk.join(','))}`);
+              const r = await fetch(`/api/ozone-status?codes=${encodeURIComponent(chunk.join(','))}`,
+                session?.access_token ? { headers: { Authorization: `Bearer ${session.access_token}` } } : undefined);
               if (!r.ok) continue;
               const d = await r.json();
               (d.results || []).forEach(x => { if (x.status) byCode.set(x.q, x.status); });
