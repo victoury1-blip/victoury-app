@@ -272,6 +272,13 @@ export default function Sidebar({ orders = [], session }) {
     navigate(path);
     setMobileOpen(false);
   }
+  // Clic sur un lien de navigation : clic gauche simple → navigation interne (SPA) ;
+  // Cmd/Ctrl/Shift/clic-molette → on laisse le navigateur (ouvrir dans un nouvel onglet…).
+  function navClick(e, path) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault();
+    handleNav(path);
+  }
 
   const sidebarContent = (isMobile) => (
     <>
@@ -335,10 +342,11 @@ export default function Sidebar({ orders = [], session }) {
                       }).length;
                       const active = location.pathname === child.path;
                       return (
-                        <button
+                        <a
                           key={child.path}
-                          onClick={() => handleNav(child.path)}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors mb-0.5 ${active ? 'bg-blue-600 text-white font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
+                          href={child.path}
+                          onClick={(e) => navClick(e, child.path)}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors mb-0.5 no-underline ${active ? 'bg-blue-600 text-white font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                           <span>{child.label}</span>
                           {count > 0 && (
@@ -346,7 +354,7 @@ export default function Sidebar({ orders = [], session }) {
                               {count}
                             </span>
                           )}
-                        </button>
+                        </a>
                       );
                     })}
                   </div>
@@ -360,10 +368,11 @@ export default function Sidebar({ orders = [], session }) {
             ? orders.filter(o => o.status === 'chic_nouveau').length
             : 0;
           return (
-            <button
+            <a
               key={item.path}
-              onClick={() => handleNav(item.path)}
-              className={`relative w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${active ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+              href={item.path}
+              onClick={(e) => navClick(e, item.path)}
+              className={`relative w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors no-underline ${active ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
             >
               <Icon size={16} className="shrink-0" />
               {showLabel && <span className="flex-1 text-left">{item.label}</span>}
@@ -372,7 +381,7 @@ export default function Sidebar({ orders = [], session }) {
                   {itemBadge}
                 </span>
               )}
-            </button>
+            </a>
           );
         })}
       </nav>
