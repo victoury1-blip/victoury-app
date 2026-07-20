@@ -462,6 +462,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
   function applyFilter() { setAppliedFilter({ ...filterForm }); setFilterOpen(false); }
   function resetFilter() { setFilterForm(emptyFilter); setAppliedFilter(emptyFilter); setLivreurOpen(false); }
+  // Re-clic sur « Liste des Colis » dans la barre latérale → actualiser (reset complet).
+  useEffect(() => {
+    const onReclick = (e) => {
+      if (e.detail?.path && e.detail.path !== '/liste-colis') return;
+      setSearch(''); setFilterForm(emptyFilter); setAppliedFilter(emptyFilter);
+      setPgPage(1); setSelected([]); setShowArchived(false);
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener('route-reclick', onReclick);
+    return () => window.removeEventListener('route-reclick', onReclick);
+  }, []);
 
   /* ── Saved filters ── */
   const [savedFilters, setSavedFilters] = useState(() => {

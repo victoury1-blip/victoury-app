@@ -265,6 +265,10 @@ export default function Sidebar({ orders = [], session }) {
   });
 
   function handleNav(path) {
+    // Re-clic sur l'onglet déjà actif → signal d'actualisation (reset recherche/filtre/page).
+    if (path === location.pathname) {
+      window.dispatchEvent(new CustomEvent('route-reclick', { detail: { path } }));
+    }
     navigate(path);
     setMobileOpen(false);
   }
