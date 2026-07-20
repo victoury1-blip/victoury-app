@@ -643,7 +643,10 @@ export default function App() {
     }
     const timer = setTimeout(syncOzoneStatuses, 5000);
     const interval = setInterval(syncOzoneStatuses, 300000);
-    return () => { clearTimeout(timer); clearInterval(interval); };
+    // Aussi au retour au premier plan (plus réactif que d'attendre 5 min).
+    const onVis = () => { if (document.visibilityState === 'visible') syncOzoneStatuses(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearTimeout(timer); clearInterval(interval); document.removeEventListener('visibilitychange', onVis); };
     // Ne dépend que de la session : on lit les commandes via ordersRef pour éviter de
     // relancer une synchro complète à chaque changement du nombre de commandes.
   }, [session]);
