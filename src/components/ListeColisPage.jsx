@@ -658,11 +658,16 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       // La recherche traverse tout (actifs + archives). Sans recherche : vue active masque
       // les archivées, vue archives ne montre qu'elles.
       if (!q && (showArchived ? !isArchived(o) : isArchived(o))) return false;
+      // Recherche par téléphone : on compare aussi la version normalisée (0 initial rétabli),
+      // et on retire tout ce qui n'est pas chiffre dans la requête pour tolérer espaces/tirets.
+      const qDigits = q.replace(/\D/g, '');
       const matchSearch = !q ||
         o.id.toLowerCase().includes(q) ||
         o.recipient.name.toLowerCase().includes(q) ||
         o.recipient.city.toLowerCase().includes(q) ||
-        (o.trackingNumber || '').toLowerCase().includes(q);
+        (o.trackingNumber || '').toLowerCase().includes(q) ||
+        (o.recipient.phone || '').toLowerCase().includes(q) ||
+        (qDigits && normalizePhone(o.recipient.phone).includes(qDigits));
       if (!matchSearch) return false;
       if (af.status && o.status !== af.status) return false;
       if (af.livreur && !(o.recipient.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
