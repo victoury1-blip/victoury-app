@@ -20,6 +20,26 @@ function isLight(hex) {
   return (r*299+g*587+b*114)/1000 > 155;
 }
 
+// Affiche le nom du livreur ; « Ozon Express » est stylé aux couleurs de la marque
+// (OZON en noir, EXPRESS en rouge). `variant` : 'badge' (pastille) ou 'inline' (texte).
+function LivreurTag({ name, variant = 'badge' }) {
+  const n = (name || '').trim();
+  if (!n || n === '—') return <span className="text-gray-300 text-xs">—</span>;
+  if (/ozon/i.test(n)) {
+    const brand = (
+      <span className="font-extrabold tracking-tight italic">
+        <span className="text-gray-900">OZON</span><span className="text-red-600">EXPRESS</span>
+      </span>
+    );
+    return variant === 'inline'
+      ? <span className="text-xs">{brand}</span>
+      : <span className="inline-flex items-center text-xs px-2 py-1 rounded bg-white border border-gray-200 shadow-sm">{brand}</span>;
+  }
+  return variant === 'inline'
+    ? <span>{n}</span>
+    : <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700">{n}</span>;
+}
+
 /* ── Status badge (reads live color from États page) ── */
 function Badge({ statusKey }) {
   const { getLive } = useStatuses();
@@ -1052,7 +1072,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     {delivery !== '—' && (
                       <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
                         <Truck size={11} />
-                        <span>{delivery}</span>
+                        <LivreurTag name={delivery} variant="inline" />
                       </div>
                     )}
                     {o.trackingNumber && (
@@ -1152,8 +1172,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   {/* LIV */}
                   <td className="px-4 py-3">
                     {delivery !== '—' ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700">{delivery}</span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <LivreurTag name={delivery} />
                         {o.ozoneLastStatus && (() => {
                           const ls = (o.ozoneLastStatus || '').toLowerCase();
                           const ozColor = ls.includes('livr') ? 'bg-green-100 text-green-700'
