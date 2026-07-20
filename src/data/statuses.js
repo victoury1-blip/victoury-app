@@ -26,7 +26,7 @@ export const ALL_STATUSES = [
   { id: 30, value: 'pret_retour',      label: 'Prêt Pour le Retour',      slug: 'pret-retour',          color: '#6B7280', isDefault: false, order: 30, showInCommandes: false, showInColis: true  },
   { id: 31, value: 'dem_suivi',        label: 'Demande de Suivi',         slug: 'dem-suivi',            color: '#06B6D4', isDefault: false, order: 31, showInCommandes: true,  showInColis: false },
   { id: 32, value: 'en_suivi',         label: 'En Suivi',                 slug: 'en-suivi',             color: '#A855F7', isDefault: false, order: 32, showInCommandes: false, showInColis: true  },
-  { id: 33, value: 'retour_recu',     label: 'Retour Reçu',              slug: 'retour-recu',          color: '#6B7280', isDefault: false, order: 33, showInCommandes: false, showInColis: true  },
+  { id: 33, value: 'retour_recu',     label: 'Retour',                   slug: 'retour-recu',          color: '#6B7280', isDefault: false, order: 33, showInCommandes: false, showInColis: true  },
   { id: 34, value: 'echange_recu',    label: 'Échange Reçu',             slug: 'echange-recu',         color: '#F59E0B', isDefault: false, order: 34, showInCommandes: false, showInColis: true  },
 ];
 

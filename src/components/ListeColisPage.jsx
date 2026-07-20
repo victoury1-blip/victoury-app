@@ -1123,7 +1123,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         {facturedIds.has(o.id) ? '✓ Facturé' : 'Pas facturé'}
                       </button>
                     )}
-                    {(o.status === 'refuse' || o.status === 'annule') && (
+                    {(o.status === 'refuse' || o.status === 'annule' || o.status === 'retour_recu') && (
                       <button
                         onClick={() => toggleRecu(o.id)}
                         className={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white transition-colors ${
@@ -1132,14 +1132,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                             : 'bg-red-800 hover:bg-red-900'
                         }`}
                       >
-                        {(o.recu || recuIds.has(o.id)) ? 'Reçus' : 'Non-reçus'}
+                        {(o.recu || recuIds.has(o.id)) ? 'Reçu' : 'Non-reçu'}
                         <span className="text-[8px]">▼</span>
                       </button>
-                    )}
-                    {o.status === 'retour_recu' && (o.recu || recuIds.has(o.id)) && (
-                      <span className="inline-flex items-center whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white bg-green-600">
-                        Reçue
-                      </span>
                     )}
                     </div>
                   </td>
