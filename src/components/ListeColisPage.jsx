@@ -1107,7 +1107,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded" />
                   </td>
                   {/* Destinataire */}
-                  <td className="px-4 py-4 min-w-[220px]">
+                  <td className="px-4 py-3 min-w-[220px]">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="text-sm font-bold text-orange-600 font-mono">{o.trackingNumber || o.id}</span>
                       {o.trackingNumber && (
@@ -1139,12 +1139,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   </td>
 
                   {/* Produits */}
-                  <td className="px-4 py-3 min-w-[160px]">
+                  <td className="px-4 py-3 min-w-[200px] max-w-[280px]">
                     {(o.products?.length > 0 ? o.products : [o.product]).map((p, i) => p && (
-                      <div key={i} className="text-sm leading-snug mb-0.5 break-words">
+                      <div key={i} className="text-sm leading-snug mb-1 break-words">
                         <span className="font-medium text-gray-800">{p.name}</span>
-                        {p.size && <span className="ml-1 text-xs text-gray-500">/ {p.size}</span>}
-                        <span className="ml-1 text-xs text-gray-400">×{p.qty || 1}</span>
+                        {p.size && <span className="ml-1 text-xs text-gray-500 whitespace-nowrap">/ {p.size}</span>}
+                        <span className="ml-1 text-xs text-gray-400 whitespace-nowrap">×{p.qty || 1}</span>
                       </div>
                     ))}
                   </td>
