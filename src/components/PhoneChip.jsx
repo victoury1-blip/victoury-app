@@ -19,7 +19,15 @@ export default function PhoneChip({ phone, allOrders }) {
   const [open, setOpen] = useState(false);
   if (!phone) return null;
   const np = normalizePhone(phone);
-  const history = allOrders ? allOrders.filter(o => normalizePhone(o.recipient?.phone) === np) : [];
+  // Historique par commandes DISTINCTES (dédupliqué par id) : une même commande
+  // (ou ses doublons de même id) ne doit pas se compter comme « client connu ».
+  const seen = new Set();
+  const history = (allOrders || []).filter(o => {
+    if (normalizePhone(o.recipient?.phone) !== np) return false;
+    if (seen.has(o.id)) return false;
+    seen.add(o.id);
+    return true;
+  });
   const hasLivre = history.some(o => o.status === 'livre');
   const isKnown = history.length > 1;
   const pc = getPhoneColors();
