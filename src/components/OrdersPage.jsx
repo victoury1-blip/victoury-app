@@ -586,7 +586,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   function handleOzoneSuccess(orderId, ozoneTracking) {
     setOrders((prev) =>
       prev.map((o) =>
-        o.id === orderId ? { ...o, validated: true, trackingNumber: ozoneTracking || o.trackingNumber, ozoneTracking: ozoneTracking, status: 'att_ramassage' } : o
+        o.id === orderId ? { ...o, validated: true, trackingNumber: ozoneTracking || o.trackingNumber, ozoneTracking: ozoneTracking, status: 'att_ramassage', dateUpdated: now() } : o
       )
     );
     addToast('success', `Colis créé — ${ozoneTracking}`, 'Commande déplacée vers En suivi');
@@ -1010,7 +1010,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                       if (livreur.toLowerCase().includes('ozon')) {
                         openOzone(order);
                       } else {
-                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage' } : o));
+                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage', dateUpdated: now() } : o));
                         addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
                       }
                     }}
@@ -1135,7 +1135,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                       }
                       if (livreur.toLowerCase().includes('ozon')) { openOzone(order); }
                       else {
-                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage' } : o));
+                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage', dateUpdated: now() } : o));
                         addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
                       }
                     }}

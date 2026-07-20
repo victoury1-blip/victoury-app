@@ -683,7 +683,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   const colis = useMemo(() => {
     const q = debouncedSearch.toLowerCase();
     const af = appliedFilter;
-    return orders.filter((o) => {
+    const filtered = orders.filter((o) => {
       const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
       if (!inPipeline) return false;
       // La recherche traverse tout (actifs + archives). Sans recherche : vue active masque
@@ -715,6 +715,19 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       }
       return true;
     });
+    // Les plus récemment ajoutées / mises à jour en premier : une commande qui vient
+    // d'être validée depuis « Confirmé » ou dont le statut change remonte en haut.
+    // On parse date + HEURE (fr-MA « jj/mm/aaaa hh:mm:ss » ou ISO « aaaa-mm-jj hh:mm »).
+    const ts = (o) => {
+      const s = o.dateUpdated || o.dateAdded || '';
+      let m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+      if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime();
+      m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime();
+      const d = Date.parse(s);
+      return isNaN(d) ? 0 : d;
+    };
+    return filtered.sort((a, b) => ts(b) - ts(a));
   }, [orders, debouncedSearch, appliedFilter, showArchived]);
 
   const archivedCount = useMemo(() => orders.reduce((n, o) => {
