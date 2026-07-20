@@ -574,44 +574,46 @@ export default function App() {
             return last['STATUT'] || last['STATUS'] || '';
           } catch { clearTimeout(t); return null; }
         }
+        const isFinal = (s) => /livr|retour|refus/i.test(s || '');
         const toSync = orders.filter(o => o.validated && (o.ozoneTracking || o.trackingNumber));
+        // Phase 1 — API officielle de suivi (par numéro, avec variantes du 0).
+        const stillPending = [];
         for (const o of toSync) {
           const tn = o.ozoneTracking || o.trackingNumber || o.id;
           try {
             let status = await trackByNumber(tn);
-            // Ozon insère parfois un 0 : soit au début (0MIMA…), soit après le préfixe
-            // lettres (MIMA3251 → MIMA03251). On essaie ces variantes.
             if (!status) {
               const variants = [];
               const m = tn.match(/^([A-Za-z]+)(\d+)$/);
               if (m) variants.push(`${m[1]}0${m[2]}`);          // MIMA3251 → MIMA03251
               if (/^\d+$/.test(tn) && !tn.startsWith('0')) variants.push('0' + tn);
-              for (const v of variants) {
-                status = await trackByNumber(v);
-                if (status) break;
-              }
-            }
-            // Repli tableau de bord : si introuvable OU statut non final (encore en
-            // attente/ramassage), on lit le STATUT réel depuis le tableau des colis Ozon
-            // (parcels_json) — d'abord par CODE d'envoi, sinon par NUMÉRO DE TÉLÉPHONE.
-            const isFinal = (s) => /livr|retour|refus/i.test(s || '');
-            if (!status || !isFinal(status)) {
-              try {
-                let r = await fetch(`/api/ozone-status?code=${encodeURIComponent(tn)}`);
-                let d = r.ok ? await r.json() : null;
-                if ((!d || !d.found) && o.recipient?.phone) {
-                  const bare = String(o.recipient.phone).replace(/\D/g, '');
-                  if (bare.length >= 8) {
-                    r = await fetch(`/api/ozone-status?phone=${encodeURIComponent(bare)}`);
-                    d = r.ok ? await r.json() : null;
-                  }
-                }
-                if (d && d.found && d.status) status = d.status;
-              } catch {}
+              for (const v of variants) { status = await trackByNumber(v); if (status) break; }
             }
             if (status && status !== o.ozoneLastStatus) {
               setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
               supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
+            }
+            if (!isFinal(status)) stillPending.push({ o, tn });
+          } catch { stillPending.push({ o, tn }); }
+        }
+        // Phase 2 — statut réel depuis le tableau Ozon (parcels_json), EN UN SEUL appel
+        // groupé (une seule connexion) pour ne pas saturer la limite de requêtes.
+        if (stillPending.length) {
+          try {
+            const codes = stillPending.map(p => p.tn).filter(c => /^[A-Za-z0-9]{3,30}$/.test(c));
+            if (codes.length) {
+              const r = await fetch(`/api/ozone-status?codes=${encodeURIComponent(codes.join(','))}`);
+              if (r.ok) {
+                const d = await r.json();
+                const byCode = new Map((d.results || []).map(x => [x.q, x.status]));
+                for (const { o, tn } of stillPending) {
+                  const status = byCode.get(tn);
+                  if (status && status !== o.ozoneLastStatus) {
+                    setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
+                    supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
+                  }
+                }
+              }
             }
           } catch {}
         }

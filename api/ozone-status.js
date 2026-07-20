@@ -30,9 +30,14 @@ export default async function handler(req, res) {
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
   if (rateLimit(clientIp)) return res.status(429).json({ error: 'Trop de requêtes. Réessayez dans une minute.' });
 
-  const query = (req.query.code || req.query.phone || '').toString().trim();
-  if (!query) return res.status(400).json({ error: 'code or phone required' });
-  if (!/^[A-Za-z0-9]{3,30}$/.test(query)) return res.status(400).json({ error: 'Format invalide' });
+  // Recherche unique (?code= / ?phone=) OU lot (?codes=A,B,C — jusqu'à 40).
+  // Le lot ne se connecte qu'UNE fois à Ozon puis interroge chaque valeur.
+  const batchRaw = (req.query.codes || '').toString().trim();
+  const queries = batchRaw
+    ? batchRaw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 40)
+    : [(req.query.code || req.query.phone || '').toString().trim()].filter(Boolean);
+  if (!queries.length) return res.status(400).json({ error: 'code, phone or codes required' });
+  if (queries.some(q => !/^[A-Za-z0-9]{3,30}$/.test(q))) return res.status(400).json({ error: 'Format invalide' });
 
   const EMAIL = process.env.OZONE_EMAIL;
   const PASS = process.env.OZONE_PASS;
@@ -98,8 +103,8 @@ export default async function handler(req, res) {
       allCookies = mergeCookies(allCookies, extractCookies(redirRes));
     }
 
-    // 2) Interroger le DataTables parcels_json avec la valeur de recherche (code ou téléphone).
-    async function queryParcels(method) {
+    // 2) Interroger le DataTables parcels_json avec une valeur de recherche (code ou téléphone).
+    async function queryParcels(query, method) {
       const params = new URLSearchParams();
       params.append('draw', '1');
       params.append('start', '0');
@@ -121,18 +126,27 @@ export default async function handler(req, res) {
       return { ok: rr.ok, status: rr.status, text: await rr.text() };
     }
 
-    let pr = await queryParcels('GET');
-    if (!pr.ok || !pr.text.trim() || pr.text.trim().startsWith('<')) pr = await queryParcels('POST');
+    async function statusFor(query) {
+      let pr = await queryParcels(query, 'GET');
+      if (!pr.ok || !pr.text.trim() || pr.text.trim().startsWith('<')) pr = await queryParcels(query, 'POST');
+      if (!pr.ok || !pr.text.trim()) return null;
+      // Isole le segment contenant la valeur recherchée puis extrait le statut ; sinon scanne tout.
+      let scope = pr.text;
+      const idx = pr.text.indexOf(query);
+      if (idx >= 0) scope = pr.text.substring(idx, idx + 2000);
+      return pickStatus(scope) || pickStatus(pr.text) || null;
+    }
 
-    if (!pr.ok || !pr.text.trim()) return res.json({ found: false, source: 'ozone' });
-
-    // La réponse DataTables contient le(s) parcel(s) filtré(s). On isole le segment
-    // qui contient le code recherché puis on en extrait le statut ; sinon on scanne tout.
-    let scope = pr.text;
-    const idx = pr.text.indexOf(query);
-    if (idx >= 0) scope = pr.text.substring(idx, idx + 2000);
-    const status = pickStatus(scope) || pickStatus(pr.text);
-
+    // Lot → tableau de résultats. Requête unique → objet simple (compat).
+    if (batchRaw) {
+      const results = [];
+      for (const q of queries) {
+        const st = await statusFor(q);
+        results.push({ q, found: !!st, status: st });
+      }
+      return res.json({ results, source: 'ozone' });
+    }
+    const status = await statusFor(queries[0]);
     return res.json({ found: !!status, status: status || null, source: 'ozone' });
   } catch (e) {
     return res.status(500).json({ error: 'Internal server error' });
