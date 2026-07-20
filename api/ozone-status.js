@@ -17,13 +17,35 @@ const STATUS_KEYWORDS = [
   'En cours de distribution', 'Mise en distribution', 'Reçu au hub', 'Reçu',
   'Expédié', 'Ramassé', 'En attente de ramassage', 'Nouveau colis',
 ];
+// Codes internes Ozon (parcel_status) → libellé lisible.
+const STATUS_CODE_MAP = [
+  [/deliver|livr/i, 'Livré'],
+  [/return|retour/i, 'Retourné'],
+  [/refus|reject/i, 'Refusé'],
+  [/distribut|out.?for/i, 'En cours de distribution'],
+  [/hub|received|recu|reçu/i, 'Reçu'],
+  [/dispatch|expedi|shipped/i, 'Expédié'],
+  [/pickup|ramass/i, 'Ramassé'],
+  [/new.?parcel|nouveau/i, 'Nouveau colis'],
+];
 
 function pickStatus(text) {
-  const low = text.toLowerCase();
-  for (const kw of STATUS_KEYWORDS) {
-    if (low.includes(kw.toLowerCase())) return kw;
-  }
+  if (!text) return '';
+  const low = String(text).toLowerCase();
+  for (const kw of STATUS_KEYWORDS) if (low.includes(kw.toLowerCase())) return kw;
+  for (const [re, label] of STATUS_CODE_MAP) if (re.test(text)) return label;
   return '';
+}
+
+const DT_COLUMNS = [
+  'PARCEL_CODE', 'PARCEL_RECEIVER', 'PARCEL_PRODUCTS', 'PARCEL_COMMENT', 'PARCEL_PICKUP_TIME',
+  'PARCEL_STATUT', 'PARCEL_CITY', 'PARCEL_PRICE', 'PARCEL_ACTION', 'PARCEL_NOTES',
+];
+const DT_NON_ORDERABLE = new Set([4, 8, 9]);
+
+function fmtTime(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 export default async function handler(req, res) {
@@ -103,38 +125,61 @@ export default async function handler(req, res) {
       allCookies = mergeCookies(allCookies, extractCookies(redirRes));
     }
 
-    // 2) Interroger le DataTables parcels_json avec une valeur de recherche (code ou téléphone).
-    async function queryParcels(query, method) {
+    // 2) Interroger le DataTables parcels_json (POST) avec le contrat complet observé :
+    //    colonnes, filtres et plage de dates obligatoire sur parcel_last_update.
+    const fEnd = new Date(Date.now() + 2 * 86400000);   // +2 jours
+    const fStart = new Date(Date.now() - 730 * 86400000); // -2 ans (large)
+    async function queryParcels(query) {
       const params = new URLSearchParams();
       params.append('draw', '1');
+      DT_COLUMNS.forEach((c, i) => {
+        params.append(`columns[${i}][data]`, c);
+        params.append(`columns[${i}][name]`, '');
+        params.append(`columns[${i}][searchable]`, 'true');
+        params.append(`columns[${i}][orderable]`, DT_NON_ORDERABLE.has(i) ? 'false' : 'true');
+        params.append(`columns[${i}][search][value]`, '');
+        params.append(`columns[${i}][search][regex]`, 'false');
+      });
       params.append('start', '0');
       params.append('length', '10');
       params.append('search[value]', query);
       params.append('search[regex]', 'false');
-      const headers = {
-        'User-Agent': UA, 'Cookie': allCookies.join('; '), 'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'application/json, text/javascript, */*; q=0.01', 'Referer': `${BASE}/parcels`,
-      };
-      let url = `${BASE}/parcels_json?${params.toString()}`;
-      const opts = { method, headers };
-      if (method === 'POST') {
-        url = `${BASE}/parcels_json`;
-        headers['Content-Type'] = 'application/x-www-form-urlencoded';
-        opts.body = params.toString();
-      }
-      const rr = await fetch(url, opts);
+      params.append('filter_situation', '0');
+      params.append('filter_status', '0');
+      params.append('filter_zone', '0');
+      params.append('filter_city', '0');
+      params.append('filter_address', '0');
+      params.append('filter_users', '0');
+      params.append('filter_by_date', 'LAST_UPDATE');
+      params.append('f_time_s', fmtTime(fStart));
+      params.append('f_time_e', fmtTime(fEnd));
+      const rr = await fetch(`${BASE}/parcels_json`, {
+        method: 'POST',
+        headers: {
+          'User-Agent': UA, 'Cookie': allCookies.join('; '), 'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json, text/javascript, */*; q=0.01', 'Referer': `${BASE}/parcels`,
+          'Origin': BASE, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
+        body: params.toString(),
+      });
       return { ok: rr.ok, status: rr.status, text: await rr.text() };
     }
 
     async function statusFor(query) {
-      let pr = await queryParcels(query, 'GET');
-      if (!pr.ok || !pr.text.trim() || pr.text.trim().startsWith('<')) pr = await queryParcels(query, 'POST');
+      const pr = await queryParcels(query);
       if (!pr.ok || !pr.text.trim()) return null;
-      // Isole le segment contenant la valeur recherchée puis extrait le statut ; sinon scanne tout.
-      let scope = pr.text;
-      const idx = pr.text.indexOf(query);
-      if (idx >= 0) scope = pr.text.substring(idx, idx + 2000);
-      return pickStatus(scope) || pickStatus(pr.text) || null;
+      let data;
+      try { data = JSON.parse(pr.text); } catch { return pickStatus(pr.text) || null; }
+      const rows = data.aaData || data.data || [];
+      if (!rows.length) return null;
+      // Ligne dont le code/téléphone correspond, sinon la première.
+      const row = rows.find(r => {
+        const code = (r.PARCEL_CODE || '') + '';
+        const phone = (r.PARCEL_PHONE || r.PARCEL_RECEIVER || '') + '';
+        return code.includes(query) || phone.includes(query);
+      }) || rows[0];
+      // PARCEL_STATUT peut être un libellé, un badge HTML ou un code interne.
+      return pickStatus(row.PARCEL_STATUT) || pickStatus(JSON.stringify(row)) || null;
     }
 
     // Lot → tableau de résultats. Requête unique → objet simple (compat).
