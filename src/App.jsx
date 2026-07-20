@@ -601,13 +601,14 @@ export default function App() {
         // avec 0, téléphone) et on retient le 1er qui remonte un statut. Appels groupés.
         if (stillPending.length) {
           try {
+            // On cherche UNIQUEMENT par CODE de colis (identifiant unique + variantes du 0).
+            // Le téléphone est volontairement exclu : un client peut avoir plusieurs colis
+            // (livré / échange / retour) et une recherche par numéro renverrait un statut ambigu.
             const jobs = stillPending.map(({ o, tn }) => {
               const cands = new Set([tn]);
               const m = tn.match(/^([A-Za-z]+)(\d+)$/);
               if (m) cands.add(`${m[1]}0${m[2]}`);
               if (/^\d+$/.test(tn) && !tn.startsWith('0')) cands.add('0' + tn);
-              const bare = String(o.recipient?.phone || '').replace(/\D/g, '');
-              if (bare.length >= 8) cands.add(bare);
               return { o, cands: [...cands].filter(c => /^[A-Za-z0-9]{3,30}$/.test(c)) };
             });
             const allCodes = [...new Set(jobs.flatMap(j => j.cands))];

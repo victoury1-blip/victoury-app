@@ -172,12 +172,14 @@ export default async function handler(req, res) {
       try { data = JSON.parse(pr.text); } catch { return pickStatus(pr.text) || null; }
       const rows = data.aaData || data.data || [];
       if (!rows.length) return null;
-      // Ligne dont le code/téléphone correspond, sinon la première.
-      const row = rows.find(r => {
-        const code = (r.PARCEL_CODE || '') + '';
-        const phone = (r.PARCEL_PHONE || r.PARCEL_RECEIVER || '') + '';
-        return code.includes(query) || phone.includes(query);
-      }) || rows[0];
+      // Correspondance EXACTE sur le code du colis pour éviter toute ambiguïté
+      // (un client peut avoir plusieurs colis avec des statuts différents).
+      const exact = rows.find(r => {
+        const code = ((r.PARCEL_CODE || '') + '').replace(/<[^>]*>/g, '');
+        return code === query || code.includes(query);
+      });
+      const row = exact || (rows.length === 1 ? rows[0] : null);
+      if (!row) return null;
       // PARCEL_STATUT peut être un libellé, un badge HTML ou un code interne.
       return pickStatus(row.PARCEL_STATUT) || pickStatus(JSON.stringify(row)) || null;
     }
