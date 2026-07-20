@@ -284,10 +284,18 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     const existingIds = new Set(orders.map(o => o.id));
     const newOrders = [];
     for (const row of rowsToImport) {
-      const code = (codeCol && row[codeCol]) || row._id;
-      if (existingIds.has(code)) continue;
       const name = (nameCol && row[nameCol]) || '';
       const phone = (phoneCol && row[phoneCol]) || '';
+      // Sans colonne code, on dérive un id STABLE du contenu (téléphone+nom+produit)
+      // pour que réimporter le même fichier ne recrée pas des doublons.
+      let code = (codeCol && row[codeCol]) || '';
+      if (!code) {
+        const prod = (productCol && row[productCol]) || '';
+        const bare = String(phone).replace(/\D/g, '');
+        const key = `${bare}|${String(name).trim().toLowerCase()}|${String(prod).trim().toLowerCase()}`;
+        code = bare || String(name).trim() ? `gs-${key.replace(/[^a-z0-9|]/g, '').slice(0, 60)}` : row._id;
+      }
+      if (existingIds.has(code)) continue;
       const city = (cityCol && row[cityCol]) || '';
       const address = (addressCol && row[addressCol]) || '';
       const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
