@@ -20,6 +20,48 @@ function isLight(hex) {
   return (r*299+g*587+b*114)/1000 > 155;
 }
 
+// Petit menu déroulant pour un sous-statut booléen (Reçu/Non-reçu, Facturé/Non-facturé).
+// Clic → popup avec les 2 options + coche sur l'option active.
+function SubStatusDropdown({ active, onChange, activeText, inactiveText, activeClass, inactiveClass }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+  const opts = [
+    { v: false, t: inactiveText },
+    { v: true, t: activeText },
+  ];
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold transition-colors ${active ? activeClass : inactiveClass}`}
+      >
+        {active ? activeText : inactiveText}
+        <span className="text-[8px]">▼</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[110px] overflow-hidden">
+          {opts.map(opt => (
+            <button
+              key={String(opt.v)}
+              onClick={() => { if (opt.v !== active) onChange(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 text-left"
+            >
+              <span className="w-3 shrink-0">{opt.v === active && <Check size={12} className="text-blue-600" />}</span>
+              {opt.t}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Affiche le nom du livreur ; « Ozon Express » est stylé aux couleurs de la marque
 // (OZON en noir, EXPRESS en rouge). `variant` : 'badge' (pastille) ou 'inline' (texte).
 function LivreurTag({ name, variant = 'badge' }) {
@@ -1143,31 +1185,27 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       </button>
                     )}
 
-                    {/* Sub-status: facture toggle (persisted in localStorage) */}
+                    {/* Sous-statut Facturé / Pas facturé — menu déroulant */}
                     {o.status === 'livre' && (
-                      <button
-                        onClick={() => toggleFacture(o.id)}
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
-                          facturedIds.has(o.id)
-                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
-                            : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-700'
-                        }`}
-                      >
-                        {facturedIds.has(o.id) ? '✓ Facturé' : 'Pas facturé'}
-                      </button>
+                      <SubStatusDropdown
+                        active={facturedIds.has(o.id)}
+                        onChange={() => toggleFacture(o.id)}
+                        activeText="✓ Facturé"
+                        inactiveText="Pas facturé"
+                        activeClass="bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200"
+                        inactiveClass="bg-gray-100 text-gray-500 border border-gray-300 hover:bg-yellow-50"
+                      />
                     )}
+                    {/* Sous-statut Reçu / Non-reçu — menu déroulant */}
                     {(o.status === 'refuse' || o.status === 'annule' || o.status === 'retour_recu') && (
-                      <button
-                        onClick={() => toggleRecu(o.id)}
-                        className={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold text-white transition-colors ${
-                          (o.recu || recuIds.has(o.id))
-                            ? 'bg-green-600 hover:bg-green-700'
-                            : 'bg-red-800 hover:bg-red-900'
-                        }`}
-                      >
-                        {(o.recu || recuIds.has(o.id)) ? 'Reçu' : 'Non-reçu'}
-                        <span className="text-[8px]">▼</span>
-                      </button>
+                      <SubStatusDropdown
+                        active={o.recu || recuIds.has(o.id)}
+                        onChange={() => toggleRecu(o.id)}
+                        activeText="Reçu"
+                        inactiveText="Non-reçu"
+                        activeClass="bg-green-600 text-white hover:bg-green-700"
+                        inactiveClass="bg-red-800 text-white hover:bg-red-900"
+                      />
                     )}
                     </div>
                   </td>
