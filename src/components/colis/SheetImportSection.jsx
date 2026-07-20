@@ -133,11 +133,11 @@ export default function SheetImportSection({ orders = [], setOrders }) {
 
   /* Télécharge un modèle CSV avec les bons entêtes + 2 exemples */
   function downloadTemplate() {
-    const headers = ['code','nom','phone','adresse','prix','ville','produit','date','taille','note livraison','note interne','confirmation','statut livraison'];
+    const headers = ['code','nom','phone','adresse','prix','ville','produit','date','taille','note livraison','note interne','statut livraison'];
     const examples = [
-      ['MIMA3001','Yassmine Kzaz','0652758903','Hay Anza rue 12','250','Agadir','Ensemble Sport Noir','2026-05-16','XL','Appeler avant livraison','msg','confirme','livre'],
-      ['MIMA3002','Ahmed Alaoui','0661472363','Bd Zerktouni imm 4','300','Casablanca','Pack Sport Bleu','2026-05-16','L','par WhatsApp','','confirme','retour'],
-      ['MIMA3003','Salma Bennani','0709015213','Quartier Riad','199','Rabat','Ensemble Sport Rouge','2026-05-17','M','','client pas dispo','annule',''],
+      ['MIMA3001','Yassmine Kzaz','0652758903','Hay Anza rue 12','250','Agadir','Ensemble Sport Noir','2026-05-16','XL','Appeler avant livraison','msg','livre'],
+      ['MIMA3002','Ahmed Alaoui','0661472363','Bd Zerktouni imm 4','300','Casablanca','Pack Sport Bleu','2026-05-16','L','par WhatsApp','','retour'],
+      ['MIMA3003','Salma Bennani','0709015213','Quartier Riad','199','Rabat','Ensemble Sport Rouge','2026-05-17','M','','client pas dispo',''],
     ];
     const esc = (v) => /[",;\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
     const csv = '﻿' + [headers, ...examples].map(r => r.map(esc).join(',')).join('\n');
