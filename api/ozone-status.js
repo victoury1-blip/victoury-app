@@ -174,10 +174,9 @@ export default async function handler(req, res) {
       if (!rows.length) return null;
       // Correspondance EXACTE sur le code du colis pour éviter toute ambiguïté
       // (un client peut avoir plusieurs colis avec des statuts différents).
-      const exact = rows.find(r => {
-        const code = ((r.PARCEL_CODE || '') + '').replace(/<[^>]*>/g, '');
-        return code === query || code.includes(query);
-      });
+      const normCode = (r) => ((r.PARCEL_CODE || '') + '').replace(/<[^>]*>/g, '').trim();
+      const exact = rows.find(r => normCode(r) === query);
+      // Repli uniquement s'il n'y a qu'une seule ligne (aucune ambiguïté possible).
       const row = exact || (rows.length === 1 ? rows[0] : null);
       if (!row) return null;
       // PARCEL_STATUT peut être un libellé, un badge HTML ou un code interne.

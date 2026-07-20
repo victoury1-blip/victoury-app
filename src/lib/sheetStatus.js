@@ -14,12 +14,14 @@ export function mapToAppStatus(raw) {
 
   // Rupture / hors stock — avant "confirme" car la valeur "CONFIRME OUT STOCK" contient les deux.
   if (has('out stock', 'outstock', 'out of stock', 'rupture', 'manque', 'نفاد', 'مخزون')) return 'manque_stock';
+  // Tokens combinés / spécifiques AVANT les tokens simples : « retour reçu » doit
+  // donner retour_recu et non recu_livreur ; l'échange et le retour avant « livr »/« recu ».
+  if (has('echang', 'chang', 'exchange', 'تبديل')) return 'change';
+  if (has('retour', 'return', 'ارجاع', 'مرجع', 'رجع')) return 'retour_recu';
   if (has('livr', 'delivered', 'تسليم', 'توصيل', 'سلم')) return 'livre';
   if (has('recu', 'received', 'توصل')) return 'recu_livreur';
   if (has('refus', 'refused', 'rejet', 'رفض')) return 'refuse';
   if (has('annul', 'cancel', 'الغاء', 'ملغ')) return 'annule';
-  if (has('echang', 'change', 'exchange', 'تبديل')) return 'change';
-  if (has('retour', 'return', 'ارجاع', 'مرجع', 'رجع')) return 'retour_recu';
   if (has('report', 'تأجيل', 'مؤجل')) return 'reporter';
   if (has('confirm', 'مؤكد', 'تاكيد')) return 'confirme';
   if (has('expedi', 'shipped', 'شحن', 'مرسل')) return 'expedier';

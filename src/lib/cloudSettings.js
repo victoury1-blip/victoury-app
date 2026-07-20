@@ -55,7 +55,8 @@ export async function cloudGet(key) {
 }
 
 export async function cloudSet(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  // QuotaExceededError (gros produits/factures) ne doit pas empêcher l'écriture cloud.
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
   try {
     const userId = await uid();
     const row = { key, value, updated_at: new Date().toISOString() };

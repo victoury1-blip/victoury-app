@@ -27,7 +27,7 @@ const saveOrdersOffline = async (...a) => (await _offlineStore()).saveOrdersOffl
 const loadOrdersOffline = async (...a) => (await _offlineStore()).loadOrdersOffline(...a);
 const queueSync = async (...a) => (await _offlineStore()).queueSync(...a);
 const getPendingSync = async (...a) => (await _offlineStore()).getPendingSync(...a);
-const clearSyncQueue = async (...a) => (await _offlineStore()).clearSyncQueue(...a);
+const deleteSyncItem = async (...a) => (await _offlineStore()).deleteSyncItem(...a);
 const deleteOrderOffline = async (...a) => (await _offlineStore()).deleteOrderOffline(...a);
 import { cloudGet, cloudSet } from './lib/cloudSettings';
 import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
@@ -171,9 +171,10 @@ export default function App() {
         if (!pending.length) return;
         for (const item of pending) {
           try {
+            let error = null;
             if (item.action === 'update') {
               const o = item.data;
-              await supabase.from('orders').upsert({
+              const r = await supabase.from('orders').upsert({
                 id: o.id, status: o.status, note: o.note, validated: o.validated,
                 recipient: o.recipient, product: o.product, products: o.products || null,
                 price: o.price, date_added: o.dateAdded,
@@ -184,14 +185,19 @@ export default function App() {
                 ...(o.ozoneTracking ? { ozone_tracking: o.ozoneTracking } : {}),
                 ...(o.ozoneLastStatus ? { ozone_last_status: o.ozoneLastStatus } : {}),
               }, { onConflict: 'id' });
+              error = r.error;
             } else if (item.action === 'delete') {
-              await supabase.from('orders').update({ is_deleted: true }).eq('id', item.data.id);
+              const r = await supabase.from('orders').update({ is_deleted: true }).eq('id', item.data.id);
+              error = r.error;
             }
+            // Ne supprimer de la file QUE les items réellement réappliqués : ceux qui
+            // échouent (réseau, RLS…) sont conservés et rejoués au prochain passage.
+            if (!error) await deleteSyncItem(item.id);
+            else console.error('Sync queue item failed:', error);
           } catch (e) {
             console.error('Sync queue item failed:', e);
           }
         }
-        await clearSyncQueue();
       } catch (e) {
         console.error('Failed to process sync queue:', e);
       }
@@ -256,7 +262,9 @@ export default function App() {
         const res = await supabase
           .from('orders')
           .select('*')
-          .neq('is_deleted', true)
+          // `neq('is_deleted', true)` exclut les lignes où is_deleted IS NULL (NULL <> true = NULL) :
+          // on inclut explicitement NULL et false pour ne pas masquer des commandes valides.
+          .or('is_deleted.is.null,is_deleted.eq.false')
           .order('created_at', { ascending: false });
         data = res.data; error = res.error;
       } catch (e) {
@@ -575,7 +583,7 @@ export default function App() {
           } catch { clearTimeout(t); return null; }
         }
         const isFinal = (s) => /livr|retour|refus/i.test(s || '');
-        const toSync = orders.filter(o => o.validated && (o.ozoneTracking || o.trackingNumber));
+        const toSync = ordersRef.current.filter(o => o.validated && (o.ozoneTracking || o.trackingNumber));
         // Phase 1 — API officielle de suivi (par numéro, avec variantes du 0).
         const stillPending = [];
         for (const o of toSync) {
@@ -635,7 +643,9 @@ export default function App() {
     const timer = setTimeout(syncOzoneStatuses, 5000);
     const interval = setInterval(syncOzoneStatuses, 300000);
     return () => { clearTimeout(timer); clearInterval(interval); };
-  }, [session, orders.length]);
+    // Ne dépend que de la session : on lit les commandes via ordersRef pour éviter de
+    // relancer une synchro complète à chaque changement du nombre de commandes.
+  }, [session]);
 
   /* ── Auto-synchro des statuts Chic Affiliate (avant tout return conditionnel) ──
      Passe les commandes « Envoyée » à « Livrée » quand Chic les marque
@@ -728,7 +738,8 @@ export default function App() {
       return;
     }
     /* Soft delete — mark the row instead of removing it so it survives cache resets */
-    await supabase.from('orders').update({ is_deleted: true }).eq('id', orderId);
+    const { error } = await supabase.from('orders').update({ is_deleted: true }).eq('id', orderId);
+    if (error) { try { await queueSync('delete', { id: orderId }); } catch {} }
   }
 
   /* Corbeille : récupère les commandes soft-deleted (les plus récentes d'abord) */
@@ -764,7 +775,7 @@ export default function App() {
       await saveOrdersOffline([order]);
       return;
     }
-    await supabase.from('orders').upsert({
+    const { error } = await supabase.from('orders').upsert({
       id: order.id,
       status: order.status,
       note: order.note,
@@ -783,6 +794,9 @@ export default function App() {
       ...(order.ozoneTracking ? { ozone_tracking: order.ozoneTracking } : {}),
       ...(order.ozoneLastStatus ? { ozone_last_status: order.ozoneLastStatus } : {}),
     }, { onConflict: 'id' });
+    // Écriture en ligne échouée (RLS, réseau transitoire…) : on met la mutation en file
+    // pour rejouer, sinon le changement local ne rejoindrait jamais la base.
+    if (error) { try { await queueSync('update', order); } catch {} }
   }
 
   const setOrdersWithSync = (updater) => {

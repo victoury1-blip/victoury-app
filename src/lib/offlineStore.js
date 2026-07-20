@@ -57,6 +57,13 @@ export async function clearSyncQueue() {
   await tx.done;
 }
 
+// Delete a single sync-queue item by its autoIncrement id (used to remove only the
+// items that were successfully replayed, so failed/new ones survive for the next flush).
+export async function deleteSyncItem(id) {
+  const db = await getDb();
+  await db.delete('syncQueue', id);
+}
+
 // Delete an order from IndexedDB
 export async function deleteOrderOffline(orderId) {
   const db = await getDb();
