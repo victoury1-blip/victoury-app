@@ -42,9 +42,34 @@ export default function PWAUpdateBanner() {
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
 
+    // Vérifier ACTIVEMENT les mises à jour : sur une PWA installée qui reste ouverte,
+    // le navigateur ne cherche pas de nouveau SW tout seul. On force reg.update() au
+    // démarrage, toutes les 60 s, et au retour au premier plan. Dès qu'un nouveau SW
+    // est trouvé, on affiche la bannière (updatefound → installed).
+    let interval = null;
+    let reg = null;
+    const onVis = () => { if (document.visibilityState === 'visible' && reg) reg.update().catch(() => {}); };
+    navigator.serviceWorker.ready.then((r) => {
+      reg = r;
+      const check = () => r.update().catch(() => {});
+      check();
+      interval = setInterval(check, 60 * 1000);
+      // Un SW trouvé + installé alors qu'un contrôleur existe déjà = mise à jour dispo.
+      r.addEventListener('updatefound', () => {
+        const sw = r.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) setNeedRefresh(true);
+        });
+      });
+    }).catch(() => {});
+    document.addEventListener('visibilitychange', onVis);
+
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', onCtrlChange);
       navigator.serviceWorker.removeEventListener('message', onMessage);
+      document.removeEventListener('visibilitychange', onVis);
+      if (interval) clearInterval(interval);
     };
   }, []);
 
