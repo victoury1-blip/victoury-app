@@ -591,8 +591,11 @@ export default function App() {
                 if (status) break;
               }
             }
-            // Repli : introuvable par numéro de suivi → chercher chez Ozon par téléphone.
-            if (!status && o.recipient?.phone) {
+            // Repli téléphone : si introuvable OU si le statut de suivi n'est pas final
+            // (encore en attente/ramassage), on demande à Ozon par NUMÉRO DE TÉLÉPHONE
+            // pour récupérer un état final (Livré / Retourné).
+            const isFinal = (s) => /livr|retour|refus/i.test(s || '');
+            if ((!status || !isFinal(status)) && o.recipient?.phone) {
               try {
                 const bare = String(o.recipient.phone).replace(/\D/g, '');
                 if (bare.length >= 8) {
