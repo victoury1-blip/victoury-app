@@ -1075,10 +1075,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       {/* Table */}
       <div className="flex-1 overflow-auto px-4 pb-4">
       <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full text-sm border-collapse min-w-[900px] table">
+        <table className="w-full text-sm table-fixed border-collapse min-w-[1180px]">
+          <colgroup>
+            <col style={{ width: '44px' }} /><col style={{ width: '210px' }} /><col style={{ width: '210px' }} />
+            <col style={{ width: '90px' }} /><col style={{ width: '140px' }} /><col style={{ width: '180px' }} />
+            <col style={{ width: '120px' }} /><col style={{ width: '130px' }} /><col style={{ width: '70px' }} /><col style={{ width: '96px' }} />
+          </colgroup>
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-                <th className="px-4 py-3 w-8">
+                <th className="px-4 py-3">
                 <input type="checkbox" checked={pagedColis.length > 0 && pagedColis.every((o) => selected.includes(o.id))} onChange={toggleAll} className="w-4 h-4 rounded" />
               </th>
             {['Destinataire', 'Produits', 'Prix', 'État', 'Note', 'LIV', 'Date', 'Validé', 'Action'].map((h) => (
@@ -1088,7 +1093,12 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
           </thead>
         </table>
         <div className="block">
-        <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px] [&_tbody_td]:align-top">
+        <table className="w-full text-sm table-fixed border-separate border-spacing-y-1 min-w-[1180px] [&_tbody_td]:align-middle">
+          <colgroup>
+            <col style={{ width: '44px' }} /><col style={{ width: '210px' }} /><col style={{ width: '210px' }} />
+            <col style={{ width: '90px' }} /><col style={{ width: '140px' }} /><col style={{ width: '180px' }} />
+            <col style={{ width: '120px' }} /><col style={{ width: '130px' }} /><col style={{ width: '70px' }} /><col style={{ width: '96px' }} />
+          </colgroup>
           <tbody>
             {colis.length === 0 ? (
               <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">
