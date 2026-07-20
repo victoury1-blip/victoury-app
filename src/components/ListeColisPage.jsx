@@ -996,7 +996,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
             </tr>
           </thead>
         </table>
-        <div className="block" style={pagedColis.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
+        <div className="block">
         <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px] [&_tbody_td]:align-top">
           <tbody>
             {colis.length === 0 ? (
