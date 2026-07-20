@@ -861,10 +861,15 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       {/* Table (défilable horizontalement, comme Liste des Colis) */}
       <div className="flex-1 overflow-auto px-4 pb-4">
         <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
-        <table className="w-full text-sm border-collapse min-w-[900px] [&_tbody_td]:align-top">
+        <table className="w-full text-sm table-fixed border-collapse min-w-[1120px]">
+          <colgroup>
+            <col style={{ width: '44px' }} /><col style={{ width: '220px' }} /><col style={{ width: '220px' }} />
+            <col style={{ width: '100px' }} /><col style={{ width: '150px' }} /><col style={{ width: '200px' }} />
+            <col style={{ width: '150px' }} /><col style={{ width: '80px' }} /><col style={{ width: '96px' }} />
+          </colgroup>
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 w-8">
+              <th className="px-4 py-3">
                 <input
                   type="checkbox"
                   checked={paged.length > 0 && paged.every((o) => selected.includes(o.id))}
@@ -876,15 +881,20 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Produits</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Prix</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">État</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 max-w-xs">Note</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Note</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Date</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Validé</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
             </tr>
           </thead>
         </table>
-        <div style={paged.length > 50 ? { maxHeight: '600px', overflowY: 'auto' } : undefined}>
-        <table className="w-full text-sm border-separate border-spacing-y-1 min-w-[900px]">
+        <div>
+        <table className="w-full text-sm table-fixed border-separate border-spacing-y-1 min-w-[1120px] [&_tbody_td]:align-middle">
+          <colgroup>
+            <col style={{ width: '44px' }} /><col style={{ width: '220px' }} /><col style={{ width: '220px' }} />
+            <col style={{ width: '100px' }} /><col style={{ width: '150px' }} /><col style={{ width: '200px' }} />
+            <col style={{ width: '150px' }} /><col style={{ width: '80px' }} /><col style={{ width: '96px' }} />
+          </colgroup>
           <tbody>
             {filtered.length === 0 && (
               <tr>
