@@ -591,21 +591,22 @@ export default function App() {
                 if (status) break;
               }
             }
-            // Repli téléphone : si introuvable OU si le statut de suivi n'est pas final
-            // (encore en attente/ramassage), on demande à Ozon par NUMÉRO DE TÉLÉPHONE
-            // pour récupérer un état final (Livré / Retourné).
+            // Repli tableau de bord : si introuvable OU statut non final (encore en
+            // attente/ramassage), on lit le STATUT réel depuis le tableau des colis Ozon
+            // (parcels_json) — d'abord par CODE d'envoi, sinon par NUMÉRO DE TÉLÉPHONE.
             const isFinal = (s) => /livr|retour|refus/i.test(s || '');
-            if ((!status || !isFinal(status)) && o.recipient?.phone) {
+            if (!status || !isFinal(status)) {
               try {
-                const bare = String(o.recipient.phone).replace(/\D/g, '');
-                if (bare.length >= 8) {
-                  const r = await fetch(`/api/ozone-check?phone=${encodeURIComponent(bare)}`);
-                  if (r.ok) {
-                    const d = await r.json();
-                    if (d.delivered > 0) status = 'Livré';
-                    else if (d.returned > 0) status = 'Retourné';
+                let r = await fetch(`/api/ozone-status?code=${encodeURIComponent(tn)}`);
+                let d = r.ok ? await r.json() : null;
+                if ((!d || !d.found) && o.recipient?.phone) {
+                  const bare = String(o.recipient.phone).replace(/\D/g, '');
+                  if (bare.length >= 8) {
+                    r = await fetch(`/api/ozone-status?phone=${encodeURIComponent(bare)}`);
+                    d = r.ok ? await r.json() : null;
                   }
                 }
+                if (d && d.found && d.status) status = d.status;
               } catch {}
             }
             if (status && status !== o.ozoneLastStatus) {
