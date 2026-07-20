@@ -596,23 +596,35 @@ export default function App() {
             if (!isFinal(status)) stillPending.push({ o, tn });
           } catch { stillPending.push({ o, tn }); }
         }
-        // Phase 2 — statut réel depuis le tableau Ozon (parcels_json), EN UN SEUL appel
-        // groupé (une seule connexion) pour ne pas saturer la limite de requêtes.
+        // Phase 2 — statut réel depuis le tableau Ozon (parcels_json). Ozon exige une
+        // correspondance EXACTE : on envoie plusieurs candidats par colis (code, variante
+        // avec 0, téléphone) et on retient le 1er qui remonte un statut. Appels groupés.
         if (stillPending.length) {
           try {
-            const codes = stillPending.map(p => p.tn).filter(c => /^[A-Za-z0-9]{3,30}$/.test(c));
-            if (codes.length) {
-              const r = await fetch(`/api/ozone-status?codes=${encodeURIComponent(codes.join(','))}`);
-              if (r.ok) {
-                const d = await r.json();
-                const byCode = new Map((d.results || []).map(x => [x.q, x.status]));
-                for (const { o, tn } of stillPending) {
-                  const status = byCode.get(tn);
-                  if (status && status !== o.ozoneLastStatus) {
-                    setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
-                    supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
-                  }
-                }
+            const jobs = stillPending.map(({ o, tn }) => {
+              const cands = new Set([tn]);
+              const m = tn.match(/^([A-Za-z]+)(\d+)$/);
+              if (m) cands.add(`${m[1]}0${m[2]}`);
+              if (/^\d+$/.test(tn) && !tn.startsWith('0')) cands.add('0' + tn);
+              const bare = String(o.recipient?.phone || '').replace(/\D/g, '');
+              if (bare.length >= 8) cands.add(bare);
+              return { o, cands: [...cands].filter(c => /^[A-Za-z0-9]{3,30}$/.test(c)) };
+            });
+            const allCodes = [...new Set(jobs.flatMap(j => j.cands))];
+            const byCode = new Map();
+            for (let i = 0; i < allCodes.length; i += 30) {
+              const chunk = allCodes.slice(i, i + 30);
+              const r = await fetch(`/api/ozone-status?codes=${encodeURIComponent(chunk.join(','))}`);
+              if (!r.ok) continue;
+              const d = await r.json();
+              (d.results || []).forEach(x => { if (x.status) byCode.set(x.q, x.status); });
+            }
+            for (const { o, cands } of jobs) {
+              let status = null;
+              for (const c of cands) { const s = byCode.get(c); if (s) { status = s; break; } }
+              if (status && status !== o.ozoneLastStatus) {
+                setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
+                supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
               }
             }
           } catch {}
