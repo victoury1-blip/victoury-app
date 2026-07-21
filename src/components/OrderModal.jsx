@@ -270,9 +270,11 @@ export default function OrderModal({ order, onClose, onSave }) {
               {form.products.map((prod, idx) => {
                 const stockProducts = loadProducts();
                 const selProd = stockProducts.find(p => p.name === prod.name);
+                // Par défaut : tailles vêtements (S…5XL). On ne montre les tailles
+                // numériques (36-47) que si la taille déjà saisie est un nombre.
                 const sizes = selProd
                   ? selProd.variations.map(v => v.taille)
-                  : (prod.size && isNaN(prod.size) ? SIZE_OPTIONS : NUMERIC_SIZES);
+                  : (prod.size && !isNaN(prod.size) ? NUMERIC_SIZES : SIZE_OPTIONS);
                 const sizeOptions = sizes.includes(prod.size || '') || !prod.size ? sizes : [prod.size, ...sizes];
                 return (
                   <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2 border border-gray-100">
