@@ -60,7 +60,11 @@ function filterByPeriod(orders, period) {
   const yesterdayEnd   = new Date(todayStart);
 
   return orders.filter(o => {
-    const d = parseDate(o.dateAdded);
+    // On compte par la date d'ENTRÉE dans le système (created_at), pas par la date de
+    // la commande : ainsi les imports du jour apparaissent bien dans « Aujourd'hui ».
+    let d = null;
+    if (o.createdAt) { const c = new Date(o.createdAt); if (!isNaN(c.getTime())) d = c; }
+    if (!d) d = parseDate(o.dateAdded);
     if (!d) return period === 'all';
     if (period === 'today')     return d >= todayStart;
     if (period === 'yesterday') return d >= yesterdayStart && d < yesterdayEnd;

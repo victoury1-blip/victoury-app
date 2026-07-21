@@ -101,6 +101,7 @@ function mapRow(o) {
     ozoneLastStatus: o.ozone_last_status || null,
     manuallyModified: o.manually_modified || false,
     recu: o.recu || false,
+    createdAt: o.created_at || null,
   };
 }
 
