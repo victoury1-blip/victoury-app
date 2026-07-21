@@ -25,6 +25,17 @@ function parseDate(dateAdded) {
   return isNaN(t) ? null : new Date(t);
 }
 
+/** Date de référence = date d'entrée dans le système (createdAt),
+ *  avec repli sur la date métier (dateAdded) pour les vieilles commandes
+ *  sans createdAt. Cohérent avec le Tableau de bord. */
+function orderRefDate(o) {
+  if (o?.createdAt) {
+    const d = new Date(o.createdAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return parseDate(o?.dateAdded);
+}
+
 function KpiCard({ icon: Icon, value, label, color }) {
   return (
     <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
@@ -50,7 +61,7 @@ export default function AnalyticsPage({ orders = [] }) {
   }, [period]);
 
   const filtered = useMemo(
-    () => orders.filter(o => { const d = parseDate(o.dateAdded); return d && d >= cutoff; }),
+    () => orders.filter(o => { const d = orderRefDate(o); return d && d >= cutoff; }),
     [orders, cutoff]
   );
 
@@ -75,7 +86,7 @@ export default function AnalyticsPage({ orders = [] }) {
       map[key] = 0;
     }
     filtered.forEach(o => {
-      const d = parseDate(o.dateAdded);
+      const d = orderRefDate(o);
       if (!d) return;
       const key = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
       if (key in map) map[key]++;
