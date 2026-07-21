@@ -43,11 +43,23 @@ export async function loadFacturesRemote() {
 export async function nextRef() {
   const d = new Date();
   const dd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  // Plancher = plus grand numéro déjà utilisé, pour ne JAMAIS réémettre un numéro existant.
+  let maxUsed = 0;
+  try {
+    loadFactures().forEach(f => {
+      const m = /(\d+)\s*$/.exec(f?.ref || '');
+      if (m) maxUsed = Math.max(maxUsed, parseInt(m[1], 10));
+    });
+  } catch {}
+  let n = 0;
   try {
     const { data, error } = await supabase.rpc('next_fct_id');
-    if (!error && data) return `FCT-${dd}-${String(data).padStart(4,'0')}`;
+    if (!error && data) n = Math.max(parseInt(data, 10) || 0, maxUsed + 1);
   } catch {}
-  const n = parseInt(localStorage.getItem(CTR_KEY) || '0', 10) + 1;
+  if (!n) {
+    const stored = parseInt(localStorage.getItem(CTR_KEY) || '0', 10) || 0;
+    n = Math.max(stored, maxUsed) + 1;
+  }
   localStorage.setItem(CTR_KEY, String(n));
   return `FCT-${dd}-${String(n).padStart(4,'0')}`;
 }

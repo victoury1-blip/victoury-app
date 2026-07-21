@@ -471,9 +471,18 @@ function NewFactureModal({ orders, onClose, onCreated }) {
     })();
   }, []);
 
+  // Commandes déjà présentes dans une facture existante : à exclure de la nouvelle facture.
+  const invoicedIds = useMemo(() => {
+    const set = new Set();
+    try { loadFactures().forEach(f => (f?.colis || []).forEach(c => c?.orderId != null && set.add(c.orderId))); } catch {}
+    return set;
+  }, []);
+
   const eligible = useMemo(() => orders.filter(o =>
-    ELIGIBLE_STATUSES.includes(o.status) && (o.validated || o.trackingNumber) && (livreur ? normName(o.recipient?.delivery) === normName(livreur) : true)
-  ), [orders, livreur]);
+    ELIGIBLE_STATUSES.includes(o.status) && (o.validated || o.trackingNumber)
+    && !invoicedIds.has(o.id)
+    && (livreur ? normName(o.recipient?.delivery) === normName(livreur) : true)
+  ), [orders, livreur, invoicedIds]);
 
   const livreurs = useMemo(() => {
     const seen = new Map();
