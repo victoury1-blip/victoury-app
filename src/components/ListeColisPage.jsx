@@ -481,7 +481,7 @@ const isCasa = (city) => {
   return ['casa','casablanca','كازا','كازابلانكا','الدارالبيضاء','الدار البيضاء','dar el beida','darelbeida'].some(k => c.includes(k.replace(/[\s\-]/g, '')));
 };
 
-export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteOrder, fetchDeletedOrders, restoreOrder }) {
+export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteOrder, fetchDeletedOrders, restoreOrder, purgeOrder }) {
   const [tab] = useState('colis');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
@@ -515,6 +515,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       const ok = await restoreOrder?.(id);
       if (ok) { setTrashOrders(prev => prev.filter(o => o.id !== id)); toast.success('Commande restaurée'); }
       else toast.error('Échec de la restauration');
+    } finally { setRestoringId(null); }
+  }
+  async function handlePurge(id) {
+    if (!window.confirm('Supprimer DÉFINITIVEMENT cette commande ? (irréversible)')) return;
+    setRestoringId(id);
+    try {
+      const ok = await purgeOrder?.(id);
+      if (ok) { setTrashOrders(prev => prev.filter(o => o.id !== id)); toast.success('Supprimée définitivement'); }
+      else toast.error('Échec de la suppression');
     } finally { setRestoringId(null); }
   }
   async function handleRestoreAll() {
@@ -1463,6 +1472,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors"
                   >
                     {restoringId === o.id ? '…' : 'Restaurer'}
+                  </button>
+                  <button
+                    onClick={() => handlePurge(o.id)}
+                    disabled={restoringId === o.id}
+                    title="Supprimer définitivement"
+                    className="shrink-0 p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
               ))}

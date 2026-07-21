@@ -797,6 +797,17 @@ export default function App() {
     return true;
   }
 
+  /* Suppression DÉFINITIVE depuis la Corbeille : retire la ligne de Supabase et de la
+     liste noire (irréversible). Utilisé pour purger des commandes non désirées. */
+  async function purgeOrder(orderId) {
+    const { error } = await supabase.from('orders').delete().eq('id', orderId);
+    if (error) { logError('Suppression définitive', error.message); return false; }
+    deletedIdsRef.current.delete(orderId);
+    try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    return true;
+  }
+
   async function updateOrderInSupabase(order) {
     if (!navigator.onLine) {
       await queueSync('update', order);
@@ -896,7 +907,7 @@ export default function App() {
           <Route path="/analytics" element={<AnalyticsPage orders={orders} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
           <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
-          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} fetchDeletedOrders={fetchDeletedOrders} restoreOrder={restoreOrder} />} />
+          <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} fetchDeletedOrders={fetchDeletedOrders} restoreOrder={restoreOrder} purgeOrder={purgeOrder} />} />
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/chic-affiliate" element={<ChicAffiliatePage orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
