@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
-import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel } from '../data/factures';
+import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel, dedupeFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
@@ -417,6 +417,7 @@ function getLivreurFrais(livreurName, city, status, fraisCache, livreursList) {
 
 /* ─── New Facture Modal ─── */
 function NewFactureModal({ orders, onClose, onCreated }) {
+  const [creating, setCreating] = useState(false);
   const [livreur, setLivreur] = useState('');
   const [fraisDefault, setFraisDefault] = useState(0);
   const [selected, setSelected] = useState({});
@@ -515,10 +516,13 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   const totalNet = totalLivre - totalFrais;
 
   async function create() {
-    if (!selOrders.length) return;
+    if (!selOrders.length || creating) return;
+    setCreating(true);
     const ref = await nextRef();
     const facture = {
-      id: ref,
+      // id UNIQUE (distinct du ref) : deux factures ne doivent jamais partager d'id,
+      // sinon un toggle/suppression en affecterait plusieurs.
+      id: `${ref}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
       ref,
       dateCreation: nowTs(),
       datePaiement: null,
@@ -639,9 +643,9 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 
         <div className="flex justify-end gap-3 px-6 py-4 border-t">
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Annuler</button>
-          <button onClick={create} disabled={!selOrders.length}
+          <button onClick={create} disabled={!selOrders.length || creating}
             className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-40">
-            Créer la facture ({selOrders.length} colis)
+            {creating ? 'Création…' : `Créer la facture (${selOrders.length} colis)`}
           </button>
         </div>
       </div>
@@ -686,8 +690,9 @@ export default function FacturesPage({ orders }) {
         if (currentUserId && row?.user_id && row.user_id !== currentUserId) return;
         const val = row?.value;
         if (Array.isArray(val)) {
-          setFactures(val);
-          localStorage.setItem('victoury_factures', JSON.stringify(val));
+          const clean = dedupeFactures(val);
+          setFactures(clean);
+          localStorage.setItem('victoury_factures', JSON.stringify(clean));
         }
       })
       .subscribe();

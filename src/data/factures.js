@@ -4,19 +4,37 @@ import { supabase } from '../lib/supabase';
 const KEY = 'victoury_factures';
 const CTR_KEY = 'victoury_fct_counter';
 
+// Déduplique les factures : par id unique, et à défaut par (ref + dateCreation) pour
+// nettoyer d'anciens doublons créés avec un même id (id == ref à l'époque).
+export function dedupeFactures(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const f of list) {
+    if (!f) continue;
+    const key = `${f.id || ''}|${f.ref || ''}|${f.dateCreation || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(f);
+  }
+  return out;
+}
+
 export function loadFactures() {
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+  try { return dedupeFactures(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch { return []; }
 }
 export function saveFactures(list) {
-  localStorage.setItem(KEY, JSON.stringify(list));
-  cloudSet(KEY, list);
+  const clean = dedupeFactures(list);
+  localStorage.setItem(KEY, JSON.stringify(clean));
+  cloudSet(KEY, clean);
 }
 export async function loadFacturesRemote() {
   try {
     const remote = await cloudGet(KEY);
     if (Array.isArray(remote)) {
-      localStorage.setItem(KEY, JSON.stringify(remote));
-      return remote;
+      const clean = dedupeFactures(remote);
+      localStorage.setItem(KEY, JSON.stringify(clean));
+      return clean;
     }
   } catch {}
   return null;
