@@ -648,7 +648,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
   return (
     <div className="flex flex-col h-full">
-      {duplicateGroups.length > 0 && (
+      {activeTab === 'a_confirmer' && duplicateGroups.length > 0 && (
         <div className="mx-4 mt-2 mb-0 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
           <div className="flex items-center gap-2 font-bold mb-1">
             <AlertTriangle size={16} /> Commandes en double détectées aujourd'hui
