@@ -14,11 +14,13 @@ const EXPENSE_CATS = [
   { value: 'autres', label: 'Autres dépenses', color: 'text-gray-600', bg: 'bg-gray-100' },
 ];
 
-function KpiCard({ label, value, unit = 'MAD', subtitle, color, icon: Icon, progress }) {
+function KpiCard({ label, value, unit = 'MAD', subtitle, color, icon: Icon, progress, onClick }) {
   return (
-    <div className={`bg-white border-l-4 ${color.border} rounded-xl p-5 shadow-sm`}>
+    <div onClick={onClick}
+      className={`bg-white border-l-4 ${color.border} rounded-xl p-5 shadow-sm ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}>
       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
         <Icon size={13} className={color.icon} /> {label}
+        {onClick && <span className="ml-auto text-[10px] font-bold text-gray-400 normal-case">détail ›</span>}
       </div>
       <div className={`text-2xl font-black mt-2 ${color.text}`}>{fmt(value)} <span className="text-sm font-semibold">{unit}</span></div>
       {subtitle && <div className="text-xs text-gray-500 mt-1">{subtitle}</div>}
@@ -40,6 +42,7 @@ export default function ProfitPage({ orders = [] }) {
   const [dateTo,   setDateTo]   = useState(lastDay);
   const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay });
   const [activePreset, setActivePreset] = useState('mois');
+  const [showCost, setShowCost] = useState(false);
 
   const [adTransfers, setAdTransfers] = useState(() => {
     try { return JSON.parse(localStorage.getItem('ad_transfers') || '[]'); } catch { return []; }
@@ -168,6 +171,29 @@ export default function ProfitPage({ orders = [] }) {
     return cost;
   }
 
+  // Détail du calcul du coût d'achat pour un colis (pour vérification).
+  function getProductCostDetail(colis) {
+    const order = orderMap.get(colis.orderId);
+    const prods = order?.products?.length ? order.products : [order?.product].filter(Boolean);
+    const items = [];
+    for (const p of (prods || [])) {
+      if (!p?.name) continue;
+      const pn = (p.name || '').trim().toLowerCase();
+      const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
+      const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
+        || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn))
+        || stockProducts.find(s => {
+          const sn = (s.name || '').trim().toLowerCase();
+          const snWords = sn.split(/\s+/).filter(w => w.length > 2);
+          return pnWords.filter(w => snWords.some(sw => sw.includes(w) || w.includes(sw))).length >= 2;
+        });
+      const unitCost = sp ? (parseFloat(sp.prixAchat || sp.purchasePrice || 0) || 0) : 0;
+      const qty = p.qty || 1;
+      items.push({ name: p.name, matched: sp?.name || null, unitCost, qty, cost: unitCost * qty });
+    }
+    return items;
+  }
+
   // Calculations
   const ca = livresColis.reduce((s, c) => s + (c.prix || 0), 0);
   const coutAchat = livresColis.reduce((s, c) => s + getProductCost(c), 0);
@@ -269,7 +295,7 @@ export default function ProfitPage({ orders = [] }) {
             subtitle={`${totalLivre} livrée${totalLivre > 1 ? 's' : ''} | ${totalRefuse} refusée${totalRefuse > 1 ? 's' : ''}`}
             color={{ border: 'border-blue-500', icon: 'text-blue-500', text: 'text-blue-700', bar: 'bg-blue-500' }} />
           <KpiCard label="Coût d'Achat" value={coutAchat} icon={Package}
-            subtitle={`${pct(coutAchat, ca)}% du CA`}
+            subtitle={`${pct(coutAchat, ca)}% du CA`} onClick={() => setShowCost(true)}
             color={{ border: 'border-red-400', icon: 'text-red-500', text: 'text-red-600', bar: 'bg-red-400' }} />
           <KpiCard label="Frais Livraison" value={fraisLiv} icon={Truck}
             subtitle={`${allFactureColis.length} colis au total`}
@@ -444,6 +470,59 @@ export default function ProfitPage({ orders = [] }) {
           </div>
         </div>
       </div>
+
+      {/* Détail Coût d'Achat — vérification par produit */}
+      {showCost && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => setShowCost(false)}>
+          <div className="fixed inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Package size={18} className="text-red-500" />
+                <h2 className="font-bold text-gray-900">Détail du Coût d'Achat</h2>
+                <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold">{fmt(coutAchat)} MAD</span>
+              </div>
+              <button onClick={() => setShowCost(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+            <div className="overflow-auto p-3">
+              <p className="text-xs text-gray-500 px-2 pb-2">
+                Le coût d'achat vient du <b>Prix d'achat</b> saisi dans <b>Stock</b> (× quantité), uniquement pour les commandes livrées.
+                Les lignes en rouge n'ont <b>aucun prix d'achat trouvé</b> (produit non associé au Stock → coût 0).
+              </p>
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 uppercase text-[10px]">
+                    <th className="px-2 py-2 text-left">Colis</th>
+                    <th className="px-2 py-2 text-left">Produit (commande)</th>
+                    <th className="px-2 py-2 text-left">Produit Stock associé</th>
+                    <th className="px-2 py-2 text-right">Prix achat U.</th>
+                    <th className="px-2 py-2 text-center">Qté</th>
+                    <th className="px-2 py-2 text-right">Coût</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {livresColis.flatMap((c) => getProductCostDetail(c).map((it, j) => (
+                    <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.unitCost === 0 ? 'bg-red-50/60' : ''}`}>
+                      <td className="px-2 py-2 font-mono font-bold text-blue-600">{j === 0 ? c.orderId : ''}</td>
+                      <td className="px-2 py-2 text-gray-700">{it.name}</td>
+                      <td className={`px-2 py-2 ${it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
+                      <td className="px-2 py-2 text-right">{fmt(it.unitCost)}</td>
+                      <td className="px-2 py-2 text-center">{it.qty}</td>
+                      <td className="px-2 py-2 text-right font-semibold text-red-600">{fmt(it.cost)}</td>
+                    </tr>
+                  )))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 font-bold">
+                    <td className="px-2 py-2" colSpan={5}>TOTAL Coût d'Achat</td>
+                    <td className="px-2 py-2 text-right text-red-600">{fmt(coutAchat)} MAD</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ad Transfers Modal */}
       {showAdModal && (
