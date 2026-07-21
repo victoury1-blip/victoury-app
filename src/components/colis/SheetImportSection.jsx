@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, ChevronDown, Upload, FileSpreadsheet, Trash2, Phone, Truck } from 'lucide-react';
+import { Search, X, ChevronDown, Upload, FileSpreadsheet, Trash2, Phone, Truck, ExternalLink, Pencil } from 'lucide-react';
 import { cloudGet, cloudSet } from '../../lib/cloudSettings';
 import { normalizePhone } from '../PhoneChip';
 import { useToast } from '../Toast';
@@ -132,6 +132,27 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   }, []);
 
   /* Télécharge un modèle CSV avec les bons entêtes + 2 exemples */
+  // Lien direct vers la feuille Google Sheets (mémorisé) pour l'ouvrir sans la chercher.
+  const [sheetUrl, setSheetUrl] = useState(() => { try { return localStorage.getItem('gs_sheet_url') || ''; } catch { return ''; } });
+  useEffect(() => { cloudGet('gs_sheet_url').then(u => { if (typeof u === 'string' && u) setSheetUrl(prev => prev || u); }); }, []);
+  function saveSheetUrl(u) {
+    const url = (u || '').trim();
+    try { localStorage.setItem('gs_sheet_url', url); } catch {}
+    cloudSet('gs_sheet_url', url);
+    setSheetUrl(url);
+  }
+  function askSheetUrl() {
+    const u = (window.prompt('Colle le lien de ta feuille Google Sheets :', sheetUrl || '') || '').trim();
+    if (!u) return;
+    if (!/^https?:\/\/(docs|drive)\.google\.com\//i.test(u)) { toast.error('Lien Google Sheets invalide'); return; }
+    saveSheetUrl(u);
+    toast.success('Lien enregistré');
+  }
+  function openSheet() {
+    if (!sheetUrl) { askSheetUrl(); return; }
+    window.open(sheetUrl, '_blank', 'noopener');
+  }
+
   function downloadTemplate() {
     const headers = ['code','nom','phone','adresse','prix','ville','produit','date','taille','note livraison','note interne','statut livraison'];
     const examples = [
@@ -459,6 +480,10 @@ export default function SheetImportSection({ orders = [], setOrders }) {
               className="flex items-center gap-2 px-5 py-2.5 bg-white text-green-700 border border-green-300 rounded-lg text-sm font-semibold hover:bg-green-50 transition">
               <FileSpreadsheet size={15} /> Télécharger le modèle
             </button>
+            <button onClick={openSheet}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
+              <ExternalLink size={15} /> {sheetUrl ? 'Ouvrir ma feuille' : 'Lier ma feuille'}
+            </button>
           </div>
           <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
           <div className="text-gray-400 text-xs mt-5 max-w-md space-y-1">
@@ -482,6 +507,16 @@ export default function SheetImportSection({ orders = [], setOrders }) {
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-300" />
         </div>
         <div className="flex gap-2 ml-auto">
+          <div className="flex items-center">
+            <button onClick={openSheet} title={sheetUrl ? 'Ouvrir la feuille Google Sheets' : 'Enregistrer le lien de ta feuille'}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition rounded-l-lg">
+              <ExternalLink size={13} /> {sheetUrl ? 'Ouvrir la feuille' : 'Lier ma feuille'}
+            </button>
+            <button onClick={askSheetUrl} title="Changer le lien de la feuille"
+              className="px-2 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 transition rounded-r-lg border-l border-emerald-500">
+              <Pencil size={12} />
+            </button>
+          </div>
           <button onClick={downloadTemplate} title="Télécharger le modèle CSV"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-green-700 border border-green-300 rounded-lg text-xs font-semibold hover:bg-green-50 transition">
             <FileSpreadsheet size={13} /> Modèle
