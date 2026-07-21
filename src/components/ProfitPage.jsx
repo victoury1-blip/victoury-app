@@ -164,7 +164,10 @@ export default function ProfitPage({ orders = [] }) {
 
   const livresColis = allFactureColis.filter(c => c.status === 'livre');
   const refuseColis = allFactureColis.filter(c => c.status === 'refuse');
-  const tableColis = allFactureColis.filter(c => c.status === 'livre' || c.status === 'refuse');
+  const changeColis = allFactureColis.filter(c => c.status === 'change');
+  // Échange inclus dans le tableau : on lui compte SEULEMENT ses frais (pas de coût
+  // d'achat car le produit est échangé, et pas de nouveau chiffre d'affaires).
+  const tableColis = allFactureColis.filter(c => c.status === 'livre' || c.status === 'refuse' || c.status === 'change');
 
   // Match each colis to its order for product cost calculation
   const orderMap = useMemo(() => new Map(orders.map(o => [o.id, o])), [orders]);
@@ -427,7 +430,7 @@ export default function ProfitPage({ orders = [] }) {
         {/* Orders table from factures */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-3 border-b bg-gray-50 flex items-center justify-between">
-            <h2 className="font-bold text-gray-700 text-sm">Commandes des factures ({livresColis.length} livrées · {refuseColis.length} refusées)</h2>
+            <h2 className="font-bold text-gray-700 text-sm">Commandes des factures ({livresColis.length} livrées · {refuseColis.length} refusées · {changeColis.length} échanges)</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -444,29 +447,31 @@ export default function ProfitPage({ orders = [] }) {
                 )}
                 {tableColis.map((c, i) => {
                   const isRefuse = c.status === 'refuse';
+                  const isChange = c.status === 'change';
+                  const noCost = isRefuse || isChange; // échange : pas de coût d'achat, pas de CA
                   const pv = c.prix || 0;
-                  const pa = isRefuse ? 0 : getProductCost(c);
+                  const pa = noCost ? 0 : getProductCost(c);
                   const fl = c.fraisLivraison || 0;
-                  const marge = isRefuse ? -(fl) : pv - pa - fl;
+                  const marge = noCost ? -(fl) : pv - pa - fl;
                   const order = orderMap.get(c.orderId);
                   const prodName = c.product || order?.product?.name || '—';
                   return (
-                    <tr key={`${c.orderId}-${i}`} className={`hover:bg-gray-50 ${isRefuse ? 'bg-red-50/50' : ''}`}>
+                    <tr key={`${c.orderId}-${i}`} className={`hover:bg-gray-50 ${isRefuse ? 'bg-red-50/50' : isChange ? 'bg-amber-50/50' : ''}`}>
                       <td className="px-4 py-2.5 text-xs text-gray-500">{c.factureRef}</td>
                       <td className="px-4 py-2.5 font-mono text-xs font-bold text-blue-600">{c.orderId}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-700">{c.recipient || '—'}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-500">{c.city || order?.recipient?.city || '—'}</td>
                       <td className="px-4 py-2.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isRefuse ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
-                          {isRefuse ? 'Refusé' : 'Livré'}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isRefuse ? 'bg-red-100 text-red-600' : isChange ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                          {isRefuse ? 'Refusé' : isChange ? 'Échange' : 'Livré'}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[150px] truncate">
                         {prodName}
                         {order?.products?.length > 1 && <span className="text-[10px] text-gray-400 ml-1">(+{order.products.length - 1})</span>}
                       </td>
-                      <td className="px-4 py-2.5 font-semibold text-gray-800">{isRefuse ? '—' : fmt(pv)}</td>
-                      <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{isRefuse ? '—' : fmt(pa)}</td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-800">{noCost ? '—' : fmt(pv)}</td>
+                      <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{noCost ? '—' : fmt(pa)}</td>
                       <td className="px-4 py-2.5 text-orange-500 text-xs font-semibold">{fmt(fl)}</td>
                       <td className={`px-4 py-2.5 font-bold text-xs ${marge >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(marge)}</td>
                     </tr>
@@ -476,7 +481,7 @@ export default function ProfitPage({ orders = [] }) {
               {tableColis.length > 0 && (
                 <tfoot className="border-t-2 border-gray-200 bg-gray-50">
                   <tr>
-                    <td colSpan={6} className="px-4 py-3 text-xs font-bold text-gray-600">TOTAL ({livresColis.length} livrées · {refuseColis.length} refusées)</td>
+                    <td colSpan={6} className="px-4 py-3 text-xs font-bold text-gray-600">TOTAL ({livresColis.length} livrées · {refuseColis.length} refusées · {changeColis.length} échanges)</td>
                     <td className="px-4 py-3 font-black text-gray-800">{fmt(ca)}</td>
                     <td className="px-4 py-3 font-bold text-red-500">{fmt(coutAchat)}</td>
                     <td className="px-4 py-3 font-bold text-orange-500">{fmt(fraisLiv)}</td>
