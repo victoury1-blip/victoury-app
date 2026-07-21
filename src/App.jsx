@@ -303,9 +303,14 @@ export default function App() {
         setIsLoading(false);
         return;
       }
-      /* Build blacklist from soft-deleted rows — survives cache resets */
+      /* Build blacklist from soft-deleted rows — survives cache resets.
+         On FUSIONNE avec la liste noire locale : les commandes WooCommerce (WC-xxxx)
+         supprimées n'ont pas toujours de ligne Supabase ; sans fusion, le polling WC
+         les ré-ajouterait après un rechargement. */
       const { data: delRows } = await supabase.from('orders').select('id').eq('is_deleted', true);
-      const deletedIds = (delRows || []).map(r => r.id);
+      let localBlacklist = [];
+      try { localBlacklist = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'); } catch {}
+      const deletedIds = [...new Set([...(delRows || []).map(r => r.id), ...localBlacklist])];
       deletedIdsRef.current = new Set(deletedIds);
       localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
       setOrders(data.map(mapRow));
@@ -755,6 +760,9 @@ export default function App() {
 
   async function deleteOrderFromSupabase(orderId) {
     deletedIdsRef.current.add(orderId);
+    // Persiste immédiatement la liste noire : indispensable pour les commandes WC-xxxx
+    // qui n'ont pas de ligne Supabase — sinon le polling WooCommerce les ré-ajoute.
+    try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
     if (!navigator.onLine) {
       await queueSync('delete', { id: orderId });
       await deleteOrderOffline(orderId);
