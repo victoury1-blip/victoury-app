@@ -313,7 +313,6 @@ function printFacture(f, toast) {
   <div class="head">
     <div class="brand">
       ${factureLogoHtml()}
-      <div class="sub">Gestion des commandes &amp; livraisons</div>
     </div>
     <div class="company">
       <div class="cn">VICTOURY</div>
