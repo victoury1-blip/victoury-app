@@ -247,6 +247,17 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
 
 /* ─── PDF print ─── */
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Logo VICTOURY pour la facture : image configurée dans les Paramètres si présente,
+// sinon un wordmark vectoriel (SVG) — un vrai « visuel », net à l'impression.
+function factureLogoHtml() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('victoury_app_config') || '{}');
+    if (cfg.appLogo) return `<img src="${cfg.appLogo}" alt="VICTOURY" style="height:46px;object-fit:contain;display:block" />`;
+  } catch {}
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='240' height='42' viewBox='0 0 240 42'><text x='0' y='32' font-family='Georgia, "Times New Roman", serif' font-size='36' font-weight='700' letter-spacing='5' fill='#000'>VICTOURY</text></svg>`;
+  return `<img src="data:image/svg+xml;utf8,${encodeURIComponent(svg)}" alt="VICTOURY" style="height:42px;display:block" />`;
+}
+
 function printFacture(f, toast) {
   const rows = f.colis.map((c, i) => {
     const net = (c.status === 'livre' ? (c.prix || 0) : 0) - (c.fraisLivraison || 0);
@@ -301,7 +312,7 @@ function printFacture(f, toast) {
   <div class="sheet">
   <div class="head">
     <div class="brand">
-      <div class="logo">VICTOURY</div>
+      ${factureLogoHtml()}
       <div class="sub">Gestion des commandes &amp; livraisons</div>
     </div>
     <div class="company">
