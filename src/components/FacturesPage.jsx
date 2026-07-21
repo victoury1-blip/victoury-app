@@ -252,10 +252,10 @@ function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt
 function factureLogoHtml() {
   try {
     const cfg = JSON.parse(localStorage.getItem('victoury_app_config') || '{}');
-    if (cfg.appLogo) return `<img src="${cfg.appLogo}" alt="VICTOURY" style="height:46px;object-fit:contain;display:block" />`;
+    if (cfg.appLogo) return `<img src="${cfg.appLogo}" alt="VICTOURY" style="height:70px;object-fit:contain;display:block" />`;
   } catch {}
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='240' height='42' viewBox='0 0 240 42'><text x='0' y='32' font-family='Georgia, "Times New Roman", serif' font-size='36' font-weight='700' letter-spacing='5' fill='#000'>VICTOURY</text></svg>`;
-  return `<img src="data:image/svg+xml;utf8,${encodeURIComponent(svg)}" alt="VICTOURY" style="height:42px;display:block" />`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='52' viewBox='0 0 300 52'><text x='0' y='40' font-family='Georgia, "Times New Roman", serif' font-size='46' font-weight='700' letter-spacing='6' fill='#000'>VICTOURY</text></svg>`;
+  return `<img src="data:image/svg+xml;utf8,${encodeURIComponent(svg)}" alt="VICTOURY" style="height:56px;display:block" />`;
 }
 
 function printFacture(f, toast) {
@@ -288,11 +288,10 @@ function printFacture(f, toast) {
     table { page-break-inside:auto; }
     tr { page-break-inside:avoid; page-break-after:auto; }
     thead { display:table-header-group; }
-    .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:14px; }
-    .brand .logo { font-family:'Times New Roman', Georgia, serif; font-size:34px; font-weight:700; letter-spacing:5px; color:#000; line-height:1; }
+    .head { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:16px; }
     .brand .sub { font-size:11px; color:#000; margin-top:4px; }
-    .company { text-align:right; font-size:11px; line-height:1.7; color:#000; }
-    .company .cn { font-size:14px; font-weight:800; margin-bottom:2px; }
+    .company { text-align:left; font-size:11.5px; line-height:1.8; color:#000; }
+    .company .cn { font-size:15px; font-weight:800; margin-bottom:3px; }
     .invbox { text-align:right; font-size:12px; line-height:1.7; color:#000; }
     .invbox .ref { font-size:15px; font-weight:800; color:#000; }
     .parties { display:flex; gap:16px; margin:18px 0; }
