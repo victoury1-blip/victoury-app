@@ -260,14 +260,27 @@ export default function App() {
       /* Load only non-deleted orders */
       let data, error;
       try {
-        const res = await supabase
-          .from('orders')
-          .select('*')
-          // `neq('is_deleted', true)` exclut les lignes où is_deleted IS NULL (NULL <> true = NULL) :
-          // on inclut explicitement NULL et false pour ne pas masquer des commandes valides.
-          .or('is_deleted.is.null,is_deleted.eq.false')
-          .order('created_at', { ascending: false });
-        data = res.data; error = res.error;
+        // Supabase limite chaque requête à 1000 lignes : on pagine avec range() pour
+        // TOUT charger, sinon les commandes au-delà de 1000 « disparaissent ».
+        const PAGE = 1000;
+        let all = [];
+        let from = 0;
+        while (true) {
+          const res = await supabase
+            .from('orders')
+            .select('*')
+            // `neq('is_deleted', true)` exclut les lignes où is_deleted IS NULL (NULL <> true = NULL) :
+            // on inclut explicitement NULL et false pour ne pas masquer des commandes valides.
+            .or('is_deleted.is.null,is_deleted.eq.false')
+            .order('created_at', { ascending: false })
+            .range(from, from + PAGE - 1);
+          if (res.error) { error = res.error; break; }
+          const batch = res.data || [];
+          all = all.concat(batch);
+          if (batch.length < PAGE) break;
+          from += PAGE;
+        }
+        if (!error) data = all;
       } catch (e) {
         error = e;
       }
