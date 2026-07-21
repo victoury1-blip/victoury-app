@@ -723,14 +723,10 @@ export default function App() {
 
   /* ── Supabase helpers ── */
   async function saveOrdersToSupabase(newOrders) {
+    // Les commandes supprimées (liste noire) restent supprimées : un ré-import ne doit PAS
+    // les recréer. La restauration se fait uniquement via la Corbeille (restoreOrder).
+    newOrders = newOrders.filter(o => !deletedIdsRef.current.has(o.id));
     if (!newOrders.length) return;
-    // Résurrection : seules les commandes dont l'id était supprimé doivent écraser leur ligne.
-    // Les autres NE doivent PAS écraser une commande active existante (protège les statuts).
-    const resurrectIds = new Set();
-    newOrders.forEach(o => { if (deletedIdsRef.current.delete(o.id)) resurrectIds.add(o.id); });
-    if (resurrectIds.size) {
-      try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
-    }
     const toRow = (o) => ({
       id: o.id,
       recipient: o.recipient,
@@ -754,29 +750,9 @@ export default function App() {
       for (const o of newOrders) await queueSync('update', o);
       return;
     }
-    const fresh = newOrders.filter(o => !resurrectIds.has(o.id)).map(toRow);
-    const resurrected = newOrders.filter(o => resurrectIds.has(o.id)).map(toRow);
-    // fresh : ignoreDuplicates protège une éventuelle commande active portant le même id
-    if (fresh.length) {
-      const { error } = await supabase.from('orders').upsert(fresh, { onConflict: 'id', ignoreDuplicates: true });
-      if (error) throw new Error(error.message);
-    }
-    // resurrected : écrase la ligne soft-deleted pour la réactiver
-    if (resurrected.length) {
-      const { error } = await supabase.from('orders').upsert(resurrected, { onConflict: 'id' });
-      if (error) throw new Error(error.message);
-    }
-    // Filet de sécurité : réactive TOUTE commande (ré)importée qui serait encore
-    // soft-deleted en base (blacklist incomplète > 1000, suppression sur un autre
-    // appareil…). Sinon elle apparaît localement puis « disparaît » au rechargement.
-    // `.eq('is_deleted', true)` ne touche que les lignes réellement supprimées.
-    const allIds = newOrders.map(o => o.id);
-    for (let i = 0; i < allIds.length; i += 200) {
-      const chunk = allIds.slice(i, i + 200);
-      try { await supabase.from('orders').update({ is_deleted: false }).in('id', chunk).eq('is_deleted', true); } catch {}
-      chunk.forEach(id => deletedIdsRef.current.delete(id));
-    }
-    try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
+    // ignoreDuplicates protège une éventuelle commande active existante (statuts, etc.).
+    const { error } = await supabase.from('orders').upsert(newOrders.map(toRow), { onConflict: 'id', ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
   }
 
   async function deleteOrderFromSupabase(orderId) {
@@ -853,7 +829,11 @@ export default function App() {
 
   const setOrdersWithSync = (updater) => {
     setOrders((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
+      let next = typeof updater === 'function' ? updater(prev) : updater;
+      const prevIds = new Set(prev.map(o => o.id));
+      // Ne jamais réintroduire une commande supprimée (liste noire) via un ré-import :
+      // on ne garde une commande absente de `prev` que si elle n'est pas en liste noire.
+      next = next.filter(o => prevIds.has(o.id) || !deletedIdsRef.current.has(o.id));
       const prevMap = new Map(prev.map(o => [o.id, o]));
       const brandNew = next.filter(o => !prevMap.has(o.id));
       const changed = next.filter((o) => {
