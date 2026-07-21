@@ -5,6 +5,7 @@ import { normalizePhone } from '../PhoneChip';
 import { useToast } from '../Toast';
 import { mapToAppStatus } from '../../lib/sheetStatus';
 import { hasHeaderRow, detectColumns, pickStatusHeader } from '../../lib/sheetDetect';
+import { getStatusByValue } from '../../data/statuses';
 
 
 /* ── Google Sheets status config ── */
@@ -603,7 +604,21 @@ export default function SheetImportSection({ orders = [], setOrders }) {
                         <button onClick={() => updateRow(row._id, { _status: '' })}
                           className="text-gray-300 hover:text-gray-500 transition"><X size={11} /></button>
                       </div>
-                    : <SheetStatusPicker value={row._status} onChange={v => updateRow(row._id, { _status: v })} />
+                    : (() => {
+                        // Statut détecté automatiquement depuis la colonne du Sheet (aperçu).
+                        const raw = statusCol ? String(row[statusCol] || '').trim() : '';
+                        const app = raw ? mapToAppStatus(raw) : null;
+                        if (app) {
+                          const st = getStatusByValue(app);
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: st.color }}>{st.label}</span>
+                              <span className="text-[9px] text-gray-400" title={`Détecté depuis « ${raw} »`}>auto</span>
+                            </div>
+                          );
+                        }
+                        return <SheetStatusPicker value={row._status} onChange={v => updateRow(row._id, { _status: v })} />;
+                      })()
                   }
                 </td>
               </tr>
