@@ -307,10 +307,20 @@ export default function App() {
          On FUSIONNE avec la liste noire locale : les commandes WooCommerce (WC-xxxx)
          supprimées n'ont pas toujours de ligne Supabase ; sans fusion, le polling WC
          les ré-ajouterait après un rechargement. */
-      const { data: delRows } = await supabase.from('orders').select('id').eq('is_deleted', true);
+      let delRows = [];
+      { // pagination : Supabase limite à 1000 lignes par requête
+        let from = 0;
+        while (true) {
+          const r = await supabase.from('orders').select('id').eq('is_deleted', true).range(from, from + 999);
+          const b = r.data || [];
+          delRows = delRows.concat(b);
+          if (r.error || b.length < 1000) break;
+          from += 1000;
+        }
+      }
       let localBlacklist = [];
       try { localBlacklist = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'); } catch {}
-      const deletedIds = [...new Set([...(delRows || []).map(r => r.id), ...localBlacklist])];
+      const deletedIds = [...new Set([...delRows.map(r => r.id), ...localBlacklist])];
       deletedIdsRef.current = new Set(deletedIds);
       localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
       setOrders(data.map(mapRow));
@@ -756,6 +766,17 @@ export default function App() {
       const { error } = await supabase.from('orders').upsert(resurrected, { onConflict: 'id' });
       if (error) throw new Error(error.message);
     }
+    // Filet de sécurité : réactive TOUTE commande (ré)importée qui serait encore
+    // soft-deleted en base (blacklist incomplète > 1000, suppression sur un autre
+    // appareil…). Sinon elle apparaît localement puis « disparaît » au rechargement.
+    // `.eq('is_deleted', true)` ne touche que les lignes réellement supprimées.
+    const allIds = newOrders.map(o => o.id);
+    for (let i = 0; i < allIds.length; i += 200) {
+      const chunk = allIds.slice(i, i + 200);
+      try { await supabase.from('orders').update({ is_deleted: false }).in('id', chunk).eq('is_deleted', true); } catch {}
+      chunk.forEach(id => deletedIdsRef.current.delete(id));
+    }
+    try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
   }
 
   async function deleteOrderFromSupabase(orderId) {
