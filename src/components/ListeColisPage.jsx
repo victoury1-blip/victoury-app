@@ -1216,16 +1216,28 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       </button>
                     )}
 
-                    {/* Sous-statut Facturé / Pas facturé — menu déroulant */}
+                    {/* Sous-statut Facturé : si la facture est VERSÉE, le colis est verrouillé
+                        « Facturé » (non modifiable) + badge « Versé » dessous. Sinon menu déroulant. */}
                     {o.status === 'livre' && (
-                      <SubStatusDropdown
-                        active={facturedIds.has(o.id)}
-                        onChange={() => toggleFacture(o.id)}
-                        activeText="Facturé"
-                        inactiveText="Pas facturé"
-                        activeClass="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                        inactiveClass="bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-                      />
+                      paidOrderIds.has(o.id) ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                            <Check size={12} /> Facturé
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold text-white bg-green-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/90" /> Versé
+                          </span>
+                        </div>
+                      ) : (
+                        <SubStatusDropdown
+                          active={facturedIds.has(o.id)}
+                          onChange={() => toggleFacture(o.id)}
+                          activeText="Facturé"
+                          inactiveText="Pas facturé"
+                          activeClass="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                          inactiveClass="bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+                        />
+                      )
                     )}
                     {/* Sous-statut Reçu / Non-reçu — menu déroulant */}
                     {(o.status === 'refuse' || o.status === 'annule' || o.status === 'retour_recu') && (
