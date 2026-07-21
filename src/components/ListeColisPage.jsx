@@ -492,12 +492,23 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   const [trashOrders, setTrashOrders] = useState([]);
   const [trashLoading, setTrashLoading] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
+  const [trashSearch, setTrashSearch] = useState('');
+  const [restoringAll, setRestoringAll] = useState(false);
   async function openTrash() {
-    setShowTrash(true);
+    setShowTrash(true); setTrashSearch('');
     setTrashLoading(true);
     try { setTrashOrders(await fetchDeletedOrders?.() || []); }
     finally { setTrashLoading(false); }
   }
+  const trashFiltered = useMemo(() => {
+    const q = trashSearch.trim().toLowerCase();
+    if (!q) return trashOrders;
+    return trashOrders.filter(o =>
+      (o.id || '').toLowerCase().includes(q) ||
+      (o.trackingNumber || '').toLowerCase().includes(q) ||
+      (o.recipient?.name || '').toLowerCase().includes(q) ||
+      (o.recipient?.city || '').toLowerCase().includes(q));
+  }, [trashOrders, trashSearch]);
   async function handleRestore(id) {
     setRestoringId(id);
     try {
@@ -505,6 +516,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       if (ok) { setTrashOrders(prev => prev.filter(o => o.id !== id)); toast.success('Commande restaurée'); }
       else toast.error('Échec de la restauration');
     } finally { setRestoringId(null); }
+  }
+  async function handleRestoreAll() {
+    const list = trashFiltered;
+    if (!list.length) return;
+    if (!window.confirm(`Restaurer ${list.length} commande(s) ?`)) return;
+    setRestoringAll(true);
+    let done = 0;
+    for (const o of list) {
+      try { if (await restoreOrder?.(o.id)) { done++; setTrashOrders(prev => prev.filter(x => x.id !== o.id)); } } catch {}
+    }
+    setRestoringAll(false);
+    toast.success(`${done} commande(s) restaurée(s)`);
   }
   const [filterOpen, setFilterOpen] = useState(false);
   const [livreurOpen, setLivreurOpen] = useState(false);
@@ -1407,12 +1430,27 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
               </div>
               <button onClick={() => setShowTrash(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X size={18} /></button>
             </div>
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100">
+              <input
+                value={trashSearch}
+                onChange={e => setTrashSearch(e.target.value)}
+                placeholder="Filtrer (ex: VICT, nom, ville)…"
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+              <button
+                onClick={handleRestoreAll}
+                disabled={restoringAll || !trashFiltered.length}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+              >
+                {restoringAll ? '…' : `Restaurer tout (${trashFiltered.length})`}
+              </button>
+            </div>
             <div className="overflow-y-auto p-3">
               {trashLoading ? (
                 <div className="py-10 text-center text-gray-400 text-sm">Chargement…</div>
-              ) : trashOrders.length === 0 ? (
-                <div className="py-10 text-center text-gray-400 text-sm">Aucune commande supprimée.</div>
-              ) : trashOrders.map(o => (
+              ) : trashFiltered.length === 0 ? (
+                <div className="py-10 text-center text-gray-400 text-sm">{trashSearch ? 'Aucun résultat.' : 'Aucune commande supprimée.'}</div>
+              ) : trashFiltered.map(o => (
                 <div key={o.id} className="flex items-center gap-3 px-3 py-2.5 border border-gray-100 rounded-xl mb-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-bold text-orange-600 font-mono">{o.trackingNumber || o.id}</div>
