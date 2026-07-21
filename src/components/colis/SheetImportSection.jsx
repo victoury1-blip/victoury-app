@@ -297,9 +297,30 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     }
     dateCol = best;
   }
-  // Statut de LIVRAISON uniquement : mapping manuel > "statut livraison" > statut générique.
-  // La colonne de confirmation est ignorée — seule la livraison remonte dans la Liste des Colis.
-  const statusCol = pickStatusHeader(headers) || colMap['status'];
+  // Statut : mapping manuel (Colonnes) > entête "statut livraison" > détection par CONTENU.
+  // La détection par contenu trouve la colonne dont les valeurs sont des statuts
+  // (LIVRE, RECU, RETOUR…) même si l'entête est absent/nommé autrement, en privilégiant
+  // les statuts de LIVRAISON par rapport à ceux de confirmation.
+  let statusCol = pickStatusHeader(headers) || colMap['status'];
+  if (!statusCol) {
+    const DELIV = new Set(['livre', 'retour_recu', 'recu_livreur', 'expedier', 'att_ramassage', 'manque_stock', 'reporter']);
+    const used = new Set([codeCol, nameCol, phoneCol, cityCol, addressCol, priceCol, productCol, dateCol, noteLivCol, noteIntCol, livreurCol].filter(Boolean));
+    const sample = rows.slice(0, 60);
+    let best = null, bestScore = 0;
+    for (const h of headers) {
+      if (used.has(h)) continue;
+      let deliv = 0, any = 0, tot = 0;
+      for (const r of sample) {
+        const v = r[h]; if (v === undefined || v === '') continue;
+        tot++; const m = mapToAppStatus(v);
+        if (m) { any++; if (DELIV.has(m)) deliv++; }
+      }
+      if (!tot) continue;
+      const score = (deliv * 2 + any) / tot;
+      if (any / tot > 0.4 && score > bestScore) { bestScore = score; best = h; }
+    }
+    if (best) statusCol = best;
+  }
 
 
   function importToColis(rowsToImport) {
