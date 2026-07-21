@@ -43,6 +43,29 @@ export default function ProfitPage({ orders = [] }) {
   const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay });
   const [activePreset, setActivePreset] = useState('mois');
   const [showCost, setShowCost] = useState(false);
+  // Prix d'achat MANUELS par nom de produit (override, saisis depuis le détail Coût d'Achat).
+  const [manualCost, setManualCost] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('victoury_product_cost') || '{}'); } catch { return {}; }
+  });
+  useEffect(() => {
+    cloudGet('victoury_product_cost').then(r => {
+      if (r && typeof r === 'object') {
+        setManualCost(prev => ({ ...r, ...prev }));
+      }
+    });
+  }, []);
+  function setProductCost(name, value) {
+    const key = (name || '').trim().toLowerCase();
+    if (!key) return;
+    setManualCost(prev => {
+      const next = { ...prev };
+      const v = parseFloat(value);
+      if (value === '' || isNaN(v)) delete next[key]; else next[key] = v;
+      localStorage.setItem('victoury_product_cost', JSON.stringify(next));
+      cloudSet('victoury_product_cost', next);
+      return next;
+    });
+  }
 
   const [adTransfers, setAdTransfers] = useState(() => {
     try { return JSON.parse(localStorage.getItem('ad_transfers') || '[]'); } catch { return []; }
@@ -154,6 +177,8 @@ export default function ProfitPage({ orders = [] }) {
     for (const p of prods) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
+      // Prix manuel saisi = priorité (override) — permet de corriger/compléter.
+      if (manualCost[pn] != null) { cost += manualCost[pn] * (p.qty || 1); continue; }
       const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
       const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
         || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn))
@@ -187,9 +212,10 @@ export default function ProfitPage({ orders = [] }) {
           const snWords = sn.split(/\s+/).filter(w => w.length > 2);
           return pnWords.filter(w => snWords.some(sw => sw.includes(w) || w.includes(sw))).length >= 2;
         });
-      const unitCost = sp ? (parseFloat(sp.prixAchat || sp.purchasePrice || 0) || 0) : 0;
+      const isManual = manualCost[pn] != null;
+      const unitCost = isManual ? manualCost[pn] : (sp ? (parseFloat(sp.prixAchat || sp.purchasePrice || 0) || 0) : 0);
       const qty = p.qty || 1;
-      items.push({ name: p.name, matched: sp?.name || null, unitCost, qty, cost: unitCost * qty });
+      items.push({ name: p.name, matched: isManual ? 'Prix manuel' : (sp?.name || null), manual: isManual, unitCost, qty, cost: unitCost * qty });
     }
     return items;
   }
@@ -486,8 +512,9 @@ export default function ProfitPage({ orders = [] }) {
             </div>
             <div className="overflow-auto p-3">
               <p className="text-xs text-gray-500 px-2 pb-2">
-                Le coût d'achat vient du <b>Prix d'achat</b> saisi dans <b>Stock</b> (× quantité), uniquement pour les commandes livrées.
-                Les lignes en rouge n'ont <b>aucun prix d'achat trouvé</b> (produit non associé au Stock → coût 0).
+                Le coût d'achat vient du <b>Prix d'achat</b> (Stock) × quantité, pour les commandes livrées.
+                Les lignes <span className="text-red-600 font-semibold">rouges</span> n'ont aucun prix trouvé.
+                👉 <b>Saisis le prix directement dans la case</b> « Prix achat U. » (Entrée pour valider) : il s'applique à tous les colis du même produit et se sauvegarde.
               </p>
               <table className="w-full text-xs border-collapse">
                 <thead>
@@ -502,11 +529,20 @@ export default function ProfitPage({ orders = [] }) {
                 </thead>
                 <tbody>
                   {livresColis.flatMap((c) => getProductCostDetail(c).map((it, j) => (
-                    <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.unitCost === 0 ? 'bg-red-50/60' : ''}`}>
+                    <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.unitCost === 0 ? 'bg-red-50/60' : it.manual ? 'bg-blue-50/40' : ''}`}>
                       <td className="px-2 py-2 font-mono font-bold text-blue-600">{j === 0 ? c.orderId : ''}</td>
                       <td className="px-2 py-2 text-gray-700">{it.name}</td>
-                      <td className={`px-2 py-2 ${it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
-                      <td className="px-2 py-2 text-right">{fmt(it.unitCost)}</td>
+                      <td className={`px-2 py-2 ${it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
+                      <td className="px-2 py-2 text-right">
+                        <input
+                          type="number" min="0" step="0.01"
+                          defaultValue={it.unitCost || ''}
+                          onBlur={(e) => setProductCost(it.name, e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          placeholder="0.00"
+                          className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        />
+                      </td>
                       <td className="px-2 py-2 text-center">{it.qty}</td>
                       <td className="px-2 py-2 text-right font-semibold text-red-600">{fmt(it.cost)}</td>
                     </tr>
