@@ -522,6 +522,7 @@ export default function ProfitPage({ orders = [] }) {
                     <th className="px-2 py-2 text-left">Colis</th>
                     <th className="px-2 py-2 text-left">Produit (commande)</th>
                     <th className="px-2 py-2 text-left">Produit Stock associé</th>
+                    <th className="px-2 py-2 text-right">Prix Vente</th>
                     <th className="px-2 py-2 text-right">Prix achat U.</th>
                     <th className="px-2 py-2 text-center">Qté</th>
                     <th className="px-2 py-2 text-right">Coût</th>
@@ -533,6 +534,7 @@ export default function ProfitPage({ orders = [] }) {
                       <td className="px-2 py-2 font-mono font-bold text-blue-600">{j === 0 ? c.orderId : ''}</td>
                       <td className="px-2 py-2 text-gray-700">{it.name}</td>
                       <td className={`px-2 py-2 ${it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
+                      <td className="px-2 py-2 text-right font-semibold text-gray-800">{j === 0 ? `${fmt(c.prix)}` : ''}</td>
                       <td className="px-2 py-2 text-right">
                         <input
                           type="number" min="0" step="0.01"
@@ -550,7 +552,7 @@ export default function ProfitPage({ orders = [] }) {
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-50 font-bold">
-                    <td className="px-2 py-2" colSpan={5}>TOTAL Coût d'Achat</td>
+                    <td className="px-2 py-2" colSpan={6}>TOTAL Coût d'Achat</td>
                     <td className="px-2 py-2 text-right text-red-600">{fmt(coutAchat)} MAD</td>
                   </tr>
                 </tfoot>
