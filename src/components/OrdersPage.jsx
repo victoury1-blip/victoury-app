@@ -512,6 +512,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     const today = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const byPhone = {};
     orders.forEach(o => {
+      // Ne détecter les doublons que parmi les commandes à confirmer (nouvelles) :
+      // celles déjà dans la Liste des Colis (validées / avec suivi) sont exclues.
+      const inColisPipeline = COLIS_PIPELINE_SET.has(o.status) || !!(o.trackingNumber && o.validated);
+      if (inColisPipeline) return;
       const phone = o.recipient?.phone?.replace(/\s/g, '');
       const day = o.dateAdded?.split(' ')[0] || '';
       if (!phone || day !== today) return;
