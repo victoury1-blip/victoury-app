@@ -39,20 +39,21 @@ function SubStatusDropdown({ active, onChange, activeText, inactiveText, activeC
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        className={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] px-2 py-0.5 rounded font-bold transition-colors ${active ? activeClass : inactiveClass}`}
+        className={`group inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] pl-2.5 pr-1.5 py-1 rounded-full font-semibold border shadow-sm transition-all hover:shadow ${active ? activeClass : inactiveClass}`}
       >
+        <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-current opacity-80' : 'bg-current opacity-40'}`} />
         {active ? activeText : inactiveText}
-        <span className="text-[8px]">▼</span>
+        <ChevronDown size={12} className={`shrink-0 opacity-60 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[110px] overflow-hidden">
+        <div className="absolute z-50 mt-1.5 left-0 bg-white border border-gray-100 rounded-xl shadow-2xl min-w-[130px] overflow-hidden p-1 animate-fade-in">
           {opts.map(opt => (
             <button
               key={String(opt.v)}
               onClick={() => { if (opt.v !== active) onChange(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 text-left"
+              className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs rounded-lg text-left transition-colors ${opt.v === active ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
             >
-              <span className="w-3 shrink-0">{opt.v === active && <Check size={12} className="text-blue-600" />}</span>
+              <span className="w-3.5 shrink-0">{opt.v === active && <Check size={13} className="text-blue-600" />}</span>
               {opt.t}
             </button>
           ))}
@@ -265,7 +266,7 @@ function StatusModal({ order, onClose, onSave }) {
 }
 
 /* ── Delivery status modal ── */
-function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, onDeleteOrder }) {
+function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, onDeleteOrder, onBulkFacture }) {
   const { statuses } = useStatuses();
   const [showStatus, setShowStatus] = useState(false);
   const [showLivreur, setShowLivreur] = useState(false);
@@ -442,6 +443,12 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
       <button onClick={bulkPrintLabels}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition-colors">
         <Printer size={13} /> Étiquettes
+      </button>
+
+      {/* Marquer facturé (commandes livrées) */}
+      <button onClick={onBulkFacture}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors">
+        <Check size={13} /> Facturer
       </button>
 
       {/* Export CSV */}
@@ -696,6 +703,20 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       cloudSet('victoury_manual_facture', [...next]);
       return next;
     });
+  }
+
+  // Marque en bloc « Facturé » les commandes LIVRÉES sélectionnées.
+  function bulkFacture() {
+    const ids = colis.filter(o => selected.includes(o.id) && o.status === 'livre').map(o => o.id);
+    if (!ids.length) { toast.warning('Aucune commande livrée dans la sélection'); return; }
+    setManualFacture(prev => {
+      const next = new Set([...prev, ...ids]);
+      localStorage.setItem('victoury_manual_facture', JSON.stringify([...next]));
+      cloudSet('victoury_manual_facture', [...next]);
+      return next;
+    });
+    toast.success(`${ids.length} commande(s) marquée(s) facturée(s)`);
+    setSelected([]);
   }
 
   function toggleSelect(id) {
@@ -1200,10 +1221,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       <SubStatusDropdown
                         active={facturedIds.has(o.id)}
                         onChange={() => toggleFacture(o.id)}
-                        activeText="✓ Facturé"
+                        activeText="Facturé"
                         inactiveText="Pas facturé"
-                        activeClass="bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200"
-                        inactiveClass="bg-gray-100 text-gray-500 border border-gray-300 hover:bg-yellow-50"
+                        activeClass="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                        inactiveClass="bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
                       />
                     )}
                     {/* Sous-statut Reçu / Non-reçu — menu déroulant */}
@@ -1213,8 +1234,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         onChange={() => toggleRecu(o.id)}
                         activeText="Reçu"
                         inactiveText="Non-reçu"
-                        activeClass="bg-green-600 text-white hover:bg-green-700"
-                        inactiveClass="bg-red-800 text-white hover:bg-red-900"
+                        activeClass="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                        inactiveClass="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
                       />
                     )}
                     </div>
@@ -1359,6 +1380,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
           setOrders={setOrders}
           colis={colis}
           onDeleteOrder={onDeleteOrder}
+          onBulkFacture={bulkFacture}
         />
       )}
 
