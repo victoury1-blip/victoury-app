@@ -14,10 +14,15 @@ const STATUS_COLORS = {
 
 function parseDate(dateAdded) {
   if (!dateAdded) return null;
-  const part = dateAdded.split(/[\s,à]+/)[0];
-  const [d, m, y] = part.split('/');
-  if (!d || !m || !y) return null;
-  return new Date(+y, +m - 1, +d);
+  const s = String(dateAdded).trim();
+  // Format FR : jj/mm/aaaa
+  let m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  // Format ISO (issu des imports Google Sheets) : aaaa-mm-jj
+  m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  const t = Date.parse(s);
+  return isNaN(t) ? null : new Date(t);
 }
 
 function KpiCard({ icon: Icon, value, label, color }) {
