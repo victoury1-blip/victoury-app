@@ -326,6 +326,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   function importToColis(rowsToImport) {
     const existingIds = new Set(orders.map(o => o.id));
     const newOrders = [];
+    let skipped = 0;
     for (const row of rowsToImport) {
       const name = (nameCol && row[nameCol]) || '';
       const phone = (phoneCol && row[phoneCol]) || '';
@@ -338,7 +339,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
         const key = `${bare}|${String(name).trim().toLowerCase()}|${String(prod).trim().toLowerCase()}`;
         code = bare || String(name).trim() ? `gs-${key.replace(/[^a-z0-9|]/g, '').slice(0, 60)}` : row._id;
       }
-      if (existingIds.has(code)) continue;
+      if (existingIds.has(code)) { skipped++; continue; }
       const city = (cityCol && row[cityCol]) || '';
       const address = (addressCol && row[addressCol]) || '';
       const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
@@ -378,9 +379,9 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       });
       existingIds.add(code);
     }
-    if (!newOrders.length) { toast.warning('Tous ces colis existent déjà dans le pipeline.'); return; }
+    if (!newOrders.length) { toast.warning(`Aucun importé — ${skipped} déjà présent(s) (même code).`); return; }
     setOrders(prev => [...newOrders, ...prev]);
-    toast.success(`${newOrders.length} colis importé(s) vers Liste des colis.`);
+    toast.success(`${newOrders.length} colis importé(s)${skipped ? ` · ${skipped} ignoré(s) (code en double)` : ''}.`);
   }
   const livrePhones = useMemo(() => {
     const set = new Set();
