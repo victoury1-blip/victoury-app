@@ -117,7 +117,11 @@ function DashboardSkeleton() {
 
 /* ── KPI card ── */
 const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, iconBg, trend }) {
-  const numericTarget = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^\d.]/g, '')) || 0;
+  // Parse un nombre au format fr-MA ("350.685,00 DH") : les points sont des
+  // séparateurs de milliers, la virgule le séparateur décimal.
+  const numericTarget = typeof value === 'number'
+    ? value
+    : parseFloat(String(value).replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
   const animated = useCountUp(numericTarget);
 
   // Flash vert quand la valeur augmente (nouvelle commande en temps réel)
@@ -134,7 +138,8 @@ const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, ico
   }, [numericTarget]);
   const displayValue = typeof value === 'number'
     ? Math.round(animated).toLocaleString('fr-MA')
-    : String(value).replace(/[\d,.]+/, Math.round(animated).toLocaleString('fr-MA'));
+    : String(value).replace(/[\d.,]+/, animated.toLocaleString('fr-MA',
+        /,\d/.test(String(value)) ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 }));
 
   const trendEl = trend != null && trend !== 0 ? (
     <span className={`flex items-center gap-0.5 text-xs font-bold ${trend > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
