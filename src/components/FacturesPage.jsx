@@ -278,8 +278,10 @@ function printFacture(f, toast) {
     tr { page-break-inside:avoid; page-break-after:auto; }
     thead { display:table-header-group; }
     .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:14px; }
-    .brand .logo { font-size:26px; font-weight:900; letter-spacing:1px; color:#000; }
-    .brand .sub { font-size:11px; color:#000; margin-top:2px; }
+    .brand .logo { font-family:'Times New Roman', Georgia, serif; font-size:34px; font-weight:700; letter-spacing:5px; color:#000; line-height:1; }
+    .brand .sub { font-size:11px; color:#000; margin-top:4px; }
+    .company { text-align:right; font-size:11px; line-height:1.7; color:#000; }
+    .company .cn { font-size:14px; font-weight:800; margin-bottom:2px; }
     .invbox { text-align:right; font-size:12px; line-height:1.7; color:#000; }
     .invbox .ref { font-size:15px; font-weight:800; color:#000; }
     .parties { display:flex; gap:16px; margin:18px 0; }
@@ -301,24 +303,28 @@ function printFacture(f, toast) {
     <div class="brand">
       <div class="logo">VICTOURY</div>
       <div class="sub">Gestion des commandes &amp; livraisons</div>
-      <div class="sub">victoury-maroc.com</div>
     </div>
-    <div class="invbox">
-      <div class="ref">Facture ${esc(f.ref)}</div>
-      <div>Date : <b>${esc(f.dateCreation)}</b></div>
-      <div>Colis : <b>${f.colis.length}</b></div>
-      <div>Statut : <b>${esc(STATUT_LABEL[f.statut] || f.statut || '')}</b></div>
-      ${f.datePaiement ? `<div>Payée le : <b>${esc(f.datePaiement)}</b></div>` : ''}
+    <div class="company">
+      <div class="cn">VICTOURY</div>
+      <div>Adresse : Casablanca</div>
+      <div>Téléphone : 0660003913</div>
+      <div>Email : victoury1@gmail.com</div>
+      <div>Web site : victoury-maroc.com</div>
     </div>
   </div>
 
   <div class="parties">
     <div class="party">
-      <div class="t">Livreur</div>
-      <div><b>${esc(f.livreur || '—')}</b></div>
+      <div class="t">Facture</div>
+      <div class="ref" style="font-size:15px;font-weight:800">${esc(f.ref)}</div>
+      <div>Date : <b>${esc(f.dateCreation)}</b></div>
+      <div>Colis : <b>${f.colis.length}</b> · Statut : <b>${esc(STATUT_LABEL[f.statut] || f.statut || '')}</b></div>
+      ${f.datePaiement ? `<div>Payée le : <b>${esc(f.datePaiement)}</b></div>` : ''}
     </div>
     <div class="party">
-      <div class="t">Récapitulatif</div>
+      <div class="t">Livreur</div>
+      <div><b>${esc(f.livreur || '—')}</b></div>
+      <div style="margin-top:6px" class="t">Récapitulatif</div>
       <div>Livrés : <b>${f.colis.filter(c=>c.status==='livre').length}</b> · Refusés : <b>${f.colis.filter(c=>c.status==='refuse').length}</b> · Annulés : <b>${f.colis.filter(c=>c.status==='annule').length}</b></div>
     </div>
   </div>
