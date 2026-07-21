@@ -358,8 +358,11 @@ export default function App() {
           setOrders(prev => prev.filter(x => x.id !== o.id));
           return;
         }
-        // réactivation : retirer de la liste noire et ajouter si absent
-        deletedIdsRef.current.delete(o.id);
+        // NE PAS ressusciter une commande supprimée sur un update anodin
+        // (changement de statut, synchro Ozon, écho d'un ré-enregistrement…).
+        // La restauration se fait uniquement via la Corbeille (restoreOrder),
+        // qui met déjà l'état local à jour et retire l'id de la liste noire.
+        if (deletedIdsRef.current.has(o.id)) return;
         setOrders(prev => prev.some(x => x.id === o.id)
           ? prev.map(x => x.id === o.id ? { ...x, ...mapRow(o) } : x)
           : [mapRow(o), ...prev]);
