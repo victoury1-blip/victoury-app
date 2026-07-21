@@ -770,7 +770,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   const ARCHIVE_STATES = ['livre', 'retour_recu', 'echange_recu'];
   const isArchived = (o) => {
     if (!ARCHIVE_STATES.includes(o.status)) return false;
-    const d = parseFrDate(o.dateAdded);
+    // On archive selon la date d'ENTRÉE dans le système (created_at), pas la date de la
+    // commande : les données historiques importées récemment ne doivent pas être archivées.
+    let d = o.createdAt ? new Date(o.createdAt) : null;
+    if (!d || isNaN(d.getTime())) d = parseFrDate(o.dateAdded);
     if (!d) return false;
     return (Date.now() - d.getTime()) > ARCHIVE_DAYS * 86400000;
   };
