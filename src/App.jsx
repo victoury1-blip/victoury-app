@@ -583,6 +583,15 @@ export default function App() {
           } catch { clearTimeout(t); return null; }
         }
         const isFinal = (s) => /livr|retour|refus/i.test(s || '');
+        // Ne jamais régresser un statut FINAL (Livré/Retourné/Refusé) vers un non-final :
+        // l'API officielle Ozon renvoie parfois un ancien « Attente ramassage » qui
+        // écraserait à tort un « Livré » déjà confirmé par le tableau de bord.
+        const shouldApply = (cur, next) => !!next && next !== cur && !(isFinal(cur) && !isFinal(next));
+        const applyStatus = (o, status) => {
+          if (!shouldApply(o.ozoneLastStatus, status)) return;
+          setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
+          supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
+        };
         const toSync = ordersRef.current.filter(o => o.validated && (o.ozoneTracking || o.trackingNumber));
         // Phase 1 — API officielle de suivi (par numéro, avec variantes du 0).
         const stillPending = [];
@@ -597,12 +606,11 @@ export default function App() {
               if (/^\d+$/.test(tn) && !tn.startsWith('0')) variants.push('0' + tn);
               for (const v of variants) { status = await trackByNumber(v); if (status) break; }
             }
-            if (status && status !== o.ozoneLastStatus) {
-              setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
-              supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
-            }
-            if (!isFinal(status)) stillPending.push({ o, tn });
-          } catch { stillPending.push({ o, tn }); }
+            applyStatus(o, status);
+            // Un statut déjà FINAL (côté commande ou déjà enregistré) ne nécessite pas
+            // de re-vérification par le tableau de bord.
+            if (!isFinal(status) && !isFinal(o.ozoneLastStatus)) stillPending.push({ o, tn });
+          } catch { if (!isFinal(o.ozoneLastStatus)) stillPending.push({ o, tn }); }
         }
         // Phase 2 — statut réel depuis le tableau Ozon (parcels_json). Ozon exige une
         // correspondance EXACTE : on envoie plusieurs candidats par colis (code, variante
@@ -632,10 +640,7 @@ export default function App() {
             for (const { o, cands } of jobs) {
               let status = null;
               for (const c of cands) { const s = byCode.get(c); if (s) { status = s; break; } }
-              if (status && status !== o.ozoneLastStatus) {
-                setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
-                supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
-              }
+              applyStatus(o, status);
             }
           } catch {}
         }
