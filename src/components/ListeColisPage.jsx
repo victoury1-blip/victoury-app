@@ -816,8 +816,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     // Les plus récemment ajoutées / mises à jour en premier : une commande qui vient
     // d'être validée depuis « Confirmé » ou dont le statut change remonte en haut.
     // On parse date + HEURE (fr-MA « jj/mm/aaaa hh:mm:ss » ou ISO « aaaa-mm-jj hh:mm »).
-    const ts = (o) => {
-      const s = o.dateUpdated || o.dateAdded || '';
+    const parseTs = (s) => {
+      s = s || '';
       let m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
       if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime();
       m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
@@ -825,7 +825,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       const d = Date.parse(s);
       return isNaN(d) ? 0 : d;
     };
-    return filtered.sort((a, b) => ts(b) - ts(a));
+    // Tri stable : chaque commande garde sa place. Seule une commande réellement
+    // mise à jour (nouvelle date de mise à jour) remonte. Départage déterministe
+    // par date d'ajout puis par id, pour que des dates identiques (ex. un lot
+    // horodaté d'un coup) ne fassent pas « sauter » les lignes à chaque synchro.
+    const cmp = (a, b) => {
+      const d = parseTs(b.dateUpdated || b.dateAdded) - parseTs(a.dateUpdated || a.dateAdded);
+      if (d) return d;
+      const da = parseTs(b.dateAdded) - parseTs(a.dateAdded);
+      if (da) return da;
+      return String(b.id).localeCompare(String(a.id));
+    };
+    return filtered.sort(cmp);
   }, [orders, debouncedSearch, appliedFilter, showArchived]);
 
   const archivedCount = useMemo(() => orders.reduce((n, o) => {
