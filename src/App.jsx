@@ -272,7 +272,11 @@ export default function App() {
             // `neq('is_deleted', true)` exclut les lignes où is_deleted IS NULL (NULL <> true = NULL) :
             // on inclut explicitement NULL et false pour ne pas masquer des commandes valides.
             .or('is_deleted.is.null,is_deleted.eq.false')
+            // Clé de tri UNIQUE (created_at + id) : sans départage, un lot importé
+            // avec le même created_at rend la pagination ambiguë aux frontières de
+            // page et duplique/saute des lignes.
             .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
             .range(from, from + PAGE - 1);
           if (res.error) { error = res.error; break; }
           const batch = res.data || [];
@@ -280,7 +284,12 @@ export default function App() {
           if (batch.length < PAGE) break;
           from += PAGE;
         }
-        if (!error) data = all;
+        // Dédoublonnage de sécurité par id (au cas où une insertion concurrente
+        // décale les pages pendant le chargement).
+        if (!error) {
+          const seen = new Set();
+          data = all.filter(o => (seen.has(o.id) ? false : seen.add(o.id)));
+        }
       } catch (e) {
         error = e;
       }

@@ -781,7 +781,13 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   const colis = useMemo(() => {
     const q = debouncedSearch.toLowerCase();
     const af = appliedFilter;
+    // Dédoublonnage par id : jamais deux lignes pour la même commande.
+    const seenIds = new Set();
     const filtered = orders.filter((o) => {
+      if (seenIds.has(o.id)) return false;
+      seenIds.add(o.id);
+      return true;
+    }).filter((o) => {
       const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
       if (!inPipeline) return false;
       // La recherche traverse tout (actifs + archives). Sans recherche : vue active masque
