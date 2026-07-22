@@ -1311,7 +1311,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                             : ls.includes('expédi') || ls.includes('recu') || ls.includes('reçu') ? 'bg-blue-100 text-blue-700'
                             : ls.includes('retour') ? 'bg-gray-200 text-gray-700'
                             : 'bg-teal-100 text-teal-700';
-                          return <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${ozColor}`}>{o.ozoneLastStatus}</span>;
+                          return <span className={`text-sm font-bold px-2.5 py-1 rounded-md ${ozColor}`}>{o.ozoneLastStatus}</span>;
                         })()}
                       </div>
                     ) : <span className="text-gray-300 text-xs">—</span>}
