@@ -883,7 +883,8 @@ export default function App() {
   function handleWooImport(newOrders) {
     setOrders((prev) => {
       const existingIds = new Set(prev.map((o) => o.id));
-      const fresh = newOrders.filter((o) => !existingIds.has(o.id));
+      // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
+      const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
       if (fresh.length) saveOrdersToSupabase(fresh);
       return fresh.length ? [...fresh, ...prev] : prev;
     });
