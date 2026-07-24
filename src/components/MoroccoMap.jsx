@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
-/* Coordonnées (lat, lng) des principales villes marocaines pour la carte. */
+/* Coordonnées (lat, lng) des principales villes marocaines. */
 const CITY_COORDS = {
   casablanca: [33.57, -7.59], casa: [33.57, -7.59], rabat: [34.02, -6.84],
   sale: [34.05, -6.79], marrakech: [31.63, -8.0], marrakesh: [31.63, -8.0],
@@ -31,22 +33,45 @@ const CITY_COORDS = {
   taounate: [34.54, -4.64], sefrou: [33.83, -4.84], 'moulay yacoub': [34.09, -5.18],
   ouazzane: [34.79, -5.58], 'souk el arbaa': [34.68, -5.99], 'ain harrouda': [33.64, -7.45],
   bouznika: [33.79, -7.16], 'dar bouazza': [33.52, -7.82], mediouna: [33.45, -7.51],
-  tit_mellil: [33.55, -7.48], nouaceur: [33.37, -7.58], 'ain chock': [33.54, -7.59],
+  nouaceur: [33.37, -7.58], boumia: [32.72, -5.1], midar: [34.94, -3.53],
+  imzouren: [35.15, -3.85], zaio: [34.94, -2.73], berkan: [34.92, -2.32],
+  temsia: [30.37, -9.42], biougra: [30.21, -9.37], 'ait melloul': [30.33, -9.5],
+  ksissi: [32.79, -6.19], 'sidi bennour': [32.65, -8.43], boujad: [32.76, -6.4],
+  'beni ansar': [35.26, -2.93], 'sidi yahya': [34.3, -6.3],
 };
 
-/* Contour approximatif du Maroc (lng, lat) — schématique, pas frontière officielle. */
-const OUTLINE = [
-  [-5.3, 35.9], [-6.0, 35.8], [-6.3, 35.0], [-6.7, 34.2], [-7.4, 33.7],
-  [-8.5, 33.2], [-9.3, 32.3], [-9.8, 31.5], [-9.7, 30.4], [-10.0, 29.5],
-  [-10.3, 28.6], [-11.5, 28.1], [-13.2, 27.7], [-8.67, 27.66], [-8.67, 28.7],
-  [-7.6, 29.4], [-6.5, 29.8], [-5.5, 29.6], [-4.8, 30.5], [-3.6, 31.1],
-  [-3.8, 31.7], [-2.9, 32.1], [-1.2, 32.1], [-1.1, 32.7], [-1.75, 33.7],
-  [-1.7, 34.7], [-2.2, 35.1], [-3.0, 35.3], [-3.9, 35.25], [-4.6, 35.2],
-];
+/* Alias arabe → clé latine (les villes de la feuille sont souvent en arabe). */
+const ARABIC = {
+  'الدار البيضاء': 'casablanca', 'دار البيضاء': 'casablanca', 'كازا': 'casablanca',
+  'الرباط': 'rabat', 'سلا': 'sale', 'مراكش': 'marrakech', 'فاس': 'fes',
+  'مكناس': 'meknes', 'طنجة': 'tanger', 'تطوان': 'tetouan', 'اكادير': 'agadir',
+  'أكادير': 'agadir', 'وجدة': 'oujda', 'القنيطرة': 'kenitra', 'قنيطرة': 'kenitra',
+  'الناظور': 'nador', 'ناظور': 'nador', 'اسفي': 'safi', 'آسفي': 'safi',
+  'الجديدة': 'el jadida', 'بني ملال': 'beni mellal', 'خريبكة': 'khouribga',
+  'سطات': 'settat', 'برشيد': 'berrechid', 'تازة': 'taza', 'العرائش': 'larache',
+  'كلميم': 'guelmim', 'الرشيدية': 'errachidia', 'ورزازات': 'ouarzazate',
+  'تزنيت': 'tiznit', 'الصويرة': 'essaouira', 'بركان': 'berkane',
+  'الخميسات': 'khemisset', 'تاوريرت': 'taourirt', 'المحمدية': 'mohammedia',
+  'تمارة': 'temara', 'العيون': 'laayoune', 'الحسيمة': 'al hoceima',
+  'شفشاون': 'chefchaouen', 'إفران': 'ifrane', 'ميدلت': 'midelt', 'أزرو': 'azrou',
+  'تارودانت': 'taroudant', 'الداخلة': 'dakhla', 'زاكورة': 'zagora',
+  'تنغير': 'tinghir', 'أزيلال': 'azilal', 'وزان': 'ouazzane', 'صفرو': 'sefrou',
+  'تاونات': 'taounate', 'بوعرفة': 'boumia', 'بومية': 'boumia', 'مرتيل': 'martil',
+  'الفنيدق': 'fnideq', 'المضيق': 'mdiq', 'الدريوش': 'driouch', 'جرسيف': 'guercif',
+  'سيدي قاسم': 'sidi kacem', 'سيدي سليمان': 'sidi slimane', 'اليوسفية': 'youssoufia',
+  'ايت ملول': 'ait melloul', 'انزكان': 'inezgane', 'الفقيه بن صالح': 'fkih ben salah',
+  'سيدي بنور': 'sidi bennour', 'بنسليمان': 'benslimane', 'الخميس': 'ain harrouda',
+};
 
 const normCity = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
 
 function findCoords(city) {
+  const raw = String(city || '').trim();
+  if (ARABIC[raw]) return CITY_COORDS[ARABIC[raw]];
+  // recherche arabe partielle
+  for (const [ar, key] of Object.entries(ARABIC)) {
+    if (raw.includes(ar)) return CITY_COORDS[key];
+  }
   const n = normCity(city);
   if (!n) return null;
   if (CITY_COORDS[n]) return CITY_COORDS[n];
@@ -56,15 +81,8 @@ function findCoords(city) {
   return null;
 }
 
-/* Projection lat/lng → coordonnées SVG. Cadre : Maroc principal. */
-const BOUNDS = { latMin: 27.3, latMax: 36.2, lngMin: -13.6, lngMax: -0.8 };
-const W = 520, H = 560;
-const px = (lng) => ((lng - BOUNDS.lngMin) / (BOUNDS.lngMax - BOUNDS.lngMin)) * W;
-const py = (lat) => H - ((Math.max(BOUNDS.latMin, Math.min(BOUNDS.latMax, lat)) - BOUNDS.latMin) / (BOUNDS.latMax - BOUNDS.latMin)) * H;
-
-/* Couleur selon le taux de refus : vert (bon) → orange → rouge (mauvais). */
 function heatColor(refusePct) {
-  if (refusePct === null) return '#94a3b8';
+  if (refusePct === null) return '#64748b';
   if (refusePct <= 15) return '#16a34a';
   if (refusePct <= 30) return '#eab308';
   if (refusePct <= 50) return '#f97316';
@@ -72,8 +90,6 @@ function heatColor(refusePct) {
 }
 
 export default function MoroccoMap({ orders = [] }) {
-  const [hover, setHover] = useState(null);
-
   const { cities, unmatched } = useMemo(() => {
     const m = new Map();
     const un = new Map();
@@ -81,10 +97,9 @@ export default function MoroccoMap({ orders = [] }) {
       const raw = o.recipient?.city;
       if (!raw) continue;
       const coords = findCoords(raw);
-      const key = normCity(raw);
-      if (!coords) { un.set(key, (un.get(key) || 0) + 1); continue; }
+      if (!coords) { const k = String(raw).trim(); un.set(k, (un.get(k) || 0) + 1); continue; }
       const id = `${coords[0]},${coords[1]}`;
-      const c = m.get(id) || { name: key, coords, total: 0, livre: 0, refuse: 0, ca: 0 };
+      const c = m.get(id) || { name: normCity(raw), coords, total: 0, livre: 0, refuse: 0, ca: 0 };
       c.total++;
       if (o.status === 'livre') { c.livre++; c.ca += parseFloat(o.price) || 0; }
       if (['refuse', 'annule', 'retour_recu'].includes(o.status)) c.refuse++;
@@ -95,12 +110,10 @@ export default function MoroccoMap({ orders = [] }) {
     list.forEach(c => {
       const done = c.livre + c.refuse;
       c.refusePct = done >= 3 ? Math.round((c.refuse / done) * 100) : null;
-      c.r = 6 + Math.sqrt(c.total / maxTotal) * 22;
+      c.r = 8 + Math.sqrt(c.total / maxTotal) * 28; // rayon en pixels (constant au zoom)
     });
-    return { cities: list, unmatched: [...un.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5) };
+    return { cities: list, unmatched: [...un.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6) };
   }, [orders]);
-
-  const outlinePath = OUTLINE.map(([lng, lat], i) => `${i === 0 ? 'M' : 'L'}${px(lng).toFixed(1)},${py(lat).toFixed(1)}`).join(' ') + ' Z';
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-5">
@@ -113,42 +126,38 @@ export default function MoroccoMap({ orders = [] }) {
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ background: '#dc2626' }} /> &gt;50%</span>
         </div>
       </div>
-      <p className="text-xs text-gray-400 mb-3">Taille du cercle = volume de commandes · couleur = taux de refus/retour</p>
+      <p className="text-xs text-gray-400 mb-3">Taille du cercle = volume · couleur = taux de refus · molette/pincer pour zoomer, glisser pour déplacer</p>
       {cities.length === 0 ? (
         <div className="h-64 flex items-center justify-center text-gray-400 text-sm">Aucune ville reconnue</div>
       ) : (
-        <div className="relative flex justify-center">
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-lg" role="img" aria-label="Carte des ventes par ville au Maroc">
-            <path d={outlinePath} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1.5" strokeLinejoin="round" />
+        <div className="rounded-xl overflow-hidden border border-gray-200">
+          <MapContainer center={[31.8, -7.0]} zoom={6} scrollWheelZoom style={{ height: 520, width: '100%', background: '#eef2f7' }}>
+            <TileLayer
+              attribution='&copy; OpenStreetMap'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
             {cities.map(c => (
-              <g key={c.name}
-                 onMouseEnter={() => setHover(c)} onMouseLeave={() => setHover(null)}
-                 style={{ cursor: 'pointer' }}>
-                <circle cx={px(c.coords[1])} cy={py(c.coords[0])} r={c.r}
-                        fill={heatColor(c.refusePct)} fillOpacity="0.55"
-                        stroke={heatColor(c.refusePct)} strokeWidth="1.5" />
-                {c.total >= 5 && (
-                  <text x={px(c.coords[1])} y={py(c.coords[0]) - c.r - 4}
-                        textAnchor="middle" fontSize="11" fontWeight="600" fill="#334155"
-                        style={{ textTransform: 'capitalize' }}>
-                    {c.name}
-                  </text>
-                )}
-              </g>
+              <CircleMarker
+                key={c.name}
+                center={c.coords}
+                radius={c.r}
+                pathOptions={{ color: heatColor(c.refusePct), fillColor: heatColor(c.refusePct), fillOpacity: 0.55, weight: 1.5 }}
+              >
+                <Tooltip direction="top" offset={[0, -4]}>
+                  <div className="text-xs">
+                    <p className="font-bold capitalize text-sm mb-0.5">{c.name}</p>
+                    <p>📦 {c.total} commandes</p>
+                    <p style={{ color: '#16a34a' }}>✅ {c.livre} livrées · {Math.round(c.ca).toLocaleString('fr-MA')} DH</p>
+                    <p style={{ color: '#dc2626' }}>❌ {c.refuse} refus/retours{c.refusePct !== null ? ` (${c.refusePct}%)` : ''}</p>
+                  </div>
+                </Tooltip>
+              </CircleMarker>
             ))}
-          </svg>
-          {hover && (
-            <div className="absolute top-2 left-2 bg-gray-900 text-white rounded-xl px-3.5 py-2.5 text-xs shadow-lg pointer-events-none">
-              <p className="font-bold text-sm capitalize mb-1">{hover.name}</p>
-              <p>📦 {hover.total} commandes</p>
-              <p className="text-green-300">✅ {hover.livre} livrées · {Math.round(hover.ca).toLocaleString('fr-MA')} DH</p>
-              <p className="text-red-300">❌ {hover.refuse} refus/retours{hover.refusePct !== null ? ` (${hover.refusePct}%)` : ''}</p>
-            </div>
-          )}
+          </MapContainer>
         </div>
       )}
       {unmatched.length > 0 && (
-        <p className="text-[11px] text-gray-400 mt-2">
+        <p className="text-[11px] text-gray-400 mt-2" dir="auto">
           Villes non localisées : {unmatched.map(([n, c]) => `${n} (${c})`).join(', ')}
         </p>
       )}
