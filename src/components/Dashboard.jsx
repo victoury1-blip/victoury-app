@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import useCountUp from '../hooks/useCountUp';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
@@ -211,7 +210,9 @@ const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, ico
   const numericTarget = typeof value === 'number'
     ? value
     : parseFloat(String(value).replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
-  const animated = useCountUp(numericTarget);
+  // Pas d'animation de comptage : les chiffres « sautaient » à chaque
+  // ouverture du dashboard et à chaque synchro. Affichage direct.
+  const animated = numericTarget;
 
   // Flash vert quand la valeur augmente (nouvelle commande en temps réel)
   const prevRef = React.useRef(numericTarget);
