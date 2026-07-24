@@ -48,7 +48,7 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/wc-api/, /^\/chic-api/],
+        navigateFallbackDenylist: [/^\/wc-api/, /^\/chic-api/, /^\/api\//, /^\/ozone-/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

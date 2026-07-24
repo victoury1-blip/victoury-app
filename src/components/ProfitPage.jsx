@@ -35,8 +35,12 @@ function KpiCard({ label, value, unit = 'MAD', subtitle, color, icon: Icon, prog
 
 export default function ProfitPage({ orders = [] }) {
   const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-  const lastDay  = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
+  // Format LOCAL aaaa-mm-jj : toISOString() décale d'un jour en UTC+1 (minuit
+  // local du 1er sérialisé « 30 du mois précédent »), ce qui excluait le
+  // dernier jour du mois des calculs.
+  const localIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const firstDay = localIso(new Date(today.getFullYear(), today.getMonth(), 1));
+  const lastDay  = localIso(new Date(today.getFullYear(), today.getMonth() + 1, 0));
 
   const [dateFrom, setDateFrom] = useState(firstDay);
   const [dateTo,   setDateTo]   = useState(lastDay);
@@ -119,7 +123,7 @@ export default function ProfitPage({ orders = [] }) {
     setApplied({ dateFrom: firstDay, dateTo: lastDay });
     setActivePreset('mois');
   }
-  const iso = d => d.toISOString().slice(0, 10);
+  const iso = localIso; // format local, pas UTC (voir plus haut)
   function setPreset(type) {
     const n = new Date();
     let from, to;
@@ -296,11 +300,16 @@ export default function ProfitPage({ orders = [] }) {
           </button>
           <button onClick={() => {
             const rows = [['Facture','ID Colis','Client','Ville','Statut','Prix Vente','Coût Achat','Frais Liv.','Marge'].join(',')];
+            const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
             tableColis.forEach(c => {
+              // Même logique que le tableau affiché : refusé ET échange n'ont
+              // ni CA ni coût d'achat — seule la marge = -frais de livraison.
               const isR = c.status === 'refuse';
-              const pa = isR ? 0 : getProductCost(c); const fl = c.fraisLivraison||0;
-              const m = isR ? -fl : (c.prix||0) - pa - fl;
-              rows.push([c.factureRef, c.orderId, c.recipient||'', c.city||'', isR?'Refusé':'Livré', isR?0:c.prix||0, pa.toFixed(2), fl, m.toFixed(2)].join(','));
+              const isC = c.status === 'change';
+              const noCost = isR || isC;
+              const pa = noCost ? 0 : getProductCost(c); const fl = c.fraisLivraison||0;
+              const m = noCost ? -fl : (c.prix||0) - pa - fl;
+              rows.push([esc(c.factureRef), esc(c.orderId), esc(c.recipient||''), esc(c.city||''), isR?'Refusé':isC?'Échange':'Livré', noCost?0:c.prix||0, pa.toFixed(2), fl, m.toFixed(2)].join(','));
             });
             rows.push('');
             EXPENSE_CATS.forEach(cat => {

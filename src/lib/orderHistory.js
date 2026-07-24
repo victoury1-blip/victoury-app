@@ -16,7 +16,8 @@ export function getUserDisplayName(email) {
  */
 export function recordHistory(orderId, status, user, fromStatus = null, note = null) {
   const key = `order_history_${orderId}`;
-  const hist = JSON.parse(localStorage.getItem(key) || '[]');
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
   const ts = now();
   const entry = { timestamp: ts, status, fromStatus, note, user: getUserDisplayName(user) };
   hist.push(entry);

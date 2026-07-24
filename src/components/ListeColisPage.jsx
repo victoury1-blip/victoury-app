@@ -102,7 +102,8 @@ function Badge({ statusKey }) {
 function ColisHistoryModal({ order, onClose }) {
   const [hist, setHist] = useState([]);
   React.useEffect(() => {
-    const local = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]');
+    let local = [];
+    try { local = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]'); } catch {}
     if (local.length) setHist(local);
     supabase.from('order_history').select('*').eq('order_id', order.id).order('timestamp', { ascending: true })
       .then(({ data }) => {
@@ -323,13 +324,14 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
     const data = selectedOrders;
     const header = ['ID','Tracking','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
     const csvRows = [header.join(',')];
+    const qf = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     data.forEach(o => {
       const st = statuses.find(s => s.value === o.status);
       csvRows.push([
-        o.id, o.trackingNumber || '', o.recipient?.name || '', o.recipient?.phone || '',
-        o.recipient?.city || '', `"${(o.recipient?.address || '').replace(/"/g, '""')}"`,
-        o.recipient?.delivery || '', (o.products?.[0]?.name || o.product?.name || ''),
-        o.price || 0, st?.label || o.status, o.dateAdded || ''
+        qf(o.id), qf(o.trackingNumber || ''), qf(o.recipient?.name || ''), qf(o.recipient?.phone || ''),
+        qf(o.recipient?.city || ''), qf(o.recipient?.address || ''),
+        qf(o.recipient?.delivery || ''), qf(o.products?.[0]?.name || o.product?.name || ''),
+        o.price || 0, qf(st?.label || o.status), qf(o.dateAdded || '')
       ].join(','));
     });
     const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -377,6 +379,7 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
     <script>window.onload=()=>window.print();</script>
     </body></html>`;
     const w = window.open('', '_blank');
+    if (!w) return; // popup bloquée par le navigateur
     w.document.write(html);
     w.document.close();
   }
@@ -798,15 +801,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       const qDigits = q.replace(/\D/g, '');
       const matchSearch = !q ||
         o.id.toLowerCase().includes(q) ||
-        o.recipient.name.toLowerCase().includes(q) ||
-        o.recipient.city.toLowerCase().includes(q) ||
+        (o.recipient?.name || '').toLowerCase().includes(q) ||
+        (o.recipient?.city || '').toLowerCase().includes(q) ||
         (o.trackingNumber || '').toLowerCase().includes(q) ||
-        (o.recipient.phone || '').toLowerCase().includes(q) ||
-        (qDigits && normalizePhone(o.recipient.phone).includes(qDigits));
+        (o.recipient?.phone || '').toLowerCase().includes(q) ||
+        (qDigits && normalizePhone(o.recipient?.phone).includes(qDigits));
       if (!matchSearch) return false;
       if (af.status && o.status !== af.status) return false;
-      if (af.livreur && !(o.recipient.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
-      if (af.ville && !(o.recipient.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
+      if (af.livreur && !(o.recipient?.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
+      if (af.ville && !(o.recipient?.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
       if (af.produit) {
         const prods = o.products?.length ? o.products : [o.product];
         if (!prods.some(p => p?.name?.toLowerCase().includes(af.produit.toLowerCase()))) return false;
@@ -906,13 +909,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   function exportColisCSV(data) {
     const header = ['ID','Tracking','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
     const csvRows = [header.join(',')];
+    const qf = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     data.forEach(o => {
       const st = statuses.find(s => s.value === o.status);
       csvRows.push([
-        o.id, o.trackingNumber || '', o.recipient?.name || '', o.recipient?.phone || '',
-        o.recipient?.city || '', `"${(o.recipient?.address || '').replace(/"/g, '""')}"`,
-        o.recipient?.delivery || '', (o.products?.[0]?.name || o.product?.name || ''),
-        o.price || 0, st?.label || o.status, o.dateAdded || ''
+        qf(o.id), qf(o.trackingNumber || ''), qf(o.recipient?.name || ''), qf(o.recipient?.phone || ''),
+        qf(o.recipient?.city || ''), qf(o.recipient?.address || ''),
+        qf(o.recipient?.delivery || ''), qf(o.products?.[0]?.name || o.product?.name || ''),
+        o.price || 0, qf(st?.label || o.status), qf(o.dateAdded || '')
       ].join(','));
     });
     const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -1066,7 +1070,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       const from = preset.month
                         ? new Date(to.getFullYear(), to.getMonth(), 1)
                         : new Date(to.getTime() - preset.days * 86400000);
-                      const iso = (d) => d.toISOString().slice(0, 10);
+                      // format LOCAL : toISOString() recule d'un jour en UTC+1
+                      const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                       setFilterForm(p => ({ ...p, dateFrom: iso(from), dateTo: iso(to) }));
                     }}
                     className="px-2.5 py-1 rounded-full border border-gray-300 text-xs text-gray-700 hover:bg-blue-50 hover:border-blue-300 transition">

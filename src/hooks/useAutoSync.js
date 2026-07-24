@@ -31,10 +31,13 @@ const SYNC_KEYS = [
   'chic_config',
 ];
 
+// Clés fusionnées par UNION (croissante). Attention : une union ne peut jamais
+// retirer un élément — n'y mettre que des listes purement additives.
+// `victoury_recu_ids` et `victoury_manual_facture` en sont EXCLUES : décocher
+// « Reçu » / « Facturé » doit tenir après la synchro (sinon l'union ré-ajoute
+// l'id retiré) ; la colonne orders.recu et les factures sont la source de vérité.
 const MERGE_KEYS = new Set([
   'victoury_sent_livreur',
-  'victoury_recu_ids',
-  'victoury_manual_facture',
   'deleted_order_ids',
 ]);
 

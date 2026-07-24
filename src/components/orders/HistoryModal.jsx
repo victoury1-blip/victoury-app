@@ -6,7 +6,8 @@ import StatusBadge from './StatusBadge';
 export default function HistoryModal({ order, onClose }) {
   const [hist, setHist] = useState([]);
   React.useEffect(() => {
-    const local = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]');
+    let local = [];
+    try { local = JSON.parse(localStorage.getItem(`order_history_${order.id}`) || '[]'); } catch {}
     if (local.length) setHist(local);
     supabase.from('order_history').select('*').eq('order_id', order.id).order('timestamp', { ascending: true })
       .then(({ data }) => {

@@ -4,6 +4,10 @@ const rateLimitMap = new Map();
 
 function rateLimit(ip, maxRequests = 10, windowMs = 60000) {
   const now = Date.now();
+  // purge des entrées expirées pour ne pas croître indéfiniment
+  if (rateLimitMap.size > 500) {
+    for (const [k, v] of rateLimitMap) if (now - v.start > windowMs) rateLimitMap.delete(k);
+  }
   const entry = rateLimitMap.get(ip);
   if (!entry || now - entry.start > windowMs) {
     rateLimitMap.set(ip, { start: now, count: 1 });

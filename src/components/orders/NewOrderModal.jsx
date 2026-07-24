@@ -55,7 +55,9 @@ export default function NewOrderModal({ onClose, onSave }) {
         id,
         recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: form.livreur || null },
         product: { name: firstProd.name, size: firstProd.size, qty: firstProd.qty || 1, stock: 0 },
-        products: form.products,
+        // Copie profonde : sinon les N copies partagent le même tableau et
+        // modifier le produit d'une commande modifie toutes les autres.
+        products: form.products.map(p => ({ ...p })),
         price: parseFloat(form.prix) || 0,
         status: form.status || 'nouveau',
         note: '',

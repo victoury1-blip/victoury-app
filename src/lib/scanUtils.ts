@@ -26,7 +26,7 @@ export type ScanCheck =
   | { ok: false; reason: 'not_found' | 'deja_expedier' | 'statut_invalide' };
 
 /** Statuts acceptés au scan retour : le statut est conservé, le colis passe "Reçu". */
-export const RETOUR_ACCEPTED: ReadonlySet<string> = new Set(['retour', 'annule', 'echange', 'refuse']);
+export const RETOUR_ACCEPTED: ReadonlySet<string> = new Set(['pret_retour', 'retour_recu', 'annule', 'change', 'refuse']);
 
 /** Seul statut ramassable : passe à "expedier" au scan. */
 export const RAMASSAGE_ACCEPTED = 'att_ramassage';

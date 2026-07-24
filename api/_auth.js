@@ -46,6 +46,12 @@ function isSameOrigin(req) {
 }
 
 export async function isAuthenticated(req) {
-  if (isSameOrigin(req)) return true;
-  return verifyToken(req);
+  // Le jeton Supabase est LA vérification : Origin/Referer sont forgeables
+  // (curl, scripts) et ne suffisent pas seuls. Le repli same-origin n'est
+  // utilisé que si la config Supabase manque côté serveur (sinon l'app
+  // elle-même serait bloquée).
+  const hasSupaEnv = !!((process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) &&
+                        (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY));
+  if (hasSupaEnv) return verifyToken(req);
+  return isSameOrigin(req);
 }

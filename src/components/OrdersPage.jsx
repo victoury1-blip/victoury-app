@@ -140,13 +140,17 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
   function bulkChangeStatus(newStatus) {
     const ts = now();
     selected.forEach(id => recordHistory(id, newStatus, currentUser));
+    // Les VICTxxxx sont générés AVANT setOrders : l'updater doit rester pur
+    // (StrictMode le ré-exécute et brûlerait/dupliquerait des ids).
+    const newIds = new Map();
+    if (newStatus === 'confirme') {
+      for (const o of orders) {
+        if (selected.includes(o.id) && !/^VICT\d+$/i.test(o.trackingNumber || '')) newIds.set(o.id, generateVictId());
+      }
+    }
     setOrders(prev => prev.map(o => {
       if (!selected.includes(o.id)) return o;
-      const hasVict = /^VICT\d+$/i.test(o.trackingNumber || '');
-      const trackingNumber = (newStatus === 'confirme' && !hasVict)
-        ? generateVictId()
-        : o.trackingNumber;
-      return { ...o, status: newStatus, trackingNumber, dateUpdated: ts };
+      return { ...o, status: newStatus, trackingNumber: newIds.get(o.id) || o.trackingNumber, dateUpdated: ts };
     }));
     setShowStatus(false);
     setSelected([]);
@@ -176,15 +180,17 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     const data = selectedOrders;
     const header = ['ID','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Taille','Qty','Prix','Statut','Date ajout'];
     const csvRows = [header.join(',')];
+    // Chaque champ est quoté : une virgule dans un nom/produit décalerait les colonnes.
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     data.forEach(o => {
       const st = statuses.find(s => s.value === o.status);
       csvRows.push([
-        o.id, o.recipient?.name || '', o.recipient?.phone || '',
-        o.recipient?.city || '', `"${(o.recipient?.address || '').replace(/"/g, '""')}"`,
-        o.recipient?.delivery || '', (o.products?.[0]?.name || o.product?.name || ''),
-        (o.products?.[0]?.size || o.product?.size || ''),
+        q(o.id), q(o.recipient?.name || ''), q(o.recipient?.phone || ''),
+        q(o.recipient?.city || ''), q(o.recipient?.address || ''),
+        q(o.recipient?.delivery || ''), q(o.products?.[0]?.name || o.product?.name || ''),
+        q(o.products?.[0]?.size || o.product?.size || ''),
         (o.products?.[0]?.qty || o.product?.qty || 1),
-        o.price || 0, st?.label || o.status, o.dateAdded || ''
+        o.price || 0, q(st?.label || o.status), q(o.dateAdded || '')
       ].join(','));
     });
     const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -237,6 +243,7 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     </body></html>`;
 
     const w = window.open('', '_blank');
+    if (!w) return; // popup bloquée par le navigateur
     w.document.write(html);
     w.document.close();
   }
@@ -534,7 +541,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       if (!currentStatuses.includes(o.status)) return false;
       /* Search */
       const q = debouncedSearch.toLowerCase();
-      if (q && !o.id.toLowerCase().includes(q) && !o.recipient.name.toLowerCase().includes(q) && !o.recipient.phone.includes(q) && !o.product.name.toLowerCase().includes(q)) return false;
+      if (q && !o.id.toLowerCase().includes(q)
+            && !(o.recipient?.name || '').toLowerCase().includes(q)
+            && !(o.recipient?.phone || '').includes(q)
+            && !(o.products?.[0]?.name || o.product?.name || '').toLowerCase().includes(q)) return false;
       /* Advanced filters */
       if (af.status && o.status !== af.status) return false;
       if (af.livreur && !(o.recipient.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
@@ -546,8 +556,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       if (af.dateFrom || af.dateTo) {
         const d = parseFrDate(o.dateAdded);
         if (d) {
-          if (af.dateFrom && d < new Date(af.dateFrom)) return false;
-          if (af.dateTo && d > new Date(af.dateTo)) return false;
+          if (af.dateFrom && d < new Date(af.dateFrom + 'T00:00:00')) return false;
+          if (af.dateTo && d > new Date(af.dateTo + 'T23:59:59')) return false;
         }
       }
       return true;
@@ -622,13 +632,14 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   function exportOrdersCSV(data) {
     const header = ['ID','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
     const csvRows = [header.join(',')];
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     data.forEach(o => {
       const st = statuses.find(s => s.value === o.status);
       csvRows.push([
-        o.id, o.recipient?.name || '', o.recipient?.phone || '',
-        o.recipient?.city || '', `"${(o.recipient?.address || '').replace(/"/g, '""')}"`,
-        o.recipient?.delivery || '', (o.products?.[0]?.name || o.product?.name || ''),
-        o.price || 0, st?.label || o.status, o.dateAdded || ''
+        q(o.id), q(o.recipient?.name || ''), q(o.recipient?.phone || ''),
+        q(o.recipient?.city || ''), q(o.recipient?.address || ''),
+        q(o.recipient?.delivery || ''), q(o.products?.[0]?.name || o.product?.name || ''),
+        o.price || 0, q(st?.label || o.status), q(o.dateAdded || '')
       ].join(','));
     });
     const blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -792,14 +803,13 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
-                {/* Date d'ajout */}
+                {/* Plage sur la date d'ajout */}
                 <div>
-                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date d'ajout</label>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date d'ajout — du</label>
                   <input type="date" value={filterForm.dateFrom} onChange={e => setFilterForm(p => ({ ...p, dateFrom: e.target.value }))} className="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" />
                 </div>
-                {/* Date de mise à jour */}
                 <div>
-                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date de mise à jour</label>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Date d'ajout — au</label>
                   <input type="date" value={filterForm.dateTo} onChange={e => setFilterForm(p => ({ ...p, dateTo: e.target.value }))} className="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-blue-400" />
                 </div>
                 {/* Buttons */}
@@ -1252,18 +1262,17 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
+            // À la confirmation, attribuer un numéro de suivi VICT (celui envoyé
+            // à Ozon) si la commande n'en a pas déjà un — généré AVANT setOrders
+            // pour garder l'updater pur (StrictMode le ré-exécute).
+            const target = orders.find(o => o.id === orderId);
+            const needsVict = newStatus === 'confirme' && !/^VICT\d+$/i.test(target?.trackingNumber || '');
+            const newVict = needsVict ? generateVictId() : null;
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
               const addedNote = note ? `\nNote interne: ${note}` : '';
-              // À la confirmation, attribuer un numéro de suivi VICT (celui envoyé
-              // à Ozon) si la commande n'en a pas déjà un — les commandes
-              // WooCommerce (WC-xxxx) reçoivent ainsi un vrai code VICT.
-              const hasVict = /^VICT\d+$/i.test(o.trackingNumber || '');
-              const trackingNumber = (newStatus === 'confirme' && !hasVict)
-                ? generateVictId()
-                : o.trackingNumber;
-              return { ...o, status: newStatus, trackingNumber, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
+              return { ...o, status: newStatus, trackingNumber: newVict || o.trackingNumber, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
             }));
             setStatusDropdown(null);
             const changedOrder = orders.find(o => o.id === orderId);

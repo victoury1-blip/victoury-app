@@ -329,7 +329,13 @@ export default function App() {
       }
       let localBlacklist = [];
       try { localBlacklist = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'); } catch {}
-      const deletedIds = [...new Set([...delRows.map(r => r.id), ...localBlacklist])];
+      // Une ligne ACTIVE dans Supabase (is_deleted=false) fait foi : une commande
+      // restaurée via la Corbeille est retirée de la liste noire, même si un autre
+      // appareil a encore son id dans son localStorage (sinon la restauration ne
+      // « tient » pas après une synchro).
+      const activeIds = new Set(data.map(o => o.id));
+      const deletedIds = [...new Set([...delRows.map(r => r.id), ...localBlacklist])]
+        .filter(id => !activeIds.has(id));
       deletedIdsRef.current = new Set(deletedIds);
       localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
       setOrders(data.map(mapRow));

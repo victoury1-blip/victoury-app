@@ -246,14 +246,16 @@ export default function Dashboard({ orders = [], isLoading = false }) {
   const daily = useMemo(() => {
     const todayConfirm = todayOrders.filter(o => ['confirme','livre'].includes(o.status)).length;
     const yestConfirm = yesterdayOrders.filter(o => ['confirme','livre'].includes(o.status)).length;
-    const todayLivre = counts.livre;
+    // Tendances jour vs veille : comparer les chiffres DU JOUR (pas les totaux
+    // globaux, sinon la flèche affiche des pourcentages absurdes).
+    const todayLivre = todayOrders.filter(o => o.status === 'livre').length;
     const yestLivre = yesterdayOrders.filter(o => o.status === 'livre').length;
-    const todayRefuse = counts.refuse + counts.annule;
+    const todayRefuse = todayOrders.filter(o => ['refuse','annule'].includes(o.status)).length;
     const yestRefuse = yesterdayOrders.filter(o => ['refuse','annule'].includes(o.status)).length;
-    const todayCA = ca;
+    const todayCA = todayOrders.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
     const yestCA = yesterdayOrders.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
     return { todayConfirm, yestConfirm, todayLivre, yestLivre, todayRefuse, yestRefuse, todayCA, yestCA };
-  }, [todayOrders, yesterdayOrders, counts, ca]);
+  }, [todayOrders, yesterdayOrders]);
 
   const periodSummaries = useMemo(() => [
     { label: "Aujourd'hui", dateHint: fmtDate(now), orders: filterByPeriod(orders, 'today'), bgClass: 'bg-gradient-to-br from-blue-500 to-blue-600' },
@@ -349,7 +351,8 @@ export default function Dashboard({ orders = [], isLoading = false }) {
   const livreurStats = useMemo(() => {
     const map = new Map();
     orders.forEach(o => {
-      const liv = o.recipient?.delivery;
+      const d = o.recipient?.delivery;
+      const liv = typeof d === 'string' ? d : d?.nom;
       if (!liv) return;
       const prev = map.get(liv) || { name: liv, total: 0, livre: 0, refuse: 0, revenue: 0 };
       prev.total++;
