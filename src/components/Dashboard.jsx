@@ -155,8 +155,10 @@ function ObjectifsCard({ orders }) {
   const hasGoals = (goals.livraisons || 0) > 0 || (goals.ca || 0) > 0;
   return (
     <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-5 shadow-sm relative overflow-hidden">
-      <Star size={72} className="absolute right-3 bottom-2 opacity-10 text-white" />
-      <div className="flex items-center justify-between mb-3">
+      {/* pointer-events-none : l'icône décorative absolue recouvrait le bouton
+          « Modifier » sur la carte compacte et interceptait les clics. */}
+      <Star size={72} className="absolute right-3 bottom-2 opacity-10 text-white pointer-events-none" />
+      <div className="flex items-center justify-between mb-3 relative z-10">
         <div className="flex items-center gap-2">
           <Star size={18} className="text-yellow-300" />
           <span className="text-white font-bold text-sm">Objectifs — {MONTH_LABELS[new Date().getMonth()]}</span>
