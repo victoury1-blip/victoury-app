@@ -163,8 +163,41 @@ export default function ProfitPage({ orders = [] }) {
         colis.push({ ...c, factureRef: f.ref, factureId: f.id, livreur: f.livreur, factureDateCreation: f.dateCreation });
       }
     }
+    // Commandes terminées (livré/refusé/échange) SANS facture, dans la période :
+    // sans elles, un mois où rien n'a encore été facturé affiche 0 partout
+    // (typiquement les commandes importées de Google Sheets). Frais de
+    // livraison inconnus hors facture → 0, la facture reste la référence.
+    const invoicedIds = new Set();
+    for (const f of factures) for (const c of (f.colis || [])) invoicedIds.add(c.orderId);
+    const inPeriod = (o) => {
+      let d = null;
+      if (o.createdAt) { const t = new Date(o.createdAt); if (!isNaN(t)) d = t; }
+      if (!d) {
+        const m = String(o.dateAdded || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (m) d = new Date(+m[3], +m[2] - 1, +m[1]);
+        else { const m2 = String(o.dateAdded || '').match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if (m2) d = new Date(+m2[1], +m2[2] - 1, +m2[3]); }
+      }
+      if (!d) return false;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return key >= applied.dateFrom && key <= applied.dateTo;
+    };
+    for (const o of orders) {
+      if (!['livre', 'refuse', 'change'].includes(o.status)) continue;
+      if (invoicedIds.has(o.id)) continue;
+      if (!inPeriod(o)) continue;
+      colis.push({
+        orderId: o.id,
+        recipient: o.recipient?.name || '',
+        city: o.recipient?.city || '',
+        product: o.products?.[0]?.name || o.product?.name || '',
+        prix: parseFloat(o.price) || 0,
+        status: o.status,
+        fraisLivraison: 0,
+        factureRef: '— sans facture',
+      });
+    }
     return colis;
-  }, [factures, applied]);
+  }, [factures, orders, applied]);
 
   const livresColis = allFactureColis.filter(c => c.status === 'livre');
   const refuseColis = allFactureColis.filter(c => c.status === 'refuse');
