@@ -354,19 +354,35 @@ export default function StockPage() {
      et les publie automatiquement, un par un, avec progression. ── */
   const [bulkPush, setBulkPush] = useState(null); // null | { done, total, name }
 
+  /* Sélection de produits (cases à cocher) pour publier uniquement ceux choisis. */
+  const [selected, setSelected] = useState(() => new Set());
+  const toggleSelect = (id) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const toggleSelectAll = () => setSelected(prev => {
+    const allSelected = filtered.length > 0 && filtered.every(p => prev.has(p.id));
+    return allSelected ? new Set() : new Set(filtered.map(p => p.id));
+  });
+
   async function bulkPushToWoo() {
     if (bulkPush) return;
     setBulkPush({ done: 0, total: 0, name: 'Vérification WooCommerce…' });
     try {
       const existingIds = await fetchWooProductIds();
+      // Base = la sélection si des cases sont cochées, sinon tous les produits.
+      const pool = selected.size ? products.filter(p => selected.has(p.id)) : products;
       // Manquants = pas de wooId, OU wooId qui n'existe plus sur la boutique.
-      const missing = products.filter(p => !p.wooId || !existingIds.has(p.wooId));
+      const missing = pool.filter(p => !p.wooId || !existingIds.has(p.wooId));
       if (!missing.length) {
-        alert('✅ Tous les produits sont déjà sur WooCommerce.');
+        alert(selected.size
+          ? '✅ Les produits sélectionnés sont déjà sur WooCommerce.'
+          : '✅ Tous les produits sont déjà sur WooCommerce.');
         setBulkPush(null);
         return;
       }
-      if (!window.confirm(`${missing.length} produit(s) absent(s) de WooCommerce.\nLes publier maintenant ?`)) {
+      if (!window.confirm(`${missing.length} produit(s)${selected.size ? ' sélectionné(s)' : ''} absent(s) de WooCommerce.\nLes publier maintenant ?`)) {
         setBulkPush(null);
         return;
       }
@@ -385,6 +401,7 @@ export default function StockPage() {
       }
       alert(`✅ ${done - failed.length}/${missing.length} produit(s) publié(s) sur WooCommerce.` +
         (failed.length ? `\n\n❌ Échecs:\n${failed.slice(0, 5).join('\n')}` : ''));
+      setSelected(new Set());
     } catch (e) {
       alert('❌ Erreur: ' + e.message);
     } finally {
@@ -455,7 +472,7 @@ export default function StockPage() {
           <Upload size={14} className={bulkPush ? 'animate-pulse' : ''} />
           {bulkPush
             ? (bulkPush.total ? `${bulkPush.done}/${bulkPush.total} — ${bulkPush.name.slice(0, 24)}` : bulkPush.name)
-            : 'Publier sur Woo'}
+            : (selected.size ? `Publier sur Woo (${selected.size})` : 'Publier sur Woo')}
         </button>
 
         <div className="flex items-center gap-2 ml-2">
@@ -488,6 +505,11 @@ export default function StockPage() {
         <table className="w-full text-sm border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
+              <th className="px-3 py-3">
+                <input type="checkbox" className="w-4 h-4 rounded cursor-pointer"
+                  checked={filtered.length > 0 && filtered.every(p => selected.has(p.id))}
+                  onChange={toggleSelectAll} />
+              </th>
               {['IMAGE', 'PRODUIT', 'STOCK #', 'AJUSTER', 'STATUT', 'BOUTIQUE', 'ID SHOPIFY', 'PRIX', 'COMPARE-AT', 'ÉTIQUETTE', 'ACTIONS'].map(h => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
@@ -495,7 +517,7 @@ export default function StockPage() {
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={11} className="py-16 text-center text-gray-400">Aucun produit trouvé</td></tr>
+              <tr><td colSpan={12} className="py-16 text-center text-gray-400">Aucun produit trouvé</td></tr>
             )}
             {filtered.map(p => {
               const total = getTotalStock(p);
@@ -503,7 +525,13 @@ export default function StockPage() {
               return (
                 <React.Fragment key={p.id}>
                   {/* Product row */}
-                  <tr className="bg-white border-b border-gray-100 hover:bg-gray-50">
+                  <tr className={`border-b border-gray-100 hover:bg-gray-50 ${selected.has(p.id) ? 'bg-purple-50/60' : 'bg-white'}`}>
+                    {/* Sélection */}
+                    <td className="px-3 py-3">
+                      <input type="checkbox" className="w-4 h-4 rounded cursor-pointer"
+                        checked={selected.has(p.id)}
+                        onChange={() => toggleSelect(p.id)} />
+                    </td>
                     {/* Image */}
                     <td className="px-3 py-3">
                       <div className="w-12 h-12 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center">
@@ -590,7 +618,7 @@ export default function StockPage() {
                   {/* Expanded variations */}
                   {isOpen && (
                     <tr className="bg-blue-50/40">
-                      <td colSpan={11} className="px-6 py-4">
+                      <td colSpan={12} className="px-6 py-4">
                         <div className="text-xs font-semibold text-gray-500 uppercase mb-2">VARIATIONS DU PRODUIT</div>
                         <table className="w-full text-sm">
                           <thead>
