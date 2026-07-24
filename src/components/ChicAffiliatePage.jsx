@@ -1448,7 +1448,8 @@ function ChicFacturesTab({ orders = [], setOrders }) {
       const qty = o.product?.qty || 1;
       const vente = o.price || 0;
       const revendeur = (prod?.purchasePrice || 0) * qty;
-      const frais = o.chicFrais || 0;
+      /* frais enregistré sur la commande, sinon fallback sur le tableau Villes & Frais */
+      const frais = o.chicFrais || parseFloat(recallCityFrais(o.recipient?.city)) || 0;
       return { o, qty, vente, revendeur, frais, benefice: vente - revendeur - frais, prodName: prod?.name || o.product?.name || '—' };
     });
   }, [list]);
