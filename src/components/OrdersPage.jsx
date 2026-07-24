@@ -564,11 +564,33 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     });
   }, [orders, currentStatuses, debouncedSearch, appliedFilter, modifiedIds]);
 
+  /* ── Relance : reportées dont la date de rappel est atteinte ── */
+  const isDueForRelance = (o) => {
+    if (o.status !== 'reporter' || !o.reportDate) return false;
+    const d = new Date(o.reportDate + (o.reportDate.length <= 10 ? 'T23:59:59' : ''));
+    return !isNaN(d.getTime()) && d <= new Date();
+  };
+  const dueRelance = useMemo(
+    () => (activeTab === 'reporter' ? filtered.filter(isDueForRelance) : []),
+    [filtered, activeTab]
+  );
+  /* Dans l'onglet Reporté, les commandes à relancer passent en tête (plus ancienne d'abord). */
+  const displayList = useMemo(() => {
+    if (activeTab !== 'reporter' || !dueRelance.length) return filtered;
+    const due = new Set(dueRelance.map(o => o.id));
+    return [...filtered].sort((a, b) => {
+      const da = due.has(a.id), db = due.has(b.id);
+      if (da !== db) return da ? -1 : 1;
+      if (da && db) return String(a.reportDate || '').localeCompare(String(b.reportDate || ''));
+      return 0;
+    });
+  }, [filtered, dueRelance, activeTab]);
+
   const maxPage = Math.max(1, Math.ceil(filtered.length / pgPer));
   useEffect(() => {
     if (pgPage > maxPage && filtered.length > 0) setPgPage(maxPage);
   }, [pgPage, maxPage, filtered.length]);
-  const paged = useMemo(() => paginate(filtered, Math.min(pgPage, maxPage), pgPer), [filtered, pgPage, maxPage, pgPer]);
+  const paged = useMemo(() => paginate(displayList, Math.min(pgPage, maxPage), pgPer), [displayList, pgPage, maxPage, pgPer]);
 
   function toggleSelect(id) {
     setSelected((prev) =>
@@ -673,6 +695,14 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               📞 {g.phone} — {g.orders.length} commandes ({g.orders.map(o => o.id).join(', ')})
             </p>
           ))}
+        </div>
+      )}
+      {activeTab === 'reporter' && dueRelance.length > 0 && (
+        <div className="mx-4 mt-2 mb-0 p-3 bg-orange-50 border border-orange-300 rounded-xl text-sm text-orange-800">
+          <div className="flex items-center gap-2 font-bold">
+            <AlertTriangle size={16} />
+            📞 {dueRelance.length} commande{dueRelance.length > 1 ? 's' : ''} à relancer aujourd'hui — affichée{dueRelance.length > 1 ? 's' : ''} en tête de liste
+          </div>
         </div>
       )}
       {/* Header */}

@@ -115,6 +115,93 @@ function DashboardSkeleton() {
   );
 }
 
+/* ── Objectifs du mois ── */
+const MONTH_LABELS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+function ObjectifsCard({ orders }) {
+  const [goals, setGoals] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('victoury_objectifs') || '{}'); } catch { return {}; }
+  });
+  const [editing, setEditing] = React.useState(false);
+  const [form, setForm] = React.useState({ livraisons: '', ca: '' });
+  React.useEffect(() => {
+    import('../lib/cloudSettings').then(({ cloudGet }) =>
+      cloudGet('victoury_objectifs').then(v => { if (v && typeof v === 'object') setGoals(v); }).catch(() => {})
+    );
+  }, []);
+  const month = filterByPeriod(orders, 'month');
+  const livre = month.filter(o => o.status === 'livre').length;
+  const caMois = month.filter(o => ['confirme', 'livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
+  const save = () => {
+    const g = { livraisons: parseInt(form.livraisons) || 0, ca: parseFloat(form.ca) || 0 };
+    setGoals(g);
+    try { localStorage.setItem('victoury_objectifs', JSON.stringify(g)); } catch {}
+    import('../lib/cloudSettings').then(({ cloudSet }) => cloudSet('victoury_objectifs', g)).catch(() => {});
+    setEditing(false);
+  };
+  const bar = (val, goal, color) => {
+    const pct = goal > 0 ? Math.min(100, Math.round((val / goal) * 100)) : 0;
+    return (
+      <div className="flex-1 min-w-[220px]">
+        <div className="flex justify-between text-xs text-white/80 mb-1">
+          <span>{val.toLocaleString('fr-MA')} / {goal.toLocaleString('fr-MA')}</span>
+          <span className="font-bold">{pct}%</span>
+        </div>
+        <div className="h-2.5 bg-white/20 rounded-full overflow-hidden">
+          <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    );
+  };
+  const hasGoals = (goals.livraisons || 0) > 0 || (goals.ca || 0) > 0;
+  return (
+    <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+      <Star size={72} className="absolute right-3 bottom-2 opacity-10 text-white" />
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Star size={18} className="text-yellow-300" />
+          <span className="text-white font-bold text-sm">Objectifs — {MONTH_LABELS[new Date().getMonth()]}</span>
+        </div>
+        <button
+          onClick={() => { setForm({ livraisons: goals.livraisons || '', ca: goals.ca || '' }); setEditing(e => !e); }}
+          className="text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition"
+        >{editing ? 'Fermer' : 'Modifier'}</button>
+      </div>
+      {editing ? (
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs text-white/70 mb-1">Objectif livraisons</label>
+            <input type="number" min="0" value={form.livraisons} onChange={e => setForm(p => ({ ...p, livraisons: e.target.value }))}
+              className="w-32 px-2.5 py-1.5 rounded-lg text-sm bg-white/90 text-gray-900 focus:outline-none" placeholder="ex: 100" />
+          </div>
+          <div>
+            <label className="block text-xs text-white/70 mb-1">Objectif CA (DH)</label>
+            <input type="number" min="0" value={form.ca} onChange={e => setForm(p => ({ ...p, ca: e.target.value }))}
+              className="w-32 px-2.5 py-1.5 rounded-lg text-sm bg-white/90 text-gray-900 focus:outline-none" placeholder="ex: 30000" />
+          </div>
+          <button onClick={save} className="px-4 py-1.5 rounded-lg bg-yellow-400 hover:bg-yellow-300 text-indigo-900 text-sm font-bold transition">Enregistrer</button>
+        </div>
+      ) : hasGoals ? (
+        <div className="flex flex-wrap gap-6">
+          {(goals.livraisons || 0) > 0 && (
+            <div className="flex-1 min-w-[220px]">
+              <p className="text-white/70 text-xs mb-1.5 font-semibold">🚚 Livraisons</p>
+              {bar(livre, goals.livraisons, 'bg-emerald-400')}
+            </div>
+          )}
+          {(goals.ca || 0) > 0 && (
+            <div className="flex-1 min-w-[220px]">
+              <p className="text-white/70 text-xs mb-1.5 font-semibold">💰 Chiffre d'affaires</p>
+              {bar(caMois, goals.ca, 'bg-yellow-400')}
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-white/70 text-sm">Fixez vos objectifs du mois (livraisons, CA) et suivez votre progression ici.</p>
+      )}
+    </div>
+  );
+}
+
 /* ── KPI card ── */
 const KpiCard = React.memo(function KpiCard({ icon: Icon, label, value, sub, iconBg, trend }) {
   // Parse un nombre au format fr-MA ("350.685,00 DH") : les points sont des
@@ -482,6 +569,9 @@ export default function Dashboard({ orders = [], isLoading = false }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
         {kpis.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
+
+      {/* Objectifs du mois */}
+      <ObjectifsCard orders={orders} />
 
       {/* Chic Affiliate stats */}
       {chicStats.productCount > 0 && (

@@ -4,6 +4,136 @@ import { UserPlus, Trash2, Edit3, X, Shield, Phone, Mail, Camera, Save, ArrowLef
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
+/* ── Performance de l'équipe (agrégée depuis order_history) ── */
+function parseFrTs(s) {
+  const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,T]*(\d{1,2})?:?(\d{1,2})?/);
+  if (!m) return null;
+  const d = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function TeamPerformance() {
+  const [rows, setRows] = useState([]);
+  const [period, setPeriod] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // order_history peut être volumineux : pagination par 1000 (max 10 000 lignes récentes).
+      let all = [];
+      for (let from = 0; from < 10000; from += 1000) {
+        const { data, error } = await supabase
+          .from('order_history')
+          .select('status, user_name, timestamp')
+          .order('id', { ascending: false })
+          .range(from, from + 999);
+        if (error || !data?.length) break;
+        all = all.concat(data);
+        if (data.length < 1000) break;
+      }
+      if (!cancelled) { setRows(all); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const stats = React.useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - period + 1);
+    const map = new Map();
+    for (const r of rows) {
+      const d = parseFrTs(r.timestamp);
+      if (!d || d < cutoff) continue;
+      const name = r.user_name || 'inconnu';
+      const s = map.get(name) || { name, total: 0, confirme: 0, livre: 0, refuse: 0, last: null };
+      s.total++;
+      if (r.status === 'confirme') s.confirme++;
+      if (r.status === 'livre') s.livre++;
+      if (r.status === 'refuse' || r.status === 'annule') s.refuse++;
+      if (!s.last || d > s.last) s.last = d;
+      map.set(name, s);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [rows, period]);
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">Performance de l'équipe</h2>
+          <p className="text-xs text-gray-500">Actions enregistrées dans l'historique des commandes</p>
+        </div>
+        <div className="flex gap-1.5">
+          {[7, 30, 90].map(p => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${period === p ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+              {p} jours
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+        {loading ? (
+          <div className="p-4 space-y-2">
+            {[...Array(3)].map((_, i) => <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />)}
+          </div>
+        ) : stats.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm py-8">Aucune activité sur cette période</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-3 text-left">Utilisateur</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
+                  <th className="px-4 py-3 text-center">Confirmées</th>
+                  <th className="px-4 py-3 text-center">Livrées</th>
+                  <th className="px-4 py-3 text-center">Refus/Annul.</th>
+                  <th className="px-4 py-3 text-center">Taux succès</th>
+                  <th className="px-4 py-3 text-right">Dernière activité</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map((s, i) => {
+                  const denom = s.livre + s.refuse;
+                  const taux = denom > 0 ? Math.round((s.livre / denom) * 100) : null;
+                  return (
+                    <tr key={s.name} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-3 font-semibold text-gray-800">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">
+                            {s.name[0]?.toUpperCase()}
+                          </div>
+                          <span className="truncate max-w-[200px]">{s.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-gray-700">{s.total}</td>
+                      <td className="px-4 py-3 text-center text-green-600 font-medium">{s.confirme}</td>
+                      <td className="px-4 py-3 text-center text-emerald-600 font-medium">{s.livre}</td>
+                      <td className="px-4 py-3 text-center text-red-500 font-medium">{s.refuse}</td>
+                      <td className="px-4 py-3 text-center">
+                        {taux !== null ? (
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${taux >= 70 ? 'bg-green-100 text-green-700' : taux >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'}`}>
+                            {taux}%
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-gray-500">
+                        {s.last ? s.last.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ModeratorsPage() {
   const { moderators, setModerators, isAdmin } = usePermissions();
   const navigate = useNavigate();
@@ -195,6 +325,9 @@ export default function ModeratorsPage() {
           </div>
         )}
       </div>
+
+      {/* Performance de l'équipe */}
+      <TeamPerformance />
 
       {/* Back to settings */}
       <button onClick={() => navigate('/reglage')}
