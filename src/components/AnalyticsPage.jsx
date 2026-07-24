@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ShoppingCart, DollarSign, TrendingUp, TrendingDown, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import MoroccoMap from './MoroccoMap';
 
 const STATUS_COLORS = {
   livre: '#22c55e',
@@ -316,6 +317,8 @@ export default function AnalyticsPage({ orders = [] }) {
           )}
         </div>
       </div>
+
+      <MoroccoMap orders={filtered} />
 
       <div className="bg-white rounded-xl shadow-sm p-5">
         <h2 className="text-base font-semibold text-gray-700 mb-4">Top produits</h2>
