@@ -84,6 +84,12 @@ function mapWooProduct(wooProduct, variations) {
   };
 }
 
+/** Récupère l'ensemble des IDs produits réellement présents sur WooCommerce. */
+export async function fetchWooProductIds() {
+  const all = await fetchAllWooProducts();
+  return new Set(all.map(p => p.id));
+}
+
 export async function deleteWooProduct(wooProductId) {
   const { ck, cs } = getWooKeys();
   if (!ck || !cs || !wooProductId) return;

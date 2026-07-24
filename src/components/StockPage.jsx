@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, Check, ImageIcon, X,
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
-import { importProductsFromWooCommerce, updateWooStock, pushProductToWoo, deleteWooProduct } from '../lib/woocommerce';
+import { importProductsFromWooCommerce, updateWooStock, pushProductToWoo, deleteWooProduct, fetchWooProductIds } from '../lib/woocommerce';
 
 /* ─── helpers ─── */
 function stockColor(n) {
@@ -349,6 +349,49 @@ export default function StockPage() {
     }
   }
 
+  /* ── Publication en masse : détecte les produits ABSENTS de WooCommerce
+     (y compris ceux avec un ancien wooId qui n'existe plus côté boutique)
+     et les publie automatiquement, un par un, avec progression. ── */
+  const [bulkPush, setBulkPush] = useState(null); // null | { done, total, name }
+
+  async function bulkPushToWoo() {
+    if (bulkPush) return;
+    setBulkPush({ done: 0, total: 0, name: 'Vérification WooCommerce…' });
+    try {
+      const existingIds = await fetchWooProductIds();
+      // Manquants = pas de wooId, OU wooId qui n'existe plus sur la boutique.
+      const missing = products.filter(p => !p.wooId || !existingIds.has(p.wooId));
+      if (!missing.length) {
+        alert('✅ Tous les produits sont déjà sur WooCommerce.');
+        setBulkPush(null);
+        return;
+      }
+      if (!window.confirm(`${missing.length} produit(s) absent(s) de WooCommerce.\nLes publier maintenant ?`)) {
+        setBulkPush(null);
+        return;
+      }
+      let done = 0, failed = [];
+      let current = products;
+      for (const p of missing) {
+        setBulkPush({ done, total: missing.length, name: p.name });
+        try {
+          const created = await pushProductToWoo(p);
+          current = current.map(x => x.id === p.id ? { ...x, wooId: created.id, boutique: 'WooCommerce' } : x);
+          persist(current);
+        } catch (e) {
+          failed.push(`${p.name}: ${e.message}`);
+        }
+        done++;
+      }
+      alert(`✅ ${done - failed.length}/${missing.length} produit(s) publié(s) sur WooCommerce.` +
+        (failed.length ? `\n\n❌ Échecs:\n${failed.slice(0, 5).join('\n')}` : ''));
+    } catch (e) {
+      alert('❌ Erreur: ' + e.message);
+    } finally {
+      setBulkPush(null);
+    }
+  }
+
   const filtered = useMemo(() => products.filter(p => {
     const q = debouncedSearch.toLowerCase();
     const matchQ = !q || p.name.toLowerCase().includes(q) || (p.ref || '').toLowerCase().includes(q);
@@ -403,6 +446,16 @@ export default function StockPage() {
           disabled={syncing}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 disabled:opacity-60">
           <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} /> Synchroniser
+        </button>
+        <button
+          onClick={bulkPushToWoo}
+          disabled={!!bulkPush}
+          title="Publier sur WooCommerce tous les produits qui n'y sont pas encore"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-60">
+          <Upload size={14} className={bulkPush ? 'animate-pulse' : ''} />
+          {bulkPush
+            ? (bulkPush.total ? `${bulkPush.done}/${bulkPush.total} — ${bulkPush.name.slice(0, 24)}` : bulkPush.name)
+            : 'Publier sur Woo'}
         </button>
 
         <div className="flex items-center gap-2 ml-2">
