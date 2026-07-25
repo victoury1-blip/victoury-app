@@ -1109,7 +1109,7 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
   );
 }
 
-function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
+function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau' }) {
   const [result, setResult] = useState(null);   /* { id, ok, msg } */
   const [editOrder, setEditOrder] = useState(null);
   const [historyOrder, setHistoryOrder] = useState(null);
@@ -1172,9 +1172,11 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     </div>
   );
 
-  /* Commandes Site = pipeline actif (avant facturation). Livrées/Facturées
-     passent dans l'onglet Factures. */
-  const siteOrders = orders.filter(o => o.status === 'chic_nouveau' || o.status === 'chic_envoye');
+  /* mode 'nouveau' = Nouvelles commandes (pas encore envoyées) ;
+     mode 'envoye' = Envoyées (déjà envoyées à Chic, en attente de livraison).
+     Livrées/Facturées passent dans l'onglet Factures. */
+  const siteOrders = orders.filter(o =>
+    mode === 'envoye' ? o.status === 'chic_envoye' : o.status === 'chic_nouveau');
   const norm = s => (s || '').toString().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ').trim();
@@ -1274,7 +1276,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
               </tr>
             ))}
             {!siteOrders.length && (
-              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Aucune commande du site sur des produits Chic</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400">{mode === 'envoye' ? 'Aucune commande envoyée en attente de livraison' : 'Aucune nouvelle commande sur des produits Chic'}</td></tr>
             )}
           </tbody>
         </table>
@@ -1300,7 +1302,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
             </div>
           </div>
         ))}
-        {!siteOrders.length && <p className="text-center py-8 text-gray-400 text-sm">Aucune commande du site sur des produits Chic</p>}
+        {!siteOrders.length && <p className="text-center py-8 text-gray-400 text-sm">{mode === 'envoye' ? 'Aucune commande envoyée en attente de livraison' : 'Aucune nouvelle commande sur des produits Chic'}</p>}
       </div>
 
       {sendModal && <SendToChicModal order={sendModal.order} chicProduct={sendModal.chicProduct} onClose={() => setSendModal(null)} onSent={onSent} />}
@@ -1755,6 +1757,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
   const [tab, setTab] = useState('products');
   const [sessionExpired, setSessionExpired] = useState(false);
   const siteCount = orders.filter(o => o.status === 'chic_nouveau').length;
+  const sentCount = orders.filter(o => o.status === 'chic_envoye').length;
   const factureCount = orders.filter(o => o.status === 'chic_livre').length;
 
   useEffect(() => {
@@ -1804,18 +1807,21 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           <Package size={14} /> Produits
         </button>
         <button
-          onClick={() => setTab('orders')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'orders' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
-        >
-          <ShoppingCart size={14} /> Commandes
-        </button>
-        <button
           onClick={() => setTab('site')}
           className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'site' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
-          <ShoppingCart size={14} /> Commandes Site
+          <ShoppingCart size={14} /> Nouvelles commandes
           {siteCount > 0 && (
             <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center">{siteCount}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('sent')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'sent' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
+        >
+          <Send size={14} /> Envoyées
+          {sentCount > 0 && (
+            <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{sentCount}</span>
           )}
         </button>
         <button
@@ -1844,8 +1850,8 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
       {/* Content */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         {tab === 'products' ? <ProductsTab />
-          : tab === 'orders' ? <OrdersTab victouryOrders={orders} setVictouryOrders={setOrders} />
-          : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} />
+          : tab === 'site' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} mode="nouveau" />
+          : tab === 'sent' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} mode="envoye" />
           : tab === 'factures' ? <ChicFacturesTab orders={orders} setOrders={setOrders} />
           : tab === 'villes' ? <ChicCitiesTab />
           : <SendOrderTab />}
