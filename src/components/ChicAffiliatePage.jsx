@@ -1345,14 +1345,27 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
                 <StatusSelect o={o} />
               </div>
             </div>
-            <div className="font-medium text-sm text-gray-800">{o.recipient?.name || '—'}</div>
-            <div className="text-xs text-gray-600 flex flex-wrap gap-x-3">
-              <span>{o.recipient?.phone}</span>
-              <span>{o.recipient?.city}</span>
-              <span>{o.product?.name} {o.product?.size ? `/ ${o.product.size}` : ''}</span>
+            {/* Infos client étiquetées à gauche, prix en face à droite */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0 space-y-1 text-sm">
+                {[
+                  ['Nom', o.recipient?.name],
+                  ['Ville', o.recipient?.city],
+                  ['Adresse', o.recipient?.address],
+                  ['Produit', `${o.product?.name || ''}${o.product?.size ? ` / ${o.product.size}` : ''}`],
+                  ['Téléphone', o.recipient?.phone],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex gap-2">
+                    <span className="text-gray-400 text-xs w-16 shrink-0">{label}</span>
+                    <span className="text-gray-800 break-words min-w-0" dir="auto">{val || '—'}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-lg font-black text-gray-900 whitespace-nowrap">{(o.price || 0).toFixed(2)} DH</p>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-800">{(o.price || 0).toFixed(2)} DH</span>
+            <div className="flex items-center justify-end pt-1 border-t border-gray-100">
               <ActionButtons o={o} />
             </div>
           </div>
