@@ -600,6 +600,31 @@ export function computeChicStatusUpdates(chicOrders, victouryOrders) {
   return updates;
 }
 
+/* Associe à chaque commande Victoury son STATUT BRUT côté Chic (texte affiché
+   sur chic-affiliate.com : « Non confirmé », « Confirmé le… », « Livré »,
+   « Annulé »…). Match par téléphone + nom de produit. → { [orderId]: rawStatus } */
+export function getChicStatusMap(chicOrders, victouryOrders) {
+  const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  const base = s => norm(s).split(/\s*[-–—/|]\s*/)[0].trim();
+  const phoneKey = s => (s || '').replace(/\D/g, '').slice(-9);
+  const byPhone = new Map();
+  for (const c of (chicOrders || [])) {
+    const k = phoneKey(c.Recipient_phone);
+    if (!k) continue;
+    if (!byPhone.has(k)) byPhone.set(k, []);
+    byPhone.get(k).push(c);
+  }
+  const map = {};
+  for (const o of (victouryOrders || [])) {
+    const cands = byPhone.get(phoneKey(o.recipient?.phone)) || [];
+    if (!cands.length) continue;
+    const b = base(o.product?.name);
+    const match = (b && cands.find(c => { const cb = base(c.product?.name); return cb && (cb === b || cb.includes(b) || b.includes(cb)); })) || cands[0];
+    if (match) map[o.id] = stripHtml(match.status || '').trim();
+  }
+  return map;
+}
+
 /* Récupère les commandes Chic récentes (sans filtre de date) pour l'auto-synchro. */
 export async function fetchChicRecentOrders(length = 100) {
   const data = await fetchChicOrders('', '', 0, length);

@@ -9,7 +9,7 @@ import {
   getChicConfig, saveChicConfig, fetchChicOrders, fetchChicProducts,
   fetchChicCounts, fetchChicProductDetails, createChicOrder, stripHtml,
   discoverChicApi, diagnoseChicProduct, diagnoseChicList, diagnoseChicJs,
-  fetchChicCityFees, computeChicStatusUpdates,
+  fetchChicCityFees, computeChicStatusUpdates, fetchChicRecentOrders, getChicStatusMap,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 import { cloudSet, cloudGet } from '../lib/cloudSettings';
@@ -1238,8 +1238,43 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
     setResult({ id: orderId, ok: true, msg: `Commande ${orderId} envoyée à Chic Affiliate ✅` });
   }
 
+  /* Statut RÉEL côté Chic Affiliate pour chaque colis (mode Liste Colis Chic). */
+  const [chicStatuses, setChicStatuses] = useState({});
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+  async function refreshChicStatuses() {
+    if (loadingStatuses) return;
+    setLoadingStatuses(true);
+    setResult(null);
+    try {
+      const chicOrders = await fetchChicRecentOrders(200);
+      const map = getChicStatusMap(chicOrders, siteOrders);
+      setChicStatuses(map);
+      const found = Object.keys(map).length;
+      setResult({ ok: found > 0, msg: found > 0 ? `Statuts Chic récupérés pour ${found} commande(s).` : 'Aucune correspondance trouvée sur Chic Affiliate.' });
+    } catch (e) {
+      setResult({ ok: false, msg: `Erreur Chic: ${e.message}` });
+    } finally {
+      setLoadingStatuses(false);
+    }
+  }
+  // Auto-chargement des statuts à l'ouverture de la Liste Colis Chic.
+  useEffect(() => {
+    if (mode === 'envoye' && siteOrders.length && getChicConfig()?.sessionCookie) refreshChicStatuses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
   return (
     <div className="space-y-4">
+      {mode === 'envoye' && (
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs text-gray-500">Colis envoyés à Chic — statut récupéré directement de chic-affiliate.com</p>
+          <button onClick={refreshChicStatuses} disabled={loadingStatuses}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 disabled:opacity-60">
+            {loadingStatuses ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            Actualiser les statuts Chic
+          </button>
+        </div>
+      )}
       {result && (
         <div className={`text-sm p-3 rounded-lg ${result.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
           {result.ok ? <CheckCircle2 size={14} className="inline mr-1" /> : <AlertCircle size={14} className="inline mr-1" />}
@@ -1259,6 +1294,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
               <th className="px-3 py-2">Produit</th>
               <th className="px-3 py-2">Taille</th>
               <th className="px-3 py-2">Prix</th>
+              {mode === 'envoye' && <th className="px-3 py-2">Statut Chic</th>}
               <th className="px-3 py-2">Statut</th>
               <th className="px-3 py-2">Actions</th>
             </tr>
@@ -1273,12 +1309,17 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
                 <td className="px-3 py-2">{o.product?.name || '—'}</td>
                 <td className="px-3 py-2">{o.product?.size || '—'}</td>
                 <td className="px-3 py-2 font-semibold">{(o.price || 0).toFixed(2)} DH</td>
+                {mode === 'envoye' && (
+                  <td className="px-3 py-2">
+                    {chicStatuses[o.id] ? <StatusBadge raw={chicStatuses[o.id]} /> : <span className="text-xs text-gray-300">—</span>}
+                  </td>
+                )}
                 <td className="px-3 py-2"><StatusSelect o={o} /></td>
                 <td className="px-3 py-2"><ActionButtons o={o} /></td>
               </tr>
             ))}
             {!siteOrders.length && (
-              <tr><td colSpan={9} className="text-center py-8 text-gray-400">{mode === 'envoye' ? 'Aucun colis Chic (envoyé / livré / facturé)' : 'Aucune nouvelle commande sur des produits Chic'}</td></tr>
+              <tr><td colSpan={mode === 'envoye' ? 10 : 9} className="text-center py-8 text-gray-400">{mode === 'envoye' ? 'Aucun colis Chic (envoyé / livré / facturé)' : 'Aucune nouvelle commande sur des produits Chic'}</td></tr>
             )}
           </tbody>
         </table>
@@ -1288,9 +1329,12 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
       <div className="md:hidden space-y-2">
         {siteOrders.map(o => (
           <div key={o.id} className="bg-white border border-gray-200 rounded-lg p-3 space-y-1.5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="font-mono text-xs text-gray-500">{o.id}</span>
-              <StatusSelect o={o} />
+              <div className="flex items-center gap-1.5">
+                {mode === 'envoye' && chicStatuses[o.id] && <StatusBadge raw={chicStatuses[o.id]} />}
+                <StatusSelect o={o} />
+              </div>
             </div>
             <div className="font-medium text-sm text-gray-800">{o.recipient?.name || '—'}</div>
             <div className="text-xs text-gray-600 flex flex-wrap gap-x-3">
