@@ -29,6 +29,8 @@ const SYNC_KEYS = [
   'gs_import',
   'victoury_saved_filters',
   'chic_config',
+  'chic_hidden_orders',
+  'chic_hidden_ids',
 ];
 
 // Clés fusionnées par UNION (croissante). Attention : une union ne peut jamais
@@ -39,6 +41,9 @@ const SYNC_KEYS = [
 const MERGE_KEYS = new Set([
   'victoury_sent_livreur',
   'deleted_order_ids',
+  // Masquage des commandes/produits Chic : additif, doit tenir sur tous les appareils.
+  'chic_hidden_orders',
+  'chic_hidden_ids',
 ]);
 
 const SYNC_INTERVAL = 30_000;

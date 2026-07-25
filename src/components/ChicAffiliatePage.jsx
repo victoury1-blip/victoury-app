@@ -12,6 +12,7 @@ import {
   fetchChicCityFees, computeChicStatusUpdates,
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
+import { cloudSet, cloudGet } from '../lib/cloudSettings';
 
 /* Statuts propres aux commandes Chic (pipeline site -> livraison -> facture). */
 const CHIC_ORDER_STATUSES = [
@@ -665,15 +666,28 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
     try { return new Set(JSON.parse(localStorage.getItem('chic_hidden_orders') || '[]')); } catch { return new Set(); }
   });
   const [showHiddenOrders, setShowHiddenOrders] = useState(false);
+  // Récupère la liste masquée du cloud au montage (masquage cross-appareils).
+  useEffect(() => {
+    cloudGet('chic_hidden_orders').then(cloud => {
+      if (!Array.isArray(cloud) || !cloud.length) return;
+      setHiddenOrders(prev => {
+        const merged = new Set([...prev, ...cloud.map(String)]);
+        localStorage.setItem('chic_hidden_orders', JSON.stringify([...merged]));
+        return merged;
+      });
+    }).catch(() => {});
+  }, []);
   function hideOrder(id) {
     const next = new Set(hiddenOrders); next.add(String(id));
     localStorage.setItem('chic_hidden_orders', JSON.stringify([...next]));
     setHiddenOrders(next);
+    cloudSet('chic_hidden_orders', [...next]); // propage à tous les appareils
   }
   function unhideOrder(id) {
     const next = new Set(hiddenOrders); next.delete(String(id));
     localStorage.setItem('chic_hidden_orders', JSON.stringify([...next]));
     setHiddenOrders(next);
+    cloudSet('chic_hidden_orders', [...next]);
   }
   const visibleOrders = orders.filter(o => showHiddenOrders || !hiddenOrders.has(String(o.id)));
   const hiddenCount = orders.filter(o => hiddenOrders.has(String(o.id))).length;
