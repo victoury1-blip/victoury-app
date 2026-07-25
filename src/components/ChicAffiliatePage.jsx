@@ -1173,10 +1173,12 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
   );
 
   /* mode 'nouveau' = Nouvelles commandes (pas encore envoyées) ;
-     mode 'envoye' = Envoyées (déjà envoyées à Chic, en attente de livraison).
-     Livrées/Facturées passent dans l'onglet Factures. */
+     mode 'envoye' = Liste Colis Chic : toutes les commandes envoyées à Chic
+     et leur suite (envoyée → livrée → facturée). Une commande facturée RESTE
+     dans cette liste (badge « Facturée ») en plus d'apparaître dans Factures. */
+  const SENT_STATUSES = ['chic_envoye', 'chic_livre', 'chic_facture'];
   const siteOrders = orders.filter(o =>
-    mode === 'envoye' ? o.status === 'chic_envoye' : o.status === 'chic_nouveau');
+    mode === 'envoye' ? SENT_STATUSES.includes(o.status) : o.status === 'chic_nouveau');
   const norm = s => (s || '').toString().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ').trim();
@@ -1276,7 +1278,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
               </tr>
             ))}
             {!siteOrders.length && (
-              <tr><td colSpan={9} className="text-center py-8 text-gray-400">{mode === 'envoye' ? 'Aucune commande envoyée en attente de livraison' : 'Aucune nouvelle commande sur des produits Chic'}</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400">{mode === 'envoye' ? 'Aucun colis Chic (envoyé / livré / facturé)' : 'Aucune nouvelle commande sur des produits Chic'}</td></tr>
             )}
           </tbody>
         </table>
@@ -1302,7 +1304,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
             </div>
           </div>
         ))}
-        {!siteOrders.length && <p className="text-center py-8 text-gray-400 text-sm">{mode === 'envoye' ? 'Aucune commande envoyée en attente de livraison' : 'Aucune nouvelle commande sur des produits Chic'}</p>}
+        {!siteOrders.length && <p className="text-center py-8 text-gray-400 text-sm">{mode === 'envoye' ? 'Aucun colis Chic (envoyé / livré / facturé)' : 'Aucune nouvelle commande sur des produits Chic'}</p>}
       </div>
 
       {sendModal && <SendToChicModal order={sendModal.order} chicProduct={sendModal.chicProduct} onClose={() => setSendModal(null)} onSent={onSent} />}
@@ -1757,7 +1759,8 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
   const [tab, setTab] = useState('products');
   const [sessionExpired, setSessionExpired] = useState(false);
   const siteCount = orders.filter(o => o.status === 'chic_nouveau').length;
-  const sentCount = orders.filter(o => o.status === 'chic_envoye').length;
+  // Badge = colis en cours (envoyés + livrés non encore facturés).
+  const sentCount = orders.filter(o => o.status === 'chic_envoye' || o.status === 'chic_livre').length;
   const factureCount = orders.filter(o => o.status === 'chic_livre').length;
 
   useEffect(() => {
@@ -1819,7 +1822,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           onClick={() => setTab('sent')}
           className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'sent' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
-          <Send size={14} /> Envoyées
+          <Send size={14} /> Liste Colis Chic
           {sentCount > 0 && (
             <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{sentCount}</span>
           )}
