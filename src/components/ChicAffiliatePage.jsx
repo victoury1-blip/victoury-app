@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Store, Settings, Search, ChevronDown, ChevronRight, RefreshCw,
   Download, Loader2, AlertCircle, CheckCircle2, Check, Package, ShoppingCart,
-  Send, Pencil, Trash2, Clock, X,
+  Send, Pencil, Trash2, Clock, X, MessageCircle, Phone,
 } from 'lucide-react';
 import HistoryModal from './orders/HistoryModal';
 import {
@@ -1090,8 +1090,27 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder }) {
     setOrders?.(prev => prev.map(o => o.id === updated.id ? { ...updated, manuallyModified: true } : o));
     setEditOrder(null);
   }
+  // Téléphone → chiffres seulement ; format international pour WhatsApp.
+  const phoneDigits = (o) => String(o.recipient?.phone || '').replace(/\D/g, '');
+  const waNumber = (o) => {
+    let d = phoneDigits(o);
+    if (d.startsWith('212')) return d;
+    if (d.startsWith('0')) return '212' + d.slice(1);
+    if (d.length === 9) return '212' + d; // 6/7xxxxxxx sans le 0
+    return d;
+  };
   const ActionButtons = ({ o }) => (
     <div className="flex items-center gap-1">
+      {phoneDigits(o) && (
+        <>
+          <a href={`https://api.whatsapp.com/send?phone=${waNumber(o)}`} target="_blank" rel="noopener noreferrer"
+             title="WhatsApp" onClick={e => e.stopPropagation()}
+             className="p-1.5 rounded bg-green-100 text-green-600 hover:bg-green-200 transition"><MessageCircle size={13} /></a>
+          <a href={`tel:${phoneDigits(o).startsWith('0') || phoneDigits(o).startsWith('212') ? o.recipient.phone : '0' + phoneDigits(o).slice(-9)}`}
+             title="Appeler" onClick={e => e.stopPropagation()}
+             className="p-1.5 rounded bg-sky-100 text-sky-600 hover:bg-sky-200 transition"><Phone size={13} /></a>
+        </>
+      )}
       {o.status !== 'chic_envoye' && (
         <button
           onClick={() => openSend(o)}
