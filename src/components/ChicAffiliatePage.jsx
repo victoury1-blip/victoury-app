@@ -45,16 +45,49 @@ function setCityFraisValue(cityName, val) {
 }
 
 /* ── Status badge ── */
+/* Couleur d'un sous-statut Chic (raison / dernière action). */
+function subStatusStyle(s) {
+  const l = s.toLowerCase();
+  if (/annul|cancel/.test(l)) return { cls: 'bg-red-100 text-red-700', dot: '#dc2626', icon: '✕' };
+  if (/livr|deliver/.test(l)) return { cls: 'bg-green-100 text-green-700', dot: '#16a34a', icon: '✓' };
+  if (/retour|return/.test(l)) return { cls: 'bg-orange-100 text-orange-700', dot: '#f97316', icon: '↩' };
+  if (/vocal|voix|inject|injoign|pas de r|no answer|repond/.test(l)) return { cls: 'bg-amber-100 text-amber-700', dot: '#f59e0b', icon: '📞' };
+  if (/expedi|ship|en cours|distrib/.test(l)) return { cls: 'bg-sky-100 text-sky-700', dot: '#0ea5e9', icon: '🚚' };
+  if (/nouveau|new/.test(l)) return { cls: 'bg-blue-100 text-blue-700', dot: '#3b82f6', icon: '✦' };
+  if (/report|reprogram/.test(l)) return { cls: 'bg-violet-100 text-violet-700', dot: '#8b5cf6', icon: '⏱' };
+  return { cls: 'bg-gray-100 text-gray-600', dot: '#9ca3af', icon: '•' };
+}
+
+/* Découpe le statut brut « Non confirméBoit vocal » / « Confirmé le 2026-07-25Nouveau »
+   en (confirmation, date, sous-statut) pour un affichage propre en deux pastilles. */
+function parseChicStatus(raw) {
+  const text = stripHtml(raw).replace(/\s+/g, ' ').trim();
+  const m = text.match(/^(Non\s+confirmé|Confirmé)(?:\s*le\s*(\d{4}-\d{2}-\d{2}))?\s*(.*)$/i);
+  if (!m) return { confirmed: null, label: text, date: '', sub: '' };
+  const confirmed = /^Confirmé/i.test(m[1]);
+  return { confirmed, date: m[2] || '', sub: (m[3] || '').trim() };
+}
+
 function StatusBadge({ raw }) {
-  const text = stripHtml(raw).trim();
-  const lower = text.toLowerCase();
-  let color = 'bg-gray-100 text-gray-700';
-  if (lower.includes('livré') || lower.includes('delivered')) color = 'bg-green-100 text-green-700';
-  else if (lower.includes('confirmé') || lower.includes('confirmed')) color = 'bg-blue-100 text-blue-700';
-  else if (lower.includes('annulé') || lower.includes('cancel')) color = 'bg-red-100 text-red-700';
-  else if (lower.includes('expédié') || lower.includes('shipped') || lower.includes('en cours')) color = 'bg-yellow-100 text-yellow-700';
-  else if (lower.includes('retour') || lower.includes('return')) color = 'bg-orange-100 text-orange-700';
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${color}`}>{text || '—'}</span>;
+  const { confirmed, label, date, sub } = parseChicStatus(raw);
+  if (confirmed === null) {
+    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 whitespace-nowrap">{label || '—'}</span>;
+  }
+  const ss = sub ? subStatusStyle(sub) : null;
+  return (
+    <div className="inline-flex flex-col items-end gap-1">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${confirmed ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${confirmed ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+        {confirmed ? 'Confirmé' : 'Non confirmé'}
+        {date && <span className="font-normal opacity-70">· {date.slice(5)}</span>}
+      </span>
+      {ss && (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${ss.cls}`}>
+          <span>{ss.icon}</span>{sub}
+        </span>
+      )}
+    </div>
+  );
 }
 
 /* ── Config Panel ── */
