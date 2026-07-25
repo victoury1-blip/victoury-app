@@ -1158,7 +1158,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
              className="p-1.5 rounded bg-sky-100 text-sky-600 hover:bg-sky-200 transition"><Phone size={13} /></a>
         </>
       )}
-      {o.status !== 'chic_envoye' && (
+      {o.status === 'chic_nouveau' && (
         <button
           onClick={() => openSend(o)}
           className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition"

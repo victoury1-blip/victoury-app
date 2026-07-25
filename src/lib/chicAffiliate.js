@@ -585,10 +585,17 @@ export function computeChicStatusUpdates(chicOrders, victouryOrders) {
     if (o.status !== 'chic_envoye') continue;
     const cands = byPhone.get(phoneKey(o.recipient?.phone)) || [];
     const b = base(o.product?.name);
-    const match = cands.find(c => { const cb = base(c.product?.name); return cb && (cb === b || cb.includes(b) || b.includes(cb)); }) || cands[0];
+    // Exiger un vrai match produit : PAS de repli sur cands[0] — sinon une
+    // commande Chic d'un autre produit au même téléphone (souvent déjà livrée)
+    // marquait à tort cette commande « Livrée ».
+    if (!b) continue;
+    const match = cands.find(c => { const cb = base(c.product?.name); return cb && (cb === b || cb.includes(b) || b.includes(cb)); });
     if (!match) continue;
     const st = stripHtml(match.status || '').toLowerCase();
-    if (st.includes('livr')) updates.push({ id: o.id, status: 'chic_livre' });
+    // Le statut Chic doit VRAIMENT être livré (et non annulé/retour qui peut
+    // contenir « livraison »). On confirme « livr » sans mot d'annulation.
+    const isLivre = /livr[ée]/.test(st) && !/annul|retour|refus|non\s*livr/.test(st);
+    if (isLivre) updates.push({ id: o.id, status: 'chic_livre' });
   }
   return updates;
 }
