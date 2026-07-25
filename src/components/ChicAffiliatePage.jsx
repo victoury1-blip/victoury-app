@@ -1345,21 +1345,14 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
                 <StatusSelect o={o} />
               </div>
             </div>
-            {/* Infos client étiquetées à gauche, prix en face à droite */}
+            {/* Infos client à gauche, prix en face à droite */}
             <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0 space-y-1 text-sm">
-                {[
-                  ['Nom', o.recipient?.name],
-                  ['Ville', o.recipient?.city],
-                  ['Adresse', o.recipient?.address],
-                  ['Produit', `${o.product?.name || ''}${o.product?.size ? ` / ${o.product.size}` : ''}`],
-                  ['Téléphone', o.recipient?.phone],
-                ].map(([label, val]) => (
-                  <div key={label} className="flex gap-2">
-                    <span className="text-gray-400 text-xs w-16 shrink-0">{label}</span>
-                    <span className="text-gray-800 break-words min-w-0" dir="auto">{val || '—'}</span>
-                  </div>
-                ))}
+              <div className="flex-1 min-w-0 space-y-0.5 text-sm">
+                <p className="font-semibold text-gray-900 break-words" dir="auto">{o.recipient?.name || '—'}</p>
+                <p className="text-gray-600 break-words" dir="auto">{o.recipient?.city || '—'}</p>
+                {o.recipient?.address && <p className="text-gray-500 text-xs break-words" dir="auto">{o.recipient.address}</p>}
+                <p className="text-gray-700 break-words" dir="auto">{o.product?.name || '—'}{o.product?.size ? ` / ${o.product.size}` : ''}</p>
+                <p className="text-gray-600 font-mono text-xs">{o.recipient?.phone || '—'}</p>
               </div>
               <div className="text-right shrink-0">
                 <p className="text-lg font-black text-gray-900 whitespace-nowrap">{(o.price || 0).toFixed(2)} DH</p>
