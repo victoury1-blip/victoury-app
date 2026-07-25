@@ -1842,12 +1842,6 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
         >
           📍 Villes & Frais
         </button>
-        <button
-          onClick={() => setTab('send')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'send' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
-        >
-          <Send size={14} /> Envoyer
-        </button>
       </div>
 
       {/* Content */}
@@ -1857,7 +1851,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           : tab === 'sent' ? <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} mode="envoye" />
           : tab === 'factures' ? <ChicFacturesTab orders={orders} setOrders={setOrders} />
           : tab === 'villes' ? <ChicCitiesTab />
-          : <SendOrderTab />}
+          : <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} mode="nouveau" />}
       </div>
     </div>
   );
