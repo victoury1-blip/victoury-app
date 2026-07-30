@@ -456,8 +456,12 @@ export default function App() {
           return;
         }
         // Serveur WooCommerce parfois lent : timeout large (25s) + 2 tentatives.
+        // Auth par query-string (consumer_key/secret) ET header Basic : certaines
+        // hébergements suppriment l'en-tête Authorization -> 401. La query-string
+        // fonctionne dans tous les cas (HTTPS).
         const WC_TIMEOUT = 25000;
         const wcHeaders = { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) };
+        const wcAuthQs = `consumer_key=${encodeURIComponent(config.consumerKey)}&consumer_secret=${encodeURIComponent(config.consumerSecret)}`;
         async function wcFetchWithRetry(attempts = 2) {
           let lastErr;
           for (let i = 0; i < attempts; i++) {
@@ -465,7 +469,7 @@ export default function App() {
             const to = setTimeout(() => controller.abort(), WC_TIMEOUT);
             try {
               return await fetch(
-                `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50`,
+                `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&${wcAuthQs}`,
                 { signal: controller.signal, headers: wcHeaders }
               );
             } catch (err) {

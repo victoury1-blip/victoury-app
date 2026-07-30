@@ -297,12 +297,15 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   /* ── WooCommerce handlers ── */
   function updateWoo(field, val) { setWoo((p) => ({ ...p, [field]: val, testStatus: 'idle', saved: false })); }
 
-  // fetch WooCommerce avec timeout large (25s) — serveur parfois lent.
+  // fetch WooCommerce : timeout 25s + auth query-string (au cas où l'hébergeur
+  // supprime l'en-tête Authorization) EN PLUS du header Basic.
   async function wcFetch(path) {
     const ac = new AbortController();
     const to = setTimeout(() => ac.abort(), 25000);
+    const sep = path.includes('?') ? '&' : '?';
+    const url = `${path}${sep}consumer_key=${encodeURIComponent(woo.consumerKey)}&consumer_secret=${encodeURIComponent(woo.consumerSecret)}`;
     try {
-      return await fetch(path, {
+      return await fetch(url, {
         signal: ac.signal,
         headers: { 'Authorization': 'Basic ' + btoa(woo.consumerKey + ':' + woo.consumerSecret) },
       });
