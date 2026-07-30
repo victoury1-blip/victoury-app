@@ -455,15 +455,27 @@ export default function App() {
           setWooError('⚙️ WooCommerce non configuré — ajoutez vos clés API dans Paramètres');
           return;
         }
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        let res;
-        try {
-          res = await fetch(
-            `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50`,
-            { signal: controller.signal, headers: { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) } }
-          );
-        } finally { clearTimeout(timeout); }
+        // Serveur WooCommerce parfois lent : timeout large (25s) + 2 tentatives.
+        const WC_TIMEOUT = 25000;
+        const wcHeaders = { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) };
+        async function wcFetchWithRetry(attempts = 2) {
+          let lastErr;
+          for (let i = 0; i < attempts; i++) {
+            const controller = new AbortController();
+            const to = setTimeout(() => controller.abort(), WC_TIMEOUT);
+            try {
+              return await fetch(
+                `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50`,
+                { signal: controller.signal, headers: wcHeaders }
+              );
+            } catch (err) {
+              lastErr = err;
+              if (i < attempts - 1) await new Promise(r => setTimeout(r, 1500));
+            } finally { clearTimeout(to); }
+          }
+          throw lastErr;
+        }
+        const res = await wcFetchWithRetry();
         if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
         setWooError(null);
         const data = await res.json();
@@ -589,7 +601,7 @@ export default function App() {
         });
       } catch (e) {
         const isTimeout = e?.name === 'AbortError';
-        const msg = isTimeout ? 'délai dépassé (8s) — serveur WooCommerce lent' : (e?.message || 'erreur réseau');
+        const msg = isTimeout ? 'serveur WooCommerce lent (délai dépassé) — réessai automatique' : (e?.message || 'erreur réseau');
         setWooError('⚠️ WooCommerce: ' + msg);
         logWcSync({ status: 'error', error: msg });
         logError('wc_poll', msg, { timeout: isTimeout });
