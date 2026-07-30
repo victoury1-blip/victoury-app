@@ -193,12 +193,24 @@ export default function ModeratorsPage() {
       setModerators(moderators.map(m => m.email === editModal.email ? { ...entry } : m));
     }
     if (password) {
+      // Crée réellement le compte de connexion Supabase via la fonction serveur.
       try {
-        const { error } = await supabase.auth.admin.updateUserById(
-          form.email, { password }
-        ).catch(() => ({}));
-        if (error) setPwMsg('Mot de passe enregistré localement (mise à jour Supabase nécessite accès admin)');
-      } catch {}
+        const { data: { session } } = await supabase.auth.getSession();
+        const r = await fetch('/api/create-moderator', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ email: form.email.trim(), password }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { setPwMsg('⚠️ ' + (j.error || 'Compte non créé — voir la configuration serveur')); return; }
+        setPwMsg('✅ Compte de connexion créé — le modérateur peut se connecter.');
+      } catch (e) {
+        setPwMsg('⚠️ Erreur réseau lors de la création du compte.');
+        return;
+      }
     }
     setEditModal(null);
   }
