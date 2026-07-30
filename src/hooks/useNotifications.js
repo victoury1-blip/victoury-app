@@ -15,32 +15,49 @@ const A_CONFIRMER_STATUSES = new Set([
 ]);
 
 /**
- * Affiche le nombre de commandes « à confirmer » sur l'icône de l'app via
- * l'API Badging (setAppBadge). L'autorisation de notification étant désormais
- * demandée au premier geste (App.jsx), le badge s'applique sans qu'aucune
- * notification visible ne soit posée dans la barre — c'est ce que veut
- * l'utilisateur : uniquement le chiffre sur l'icône, rien dans le tiroir.
+ * Affiche le nombre de commandes « à confirmer » sur l'icône de l'app.
+ *
+ * Deux mécanismes complémentaires, car l'API Badging (setAppBadge) SEULE ne
+ * s'affiche pas sur les lanceurs Samsung/One UI :
+ *   1. setAppBadge(count) — standard (fonctionne sur desktop / certains Android).
+ *   2. Une notification PERSISTANTE et SILENCIEUSE portant le nombre : sur
+ *      Samsung, c'est sa présence qui fait apparaître la pastille sur l'icône
+ *      (comme WhatsApp). Elle est mise à jour (renotify:false = pas de son/vibration
+ *      répétés) et retirée dès qu'il n'y a plus de commande à confirmer.
  *
  * `notifPerm` permet de ré-appliquer dès que l'autorisation passe à « granted ».
  */
 export default function useNotifications(orders, notifPerm) {
-  // Nettoyage des anciennes notifications persistantes ("badge-*" ou la
-  // pastille silencieuse d'une version précédente) pour ne rien laisser dans
-  // la barre.
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.ready
-      .then(reg => reg.getNotifications())
-      .then(list => list.forEach(n => {
-        if (n.tag === BADGE_TAG || n.tag?.startsWith('badge-')) n.close();
-      }))
-      .catch(() => {});
-  }, [orders, notifPerm]);
-
-  useEffect(() => {
-    if (!('setAppBadge' in navigator)) return;
     const count = (orders || []).filter(o => A_CONFIRMER_STATUSES.has(o.status)).length;
-    if (count > 0) navigator.setAppBadge(count).catch(() => {});
-    else navigator.clearAppBadge().catch(() => {});
+
+    // 1) Badging API
+    if ('setAppBadge' in navigator) {
+      if (count > 0) navigator.setAppBadge(count).catch(() => {});
+      else navigator.clearAppBadge().catch(() => {});
+    }
+
+    // 2) Notification silencieuse persistante (pastille icône Samsung)
+    if (!('serviceWorker' in navigator)) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+    navigator.serviceWorker.ready.then(reg => {
+      if (count > 0) {
+        reg.showNotification('Victoury — commandes à confirmer', {
+          body: `${count} commande${count > 1 ? 's' : ''} à confirmer`,
+          tag: BADGE_TAG,
+          renotify: false,   // pas de son/vibration à chaque mise à jour
+          silent: true,
+          badge: '/pwa-192x192.png',
+          icon: '/pwa-192x192.png',
+          data: { url: '/commandes/a-confirmer' },
+        }).catch(() => {});
+      } else {
+        // Plus rien à confirmer : retirer la pastille
+        reg.getNotifications({ tag: BADGE_TAG })
+          .then(list => list.forEach(n => n.close()))
+          .catch(() => {});
+      }
+    }).catch(() => {});
   }, [orders, notifPerm]);
 }
