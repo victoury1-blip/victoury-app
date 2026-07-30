@@ -297,13 +297,23 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   /* ── WooCommerce handlers ── */
   function updateWoo(field, val) { setWoo((p) => ({ ...p, [field]: val, testStatus: 'idle', saved: false })); }
 
+  // fetch WooCommerce avec timeout large (25s) — serveur parfois lent.
+  async function wcFetch(path) {
+    const ac = new AbortController();
+    const to = setTimeout(() => ac.abort(), 25000);
+    try {
+      return await fetch(path, {
+        signal: ac.signal,
+        headers: { 'Authorization': 'Basic ' + btoa(woo.consumerKey + ':' + woo.consumerSecret) },
+      });
+    } finally { clearTimeout(to); }
+  }
+
   async function testWoo() {
     if (!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret) return;
     setWoo((p) => ({ ...p, testStatus: 'loading' }));
     try {
-      const res = await fetch('/wc-api/wp-json/wc/v3/orders?per_page=1', {
-        headers: { 'Authorization': 'Basic ' + btoa(woo.consumerKey + ':' + woo.consumerSecret) },
-      });
+      const res = await wcFetch('/wc-api/wp-json/wc/v3/orders?per_page=1');
       setWoo((p) => ({ ...p, testStatus: res.ok ? 'success' : 'error' }));
     } catch { setWoo((p) => ({ ...p, testStatus: 'error' })); }
   }
@@ -318,9 +328,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   async function syncWoo() {
     setWoo((p) => ({ ...p, syncStatus: 'loading' }));
     try {
-      const res = await fetch('/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50', {
-        headers: { 'Authorization': 'Basic ' + btoa(woo.consumerKey + ':' + woo.consumerSecret) },
-      });
+      const res = await wcFetch('/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50');
       if (!res.ok) throw new Error();
       const data = await res.json();
       const getMeta = (meta, ...keys) => {
