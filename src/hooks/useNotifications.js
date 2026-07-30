@@ -8,6 +8,12 @@ export function requestPermission() {
 
 const BADGE_TAG = 'pending-orders-badge';
 
+// Mêmes statuts que l'onglet « À Confirmer » (OrdersPage) : le chiffre sur
+// l'icône doit correspondre au badge « À Confirmer », pas seulement à « nouveau ».
+const A_CONFIRMER_STATUSES = new Set([
+  'nouveau', 'attente', 'en_attente', 'pas_rep', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste',
+]);
+
 /**
  * Affiche le nombre de commandes « à confirmer » sur l'icône de l'app via
  * l'API Badging (setAppBadge). L'autorisation de notification étant désormais
@@ -33,7 +39,7 @@ export default function useNotifications(orders, notifPerm) {
 
   useEffect(() => {
     if (!('setAppBadge' in navigator)) return;
-    const count = (orders || []).filter(o => o.status === 'nouveau').length;
+    const count = (orders || []).filter(o => A_CONFIRMER_STATUSES.has(o.status)).length;
     if (count > 0) navigator.setAppBadge(count).catch(() => {});
     else navigator.clearAppBadge().catch(() => {});
   }, [orders, notifPerm]);
