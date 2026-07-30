@@ -168,6 +168,17 @@ export default function ModeratorsPage() {
     setForm(p => ({ ...p, permissions: ALL_PERMISSIONS.map(p => p.key) }));
   }
 
+  /* Rôles prêts à l'emploi : appliquent un jeu de permissions en un clic. */
+  const ROLE_PRESETS = [
+    { key: 'confirmation', label: '📞 Confirmation', perms: ['ajout_commandes', 'modif_commandes', 'liste_colis'] },
+    { key: 'livreur', label: '🚚 Livreur', perms: ['liste_colis', 'livraison', 'ramassage', 'retour'] },
+    { key: 'stock', label: '📦 Stock', perms: ['stock', 'liste_colis'] },
+    { key: 'admin', label: '👑 Admin (tout)', perms: ALL_PERMISSIONS.map(p => p.key) },
+  ];
+  function applyPreset(perms) {
+    setForm(p => ({ ...p, permissions: [...perms] }));
+  }
+
   async function save() {
     if (!form.name.trim() || !form.email.trim()) return;
     if (password && password.length < 6) {
@@ -418,6 +429,19 @@ export default function ModeratorsPage() {
                   </button>
                 </div>
                 {pwMsg && <p className={`text-xs mt-1 ${pwMsg.includes('✓') ? 'text-green-600' : 'text-red-500'}`}>{pwMsg}</p>}
+              </div>
+
+              {/* Rôles rapides */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Rôle rapide</label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {ROLE_PRESETS.map(r => (
+                    <button key={r.key} onClick={() => applyPreset(r.perms)}
+                      className="px-3 py-1.5 rounded-full border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:border-blue-300 transition">
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Permissions */}
