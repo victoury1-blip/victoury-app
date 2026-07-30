@@ -8,11 +8,11 @@ export function requestPermission() {
 
 const BADGE_TAG = 'pending-orders-badge';
 
-// Mêmes statuts que l'onglet « À Confirmer » (OrdersPage) : le chiffre sur
-// l'icône doit correspondre au badge « À Confirmer », pas seulement à « nouveau ».
-const A_CONFIRMER_STATUSES = new Set([
-  'nouveau', 'attente', 'en_attente', 'pas_rep', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste',
-]);
+// La pastille = uniquement les commandes RÉELLEMENT NOUVELLES (statut « nouveau »
+// : WooCommerce / ajout manuel), comme le badge WhatsApp. On EXCLUT les vieux
+// statuts d'attente (en_attente/pas_rep…) issus des imports Google Sheets, qui
+// gonflaient le chiffre sans être de vraies nouvelles commandes.
+const NEW_STATUSES = new Set(['nouveau']);
 
 /**
  * Affiche le nombre de commandes « à confirmer » sur l'icône de l'app.
@@ -29,7 +29,7 @@ const A_CONFIRMER_STATUSES = new Set([
  */
 export default function useNotifications(orders, notifPerm) {
   useEffect(() => {
-    const count = (orders || []).filter(o => A_CONFIRMER_STATUSES.has(o.status)).length;
+    const count = (orders || []).filter(o => NEW_STATUSES.has(o.status)).length;
 
     // 1) Badging API
     if ('setAppBadge' in navigator) {
@@ -43,8 +43,8 @@ export default function useNotifications(orders, notifPerm) {
 
     navigator.serviceWorker.ready.then(reg => {
       if (count > 0) {
-        reg.showNotification('Victoury — commandes à confirmer', {
-          body: `${count} commande${count > 1 ? 's' : ''} à confirmer`,
+        reg.showNotification('Victoury — nouvelles commandes', {
+          body: `${count} nouvelle${count > 1 ? 's' : ''} commande${count > 1 ? 's' : ''}`,
           tag: BADGE_TAG,
           renotify: false,   // pas de son/vibration à chaque mise à jour
           silent: true,
