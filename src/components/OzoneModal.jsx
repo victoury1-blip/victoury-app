@@ -76,7 +76,9 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     cityId: '',
     address: `${order.recipient.address || ''} ${order.recipient.city || ''}`.trim(),
     price: String(order.price || ''),
-    note: order.noteLivraison || order.note || '',
+    // Commentaire envoyé à Ozon = UNIQUEMENT la note de livraison (jamais la
+    // note interne, qui ne doit pas partir au livreur).
+    note: order.noteLivraison || '',
     open: '1',
     fragile: '0',
     replace: order.echange ? '1' : '0',
