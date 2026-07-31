@@ -455,34 +455,44 @@ export default function App() {
           setWooError('⚙️ WooCommerce non configuré — ajoutez vos clés API dans Paramètres');
           return;
         }
-        // Serveur WooCommerce parfois lent : timeout large (25s) + 2 tentatives.
-        // Auth par query-string (consumer_key/secret) ET header Basic : certaines
-        // hébergements suppriment l'en-tête Authorization -> 401. La query-string
-        // fonctionne dans tous les cas (HTTPS).
+        // Récupération côté SERVEUR (fonction /api/woo-orders) : bien plus fiable
+        // que le navigateur → rewrite → boutique (évite « Failed to fetch », CORS,
+        // suppression d'en-têtes). Repli sur le rewrite direct si l'API échoue.
         const WC_TIMEOUT = 25000;
-        const wcHeaders = { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) };
-        const wcAuthQs = `consumer_key=${encodeURIComponent(config.consumerKey)}&consumer_secret=${encodeURIComponent(config.consumerSecret)}`;
-        async function wcFetchWithRetry(attempts = 2) {
-          let lastErr;
-          for (let i = 0; i < attempts; i++) {
-            const controller = new AbortController();
-            const to = setTimeout(() => controller.abort(), WC_TIMEOUT);
-            try {
-              return await fetch(
-                `/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&${wcAuthQs}`,
-                { signal: controller.signal, headers: wcHeaders }
-              );
-            } catch (err) {
-              lastErr = err;
-              if (i < attempts - 1) await new Promise(r => setTimeout(r, 1500));
-            } finally { clearTimeout(to); }
-          }
-          throw lastErr;
+        let data;
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const controller = new AbortController();
+          const to = setTimeout(() => controller.abort(), WC_TIMEOUT + 3000);
+          let apiRes;
+          try {
+            apiRes = await fetch('/api/woo-orders', {
+              method: 'POST',
+              signal: controller.signal,
+              headers: {
+                'Content-Type': 'application/json',
+                ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+              },
+              body: JSON.stringify({ siteUrl: config.siteUrl || 'https://victoury-maroc.com', consumerKey: config.consumerKey, consumerSecret: config.consumerSecret }),
+            });
+          } finally { clearTimeout(to); }
+          const j = await apiRes.json().catch(() => ({}));
+          if (!apiRes.ok) throw new Error(j.error || `API ${apiRes.status}`);
+          data = j.orders || [];
+        } catch (apiErr) {
+          // Repli : appel direct via le rewrite Vercel (query-string + header).
+          const wcHeaders = { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) };
+          const wcAuthQs = `consumer_key=${encodeURIComponent(config.consumerKey)}&consumer_secret=${encodeURIComponent(config.consumerSecret)}`;
+          const controller = new AbortController();
+          const to = setTimeout(() => controller.abort(), WC_TIMEOUT);
+          let res;
+          try {
+            res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&${wcAuthQs}`, { signal: controller.signal, headers: wcHeaders });
+          } finally { clearTimeout(to); }
+          if (!res.ok) { setWooError('⚠️ WooCommerce: ' + (apiErr.message || 'erreur ' + res.status) + ' — vérifiez vos clés API'); return; }
+          data = await res.json();
         }
-        const res = await wcFetchWithRetry();
-        if (!res.ok) { setWooError('⚠️ WooCommerce: erreur ' + res.status + ' — vérifiez vos clés API dans Paramètres'); return; }
         setWooError(null);
-        const data = await res.json();
         const getMeta = (meta, ...keys) => {
           if (!meta) return '';
           /* Exact & attribute_ prefix match */

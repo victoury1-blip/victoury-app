@@ -312,12 +312,32 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     } finally { clearTimeout(to); }
   }
 
+  // Récupère les commandes WooCommerce via la fonction serveur (fiable), avec
+  // repli sur l'appel direct. Renvoie un tableau de commandes ou lève une erreur.
+  async function wcGetOrders(status = 'processing,pending') {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch('/api/woo-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, status }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `API ${r.status}`);
+      return j.orders || [];
+    } catch (apiErr) {
+      const res = await wcFetch(`/wc-api/wp-json/wc/v3/orders?status=${status}&per_page=50`);
+      if (!res.ok) throw new Error(apiErr.message || `HTTP ${res.status}`);
+      return res.json();
+    }
+  }
+
   async function testWoo() {
     if (!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret) return;
     setWoo((p) => ({ ...p, testStatus: 'loading' }));
     try {
-      const res = await wcFetch('/wc-api/wp-json/wc/v3/orders?per_page=1');
-      setWoo((p) => ({ ...p, testStatus: res.ok ? 'success' : 'error' }));
+      await wcGetOrders('any');
+      setWoo((p) => ({ ...p, testStatus: 'success' }));
     } catch { setWoo((p) => ({ ...p, testStatus: 'error' })); }
   }
 
@@ -331,9 +351,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   async function syncWoo() {
     setWoo((p) => ({ ...p, syncStatus: 'loading' }));
     try {
-      const res = await wcFetch('/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await wcGetOrders('processing,pending');
       const getMeta = (meta, ...keys) => {
         if (!meta) return '';
         for (const k of keys) { const m = meta.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); }
