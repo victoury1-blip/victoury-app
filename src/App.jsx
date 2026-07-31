@@ -487,7 +487,7 @@ export default function App() {
           const to = setTimeout(() => controller.abort(), WC_TIMEOUT);
           let res;
           try {
-            res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&${wcAuthQs}`, { signal: controller.signal, headers: wcHeaders });
+            res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&_fields=id,number,status,date_created,date_modified,total,billing,line_items,customer_note&${wcAuthQs}`, { signal: controller.signal, headers: wcHeaders });
           } finally { clearTimeout(to); }
           if (!res.ok) { setWooError('⚠️ WooCommerce: ' + (apiErr.message || 'erreur ' + res.status) + ' — vérifiez vos clés API'); return; }
           data = await res.json();

@@ -19,13 +19,18 @@ export default async function handler(req, res) {
   const qs = new URLSearchParams({
     status,
     per_page: String(perPage),
+    // _fields : ne demander que le nécessaire -> réponse bien plus légère et
+    // rapide (évite le timeout, surtout sur Vercel Hobby limité à 10s).
+    _fields: 'id,number,status,date_created,date_modified,total,billing,line_items,customer_note',
     consumer_key: consumerKey,
     consumer_secret: consumerSecret,
   });
   const url = `${base}/wp-json/wc/v3/orders?${qs.toString()}`;
 
   const ac = new AbortController();
-  const to = setTimeout(() => ac.abort(), 25000);
+  // < 10s : rester sous la limite Vercel Hobby pour renvoyer une erreur propre
+  // plutôt que d'être tué par la plateforme.
+  const to = setTimeout(() => ac.abort(), 9000);
   try {
     const r = await fetch(url, {
       signal: ac.signal,
