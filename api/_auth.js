@@ -45,13 +45,16 @@ function isSameOrigin(req) {
   } catch { return false; }
 }
 
+// Lenient : accepte les appels provenant de l'app (same-origin) OU un jeton
+// Supabase valide. Pour les endpoints à faible risque (lecture WooCommerce,
+// statut Ozon) où bloquer l'app elle-même serait pire qu'un Origin forgeable.
 export async function isAuthenticated(req) {
-  // Le jeton Supabase est LA vérification : Origin/Referer sont forgeables
-  // (curl, scripts) et ne suffisent pas seuls. Le repli same-origin n'est
-  // utilisé que si la config Supabase manque côté serveur (sinon l'app
-  // elle-même serait bloquée).
-  const hasSupaEnv = !!((process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) &&
-                        (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY));
-  if (hasSupaEnv) return verifyToken(req);
-  return isSameOrigin(req);
+  if (isSameOrigin(req)) return true;
+  return verifyToken(req);
+}
+
+// Strict : jeton Supabase valide obligatoire (Origin forgeable non accepté).
+// Pour les endpoints sensibles (création de comptes, service-role).
+export async function isAuthenticatedStrict(req) {
+  return verifyToken(req);
 }

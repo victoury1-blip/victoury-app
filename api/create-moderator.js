@@ -7,11 +7,11 @@
 //
 // Sécurité : l'appelant doit être authentifié (admin connecté) — vérifié via _auth.
 
-import { isAuthenticated } from './_auth.js';
+import { isAuthenticatedStrict } from './_auth.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
-  if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
+  if (!(await isAuthenticatedStrict(req))) return res.status(401).json({ error: 'Non autorisé' });
 
   const SUPA_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '');
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
