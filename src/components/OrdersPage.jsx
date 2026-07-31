@@ -156,9 +156,10 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     // Les VICTxxxx sont générés AVANT setOrders : l'updater doit rester pur
     // (StrictMode le ré-exécute et brûlerait/dupliquerait des ids).
     const newIds = new Map();
-    if (newStatus === 'confirme') {
+    if (newStatus !== 'nouveau') {
       for (const o of orders) {
-        if (selected.includes(o.id) && !/^VICT\d+$/i.test(o.trackingNumber || '')) newIds.set(o.id, generateVictId());
+        const alreadyVict = /^VICT\d+$/i.test(o.trackingNumber || '') || /^VICT\d+$/i.test(o.id || '');
+        if (selected.includes(o.id) && !alreadyVict) newIds.set(o.id, generateVictId());
       }
     }
     setOrders(prev => prev.map(o => {
@@ -1308,11 +1309,13 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
-            // À la confirmation, attribuer un numéro de suivi VICT (celui envoyé
-            // à Ozon) si la commande n'en a pas déjà un — généré AVANT setOrders
-            // pour garder l'updater pur (StrictMode le ré-exécute).
+            // Dès qu'une commande QUITTE le statut « nouveau » (WooCommerce en
+            // premier lieu), on lui attribue un code de suivi VICTxxxx si elle n'en
+            // a pas déjà un — ni dans trackingNumber ni dans l'id (commandes
+            // manuelles). Généré AVANT setOrders pour garder l'updater pur.
             const target = orders.find(o => o.id === orderId);
-            const needsVict = newStatus === 'confirme' && !/^VICT\d+$/i.test(target?.trackingNumber || '');
+            const alreadyVict = /^VICT\d+$/i.test(target?.trackingNumber || '') || /^VICT\d+$/i.test(target?.id || '');
+            const needsVict = newStatus !== 'nouveau' && !alreadyVict;
             const newVict = needsVict ? generateVictId() : null;
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
