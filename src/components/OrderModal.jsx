@@ -211,6 +211,15 @@ export default function OrderModal({ order, onClose, onSave }) {
                 {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
               </Field>
 
+              <Field label="Code d'envoi (VICT)" icon="🏷">
+                <input
+                  value={form.trackingNumber || ''}
+                  onChange={(e) => update('trackingNumber', e.target.value.trim())}
+                  className={`${inputCls} font-mono`}
+                  placeholder="ex : VICT0012"
+                />
+              </Field>
+
               {form.status === 'reporter' && (
                 <Field label="Date de report">
                   <input
