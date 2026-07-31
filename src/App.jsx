@@ -40,6 +40,18 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
+import { recalcVictCounter, generateVictId } from './lib/victId';
+
+/** Attribue un code de suivi VICTxxxx aux commandes WooCommerce fraîchement
+ *  importées (l'id interne reste WC-xxxx pour la déduplication, mais l'affichage
+ *  — trackingNumber || id — montre alors un code VICT comme les autres). */
+function assignVictTracking(freshOrders, allOrders) {
+  recalcVictCounter(allOrders);
+  freshOrders.forEach((o) => {
+    if (!/^VICT\d+$/i.test(o.trackingNumber || '')) o.trackingNumber = generateVictId();
+  });
+  return freshOrders;
+}
 
 const TAB_FROM_PARAM = {
   'a-confirmer': 'a_confirmer',
@@ -571,6 +583,7 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
+            assignVictTracking(fresh, prev);
             /* Browser push notification for first new order */
             if (initialLoadDoneRef.current) fresh.slice(0, 1).forEach(notifyNewOrder);
             /* Play notification sound — only after initial DB load */
@@ -923,6 +936,7 @@ export default function App() {
       const existingIds = new Set(prev.map((o) => o.id));
       // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
       const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
+      if (fresh.length) assignVictTracking(fresh, prev);
       if (fresh.length) saveOrdersToSupabase(fresh);
       return fresh.length ? [...fresh, ...prev] : prev;
     });
