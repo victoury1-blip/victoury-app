@@ -548,8 +548,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const filtered = useMemo(() => {
     const af = appliedFilter;
     return orders.filter((o) => {
-      /* Orders in the colis pipeline must NOT appear in order tabs */
-      const inColisPipeline = COLIS_PIPELINE_SET.has(o.status) || !!(o.trackingNumber && o.validated);
+      /* Orders in the colis pipeline must NOT appear in order tabs.
+         Exception : les commandes « Reporté » sont un suivi client (pas un colis
+         expédié) et doivent rester visibles même si elles ont un code de suivi. */
+      const inColisPipeline = COLIS_PIPELINE_SET.has(o.status)
+        || (o.status !== 'reporter' && !!(o.trackingNumber && o.validated));
       if (inColisPipeline) return false;
       if (!currentStatuses.includes(o.status)) return false;
       /* Search */

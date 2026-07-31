@@ -337,7 +337,9 @@ export default function Sidebar({ orders = [], session }) {
                     {item.children.map((child) => {
                       const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','retour_recu','echange_recu']);
                       const count = orders.filter(o => {
-                        if (COLIS_PIPE.has(o.status) || (o.trackingNumber && o.validated)) return false;
+                        const hidden = COLIS_PIPE.has(o.status)
+                          || (o.status !== 'reporter' && o.trackingNumber && o.validated);
+                        if (hidden) return false;
                         return child.statuses.includes(o.status);
                       }).length;
                       const active = location.pathname === child.path;
