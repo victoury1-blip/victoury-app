@@ -75,6 +75,19 @@ function getOzoneConfig() {
   try { return JSON.parse(localStorage.getItem('auzone_config') || '{}'); } catch { return {}; }
 }
 
+/* Nettoie une note : retire les segments identiques répétés (anciennes données
+   « Note interne: X Note interne: X ») pour n'afficher qu'une seule fois. */
+function dedupeNote(note) {
+  if (!note) return note;
+  let lines = String(note).split(/\n+/).map(l => l.trim()).filter(Boolean);
+  // dédoublonnage exact
+  lines = lines.filter((l, i) => lines.indexOf(l) === i);
+  // retire un segment entièrement contenu dans un autre (ex. « Note interne: X »
+  // dans « Note interne: X / par WhatsApp »)
+  lines = lines.filter((l, i) => !lines.some((o, j) => j !== i && o.length > l.length && o.includes(l)));
+  return lines.join('\n');
+}
+
 function resolveCityId(cityName, cities) {
   if (!cityName) return null;
   const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1026,8 +1039,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 {/* Note */}
                 <td className="px-4 py-3 max-w-[220px]">
                   {order.note ? (
-                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
-                      {order.note}
+                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">
+                      {dedupeNote(order.note)}
                     </p>
                   ) : (
                     <span className="text-gray-300 text-xs">—</span>
@@ -1301,8 +1314,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
-              const addedNote = note ? `\nNote interne: ${note}` : '';
-              return { ...o, status: newStatus, trackingNumber: newVict || o.trackingNumber, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
+              // Ne pas ré-ajouter une note déjà présente (évite « Note interne: X Note interne: X »).
+              const line = note ? `Note interne: ${note}` : '';
+              const addedNote = (line && !prevNote.includes(line)) ? `\n${line}` : '';
+              return { ...o, status: newStatus, trackingNumber: newVict || o.trackingNumber, dateUpdated: ts, note: (prevNote + addedNote).trim(), reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
             }));
             setStatusDropdown(null);
             const changedOrder = orders.find(o => o.id === orderId);
