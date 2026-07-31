@@ -52,8 +52,8 @@ import NewOrderModal from './orders/NewOrderModal';
 
 
 const tabs = [
-  { id: 'a_confirmer', label: 'À Confirmer', status: ['nouveau', 'attente', 'en_attente', 'pas_rep', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste'] },
-  { id: 'en_suivi', label: 'En Suivi', status: 'en_suivi' },
+  { id: 'a_confirmer', label: 'À Confirmer', status: ['nouveau'] },
+  { id: 'en_suivi', label: 'En Suivi', status: ['en_attente', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste', 'injoignable', 'pas_reponse', 'pas_rep_1', 'pas_rep_2', 'pas_rep_3', 'pas_rep_4', 'pas_rep_5', 'manque_stock', 'dem_suivi', 'en_suivi'] },
   { id: 'reporter', label: 'Reporté', status: 'reporter' },
   { id: 'confirme', label: 'Confirmé', status: 'confirme' },
 ];
@@ -520,7 +520,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const currentStatusRaw = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
   const currentStatuses = Array.isArray(currentStatusRaw) ? currentStatusRaw : [currentStatusRaw];
 
-  const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','dem_suivi','en_suivi','retour_recu','echange_recu']);
+  const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','retour_recu','echange_recu']);
 
   const isCasa = (city) => {
     if (!city) return false;
