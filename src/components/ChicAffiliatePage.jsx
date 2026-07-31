@@ -1159,7 +1159,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
     <div className="flex items-center gap-1">
       {phoneDigits(o) && (
         <>
-          <a href={`https://api.whatsapp.com/send?phone=${waNumber(o)}`} target="_blank" rel="noopener noreferrer"
+          <a href={`https://wa.me/${waNumber(o)}`} target="_blank" rel="noopener noreferrer"
              title="WhatsApp" onClick={e => e.stopPropagation()}
              className="p-1.5 rounded bg-green-100 text-green-600 hover:bg-green-200 transition"><WhatsAppIcon size={14} /></a>
           <a href={`tel:${phoneDigits(o).startsWith('0') || phoneDigits(o).startsWith('212') ? o.recipient.phone : '0' + phoneDigits(o).slice(-9)}`}

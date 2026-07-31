@@ -1378,11 +1378,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
               <button
                 className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-green-500 hover:bg-green-600 flex items-center justify-center gap-2"
                 onClick={() => {
-                  if (/android/i.test(navigator.userAgent)) {
-                    window.location.href = `intent://send/${whatsappPopup.phone}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.text=${encodeURIComponent(whatsappPopup.msg)};end`;
-                  } else {
-                    window.open(`https://api.whatsapp.com/send?phone=${whatsappPopup.phone}&text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
-                  }
+                  let d = String(whatsappPopup.phone || '').replace(/\D/g, '');
+                  if (d.startsWith('212')) { /* ok */ }
+                  else if (d.startsWith('0')) d = '212' + d.slice(1);
+                  else if (d.length === 9) d = '212' + d;
+                  window.open(`https://wa.me/${d}?text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank', 'noopener');
                   setWhatsappPopup(null);
                 }}
               >📤 Envoyer</button>

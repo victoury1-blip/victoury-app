@@ -1591,12 +1591,13 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                 </button>
                 <button
                   onClick={() => {
-                    const isAndroid = /android/i.test(navigator.userAgent);
-                    if (isAndroid) {
-                      window.location.href = `intent://send/${whatsappPopup.phone}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.text=${encodeURIComponent(whatsappPopup.msg)};end`;
-                    } else {
-                      window.open(`https://api.whatsapp.com/send?phone=${whatsappPopup.phone}&text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank');
-                    }
+                    // Numéro international (chiffres, 212 sans le 0) + lien wa.me
+                    // universel : ouvre la bonne discussion sur WhatsApp ET Business.
+                    let d = String(whatsappPopup.phone || '').replace(/\D/g, '');
+                    if (d.startsWith('212')) { /* ok */ }
+                    else if (d.startsWith('0')) d = '212' + d.slice(1);
+                    else if (d.length === 9) d = '212' + d;
+                    window.open(`https://wa.me/${d}?text=${encodeURIComponent(whatsappPopup.msg)}`, '_blank', 'noopener');
                     if (whatsappPopup.markSent) markLivreurSent(whatsappPopup.orderId);
                     setWhatsappPopup(null);
                   }}
