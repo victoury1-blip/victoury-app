@@ -10,13 +10,14 @@ export default function ContactModal({ phone, onClose }) {
   }
 
   function openWhatsApp() {
-    const num = clean.startsWith('+') ? clean.slice(1) : clean.startsWith('0') ? '212' + clean.slice(1) : clean;
-    const isAndroid = /android/i.test(navigator.userAgent);
-    if (isAndroid) {
-      window.location.href = `intent://send/${num}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end`;
-    } else {
-      window.open(`https://api.whatsapp.com/send?phone=${num}`, '_blank');
-    }
+    // Numéro au format international (chiffres uniquement, 212 sans le 0).
+    let d = (phone || '').replace(/\D/g, '');
+    if (d.startsWith('212')) { /* déjà international */ }
+    else if (d.startsWith('0')) d = '212' + d.slice(1);
+    else if (d.length === 9) d = '212' + d; // 6/7xxxxxxx sans le 0
+    // wa.me : lien universel qui ouvre la bonne discussion sur WhatsApp ET
+    // WhatsApp Business, Android comme iOS (contrairement à l'intent w4b figé).
+    window.open(`https://wa.me/${d}`, '_blank', 'noopener');
     onClose();
   }
 
