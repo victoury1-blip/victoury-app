@@ -518,7 +518,19 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               /* Re-sync deleted IDs from Supabase */
               const delRemote = await cloudGet('deleted_order_ids');
               if (Array.isArray(delRemote)) localStorage.setItem('deleted_order_ids', JSON.stringify(delRemote));
-              window.location.reload();
+              /* Purge TOTALE du Service Worker + caches : c'est lui qui sert
+                 l'ancienne version et peut faire échouer /api & /wc-api. */
+              try {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  await Promise.all(regs.map(r => r.unregister()));
+                }
+                if ('caches' in window) {
+                  const names = await caches.keys();
+                  await Promise.all(names.map(n => caches.delete(n)));
+                }
+              } catch {}
+              window.location.reload(true);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition"
           >

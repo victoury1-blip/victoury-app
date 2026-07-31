@@ -488,6 +488,11 @@ export default function App() {
           let res;
           try {
             res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&_fields=id,number,status,date_created,date_modified,total,billing,line_items,customer_note&${wcAuthQs}`, { signal: controller.signal, headers: wcHeaders });
+          } catch (directErr) {
+            // Les deux voies ont échoué : afficher le message le plus utile
+            // (celui de l'API serveur, qui explique la vraie cause).
+            setWooError('⚠️ WooCommerce: ' + (apiErr.message || directErr.message || 'connexion impossible'));
+            return;
           } finally { clearTimeout(to); }
           if (!res.ok) { setWooError('⚠️ WooCommerce: ' + (apiErr.message || 'erreur ' + res.status) + ' — vérifiez vos clés API'); return; }
           data = await res.json();
