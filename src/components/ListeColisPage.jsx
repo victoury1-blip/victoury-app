@@ -1257,33 +1257,22 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       <ChevronDown size={10} className="text-gray-400 group-hover:text-gray-600" />
                     </button>
 
-                    {/* Bouton info livreur. L'état « Envoyé » est synchronisé (cloud) et
-                        s'affiche sur TOUS les appareils. Le bouton « Envoyer info » (non
-                        encore envoyé) n'apparaît que là où l'info du livreur (ozone_dp_)
-                        existe localement ; ailleurs on montre quand même « ✓ Envoyé ». */}
-                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (() => {
-                      const sent = sentLivreurInfo.has(o.id);
-                      let hasDp = false;
-                      try {
-                        const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
-                        hasDp = !!(dp.name || dp.phone);
-                      } catch { hasDp = false; }
-                      if (!sent && !hasDp) return null;
-                      return (
-                        <button
-                          onClick={hasDp ? () => sendLivreurInfo(o) : undefined}
-                          disabled={!hasDp}
-                          title={sent && !hasDp ? 'Info déjà envoyée depuis un autre appareil' : undefined}
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
-                            sent
-                              ? 'bg-green-100 text-green-700 border-green-300'
-                              : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                          } ${!hasDp ? 'cursor-default' : ''}`}
-                        >
-                          {sent ? '✓ Envoyé' : '📩 Envoyer info'}
-                        </button>
-                      );
-                    })()}
+                    {/* Bouton info livreur : disponible pour toute commande Expédié / Reçu
+                        (le message utilise l'info livreur de la liste `livreurs` ou l'info
+                        Ozon si présente). L'état « ✓ Envoyé » est synchronisé (cloud) et
+                        s'affiche donc sur tous les appareils. */}
+                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (
+                      <button
+                        onClick={() => sendLivreurInfo(o)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
+                          sentLivreurInfo.has(o.id)
+                            ? 'bg-green-100 text-green-700 border-green-300'
+                            : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                        }`}
+                      >
+                        {sentLivreurInfo.has(o.id) ? '✓ Envoyé' : '📩 Envoyer info'}
+                      </button>
+                    )}
 
                     {/* Sous-statut Facturé : si la facture est VERSÉE, le colis est verrouillé
                         « Facturé » (non modifiable) + badge « Versé » dessous. Sinon menu déroulant. */}
