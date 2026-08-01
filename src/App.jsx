@@ -406,6 +406,35 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
+  /* ── Réparation UNIQUE : l'ancien backfill VICT a écrasé le trackingNumber de
+     nombreuses commandes avec un code VICT élevé (>= 28). On restaure le VRAI code :
+     le suivi Ozon (ozone_tracking) s'il existe, sinon on efface le trackingNumber
+     pour que la commande ré-affiche son id d'origine (WC-xxxx). Les VICT 1..27
+     (renumérotés à la main) sont préservés. Écriture par lots pour ne pas geler. */
+  useEffect(() => {
+    if (!session || !orders.length) return;
+    if (localStorage.getItem('vict_restore_ozon_v1') === 'done') return;
+    const backfillVict = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m && parseInt(m[1], 10) >= 28; };
+    const affected = orders.filter(o => !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber));
+    localStorage.setItem('vict_restore_ozon_v1', 'done'); // marquer tout de suite (une seule passe)
+    if (!affected.length) return;
+    (async () => {
+      const BATCH = 20;
+      for (let i = 0; i < affected.length; i += BATCH) {
+        const slice = affected.slice(i, i + BATCH);
+        await Promise.all(slice.map(o =>
+          supabase.from('orders').update({ tracking_number: o.ozoneTracking || null }).eq('id', o.id)
+            .then(() => {}).catch(() => {})
+        ));
+      }
+      setOrders(prev => prev.map(o =>
+        (!/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber))
+          ? { ...o, trackingNumber: o.ozoneTracking || null }
+          : o
+      ));
+    })();
+  }, [session, orders.length]);
+
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
      Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
      arrière-plan la connexion se coupe et les changements faits ailleurs (PC)
