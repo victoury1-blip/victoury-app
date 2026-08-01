@@ -681,7 +681,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     // déjà `trackingNumber || id` en repli. Sinon ce placeholder (WC-xxxx)
     // masque le vrai numéro de suivi Ozon lors de la création du colis.
     setModifiedIds(prev => new Set([...prev, updated.id]));
-    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+    // Rafraîchir la date de mise à jour pour que la commande éditée remonte en tête
+    // (tri par dernière màj) et que le nouveau timestamp soit synchronisé en base.
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...updated, dateUpdated: now() } : o)));
     setModalOpen(false);
   }
 
