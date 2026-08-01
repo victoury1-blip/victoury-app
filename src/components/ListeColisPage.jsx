@@ -1264,22 +1264,20 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         Une fois envoyé → « ✓ Envoyé » (état synchronisé, visible partout). */}
                     {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (() => {
                       const sent = sentLivreurInfo.has(o.id);
-                      // Info disponible si :
-                      //  - livreur Ozon RÉEL déjà récupéré (via le bouton Livraison 🚚 qui
-                      //    interroge Ozon et stocke ozone_dp_) — on n'utilise jamais le
-                      //    numéro Ozon générique, seulement l'agent réel ; OU
-                      //  - livreur PERSONNEL nommé (liste `livreurs`) avec téléphone.
+                      // Chaque commande a SON livreur : info dispo si l'agent Ozon réel a été
+                      // récupéré (ozone_dp_) OU si un livreur est assigné (recipient.delivery
+                      // présent dans la liste, ou une livraison Ozon).
                       let hasInfo = false;
                       const delivery = o.recipient?.delivery || '';
                       try {
                         const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
                         if (dp.name || dp.phone) hasInfo = true;
                       } catch {}
-                      if (!hasInfo && delivery && !/ozon/i.test(delivery)) {
+                      if (!hasInfo && delivery) {
                         try {
                           const lvs = JSON.parse(localStorage.getItem('livreurs') || '[]');
-                          if (lvs.some(l => l.nom === delivery && l.telephone)) hasInfo = true;
-                        } catch {}
+                          if (lvs.some(l => l.nom === delivery) || /ozon/i.test(delivery)) hasInfo = true;
+                        } catch { if (/ozon/i.test(delivery)) hasInfo = true; }
                       }
                       if (!sent && !hasInfo) return null;
                       return (
