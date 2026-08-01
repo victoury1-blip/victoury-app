@@ -1246,7 +1246,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   </td>
 
                   {/* État — click to change */}
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 min-w-[160px] align-top">
                     <div className="flex flex-col items-start gap-1">
                     <button
                       onClick={() => setEditOrder(o)}
@@ -1314,7 +1314,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   </td>
 
                   {/* Note */}
-                  <td className="px-4 py-3 max-w-[250px]">
+                  <td className="px-4 py-3 min-w-[200px] max-w-[250px] align-top">
                     <div className="flex flex-col gap-3">
                       {note && <span className="block text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">Note interne:<br/>{note}</span>}
                       {o.noteLivraison && (
