@@ -1065,10 +1065,19 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
                 {/* Note */}
                 <td className="px-4 py-3 max-w-[220px]">
-                  {order.note ? (
-                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">
-                      {dedupeNote(order.note)}
-                    </p>
+                  {(order.note || order.noteLivraison) ? (
+                    <div className="flex flex-col gap-2">
+                      {order.note && (
+                        <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">
+                          {dedupeNote(order.note)}
+                        </p>
+                      )}
+                      {order.noteLivraison && (
+                        <p className={`text-xs text-red-600 font-semibold leading-relaxed whitespace-pre-line ${order.note ? 'pt-2 border-t border-gray-200' : ''}`}>
+                          Note livraison:<br />{order.noteLivraison}
+                        </p>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-gray-300 text-xs">—</span>
                   )}
