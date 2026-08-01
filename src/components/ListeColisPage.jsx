@@ -12,7 +12,6 @@ import PhoneChip, { normalizePhone } from './PhoneChip';
 import { useToast } from './Toast';
 import Toggle from './Toggle';
 import { findOrderByCode } from '../lib/scanUtils';
-import { fetchOzoneDeliveryPerson } from '../lib/ozoneDelivery';
 import DeliveryStatusModal, { DELIVERY_STATUSES } from './colis/DeliveryStatusModal';
 import ScanModal from './colis/ScanModal';
 function isLight(hex) {
@@ -546,7 +545,6 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   const [livreurOpen, setLivreurOpen] = useState(false);
   const livreurRef = useRef(null);
   const [whatsappPopup, setWhatsappPopup] = useState(null);
-  const [fetchingInfoId, setFetchingInfoId] = useState(null);
   const [sentLivreurInfo, setSentLivreurInfo] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('victoury_sent_livreur') || '[]')); } catch { return new Set(); }
   });
@@ -683,19 +681,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     supabase.from('orders').update({ recu: !removing }).eq('id', orderId).then(() => {});
   }
 
-  async function sendLivreurInfo(order) {
-    // Récupérer le VRAI livreur Ozon (nom + tél) s'il n'est pas déjà en cache,
-    // pour que le message contienne le vrai numéro du livreur et non le générique.
-    let dp = {};
-    try { dp = JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch {}
-    if (!dp.phone) {
-      setFetchingInfoId(order.id);
-      try { await fetchOzoneDeliveryPerson(order); } catch {}
-      setFetchingInfoId(null);
-    }
+  function sendLivreurInfo(order) {
     const wa = buildWhatsappMessage(order, 'expedier');
     if (wa) setWhatsappPopup({ ...wa, markSent: true });
-    else toast.error("Aucune info livreur trouvée pour cette commande");
   }
 
   function markLivreurSent(orderId) {
@@ -1286,13 +1274,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                           if (lvs.some(l => l.nom === o.recipient.delivery && (l.telephone || l.nom))) hasInfo = true;
                         } catch {}
                       }
-                      // Commande Ozon : on peut récupérer le livreur réel au clic → afficher le bouton.
-                      if (!hasInfo && (o.ozoneTracking || /ozon/i.test(o.recipient?.delivery || ''))) hasInfo = true;
                       if (!sent && !hasInfo) return null;
                       return (
                         <button
                           onClick={hasInfo ? () => sendLivreurInfo(o) : undefined}
-                          disabled={(sent && !hasInfo) || fetchingInfoId === o.id}
+                          disabled={sent && !hasInfo}
                           title={sent && !hasInfo ? 'Info déjà envoyée (depuis un autre appareil)' : undefined}
                           className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
                             sent
@@ -1300,7 +1286,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                               : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
                           } ${sent && !hasInfo ? 'cursor-default' : ''}`}
                         >
-                          {fetchingInfoId === o.id ? '⏳ Ozon…' : sent ? '✓ Envoyé' : '📩 Envoyer info'}
+                          {sent ? '✓ Envoyé' : '📩 Envoyer info'}
                         </button>
                       );
                     })()}
