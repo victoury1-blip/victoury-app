@@ -85,8 +85,8 @@ function UnderConstruction() {
 function mapRow(o) {
   return {
     id: o.id,
-    recipient: o.recipient,
-    product: o.product,
+    recipient: o.recipient || {},
+    product: o.product || {},
     products: o.products || null,
     price: o.price,
     status: o.status,
@@ -178,7 +178,7 @@ export default function App() {
               const o = item.data;
               const r = await supabase.from('orders').upsert({
                 id: o.id, status: o.status, note: o.note, validated: o.validated,
-                recipient: o.recipient, product: o.product, products: o.products || null,
+                recipient: o.recipient || {}, product: o.product || {}, products: o.products || null,
                 price: o.price, date_added: o.dateAdded,
                 date_updated: new Date().toLocaleString('fr-MA'),
                 echange: o.echange || false, report_date: o.reportDate || null,
@@ -344,7 +344,7 @@ export default function App() {
       initialLoadDoneRef.current = true;
       // Cache orders to IndexedDB for offline use
       saveOrdersOffline(data.map((o) => ({
-        id: o.id, recipient: o.recipient, product: o.product, products: o.products || null,
+        id: o.id, recipient: o.recipient || {}, product: o.product || {}, products: o.products || null,
         price: o.price, status: o.status, note: o.note, dateAdded: o.date_added,
         dateUpdated: o.date_updated, validated: o.validated, echange: o.echange || false,
         reportDate: o.report_date || null, noteLivraison: o.note_livraison || '',
