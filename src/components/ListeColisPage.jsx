@@ -477,7 +477,7 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
 }
 
 /* ── Main page ── */
-const COLIS_PIPELINE = ['att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu'];
+const COLIS_PIPELINE = ['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu'];
 const isCasa = (city) => {
   if (!city) return false;
   const c = city.toLowerCase().replace(/[\s\-]/g, '');
@@ -870,7 +870,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     // « Reporté » depuis la Liste des Colis : le colis reste un colis (on garde
     // validated/trackingNumber) pour qu'il demeure dans la Liste des Colis et ne
     // saute pas dans l'onglet Reporté des commandes.
-    const leavePipeline = !COLIS_PIPELINE.includes(newStatus) && newStatus !== 'reporter';
+    const leavePipeline = !COLIS_PIPELINE.includes(newStatus) && newStatus !== 'reporter' && newStatus !== 'annule';
     setOrders((prev) => prev.map((o) => {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';
