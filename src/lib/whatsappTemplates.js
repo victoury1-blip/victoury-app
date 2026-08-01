@@ -70,15 +70,16 @@ export function buildWhatsappMessage(order, status) {
 
   const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
   const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
-  const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
   const tn = order.ozoneTracking || order.trackingNumber || order.id;
-  const dpPhone = dp.phone || livreur?.telephone || '';
+  // On utilise UNIQUEMENT le livreur personnel (liste `livreurs`), jamais le
+  // numéro Ozon Express : on ne diffuse pas le contact du livreur Ozon au client.
+  const dpPhone = livreur?.telephone || '';
 
   const msg = tpl.message
     .replace(/\{name\}/g, order.recipient.name || '')
     .replace(/\{tracking\}/g, tn)
     .replace(/\{price\}/g, order.price || '0')
-    .replace(/\{livreur\}/g, dp.name || livreur?.nom || order.recipient?.delivery || '')
+    .replace(/\{livreur\}/g, livreur?.nom || order.recipient?.delivery || '')
     .replace(/\{livreurPhone\}/g, dpPhone)
     .replace(/\{city\}/g, order.recipient?.city || '')
     .replace(/\{address\}/g, order.recipient?.address || '');
