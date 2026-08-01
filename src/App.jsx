@@ -119,6 +119,10 @@ export default function App() {
   const deletedIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
   const lastOrdersSigRef = useRef(null);
+  // id -> timestamp du dernier changement LOCAL. Pendant une courte fenêtre, une
+  // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
+  // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
+  const recentEditsRef = useRef(new Map());
   const wooConfigRef = useRef(null);
   const notifConfigRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -386,6 +390,11 @@ export default function App() {
         // La restauration se fait uniquement via la Corbeille (restoreOrder),
         // qui met déjà l'état local à jour et retire l'id de la liste noire.
         if (deletedIdsRef.current.has(o.id)) return;
+        // Ignorer l'écho d'une édition LOCALE récente (< 15 s) : le payload distant
+        // peut être plus ancien que notre état local et « écraserait » l'édition en
+        // cours (y compris des champs que l'autre appareil n'a pas touchés).
+        const editedAt = recentEditsRef.current.get(o.id);
+        if (editedAt && Date.now() - editedAt < 15000) return;
         setOrders(prev => prev.some(x => x.id === o.id)
           ? prev.map(x => x.id === o.id ? { ...x, ...mapRow(o) } : x)
           : [mapRow(o), ...prev]);
@@ -430,7 +439,28 @@ export default function App() {
         const newSig = sig(rows);
         if (newSig === lastOrdersSigRef.current) { syncing = false; return; } // rien de neuf
         lastOrdersSigRef.current = newSig;
-        setOrders(rows.map(mapRow));
+        // FUSION (et non remplacement) : on garde la version LOCALE des commandes
+        // éditées il y a moins de 15 s (mutation encore en vol / pas confirmée en
+        // base) — sinon le refetch ferait « revenir » l'édition à l'ancienne valeur.
+        const GRACE = 15000;
+        const nowTs = Date.now();
+        setOrders(prev => {
+          const prevMap = new Map(prev.map(o => [o.id, o]));
+          const fetchedIds = new Set(rows.map(o => o.id));
+          const merged = rows.map(r => {
+            const editedAt = recentEditsRef.current.get(r.id);
+            if (editedAt && nowTs - editedAt < GRACE && prevMap.has(r.id)) return prevMap.get(r.id);
+            return mapRow(r);
+          });
+          // Conserver en tête les commandes locales récentes absentes du fetch
+          // (créées localement, pas encore en base) pour ne pas les perdre.
+          const localOnly = prev.filter(o => {
+            if (fetchedIds.has(o.id) || deletedIdsRef.current.has(o.id)) return false;
+            const editedAt = recentEditsRef.current.get(o.id);
+            return editedAt && nowTs - editedAt < GRACE;
+          });
+          return [...localOnly, ...merged];
+        });
       } catch {}
       syncing = false;
     }
@@ -924,11 +954,15 @@ export default function App() {
       products: order.products || null,
       price: order.price,
       date_added: order.dateAdded,
-      date_updated: new Date().toLocaleString('fr-MA'),
+      // Utiliser la date de màj DÉJÀ posée localement (par le changement de statut)
+      // pour que la valeur en base == la valeur locale : la signature de re-synchro
+      // reste stable et on évite un remplacement inutile au prochain focus.
+      date_updated: order.dateUpdated || new Date().toLocaleString('fr-MA'),
       echange: order.echange || false,
       report_date: order.reportDate || null,
       note_livraison: order.noteLivraison || '',
       tracking_number: order.trackingNumber || null,
+      recu: order.recu ?? false,
       manually_modified: order.manuallyModified || false,
       ...(order.ozoneTracking ? { ozone_tracking: order.ozoneTracking } : {}),
       ...(order.ozoneLastStatus ? { ozone_last_status: order.ozoneLastStatus } : {}),
@@ -953,13 +987,16 @@ export default function App() {
         return o.status !== old.status || o.note !== old.note || o.validated !== old.validated
           || o.price !== old.price || o.trackingNumber !== old.trackingNumber
           || o.ozoneTracking !== old.ozoneTracking || o.recipient !== old.recipient
-          || o.product !== old.product || o.echange !== old.echange
+          || o.product !== old.product || o.products !== old.products || o.echange !== old.echange
           || o.reportDate !== old.reportDate || o.noteLivraison !== old.noteLivraison
-          || o.ozoneLastStatus !== old.ozoneLastStatus;
+          || o.recu !== old.recu || o.ozoneLastStatus !== old.ozoneLastStatus;
       });
       if (brandNew.length) saveOrdersToSupabase(brandNew).catch(e => console.error('save new orders:', e));
+      const editTs = Date.now();
+      brandNew.forEach(o => recentEditsRef.current.set(o.id, editTs));
       changed.forEach((o) => {
         modifiedIdsRef.current.add(o.id);
+        recentEditsRef.current.set(o.id, editTs); // protège l'édition d'un écrasement par un refetch/Realtime
         updateOrderInSupabase({ ...o, manuallyModified: true });
       });
       // Cache updated orders to IndexedDB
