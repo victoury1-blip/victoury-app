@@ -1263,11 +1263,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         Une fois envoyé → « ✓ Envoyé » (état synchronisé, visible partout). */}
                     {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (() => {
                       const sent = sentLivreurInfo.has(o.id);
-                      // On n'envoie l'info QUE pour un livreur PERSONNEL (présent dans la liste
-                      // `livreurs` avec un téléphone) — PAS pour les livraisons Ozon Express.
+                      // Info disponible si :
+                      //  - livreur Ozon RÉEL déjà récupéré (via le bouton Livraison 🚚 qui
+                      //    interroge Ozon et stocke ozone_dp_) — on n'utilise jamais le
+                      //    numéro Ozon générique, seulement l'agent réel ; OU
+                      //  - livreur PERSONNEL nommé (liste `livreurs`) avec téléphone.
                       let hasInfo = false;
                       const delivery = o.recipient?.delivery || '';
-                      if (delivery && !/ozon/i.test(delivery)) {
+                      try {
+                        const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
+                        if (dp.name || dp.phone) hasInfo = true;
+                      } catch {}
+                      if (!hasInfo && delivery && !/ozon/i.test(delivery)) {
                         try {
                           const lvs = JSON.parse(localStorage.getItem('livreurs') || '[]');
                           if (lvs.some(l => l.nom === delivery && l.telephone)) hasInfo = true;
