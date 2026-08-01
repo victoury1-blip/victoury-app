@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
   { path: '/import-sheets', label: 'Google Sheets', icon: FileSpreadsheet, perm: 'liste_colis' },
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
+  { path: '/fournisseur', label: 'Fournisseur',     icon: Truck, perm: 'stock' },
   { path: '/chic-affiliate', label: 'Chic Affiliate', icon: Store },
   {
     path: '/ramassage',
