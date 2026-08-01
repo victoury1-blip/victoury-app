@@ -530,8 +530,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
   function parseFrDate(str) {
     if (!str) return null;
-    const m = str.match(/(\d+)\/(\d+)\/(\d+)/);
-    return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+    // "JJ/MM/AAAA" ou "JJ/MM/AAAA HH:mm(:ss)" — on lit aussi l'heure pour un tri précis.
+    const m = String(str).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)) : null;
   }
   React.useEffect(() => {
     if (!livreurOpen) return;
@@ -570,7 +571,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
 
   const filtered = useMemo(() => {
     const af = appliedFilter;
-    return orders.filter((o) => {
+    const _list = orders.filter((o) => {
       /* Orders in the colis pipeline must NOT appear in order tabs.
          Une commande « Reporté » validée (reportée DEPUIS la Liste des Colis)
          reste un colis et n'apparaît donc pas ici ; une « Reporté » non validée
@@ -602,6 +603,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       }
       return true;
     });
+    // Tri : dernière commande MISE À JOUR en tête (date de màj, sinon date d'ajout).
+    const ts = (o) => { const d = parseFrDate(o.dateUpdated) || parseFrDate(o.dateAdded); return d ? d.getTime() : 0; };
+    return _list.sort((a, b) => ts(b) - ts(a));
   }, [orders, currentStatuses, debouncedSearch, appliedFilter, modifiedIds]);
 
   /* ── Relance : reportées dont la date de rappel est atteinte ── */
