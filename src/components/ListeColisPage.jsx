@@ -867,7 +867,10 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   function handleStatusSave(orderId, newStatus, note, reportDate) {
     const ts = getTs();
     const order = orders.find(o => o.id === orderId);
-    const leavePipeline = !COLIS_PIPELINE.includes(newStatus);
+    // « Reporté » depuis la Liste des Colis : le colis reste un colis (on garde
+    // validated/trackingNumber) pour qu'il demeure dans la Liste des Colis et ne
+    // saute pas dans l'onglet Reporté des commandes.
+    const leavePipeline = !COLIS_PIPELINE.includes(newStatus) && newStatus !== 'reporter';
     setOrders((prev) => prev.map((o) => {
       if (o.id !== orderId) return o;
       const prevNote = o.note || '';

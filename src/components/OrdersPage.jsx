@@ -550,10 +550,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     const af = appliedFilter;
     return orders.filter((o) => {
       /* Orders in the colis pipeline must NOT appear in order tabs.
-         Exception : les commandes « Reporté » sont un suivi client (pas un colis
-         expédié) et doivent rester visibles même si elles ont un code de suivi. */
+         Une commande « Reporté » validée (reportée DEPUIS la Liste des Colis)
+         reste un colis et n'apparaît donc pas ici ; une « Reporté » non validée
+         (reportée depuis À Confirmer) reste dans l'onglet Reporté. */
       const inColisPipeline = COLIS_PIPELINE_SET.has(o.status)
-        || (o.status !== 'reporter' && !!(o.trackingNumber && o.validated));
+        || !!(o.trackingNumber && o.validated);
       if (inColisPipeline) return false;
       if (!currentStatuses.includes(o.status)) return false;
       /* Search */

@@ -340,7 +340,7 @@ export default function Sidebar({ orders = [], session }) {
                       // pas de badge de comptage pour eux (sinon .includes plante).
                       const count = child.statuses ? orders.filter(o => {
                         const hidden = COLIS_PIPE.has(o.status)
-                          || (o.status !== 'reporter' && o.trackingNumber && o.validated);
+                          || (o.trackingNumber && o.validated);
                         if (hidden) return false;
                         return child.statuses.includes(o.status);
                       }).length : 0;
