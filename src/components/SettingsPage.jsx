@@ -1091,7 +1091,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                       let updated = 0;
                       const statusMap = {
                         'En attente de ramassage': 'att_ramassage',
-                        'Ramassé': 'ramasse', 'Ramasse': 'ramasse',
+                        'Ramassé': 'att_ramassage', 'Ramasse': 'att_ramassage',
                         'Expédié': 'expedier', 'Expedie': 'expedier',
                         'Reçu par le livreur': 'recu_livreur', 'Recu par le livreur': 'recu_livreur',
                         'Livré': 'livre', 'Livre': 'livre',
@@ -1104,7 +1104,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                         'Injoignable': 'injoignable',
                         'Mise en distribution': 'expedier',
                         'Attente De Ramassage': 'att_ramassage', 'Attente de ramassage': 'att_ramassage',
-                        'Reporté': 'reporte', 'Reporte': 'reporte',
+                        'Reporté': 'reporter', 'Reporte': 'reporter',
                       };
                       for (let i = 0; i < validatedOrders.length; i++) {
                         const o = validatedOrders[i];

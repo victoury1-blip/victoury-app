@@ -20,7 +20,7 @@ const NAV_ITEMS = [
     icon: ShoppingCart,
     children: [
       { path: '/commandes/a-confirmer', label: 'À Confirmer', statuses: ['nouveau'] },
-      { path: '/commandes/en-suivi',    label: 'En Suivi',    statuses: ['en_attente', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste', 'injoignable', 'pas_reponse', 'pas_rep_1', 'pas_rep_2', 'pas_rep_3', 'pas_rep_4', 'pas_rep_5', 'manque_stock', 'dem_suivi', 'en_suivi'] },
+      { path: '/commandes/en-suivi',    label: 'En Suivi',    statuses: ['en_attente', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste', 'injoignable', 'pas_reponse', 'pas_rep_1', 'pas_rep_2', 'pas_rep_3', 'pas_rep_4', 'pas_rep_5', 'manque_stock', 'dem_suivi'] },
       { path: '/commandes/reporter',    label: 'Reporté',     statuses: ['reporter'] },
       { path: '/commandes/confirme',    label: 'Confirmé',    statuses: ['confirme'] },
     ],

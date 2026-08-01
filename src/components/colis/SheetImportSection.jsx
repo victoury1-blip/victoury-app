@@ -427,9 +427,9 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     { value: 'livre',         label: 'Livré',               color: '#16a34a' },
     { value: 'refuse',        label: 'Refusé',              color: '#ef4444' },
     { value: 'annule',        label: 'Annulé',              color: '#dc2626' },
-    { value: 'retour',        label: 'Retour',              color: '#7c3aed' },
+    { value: 'retour_recu',   label: 'Retour',              color: '#7c3aed' },
     { value: 'expedier',      label: 'Expédié',             color: '#3b82f6' },
-    { value: 'ramasse',       label: 'Ramassé',             color: '#6366f1' },
+    { value: 'recu_livreur',  label: 'Ramassé',             color: '#6366f1' },
   ];
 
 
