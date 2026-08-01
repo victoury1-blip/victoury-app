@@ -88,10 +88,12 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
           for (const h of histList) {
             const raw = h['COMMENT'] || '';
             const c = raw.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-            const phoneM = c.match(/T[ée]l[ée]phone\s*:?\s*(0[0-9]{9})/i);
+            const phoneM = c.match(/T[ée]l[ée]phone\s*:?\s*(0[0-9]{9})/i) || c.match(/(0[5-7][0-9]{8})/);
             if (phoneM) deliveryPhone = phoneM[1].trim();
-            const nameM = c.match(/Livreur\s*:?\s*([A-Z][A-Za-zÀ-ÿ]+(?:\s+[A-Z][A-Za-zÀ-ÿ]+)*)/);
-            if (nameM) deliveryPerson = nameM[1].trim();
+            // Nom du livreur : lettres latines OU arabes, toute casse, jusqu'au
+            // prochain séparateur (virgule, parenthèse, « Tél », chiffre).
+            const nameM = c.match(/Livreur\s*:?\s*([A-Za-zÀ-ÿ؀-ۿ][A-Za-zÀ-ÿ؀-ۿ .'-]*?)\s*(?=[,;(]|T[ée]l|\d|$)/i);
+            if (nameM && nameM[1].trim()) deliveryPerson = nameM[1].trim();
           }
 
           setOzoneData({
