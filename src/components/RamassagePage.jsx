@@ -8,12 +8,25 @@ import useBarcodeScanner from '../hooks/useBarcodeScanner';
 
 function ScannerPage({ orders, setOrders }) {
   const [manualInput, setManualInput] = useState('');
-  const [bonsSession, setBonsSession] = useState({});
+  // Bons en cours de scan : persistés dans localStorage pour ne PAS être perdus
+  // quand on navigue vers « Liste des Bons » puis revient, ou après un reload.
+  const [bonsSession, setBonsSession] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ramassage_session') || '{}'); } catch { return {}; }
+  });
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null);
   const msgTimerRef = useRef(null);
-  const scannedIdsRef = useRef(new Set());
+  // Reconstruit l'ensemble des colis déjà scannés à partir de la session restaurée.
+  const scannedIdsRef = useRef(new Set(
+    Object.values((() => { try { return JSON.parse(localStorage.getItem('ramassage_session') || '{}'); } catch { return {}; } })())
+      .flatMap(b => (b.colis || []).map(c => c.id))
+  ));
   const navigate = useNavigate();
+
+  // Persiste la session à chaque changement (scan, retrait, enregistrement).
+  useEffect(() => {
+    try { localStorage.setItem('ramassage_session', JSON.stringify(bonsSession)); } catch {}
+  }, [bonsSession]);
 
   function playBeep() {
     try {
@@ -529,6 +542,14 @@ function BonsListPage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Colis scannés mais dont le bon n'a pas encore été enregistré (session locale).
+  const pendingCount = (() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('ramassage_session') || '{}');
+      return Object.values(s).reduce((n, b) => n + ((b.colis || []).length), 0);
+    } catch { return 0; }
+  })();
+
   useEffect(() => {
     async function load() {
       const { data } = await supabase
@@ -562,6 +583,16 @@ function BonsListPage() {
           Scanner
         </button>
       </div>
+
+      {pendingCount > 0 && (
+        <button
+          onClick={() => navigate('/ramassage/scanner')}
+          className="w-full mb-4 flex items-center justify-between gap-3 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-xl px-4 py-3 text-sm font-medium hover:bg-yellow-100 transition"
+        >
+          <span>⚠️ {pendingCount} colis scanné(s) non enregistré(s). Cliquez « Enregistrer le bon » pour les valider.</span>
+          <span className="shrink-0 font-bold underline">Aller enregistrer →</span>
+        </button>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12">
