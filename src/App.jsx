@@ -226,8 +226,13 @@ export default function App() {
       'victoury_app_config', 'victoury_shop_config', 'victoury_profile',
       'auzone_config', 'woo_config', 'livreurs', 'victoury_statuses',
       'phone_colors', 'notification_sound', 'system_timezone',
-      'victoury_sent_livreur', 'victoury_recu_ids', 'victoury_manual_facture',
+      'victoury_manual_facture',
     ];
+    // NB: 'victoury_sent_livreur' et 'victoury_recu_ids' sont volontairement EXCLUS.
+    // Ce sont des ensembles alimentés côté client (colis « info envoyée » / « reçu »).
+    // Les précharger ici écraserait (setItem direct) les ajouts locaux récents pas
+    // encore synchronisés -> l'état « Envoyé » disparaissait après un refresh.
+    // ListeColisPage les charge lui-même avec une FUSION (merge) qui préserve le local.
     const userId = session?.user?.id;
     const promises = [];
     // Load user-scoped settings
