@@ -58,6 +58,12 @@ const tabs = [
   { id: 'confirme', label: 'Confirmé', status: 'confirme' },
 ];
 
+// Statuts qui donnent droit à un code de suivi VICT (commande réellement
+// confirmée / expédiée). Les statuts de SUIVI (pas de réponse, en suivi,
+// injoignable, annulé, reporté…) n'en consomment PAS — sinon le compteur VICT
+// grimpe inutilement.
+const VICT_ON_STATUS = new Set(['confirme', 'att_ramassage', 'expedier', 'recu_livreur', 'livre', 'change']);
+
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' }, { id: '3', name: 'Fès' },
   { id: '4', name: 'Marrakech' }, { id: '5', name: 'Agadir' }, { id: '6', name: 'Tanger' },
@@ -156,7 +162,7 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     // Les VICTxxxx sont générés AVANT setOrders : l'updater doit rester pur
     // (StrictMode le ré-exécute et brûlerait/dupliquerait des ids).
     const newIds = new Map();
-    if (newStatus !== 'nouveau') {
+    if (VICT_ON_STATUS.has(newStatus)) {
       for (const o of orders) {
         const alreadyVict = /^VICT\d+$/i.test(o.trackingNumber || '') || /^VICT\d+$/i.test(o.id || '');
         if (selected.includes(o.id) && !alreadyVict) newIds.set(o.id, generateVictId());
@@ -1310,13 +1316,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
-            // Dès qu'une commande QUITTE le statut « nouveau » (WooCommerce en
-            // premier lieu), on lui attribue un code de suivi VICTxxxx si elle n'en
-            // a pas déjà un — ni dans trackingNumber ni dans l'id (commandes
-            // manuelles). Généré AVANT setOrders pour garder l'updater pur.
+            // Code VICT attribué UNIQUEMENT quand la commande est confirmée / part en
+            // livraison (VICT_ON_STATUS) et qu'elle n'en a pas déjà un — ni dans
+            // trackingNumber ni dans l'id. Généré AVANT setOrders pour garder l'updater pur.
             const target = orders.find(o => o.id === orderId);
             const alreadyVict = /^VICT\d+$/i.test(target?.trackingNumber || '') || /^VICT\d+$/i.test(target?.id || '');
-            const needsVict = newStatus !== 'nouveau' && !alreadyVict;
+            const needsVict = VICT_ON_STATUS.has(newStatus) && !alreadyVict;
             const newVict = needsVict ? generateVictId() : null;
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
