@@ -352,21 +352,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     setExternalOrders(updater);
   }
 
-  /* Filet de sécurité : toute commande confirmée / expédiée qui n'a PAS de code
-     VICT (ni id ni trackingNumber) — ex. confirmée depuis une ancienne version —
-     en reçoit un automatiquement. Exécuté une fois après le chargement. */
-  const victBackfillRef = useRef(false);
-  useEffect(() => {
-    if (victBackfillRef.current || !orders.length) return;
-    const isVict = (s) => /^VICT\d+$/i.test(s || '');
-    const toFix = orders.filter(o => VICT_ON_STATUS.has(o.status) && !isVict(o.id) && !isVict(o.trackingNumber));
-    victBackfillRef.current = true;
-    if (!toFix.length) return;
-    initVictCounter(orders);
-    const assign = new Map();
-    for (const o of toFix) assign.set(o.id, generateVictId());
-    setExternalOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
-  }, [orders, setExternalOrders]);
+  /* NB: le VICT est attribué au moment du changement de statut (confirmation /
+     expédition), voir bulkChangeStatus et le StatusChangeModal onSave. On NE fait
+     PAS de backfill de masse au montage : cela déclenchait des milliers d'écritures
+     d'un coup (appli qui rame / compteur VICT qui explose) et faisait disparaître
+     certaines commandes confirmées de l'onglet. */
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
