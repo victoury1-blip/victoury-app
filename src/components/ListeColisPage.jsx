@@ -684,6 +684,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   function sendLivreurInfo(order) {
     const wa = buildWhatsappMessage(order, 'expedier');
     if (wa) setWhatsappPopup({ ...wa, markSent: true });
+    else toast.error("Aucune info livreur disponible (ouvrez Livraison 🚚 pour récupérer le livreur Ozon)");
   }
 
   function markLivreurSent(orderId) {
@@ -1283,14 +1284,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       if (!sent && !hasInfo) return null;
                       return (
                         <button
-                          onClick={hasInfo ? () => sendLivreurInfo(o) : undefined}
-                          disabled={sent && !hasInfo}
-                          title={sent && !hasInfo ? 'Info déjà envoyée (depuis un autre appareil)' : undefined}
+                          // Toujours cliquable : permet de RENVOYER l'info (ex. corriger un
+                          // envoi ou renvoyer après avoir récupéré le vrai livreur Ozon).
+                          onClick={() => sendLivreurInfo(o)}
+                          title={sent ? 'Renvoyer l\'info livreur' : undefined}
                           className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
                             sent
-                              ? 'bg-green-100 text-green-700 border-green-300'
+                              ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
                               : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                          } ${sent && !hasInfo ? 'cursor-default' : ''}`}
+                          }`}
                         >
                           {sent ? '✓ Envoyé' : '📩 Envoyer info'}
                         </button>
