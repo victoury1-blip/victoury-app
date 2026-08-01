@@ -1257,22 +1257,39 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       <ChevronDown size={10} className="text-gray-400 group-hover:text-gray-600" />
                     </button>
 
-                    {/* Bouton info livreur : disponible pour toute commande Expédié / Reçu
-                        (le message utilise l'info livreur de la liste `livreurs` ou l'info
-                        Ozon si présente). L'état « ✓ Envoyé » est synchronisé (cloud) et
-                        s'affiche donc sur tous les appareils. */}
-                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (
-                      <button
-                        onClick={() => sendLivreurInfo(o)}
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
-                          sentLivreurInfo.has(o.id)
-                            ? 'bg-green-100 text-green-700 border-green-300'
-                            : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                        }`}
-                      >
-                        {sentLivreurInfo.has(o.id) ? '✓ Envoyé' : '📩 Envoyer info'}
-                      </button>
-                    )}
+                    {/* Bouton « Envoyer info » : n'apparaît QUE si l'info du livreur est
+                        disponible (à envoyer au client) — soit l'info Ozon locale, soit un
+                        livreur nommé (recipient.delivery) trouvé dans la liste `livreurs`.
+                        Une fois envoyé → « ✓ Envoyé » (état synchronisé, visible partout). */}
+                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (() => {
+                      const sent = sentLivreurInfo.has(o.id);
+                      let hasInfo = false;
+                      try {
+                        const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
+                        if (dp.name || dp.phone) hasInfo = true;
+                      } catch {}
+                      if (!hasInfo && o.recipient?.delivery) {
+                        try {
+                          const lvs = JSON.parse(localStorage.getItem('livreurs') || '[]');
+                          if (lvs.some(l => l.nom === o.recipient.delivery && (l.telephone || l.nom))) hasInfo = true;
+                        } catch {}
+                      }
+                      if (!sent && !hasInfo) return null;
+                      return (
+                        <button
+                          onClick={hasInfo ? () => sendLivreurInfo(o) : undefined}
+                          disabled={sent && !hasInfo}
+                          title={sent && !hasInfo ? 'Info déjà envoyée (depuis un autre appareil)' : undefined}
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold transition-colors ${
+                            sent
+                              ? 'bg-green-100 text-green-700 border-green-300'
+                              : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                          } ${sent && !hasInfo ? 'cursor-default' : ''}`}
+                        >
+                          {sent ? '✓ Envoyé' : '📩 Envoyer info'}
+                        </button>
+                      );
+                    })()}
 
                     {/* Sous-statut Facturé : si la facture est VERSÉE, le colis est verrouillé
                         « Facturé » (non modifiable) + badge « Versé » dessous. Sinon menu déroulant. */}
