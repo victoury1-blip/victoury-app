@@ -117,6 +117,7 @@ export default function App() {
   const modifiedIdsRef = useRef(new Set());
   const deletedIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
+  const lastOrdersSigRef = useRef(null);
   const wooConfigRef = useRef(null);
   const notifConfigRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -393,6 +394,49 @@ export default function App() {
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
+  }, [session]);
+
+  /* ── Catch-up sync: re-fetch orders when the app regains focus ──
+     Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
+     arrière-plan la connexion se coupe et les changements faits ailleurs (PC)
+     sont MANQUÉS. Au retour au premier plan, on re-synchronise pour rattraper
+     ce retard. Throttlé, et on ne re-rend QUE si quelque chose a changé. */
+  useEffect(() => {
+    if (!session) return;
+    let lastSync = 0;
+    let syncing = false;
+    const sig = (rows) => rows.map(o => `${o.id}|${o.status}|${o.date_updated}|${o.tracking_number}|${o.validated}|${o.recu}|${o.is_deleted}`).join('~');
+    async function reloadOrders() {
+      if (syncing || Date.now() - lastSync < 8000) return;
+      syncing = true;
+      try {
+        const PAGE = 1000; let all = []; let from = 0;
+        while (true) {
+          const res = await supabase.from('orders').select('*')
+            .or('is_deleted.is.null,is_deleted.eq.false')
+            .order('created_at', { ascending: false }).order('id', { ascending: false })
+            .range(from, from + PAGE - 1);
+          if (res.error) { syncing = false; return; }
+          const batch = res.data || [];
+          all = all.concat(batch);
+          if (batch.length < PAGE) break;
+          from += PAGE;
+        }
+        const seenIds = new Set();
+        const rows = all.filter(o => (seenIds.has(o.id) ? false : seenIds.add(o.id)))
+          .filter(o => !deletedIdsRef.current.has(o.id));
+        lastSync = Date.now();
+        const newSig = sig(rows);
+        if (newSig === lastOrdersSigRef.current) { syncing = false; return; } // rien de neuf
+        lastOrdersSigRef.current = newSig;
+        setOrders(rows.map(mapRow));
+      } catch {}
+      syncing = false;
+    }
+    const onVis = () => { if (document.visibilityState === 'visible') reloadOrders(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); };
   }, [session]);
 
   /* ── Reload settings from Supabase when app regains focus (cross-device sync) ── */
