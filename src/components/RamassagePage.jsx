@@ -103,25 +103,33 @@ function ScannerPage({ orders, setOrders }) {
       if (error) showMessage(`⚠️ ${order.id}: non synchronisé (${error.message})`, 'error');
     });
 
+    const newColis = {
+      id: order.id,
+      trackingNumber: order.trackingNumber || '',
+      recipient: order.recipient?.name || 'Inconnu',
+      phone: order.recipient?.phone || '',
+      city: order.recipient?.city || '',
+      price: order.price || 0,
+      product: order.products?.[0]?.name || order.product?.name || '',
+      time: new Date().toLocaleTimeString('fr-MA'),
+    };
+
     setBonsSession(prev => {
-      const existing = prev[livreur] || { colis: [], created_at: new Date().toISOString() };
-      if (existing.colis.find(c => c.id === order.id)) return prev;
-      return {
-        ...prev,
-        [livreur]: {
-          ...existing,
-          colis: [...existing.colis, {
-            id: order.id,
-            trackingNumber: order.trackingNumber || '',
-            recipient: order.recipient?.name || 'Inconnu',
-            phone: order.recipient?.phone || '',
-            city: order.recipient?.city || '',
-            price: order.price || 0,
-            product: order.products?.[0]?.name || order.product?.name || '',
-            time: new Date().toLocaleTimeString('fr-MA'),
-          }],
-        },
-      };
+      const existing = prev[livreur];
+      if (existing?.colis?.some(c => c.id === order.id)) return prev;
+      const bonId = existing?.bonId
+        || `BRA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const createdAt = existing?.created_at || new Date().toISOString();
+      const colis = [...(existing?.colis || []), newColis];
+      // Création/mise à jour AUTOMATIQUE du bon dans Supabase : il apparaît aussitôt
+      // dans « Liste des Bons » (statut Ouvert). L'utilisateur n'a plus qu'à le clôturer.
+      supabase.from('bons_ramassage').upsert({
+        id: bonId, livreur, colis_ids: colis.map(c => c.id), colis_count: colis.length,
+        status: 'en_cours', created_at: createdAt, note: '',
+      }, { onConflict: 'id' }).then(({ error }) => {
+        if (error) showMessage('⚠️ Bon non synchronisé: ' + error.message, 'error');
+      });
+      return { ...prev, [livreur]: { bonId, created_at: createdAt, colis } };
     });
 
     showMessage(`${order.recipient?.name || code} ajouté au bon ${livreur}`);
@@ -153,6 +161,16 @@ function ScannerPage({ orders, setOrders }) {
       if (!bon) return prev;
       const newColis = bon.colis.filter(c => c.id !== colisId);
       scannedIdsRef.current.delete(colisId);
+      // Répercuter le retrait sur le bon auto-créé dans Supabase.
+      if (bon.bonId) {
+        if (newColis.length === 0) {
+          supabase.from('bons_ramassage').delete().eq('id', bon.bonId).then(() => {});
+        } else {
+          supabase.from('bons_ramassage').update({
+            colis_ids: newColis.map(c => c.id), colis_count: newColis.length,
+          }).eq('id', bon.bonId).then(() => {});
+        }
+      }
       if (newColis.length === 0) {
         delete updated[livreur];
       } else {
@@ -167,24 +185,23 @@ function ScannerPage({ orders, setOrders }) {
     });
   }
 
+  // Le bon est déjà créé automatiquement au scan (statut Ouvert) ; ici on le CLÔTURE.
   async function saveBon(livreur) {
     const bonData = bonsSession[livreur];
     if (!bonData || bonData.colis.length === 0) return;
 
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    const bon = {
-      id: `BRA-${dateStr}-${rand}`,
-      livreur,
+    // Filet de sécurité : si le bon n'a pas d'id (ancienne session), on le crée.
+    const bonId = bonData.bonId
+      || `BRA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const payload = {
+      id: bonId, livreur,
       colis_ids: bonData.colis.map(c => c.id),
       colis_count: bonData.colis.length,
-      status: 'en_cours',
-      created_at: now.toISOString(),
+      status: 'termine',
+      created_at: bonData.created_at || new Date().toISOString(),
       note: '',
     };
-
-    const { error } = await supabase.from('bons_ramassage').insert(bon);
+    const { error } = await supabase.from('bons_ramassage').upsert(payload, { onConflict: 'id' });
     if (error) {
       showMessage('Erreur: ' + error.message, 'error');
       return;
@@ -196,7 +213,7 @@ function ScannerPage({ orders, setOrders }) {
       return updated;
     });
     bonData.colis.forEach(c => scannedIdsRef.current.delete(c.id));
-    showMessage(`Bon ${bon.id} créé pour ${livreur} (${bon.colis_count} colis)`);
+    showMessage(`Bon ${bonId} clôturé pour ${livreur} (${payload.colis_count} colis)`);
   }
 
   async function saveAllBons() {
@@ -303,7 +320,7 @@ function ScannerPage({ orders, setOrders }) {
                     onClick={saveAllBons}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
                   >
-                    Enregistrer tous les bons ({livreurKeys.length})
+                    Clôturer tous les bons ({livreurKeys.length})
                   </button>
                 </div>
               )}
@@ -321,7 +338,7 @@ function ScannerPage({ orders, setOrders }) {
                         onClick={() => saveBon(livreur)}
                         className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium transition"
                       >
-                        Enregistrer le bon
+                        Clôturer le bon
                       </button>
                     </div>
                     <div className="overflow-x-auto">
@@ -589,8 +606,8 @@ function BonsListPage() {
           onClick={() => navigate('/ramassage/scanner')}
           className="w-full mb-4 flex items-center justify-between gap-3 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-xl px-4 py-3 text-sm font-medium hover:bg-yellow-100 transition"
         >
-          <span>⚠️ {pendingCount} colis scanné(s) non enregistré(s). Cliquez « Enregistrer le bon » pour les valider.</span>
-          <span className="shrink-0 font-bold underline">Aller enregistrer →</span>
+          <span>ℹ️ {pendingCount} colis dans des bons ouverts. Cliquez « Clôturer le bon » quand le ramassage est terminé.</span>
+          <span className="shrink-0 font-bold underline">Voir le scanner →</span>
         </button>
       )}
 
