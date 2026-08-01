@@ -140,7 +140,8 @@ export default function OrderModal({ order, onClose, onSave }) {
     if (!form.recipient.name || !form.recipient.name.trim()) errs.name = 'Le nom est requis';
     const phoneDigits = (form.recipient.phone || '').replace(/\D/g, '');
     if (!form.recipient.phone || phoneDigits.length < 8) errs.phone = 'Numéro invalide (min 8 chiffres)';
-    if (!form.price || form.price <= 0) errs.price = 'Le prix doit être supérieur à 0';
+    // Le prix 0 est autorisé (échange, cadeau…) ; on refuse seulement un nombre négatif ou invalide.
+    if (form.price == null || form.price === '' || isNaN(Number(form.price)) || Number(form.price) < 0) errs.price = 'Le prix doit être un nombre valide (0 autorisé)';
     return errs;
   }
 
