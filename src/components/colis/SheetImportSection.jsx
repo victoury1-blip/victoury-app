@@ -118,12 +118,14 @@ export default function SheetImportSection({ orders = [], setOrders }) {
   const [importStatus, setImportStatus] = useState('att_ramassage');
 
   useEffect(() => {
-    const stored = localStorage.getItem('gs_import');
-    if (stored) {
-      const p = JSON.parse(stored);
-      setHeaders(p.headers); setRows(p.rows);
-      if (p.colMap) setColMap(p.colMap);
-    }
+    try {
+      const stored = localStorage.getItem('gs_import');
+      if (stored) {
+        const p = JSON.parse(stored);
+        setHeaders(p.headers); setRows(p.rows);
+        if (p.colMap) setColMap(p.colMap);
+      }
+    } catch {}
     cloudGet('gs_import').then(remote => {
       if (remote?.headers?.length) {
         setHeaders(remote.headers); setRows(remote.rows || []);
