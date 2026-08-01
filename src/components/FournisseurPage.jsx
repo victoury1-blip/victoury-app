@@ -35,7 +35,8 @@ function matchProduct(prod, item) {
   if (!prod) return false;
   const pname = norm(prod.name);
   const model = norm(item.modele);
-  if (model && !(pname.includes(model) || model.includes(pname))) return false;
+  // Un nom de produit vide ne doit JAMAIS matcher (sinon model.includes('') === true).
+  if (model && (!pname || !(pname.includes(model) || model.includes(pname)))) return false;
   const color = norm(item.couleur);
   if (color) {
     const hay = `${norm(prod.name)} ${norm(prod.color)} ${norm(prod.size)}`;
@@ -153,14 +154,14 @@ export default function FournisseurPage({ orders = [] }) {
       const prods = (o.products && o.products.length) ? o.products : (o.product ? [o.product] : []);
       const d = parseFrDate(o.dateUpdated) || parseFrDate(o.dateAdded);
       const inWeek = d && d >= weekStart;
-      for (const item of items) {
-        for (const p of prods) {
-          if (matchProduct(p, item)) {
-            const q = parseInt(p.qty, 10) || 1;
-            map[item.id].total += q;
-            if (inWeek) map[item.id].semaine += q;
-          }
-        }
+      for (const p of prods) {
+        // Chaque pièce vendue est attribuée à UN SEUL article fournisseur (le premier
+        // qui matche) pour ne pas compter deux fois quand des lignes se recoupent.
+        const item = items.find(it => matchProduct(p, it));
+        if (!item) continue;
+        const q = parseInt(p.qty, 10) || 1;
+        map[item.id].total += q;
+        if (inWeek) map[item.id].semaine += q;
       }
     }
     return map;

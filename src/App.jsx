@@ -414,13 +414,24 @@ export default function App() {
   useEffect(() => {
     if (!session || !orders.length) return;
     if (localStorage.getItem('vict_restore_ozon_v1') === 'done') return;
-    const backfillVict = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m && parseInt(m[1], 10) >= 28; };
-    const affected = orders.filter(o => !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber));
-    localStorage.setItem('vict_restore_ozon_v1', 'done'); // marquer tout de suite (une seule passe)
-    if (!affected.length) return;
+    let cancelled = false;
     (async () => {
+      // Flag GLOBAL (cloud) : la migration ne doit tourner qu'UNE seule fois pour
+      // TOUS les appareils. Sinon un 2ᵉ appareil re-réverterait des VICT >= 28
+      // légitimement émis depuis (le compteur repart de 27) -> corruption.
+      let remoteDone = false;
+      try { remoteDone = (await cloudGet('vict_restore_ozon_v1')) === 'done'; } catch {}
+      if (cancelled) return;
+      if (remoteDone) { localStorage.setItem('vict_restore_ozon_v1', 'done'); return; }
+      // Marquer AVANT d'agir (local + cloud) pour empêcher toute 2ᵉ exécution.
+      localStorage.setItem('vict_restore_ozon_v1', 'done');
+      cloudSet('vict_restore_ozon_v1', 'done');
+      const backfillVict = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m && parseInt(m[1], 10) >= 28; };
+      const affected = orders.filter(o => !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber));
+      if (!affected.length) return;
       const BATCH = 20;
       for (let i = 0; i < affected.length; i += BATCH) {
+        if (cancelled) return;
         const slice = affected.slice(i, i + BATCH);
         await Promise.all(slice.map(o =>
           supabase.from('orders').update({ tracking_number: o.ozoneTracking || null }).eq('id', o.id)
@@ -433,6 +444,7 @@ export default function App() {
           : o
       ));
     })();
+    return () => { cancelled = true; };
   }, [session, orders.length]);
 
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
