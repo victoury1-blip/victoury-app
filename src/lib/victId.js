@@ -18,22 +18,23 @@ function maxVictIn(orders) {
   return max;
 }
 
+/** Initialise le compteur = plus grand VICT réellement présent dans les commandes
+ *  (source de vérité). On IGNORE volontairement l'ancienne valeur stockée : si un
+ *  renumérotage a fait redescendre les VICT, le compteur suit les commandes réelles
+ *  (et non un compteur gonflé qui ferait sauter les numéros). `orders` doit être la
+ *  liste COMPLÈTE chargée depuis Supabase (max global tous appareils confondus). */
 export function initVictCounter(orders) {
   if (_victCounter !== null) return;
-  const stored = parseInt(localStorage.getItem('vict_counter') || '0', 10);
-  _victCounter = Math.max(maxVictIn(orders), stored);
-  cloudGet('vict_counter').then(remote => {
-    const r = parseInt(remote || '0', 10);
-    if (r > _victCounter) _victCounter = r;
-  }).catch(() => {});
+  _victCounter = maxVictIn(orders);
+  localStorage.setItem('vict_counter', String(_victCounter));
+  cloudSet('vict_counter', _victCounter);
 }
 
-/** Recalage du compteur. MONOTONE : ne descend JAMAIS en dessous de la valeur
- *  déjà atteinte (localStorage) ni du plus grand VICT encore présent — sinon un
- *  numéro déjà envoyé à Ozon serait réémis pour une autre commande. */
+/** Recalage : le compteur suit le plus grand VICT présent dans la liste complète,
+ *  sans jamais descendre sous ce qui a déjà été généré CETTE session (évite de
+ *  réémettre un numéro qu'on vient d'attribuer avant que la commande soit en base). */
 export function recalcVictCounter(orders) {
-  const stored = parseInt(localStorage.getItem('vict_counter') || '0', 10);
-  _victCounter = Math.max(maxVictIn(orders), stored, _victCounter || 0);
+  _victCounter = Math.max(maxVictIn(orders), _victCounter || 0);
   localStorage.setItem('vict_counter', String(_victCounter));
   cloudSet('vict_counter', _victCounter);
 }
