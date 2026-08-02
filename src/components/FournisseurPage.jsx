@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText } from 'lucide-react';
+import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff } from 'lucide-react';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
@@ -50,7 +50,8 @@ function matchProduct(prod, item) {
   return true;
 }
 
-const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300';
+const fieldCls = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300';
+const inputCls = `w-full ${fieldCls}`;
 
 /* ── Modal d'ajout / édition d'un article (avec tailles) ── */
 function ItemModal({ item, onClose, onSave }) {
@@ -114,12 +115,14 @@ function ItemModal({ item, onClose, onSave }) {
             <div className="space-y-2">
               {(form.sizes || []).map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <select value={s.taille} onChange={e => setSize(i, 'taille', e.target.value)} className={`${inputCls} flex-1`}>
+                  {/* Le sélecteur de taille doit être LARGE pour que la taille reste lisible. */}
+                  <select value={s.taille} onChange={e => setSize(i, 'taille', e.target.value)}
+                    className={`${fieldCls} flex-1 min-w-0 font-semibold text-gray-800 bg-white`}>
                     <option value="">Taille…</option>
                     {SIZE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                   <input type="number" inputMode="numeric" value={s.qte} onChange={e => setSize(i, 'qte', e.target.value)}
-                    className={`${inputCls} w-24`} placeholder="Qté" />
+                    className={`${fieldCls} w-20 shrink-0 text-center`} placeholder="Qté" />
                   <button onClick={() => removeSize(i)} className="p-2 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Retirer">
                     <Trash2 size={15} />
                   </button>
@@ -174,6 +177,13 @@ export default function FournisseurPage({ orders = [] }) {
   const [modalItem, setModalItem] = useState(null);       // article en édition
   const [targetFactureId, setTargetFactureId] = useState(null);
   const [search, setSearch] = useState('');
+  // Factures dépliées : le contenu n'apparaît qu'au clic sur l'œil (vue façon facture).
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggleExpand = (id) => setExpanded(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
   const searchRef = useRef(null);
   useSearchShortcut(searchRef);
 
@@ -346,6 +356,11 @@ export default function FournisseurPage({ orders = [] }) {
               {/* En-tête façon facture */}
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-2 justify-between">
                 <div className="flex items-center gap-2 min-w-0">
+                  <button onClick={() => toggleExpand(f.id)}
+                    className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 transition shrink-0"
+                    title={expanded.has(f.id) ? 'Masquer le contenu' : 'Voir le contenu'}>
+                    {expanded.has(f.id) ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                   <FileText size={16} className="text-gray-500 shrink-0" />
                   <span className="font-bold text-gray-800">{f.ref}</span>
                   <span className="text-xs text-gray-400">{f.date}</span>
@@ -380,7 +395,8 @@ export default function FournisseurPage({ orders = [] }) {
                 </div>
               </div>
 
-              {/* Lignes de la facture */}
+              {/* Lignes de la facture — visibles seulement quand la facture est ouverte à l'œil */}
+              {expanded.has(f.id) && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[820px]">
                   <thead className="bg-white border-b border-gray-200">
@@ -442,6 +458,7 @@ export default function FournisseurPage({ orders = [] }) {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           );
         })}
