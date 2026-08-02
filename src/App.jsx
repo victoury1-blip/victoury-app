@@ -41,6 +41,21 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
+import { recalcVictCounter, generateVictId } from './lib/victId';
+
+/** Attribue un code de suivi VICTxxxx aux commandes fraîchement importées (façon
+ *  Volcano : chaque nouvelle commande a son propre numéro dès l'entrée). L'id
+ *  interne reste WC-xxxx (déduplication), mais l'affichage — trackingNumber || id
+ *  — montre alors le code VICT et non le code WooCommerce. */
+function assignVictTracking(freshOrders, allOrders) {
+  recalcVictCounter(allOrders);
+  freshOrders.forEach((o) => {
+    if (!/^VICT\d+$/i.test(o.trackingNumber || '') && !/^VICT\d+$/i.test(o.id || '')) {
+      o.trackingNumber = generateVictId();
+    }
+  });
+  return freshOrders;
+}
 
 const TAB_FROM_PARAM = {
   'a-confirmer': 'a_confirmer',
@@ -427,7 +442,9 @@ export default function App() {
       localStorage.setItem('vict_restore_ozon_v1', 'done');
       cloudSet('vict_restore_ozon_v1', 'done');
       const backfillVict = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m && parseInt(m[1], 10) >= 28; };
-      const affected = orders.filter(o => !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber));
+      // NE PAS toucher les commandes « nouveau » (À Confirmer) : elles DOIVENT porter
+      // un code VICT (façon Volcano). On ne réverte que les commandes déjà traitées.
+      const affected = orders.filter(o => o.status !== 'nouveau' && !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber));
       if (!affected.length) return;
       const BATCH = 20;
       for (let i = 0; i < affected.length; i += BATCH) {
@@ -439,10 +456,44 @@ export default function App() {
         ));
       }
       setOrders(prev => prev.map(o =>
-        (!/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber))
+        (o.status !== 'nouveau' && !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber))
           ? { ...o, trackingNumber: o.ozoneTracking || null }
           : o
       ));
+    })();
+    return () => { cancelled = true; };
+  }, [session, orders.length]);
+
+  /* ── Migration UNIQUE : les commandes déjà en À Confirmer (statut « nouveau »)
+     qui portent encore un code WooCommerce (WC-xxxx) reçoivent un code VICT (façon
+     Volcano). Ne concerne QUE le statut nouveau (petit volume) ; flag cloud pour
+     ne tourner qu'une fois, écriture par lots. */
+  useEffect(() => {
+    if (!session || !orders.length) return;
+    if (localStorage.getItem('vict_nouveau_backfill_v1') === 'done') return;
+    let cancelled = false;
+    (async () => {
+      let remoteDone = false;
+      try { remoteDone = (await cloudGet('vict_nouveau_backfill_v1')) === 'done'; } catch {}
+      if (cancelled) return;
+      if (remoteDone) { localStorage.setItem('vict_nouveau_backfill_v1', 'done'); return; }
+      localStorage.setItem('vict_nouveau_backfill_v1', 'done');
+      cloudSet('vict_nouveau_backfill_v1', 'done');
+      const isVict = (s) => /^VICT\d+$/i.test(s || '');
+      const affected = orders.filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber));
+      if (!affected.length) return;
+      recalcVictCounter(orders);
+      const assign = new Map();
+      for (const o of affected) assign.set(o.id, generateVictId());
+      const entries = [...assign.entries()];
+      const BATCH = 20;
+      for (let i = 0; i < entries.length; i += BATCH) {
+        if (cancelled) return;
+        await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
+          supabase.from('orders').update({ tracking_number: vict }).eq('id', id).then(() => {}).catch(() => {})
+        ));
+      }
+      setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
     })();
     return () => { cancelled = true; };
   }, [session, orders.length]);
@@ -692,6 +743,7 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
+            assignVictTracking(fresh, prev); // code VICT dès l'entrée (façon Volcano)
             /* Browser push notification for first new order */
             if (initialLoadDoneRef.current) fresh.slice(0, 1).forEach(notifyNewOrder);
             /* Play notification sound — only after initial DB load */
@@ -1051,7 +1103,7 @@ export default function App() {
       const existingIds = new Set(prev.map((o) => o.id));
       // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
       const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
-      if (fresh.length) saveOrdersToSupabase(fresh);
+      if (fresh.length) { assignVictTracking(fresh, prev); saveOrdersToSupabase(fresh); }
       return fresh.length ? [...fresh, ...prev] : prev;
     });
     navigate('/commandes/a-confirmer');
