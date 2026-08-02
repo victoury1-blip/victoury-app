@@ -30,13 +30,21 @@ export function initVictCounter(orders) {
   cloudSet('vict_counter', _victCounter);
 }
 
-/** Recalage : le compteur suit le plus grand VICT présent dans la liste complète,
- *  sans jamais descendre sous ce qui a déjà été généré CETTE session (évite de
- *  réémettre un numéro qu'on vient d'attribuer avant que la commande soit en base). */
+/** Recalage AUTORITAIRE : le compteur = plus grand VICT réellement présent dans les
+ *  commandes. Autorise la DESCENTE (ex. après nettoyage d'anciens numéros erronés) :
+ *  ainsi la numérotation reprend juste après le dernier VICT légitime, sans sauter. */
 export function recalcVictCounter(orders) {
-  _victCounter = Math.max(maxVictIn(orders), _victCounter || 0);
+  _victCounter = maxVictIn(orders);
   localStorage.setItem('vict_counter', String(_victCounter));
   cloudSet('vict_counter', _victCounter);
+}
+
+/** Force le compteur à une valeur donnée (migration : on repart juste après le
+ *  dernier VICT légitime, en ignorant les numéros erronés encore en base). */
+export function resetVictCounter(value) {
+  _victCounter = value;
+  localStorage.setItem('vict_counter', String(value));
+  cloudSet('vict_counter', value);
 }
 
 export function generateVictId() {

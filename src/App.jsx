@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { recalcVictCounter, generateVictId } from './lib/victId';
+import { recalcVictCounter, generateVictId, resetVictCounter } from './lib/victId';
 
 /** Attribue un code de suivi VICTxxxx aux commandes fraîchement importées (façon
  *  Volcano : chaque nouvelle commande a son propre numéro dès l'entrée). L'id
@@ -421,79 +421,63 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
-  /* ── Réparation UNIQUE : l'ancien backfill VICT a écrasé le trackingNumber de
-     nombreuses commandes avec un code VICT élevé (>= 28). On restaure le VRAI code :
-     le suivi Ozon (ozone_tracking) s'il existe, sinon on efface le trackingNumber
-     pour que la commande ré-affiche son id d'origine (WC-xxxx). Les VICT 1..27
-     (renumérotés à la main) sont préservés. Écriture par lots pour ne pas geler. */
+  /* ── Migration VICT UNIQUE (façon Volcano), déterministe, en 3 étapes ordonnées :
+     1) Nettoyer les numéros erronés : VICT >= 28 posés par l'ancien backfill sur des
+        commandes DÉJÀ TRAITÉES (non « nouveau ») -> retour au suivi Ozon (ou id WC).
+     2) Repositionner le compteur juste après le dernier VICT LÉGITIME (les 1..27
+        faits à la main), en IGNORANT les numéros erronés -> la numérotation reprend
+        à 28 et ne saute plus.
+     3) Attribuer un code VICT aux commandes en À Confirmer (statut « nouveau ») qui
+        n'en ont pas encore (elles doivent porter un VICT dès l'entrée).
+     Flag GLOBAL (cloud) : tourne une seule fois pour tous les appareils. Par lots. */
   useEffect(() => {
     if (!session || !orders.length) return;
-    if (localStorage.getItem('vict_restore_ozon_v1') === 'done') return;
+    if (localStorage.getItem('vict_migration_v2') === 'done') return;
     let cancelled = false;
     (async () => {
-      // Flag GLOBAL (cloud) : la migration ne doit tourner qu'UNE seule fois pour
-      // TOUS les appareils. Sinon un 2ᵉ appareil re-réverterait des VICT >= 28
-      // légitimement émis depuis (le compteur repart de 27) -> corruption.
       let remoteDone = false;
-      try { remoteDone = (await cloudGet('vict_restore_ozon_v1')) === 'done'; } catch {}
+      try { remoteDone = (await cloudGet('vict_migration_v2')) === 'done'; } catch {}
       if (cancelled) return;
-      if (remoteDone) { localStorage.setItem('vict_restore_ozon_v1', 'done'); return; }
-      // Marquer AVANT d'agir (local + cloud) pour empêcher toute 2ᵉ exécution.
-      localStorage.setItem('vict_restore_ozon_v1', 'done');
-      cloudSet('vict_restore_ozon_v1', 'done');
-      const backfillVict = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m && parseInt(m[1], 10) >= 28; };
-      // NE PAS toucher les commandes « nouveau » (À Confirmer) : elles DOIVENT porter
-      // un code VICT (façon Volcano). On ne réverte que les commandes déjà traitées.
-      const affected = orders.filter(o => o.status !== 'nouveau' && !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber));
-      if (!affected.length) return;
-      const BATCH = 20;
-      for (let i = 0; i < affected.length; i += BATCH) {
-        if (cancelled) return;
-        const slice = affected.slice(i, i + BATCH);
-        await Promise.all(slice.map(o =>
-          supabase.from('orders').update({ tracking_number: o.ozoneTracking || null }).eq('id', o.id)
-            .then(() => {}).catch(() => {})
-        ));
-      }
-      setOrders(prev => prev.map(o =>
-        (o.status !== 'nouveau' && !/^VICT\d+$/i.test(o.id || '') && backfillVict(o.trackingNumber))
-          ? { ...o, trackingNumber: o.ozoneTracking || null }
-          : o
-      ));
-    })();
-    return () => { cancelled = true; };
-  }, [session, orders.length]);
+      if (remoteDone) { localStorage.setItem('vict_migration_v2', 'done'); return; }
+      localStorage.setItem('vict_migration_v2', 'done');
+      cloudSet('vict_migration_v2', 'done');
 
-  /* ── Migration UNIQUE : les commandes déjà en À Confirmer (statut « nouveau »)
-     qui portent encore un code WooCommerce (WC-xxxx) reçoivent un code VICT (façon
-     Volcano). Ne concerne QUE le statut nouveau (petit volume) ; flag cloud pour
-     ne tourner qu'une fois, écriture par lots. */
-  useEffect(() => {
-    if (!session || !orders.length) return;
-    if (localStorage.getItem('vict_nouveau_backfill_v1') === 'done') return;
-    let cancelled = false;
-    (async () => {
-      let remoteDone = false;
-      try { remoteDone = (await cloudGet('vict_nouveau_backfill_v1')) === 'done'; } catch {}
-      if (cancelled) return;
-      if (remoteDone) { localStorage.setItem('vict_nouveau_backfill_v1', 'done'); return; }
-      localStorage.setItem('vict_nouveau_backfill_v1', 'done');
-      cloudSet('vict_nouveau_backfill_v1', 'done');
       const isVict = (s) => /^VICT\d+$/i.test(s || '');
-      const affected = orders.filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber));
-      if (!affected.length) return;
-      recalcVictCounter(orders);
+      const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+      const badVict = (s) => victNum(s) >= 28; // numéro erroné (backfill)
+
+      // (1) Commandes traitées à nettoyer.
+      const toRevert = orders.filter(o => o.status !== 'nouveau' && !isVict(o.id) && badVict(o.trackingNumber));
+      // (3) Commandes À Confirmer à numéroter.
+      const toAssign = orders.filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber));
+
+      // (2) Compteur = plus grand VICT LÉGITIME (< 28, faits à la main). -> reprise à 28.
+      let cleanMax = 0;
+      for (const o of orders) {
+        const n = Math.max(victNum(o.trackingNumber), victNum(o.id));
+        if (n > 0 && n < 28 && n > cleanMax) cleanMax = n;
+      }
+      resetVictCounter(cleanMax);
+
       const assign = new Map();
-      for (const o of affected) assign.set(o.id, generateVictId());
-      const entries = [...assign.entries()];
+      for (const o of toAssign) assign.set(o.id, generateVictId());
+
+      const ops = [
+        ...toRevert.map(o => [o.id, o.ozoneTracking || null]),
+        ...toAssign.map(o => [o.id, assign.get(o.id)]),
+      ];
       const BATCH = 20;
-      for (let i = 0; i < entries.length; i += BATCH) {
+      for (let i = 0; i < ops.length; i += BATCH) {
         if (cancelled) return;
-        await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
-          supabase.from('orders').update({ tracking_number: vict }).eq('id', id).then(() => {}).catch(() => {})
+        await Promise.all(ops.slice(i, i + BATCH).map(([id, val]) =>
+          supabase.from('orders').update({ tracking_number: val }).eq('id', id).then(() => {}).catch(() => {})
         ));
       }
-      setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
+      setOrders(prev => prev.map(o => {
+        if (o.status !== 'nouveau' && !isVict(o.id) && badVict(o.trackingNumber)) return { ...o, trackingNumber: o.ozoneTracking || null };
+        if (assign.has(o.id)) return { ...o, trackingNumber: assign.get(o.id) };
+        return o;
+      }));
     })();
     return () => { cancelled = true; };
   }, [session, orders.length]);
