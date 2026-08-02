@@ -47,6 +47,12 @@ import { recalcVictCounter, generateVictId, resetVictCounter } from './lib/victI
  *  Volcano : chaque nouvelle commande a son propre numéro dès l'entrée). L'id
  *  interne reste WC-xxxx (déduplication), mais l'affichage — trackingNumber || id
  *  — montre alors le code VICT et non le code WooCommerce. */
+/** Parse une date applicative « JJ/MM/AAAA HH:mm(:ss) » -> timestamp (0 si invalide). */
+function parseAppDate(str) {
+  const m = String(str || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+}
+
 function assignVictTracking(freshOrders, allOrders) {
   recalcVictCounter(allOrders);
   freshOrders.forEach((o) => {
@@ -432,29 +438,34 @@ export default function App() {
      Flag GLOBAL (cloud) : tourne une seule fois pour tous les appareils. Par lots. */
   useEffect(() => {
     if (!session || !orders.length) return;
-    if (localStorage.getItem('vict_migration_v3') === 'done') return;
+    if (localStorage.getItem('vict_migration_v4') === 'done') return;
     let cancelled = false;
     (async () => {
       let remoteDone = false;
-      try { remoteDone = (await cloudGet('vict_migration_v3')) === 'done'; } catch {}
+      try { remoteDone = (await cloudGet('vict_migration_v4')) === 'done'; } catch {}
       if (cancelled) return;
-      if (remoteDone) { localStorage.setItem('vict_migration_v3', 'done'); return; }
-      localStorage.setItem('vict_migration_v3', 'done');
-      cloudSet('vict_migration_v3', 'done');
+      if (remoteDone) { localStorage.setItem('vict_migration_v4', 'done'); return; }
+      localStorage.setItem('vict_migration_v4', 'done');
+      cloudSet('vict_migration_v4', 'done');
 
       const isVict = (s) => /^VICT\d+$/i.test(s || '');
       const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-      const badVict = (s) => victNum(s) >= 28; // numéro erroné (ancien backfill)
+      // Au moment de CETTE migration, tout VICT >= 28 présent en base provient de
+      // l'ancien backfill erroné : les numéros légitimes s'arrêtent à 27.
+      const badVict = (s) => victNum(s) >= 28;
 
-      // (1) Nettoyer les numéros erronés VICT>=28 sur commandes traitées -> suivi Ozon.
+      // (1) Nettoyer les numéros erronés sur commandes DÉJÀ TRAITÉES -> suivi Ozon.
       const toRevert = orders.filter(o => o.status !== 'nouveau' && !isVict(o.id) && badVict(o.trackingNumber));
-      // (3) (Re)numéroter TOUTES les commandes À Confirmer qui n'ont pas déjà un VICT>=28
-      //     — inclut celles qui ont reçu par erreur un VICT 1..27 (doublons).
-      const hasProperVict = (o) => victNum(o.id) >= 28 || victNum(o.trackingNumber) >= 28;
-      const toAssign = orders.filter(o => o.status === 'nouveau' && !hasProperVict(o));
+      // (3) (Re)numéroter les commandes À Confirmer : celles sans VICT du tout ET
+      //     celles portant un numéro ERRONÉ (>= 28). Les commandes manuelles dont
+      //     l'id est déjà un VICT gardent le leur.
+      const toAssign = orders
+        .filter(o => o.status === 'nouveau' && victNum(o.id) === 0
+          && (victNum(o.trackingNumber) === 0 || badVict(o.trackingNumber)))
+        // Plus ancienne d'abord : la numérotation suit l'ordre d'arrivée.
+        .sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
 
-      // (2) On REPART DE VICT0027 (dernier numéro légitime, indiqué par l'utilisateur)
-      //     -> la prochaine numérotation commence à 0028.
+      // (2) On REPART DE VICT0027 (dernier numéro légitime) -> reprise à 0028.
       resetVictCounter(27);
 
       const assign = new Map();
