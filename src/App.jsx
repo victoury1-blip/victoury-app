@@ -432,32 +432,30 @@ export default function App() {
      Flag GLOBAL (cloud) : tourne une seule fois pour tous les appareils. Par lots. */
   useEffect(() => {
     if (!session || !orders.length) return;
-    if (localStorage.getItem('vict_migration_v2') === 'done') return;
+    if (localStorage.getItem('vict_migration_v3') === 'done') return;
     let cancelled = false;
     (async () => {
       let remoteDone = false;
-      try { remoteDone = (await cloudGet('vict_migration_v2')) === 'done'; } catch {}
+      try { remoteDone = (await cloudGet('vict_migration_v3')) === 'done'; } catch {}
       if (cancelled) return;
-      if (remoteDone) { localStorage.setItem('vict_migration_v2', 'done'); return; }
-      localStorage.setItem('vict_migration_v2', 'done');
-      cloudSet('vict_migration_v2', 'done');
+      if (remoteDone) { localStorage.setItem('vict_migration_v3', 'done'); return; }
+      localStorage.setItem('vict_migration_v3', 'done');
+      cloudSet('vict_migration_v3', 'done');
 
       const isVict = (s) => /^VICT\d+$/i.test(s || '');
       const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-      const badVict = (s) => victNum(s) >= 28; // numéro erroné (backfill)
+      const badVict = (s) => victNum(s) >= 28; // numéro erroné (ancien backfill)
 
-      // (1) Commandes traitées à nettoyer.
+      // (1) Nettoyer les numéros erronés VICT>=28 sur commandes traitées -> suivi Ozon.
       const toRevert = orders.filter(o => o.status !== 'nouveau' && !isVict(o.id) && badVict(o.trackingNumber));
-      // (3) Commandes À Confirmer à numéroter.
-      const toAssign = orders.filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber));
+      // (3) (Re)numéroter TOUTES les commandes À Confirmer qui n'ont pas déjà un VICT>=28
+      //     — inclut celles qui ont reçu par erreur un VICT 1..27 (doublons).
+      const hasProperVict = (o) => victNum(o.id) >= 28 || victNum(o.trackingNumber) >= 28;
+      const toAssign = orders.filter(o => o.status === 'nouveau' && !hasProperVict(o));
 
-      // (2) Compteur = plus grand VICT LÉGITIME (< 28, faits à la main). -> reprise à 28.
-      let cleanMax = 0;
-      for (const o of orders) {
-        const n = Math.max(victNum(o.trackingNumber), victNum(o.id));
-        if (n > 0 && n < 28 && n > cleanMax) cleanMax = n;
-      }
-      resetVictCounter(cleanMax);
+      // (2) On REPART DE VICT0027 (dernier numéro légitime, indiqué par l'utilisateur)
+      //     -> la prochaine numérotation commence à 0028.
+      resetVictCounter(27);
 
       const assign = new Map();
       for (const o of toAssign) assign.set(o.id, generateVictId());
