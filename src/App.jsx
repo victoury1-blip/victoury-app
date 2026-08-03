@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { recalcVictCounter, generateVictId } from './lib/victId';
+import { recalcVictCounter, generateVictId, resetVictCounter, maxLegitVict } from './lib/victId';
 
 /** Attribue un code de suivi VICTxxxx aux commandes fraîchement importées (façon
  *  Volcano : chaque nouvelle commande a son propre numéro dès l'entrée). L'id
@@ -438,15 +438,33 @@ export default function App() {
      Le compteur est monotone : il ne redescend jamais. Une seule passe par chargement. */
   useEffect(() => {
     if (!session || !orders.length || victFillRunRef.current) return;
-    const isVict = (s) => /^VICT\d+$/i.test(s || '');
+    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+    // Un numéro >= 100 vient de l'ancien backfill erroné : la commande est traitée
+    // comme SANS code et reçoit le prochain numéro de la série.
+    const GARBAGE = 100;
+    const hasValidVict = (o) => {
+      const n = Math.max(victNum(o.id), victNum(o.trackingNumber));
+      return n > 0 && n < GARBAGE;
+    };
     const missing = orders
-      .filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber))
+      .filter(o => o.status === 'nouveau' && !hasValidVict(o))
       .sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
     victFillRunRef.current = true;
-    if (!missing.length) return;
     let cancelled = false;
     (async () => {
-      recalcVictCounter(orders);
+      // Correction PONCTUELLE d'un compteur corrompu (il valait ~1394 et générait
+      // VICT1395). On le repositionne sur le plus grand numéro légitime des commandes.
+      if (localStorage.getItem('vict_counter_fix_v1') !== 'done') {
+        let remoteDone = false;
+        try { remoteDone = (await cloudGet('vict_counter_fix_v1')) === 'done'; } catch {}
+        localStorage.setItem('vict_counter_fix_v1', 'done');
+        if (!remoteDone) {
+          cloudSet('vict_counter_fix_v1', 'done');
+          resetVictCounter(maxLegitVict(orders));
+        }
+      }
+      if (!missing.length) return;
+      recalcVictCounter();
       const assign = new Map();
       for (const o of missing) assign.set(o.id, generateVictId());
       const entries = [...assign.entries()];
