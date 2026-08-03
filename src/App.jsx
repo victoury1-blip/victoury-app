@@ -442,6 +442,62 @@ export default function App() {
     return () => { cancelled = true; };
   }, [session, orders.length]);
 
+  /* ── Renumérotation UNIQUE des COMMANDES (hors Liste des Colis) à partir de 30 ──
+     Les commandes des onglets À Confirmer / En Suivi / Reporté / Confirmé reçoivent
+     une série propre VICT0030, 0031, … dans l'ordre d'ajout. Les colis ne sont
+     JAMAIS touchés, et les numéros qu'ils utilisent déjà sont sautés pour éviter
+     tout doublon. Flag global : une seule exécution, jamais de boucle. */
+  useEffect(() => {
+    if (!session || !orders.length) return;
+    if (localStorage.getItem('vict_renum_from30_v1') === 'done') return;
+    let cancelled = false;
+    (async () => {
+      let remoteDone = false;
+      try { remoteDone = (await cloudGet('vict_renum_from30_v1')) === 'done'; } catch {}
+      if (cancelled) return;
+      localStorage.setItem('vict_renum_from30_v1', 'done');
+      if (remoteDone) return;
+      cloudSet('vict_renum_from30_v1', 'done');
+
+      const COLIS = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse',
+        'pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu']);
+      const isColis = (o) => COLIS.has(o.status) || !!(o.trackingNumber && o.validated);
+      const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+      const ts = (s) => {
+        const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+      };
+
+      // Numéros déjà pris par les colis (intouchables) -> on les saute.
+      const used = new Set();
+      for (const o of orders) {
+        if (!isColis(o)) continue;
+        for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
+      }
+
+      const targets = orders.filter(o => !isColis(o)).sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded));
+      if (!targets.length) return;
+
+      let n = 29;
+      const assign = new Map();
+      for (const o of targets) {
+        do { n += 1; } while (used.has(n));
+        used.add(n);
+        assign.set(o.id, 'VICT' + String(n).padStart(4, '0'));
+      }
+      const entries = [...assign.entries()];
+      const BATCH = 20;
+      for (let i = 0; i < entries.length; i += BATCH) {
+        if (cancelled) return;
+        await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
+          supabase.from('orders').update({ tracking_number: vict }).eq('id', id).then(() => {}).catch(() => {})
+        ));
+      }
+      setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
+    })();
+    return () => { cancelled = true; };
+  }, [session, orders.length]);
+
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
      Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
      arrière-plan la connexion se coupe et les changements faits ailleurs (PC)
