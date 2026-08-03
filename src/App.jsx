@@ -406,6 +406,42 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
+  /* ── Restauration UNIQUE des numéros de suivi de la Liste des Colis ──
+     Rétablit le VRAI numéro Ozon (colonne ozone_tracking, jamais modifiée) comme
+     numéro de suivi affiché. Volontairement CONSERVATEUR : on ne touche QUE les
+     commandes qui possèdent réellement un numéro Ozon différent de celui affiché.
+     Rien n'est effacé, aucune autre commande n'est modifiée. Flag global : une
+     seule exécution, jamais de boucle (après coup les deux valeurs sont égales). */
+  useEffect(() => {
+    if (!session || !orders.length) return;
+    if (localStorage.getItem('colis_restore_ozon_v1') === 'done') return;
+    let cancelled = false;
+    (async () => {
+      let remoteDone = false;
+      try { remoteDone = (await cloudGet('colis_restore_ozon_v1')) === 'done'; } catch {}
+      if (cancelled) return;
+      localStorage.setItem('colis_restore_ozon_v1', 'done');
+      if (remoteDone) return;
+      cloudSet('colis_restore_ozon_v1', 'done');
+      const affected = orders.filter(o =>
+        o.ozoneTracking && String(o.ozoneTracking).trim() &&
+        o.trackingNumber !== o.ozoneTracking
+      );
+      if (!affected.length) return;
+      const BATCH = 20;
+      for (let i = 0; i < affected.length; i += BATCH) {
+        if (cancelled) return;
+        await Promise.all(affected.slice(i, i + BATCH).map(o =>
+          supabase.from('orders').update({ tracking_number: o.ozoneTracking }).eq('id', o.id)
+            .then(() => {}).catch(() => {})
+        ));
+      }
+      const fixed = new Map(affected.map(o => [o.id, o.ozoneTracking]));
+      setOrders(prev => prev.map(o => fixed.has(o.id) ? { ...o, trackingNumber: fixed.get(o.id) } : o));
+    })();
+    return () => { cancelled = true; };
+  }, [session, orders.length]);
+
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
      Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
      arrière-plan la connexion se coupe et les changements faits ailleurs (PC)
