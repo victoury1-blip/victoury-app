@@ -3,65 +3,40 @@ import { cloudGet, cloudSet } from './cloudSettings';
 /** Compteur d'ID VICTxxxx. Partagé entre OrdersPage et NewOrderModal. */
 let _victCounter = null;
 
-/** Au-delà de ce seuil, un VICT provient de l'ancien backfill erroné (il était
- *  monté à ~1400). La série réelle est bien en dessous : on ignore ces numéros
- *  pour ne jamais « repartir » de 1392, 1395, … */
-const GARBAGE = 100;
-
-const storedCounter = () => parseInt(localStorage.getItem('vict_counter') || '0', 10) || 0;
-
-/** Plus grand numéro VICT LÉGITIME (< GARBAGE) trouvé sur les commandes, en scannant
- *  à la fois l'id et le trackingNumber. Sert uniquement d'amorçage sur un appareil
- *  qui n'a pas encore de compteur local. */
-function maxLegitVictIn(orders) {
+/** Plus grand numéro VICT trouvé sur une commande, en scannant À LA FOIS l'id
+ *  ET le trackingNumber (les commandes confirmées portent leur VICT dans
+ *  trackingNumber, pas dans l'id). Sans ça, le compteur ignore des numéros
+ *  déjà émis et les réattribue -> collisions avec Ozon. */
+function maxVictIn(orders) {
   let max = 0;
   for (const o of orders || []) {
     for (const val of [o.id, o.trackingNumber]) {
       const m = String(val || '').match(/^VICT(\d+)$/i);
-      if (!m) continue;
-      const n = parseInt(m[1], 10);
-      if (n > max && n < GARBAGE) max = n;
+      if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
     }
   }
   return max;
 }
 
-/** Le compteur est la SOURCE DE VÉRITÉ (localStorage + cloud). On ne le recalcule
- *  pas à partir des commandes : d'anciens numéros erronés encore présents en base
- *  le feraient bondir. Amorçage depuis les commandes seulement si aucun compteur. */
+/** Initialise le compteur = plus grand VICT réellement présent dans les commandes
+ *  (source de vérité). On IGNORE volontairement l'ancienne valeur stockée : si un
+ *  renumérotage a fait redescendre les VICT, le compteur suit les commandes réelles
+ *  (et non un compteur gonflé qui ferait sauter les numéros). `orders` doit être la
+ *  liste COMPLÈTE chargée depuis Supabase (max global tous appareils confondus). */
 export function initVictCounter(orders) {
   if (_victCounter !== null) return;
-  const s = storedCounter();
-  _victCounter = s > 0 ? s : maxLegitVictIn(orders);
-  localStorage.setItem('vict_counter', String(_victCounter));
-  cloudSet('vict_counter', _victCounter);
-  // Un autre appareil peut être plus avancé : on s'aligne sur le maximum.
-  cloudGet('vict_counter').then(remote => {
-    const r = parseInt(remote || '0', 10) || 0;
-    if (r > (_victCounter || 0)) {
-      _victCounter = r;
-      localStorage.setItem('vict_counter', String(r));
-    }
-  }).catch(() => {});
-}
-
-/** Recalage MONOTONE sur la valeur stockée (aucune lecture des commandes). */
-export function recalcVictCounter() {
-  _victCounter = Math.max(storedCounter(), _victCounter || 0);
+  _victCounter = maxVictIn(orders);
   localStorage.setItem('vict_counter', String(_victCounter));
   cloudSet('vict_counter', _victCounter);
 }
 
-/** Force le compteur (correction ponctuelle d'un compteur corrompu). */
-export function resetVictCounter(value) {
-  _victCounter = value;
-  localStorage.setItem('vict_counter', String(value));
-  cloudSet('vict_counter', value);
-}
-
-/** Plus grand numéro légitime présent dans les commandes (utilitaire de correction). */
-export function maxLegitVict(orders) {
-  return maxLegitVictIn(orders);
+/** Recalage : le compteur suit le plus grand VICT présent dans la liste complète,
+ *  sans jamais descendre sous ce qui a déjà été généré CETTE session (évite de
+ *  réémettre un numéro qu'on vient d'attribuer avant que la commande soit en base). */
+export function recalcVictCounter(orders) {
+  _victCounter = Math.max(maxVictIn(orders), _victCounter || 0);
+  localStorage.setItem('vict_counter', String(_victCounter));
+  cloudSet('vict_counter', _victCounter);
 }
 
 export function generateVictId() {

@@ -41,30 +41,6 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { recalcVictCounter, generateVictId, resetVictCounter, maxLegitVict } from './lib/victId';
-
-/** Attribue un code de suivi VICTxxxx aux commandes fraîchement importées (façon
- *  Volcano : chaque nouvelle commande a son propre numéro dès l'entrée). L'id
- *  interne reste WC-xxxx (déduplication), mais l'affichage — trackingNumber || id
- *  — montre alors le code VICT et non le code WooCommerce. */
-/** Parse une date applicative « JJ/MM/AAAA HH:mm(:ss) » -> timestamp (0 si invalide). */
-function parseAppDate(str) {
-  const m = String(str || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
-}
-
-function assignVictTracking(freshOrders, allOrders) {
-  // Ne pas numéroter tant que la liste complète n'est pas chargée : le compteur
-  // serait calculé sur une liste vide/partielle (risque de doublons).
-  if (!allOrders || !allOrders.length) return freshOrders;
-  recalcVictCounter(allOrders);
-  freshOrders.forEach((o) => {
-    if (!/^VICT\d+$/i.test(o.trackingNumber || '') && !/^VICT\d+$/i.test(o.id || '')) {
-      o.trackingNumber = generateVictId();
-    }
-  });
-  return freshOrders;
-}
 
 const TAB_FROM_PARAM = {
   'a-confirmer': 'a_confirmer',
@@ -143,7 +119,6 @@ export default function App() {
   const deletedIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
   const lastOrdersSigRef = useRef(null);
-  const victFillRunRef = useRef(false);
   // id -> timestamp du dernier changement LOCAL. Pendant une courte fenêtre, une
   // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
   // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
@@ -431,55 +406,6 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
-  /* ── Attribution des codes VICT — RÈGLE UNIQUE ET STABLE ──
-     Une commande en À Confirmer qui n'a AUCUN code VICT en reçoit un : le suivant
-     de la série. On ne RENUMÉROTE JAMAIS une commande qui a déjà un code (les
-     renumérotations en série faisaient « sauter » les numéros à chaque rechargement).
-     Le compteur est monotone : il ne redescend jamais. Une seule passe par chargement. */
-  useEffect(() => {
-    if (!session || !orders.length || victFillRunRef.current) return;
-    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-    // Un numéro >= 100 vient de l'ancien backfill erroné : la commande est traitée
-    // comme SANS code et reçoit le prochain numéro de la série.
-    const GARBAGE = 100;
-    const hasValidVict = (o) => {
-      const n = Math.max(victNum(o.id), victNum(o.trackingNumber));
-      return n > 0 && n < GARBAGE;
-    };
-    const missing = orders
-      .filter(o => o.status === 'nouveau' && !hasValidVict(o))
-      .sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
-    victFillRunRef.current = true;
-    let cancelled = false;
-    (async () => {
-      // Correction PONCTUELLE d'un compteur corrompu (il valait ~1394 et générait
-      // VICT1395). On le repositionne sur le plus grand numéro légitime des commandes.
-      if (localStorage.getItem('vict_counter_fix_v1') !== 'done') {
-        let remoteDone = false;
-        try { remoteDone = (await cloudGet('vict_counter_fix_v1')) === 'done'; } catch {}
-        localStorage.setItem('vict_counter_fix_v1', 'done');
-        if (!remoteDone) {
-          cloudSet('vict_counter_fix_v1', 'done');
-          resetVictCounter(maxLegitVict(orders));
-        }
-      }
-      if (!missing.length) return;
-      recalcVictCounter();
-      const assign = new Map();
-      for (const o of missing) assign.set(o.id, generateVictId());
-      const entries = [...assign.entries()];
-      const BATCH = 20;
-      for (let i = 0; i < entries.length; i += BATCH) {
-        if (cancelled) return;
-        await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
-          supabase.from('orders').update({ tracking_number: vict }).eq('id', id).then(() => {}).catch(() => {})
-        ));
-      }
-      setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
-    })();
-    return () => { cancelled = true; };
-  }, [session, orders.length]);
-
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
      Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
      arrière-plan la connexion se coupe et les changements faits ailleurs (PC)
@@ -725,7 +651,6 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
-            assignVictTracking(fresh, prev); // code VICT dès l'entrée (façon Volcano)
             /* Browser push notification for first new order */
             if (initialLoadDoneRef.current) fresh.slice(0, 1).forEach(notifyNewOrder);
             /* Play notification sound — only after initial DB load */
@@ -1085,7 +1010,7 @@ export default function App() {
       const existingIds = new Set(prev.map((o) => o.id));
       // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
       const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
-      if (fresh.length) { assignVictTracking(fresh, prev); saveOrdersToSupabase(fresh); }
+      if (fresh.length) saveOrdersToSupabase(fresh);
       return fresh.length ? [...fresh, ...prev] : prev;
     });
     navigate('/commandes/a-confirmer');
