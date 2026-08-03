@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { recalcVictCounter, generateVictId, resetVictCounter } from './lib/victId';
+import { recalcVictCounter, generateVictId } from './lib/victId';
 
 /** Attribue un code de suivi VICTxxxx aux commandes fraîchement importées (façon
  *  Volcano : chaque nouvelle commande a son propre numéro dès l'entrée). L'id
@@ -143,7 +143,7 @@ export default function App() {
   const deletedIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
   const lastOrdersSigRef = useRef(null);
-  const dedupeRunRef = useRef(false);
+  const victFillRunRef = useRef(false);
   // id -> timestamp du dernier changement LOCAL. Pendant une courte fenêtre, une
   // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
   // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
@@ -431,116 +431,24 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
-  /* ── Migration VICT UNIQUE (façon Volcano), déterministe, en 3 étapes ordonnées :
-     1) Nettoyer les numéros erronés : VICT >= 28 posés par l'ancien backfill sur des
-        commandes DÉJÀ TRAITÉES (non « nouveau ») -> retour au suivi Ozon (ou id WC).
-     2) Repositionner le compteur juste après le dernier VICT LÉGITIME (les 1..27
-        faits à la main), en IGNORANT les numéros erronés -> la numérotation reprend
-        à 28 et ne saute plus.
-     3) Attribuer un code VICT aux commandes en À Confirmer (statut « nouveau ») qui
-        n'en ont pas encore (elles doivent porter un VICT dès l'entrée).
-     Flag GLOBAL (cloud) : tourne une seule fois pour tous les appareils. Par lots. */
+  /* ── Attribution des codes VICT — RÈGLE UNIQUE ET STABLE ──
+     Une commande en À Confirmer qui n'a AUCUN code VICT en reçoit un : le suivant
+     de la série. On ne RENUMÉROTE JAMAIS une commande qui a déjà un code (les
+     renumérotations en série faisaient « sauter » les numéros à chaque rechargement).
+     Le compteur est monotone : il ne redescend jamais. Une seule passe par chargement. */
   useEffect(() => {
-    if (!session || !orders.length) return;
-    if (localStorage.getItem('vict_migration_v6') === 'done') return;
+    if (!session || !orders.length || victFillRunRef.current) return;
+    const isVict = (s) => /^VICT\d+$/i.test(s || '');
+    const missing = orders
+      .filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber))
+      .sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
+    victFillRunRef.current = true;
+    if (!missing.length) return;
     let cancelled = false;
-    (async () => {
-      let remoteDone = false;
-      try { remoteDone = (await cloudGet('vict_migration_v6')) === 'done'; } catch {}
-      if (cancelled) return;
-      if (remoteDone) { localStorage.setItem('vict_migration_v6', 'done'); return; }
-      localStorage.setItem('vict_migration_v6', 'done');
-      cloudSet('vict_migration_v6', 'done');
-
-      const isVict = (s) => /^VICT\d+$/i.test(s || '');
-      const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-      // Les numéros LÉGITIMES sont petits (série en cours < 100). Tout VICT >= 100
-      // provient de l'ancien backfill erroné (il était monté à ~1400) : on le purge
-      // PARTOUT (tous statuts), sinon le compteur le voit et repart de 1392…
-      const GARBAGE = 100;
-      const badVict = (s) => victNum(s) >= GARBAGE;
-
-      // (1) Purger les numéros erronés sur TOUTES les commandes -> suivi Ozon (ou id).
-      const toRevert = orders.filter(o => !isVict(o.id) && badVict(o.trackingNumber));
-
-      // (2) Base = plus grand numéro DÉJÀ UTILISÉ par une commande sortie du stade
-      //     « À Confirmer » (code déjà communiqué/imprimé : intouchable).
-      let base = 0;
-      for (const o of orders) {
-        if (o.status === 'nouveau') continue;
-        for (const n of [victNum(o.id), victNum(o.trackingNumber)]) {
-          if (n > 0 && n < GARBAGE && n > base) base = n;
-        }
-      }
-
-      // (3) Renuméroter TOUTES les commandes À Confirmer d'un bloc CONTIGU à partir
-      //     de base+1 (fini les trous 35..39 laissés par les numéros « brûlés »).
-      //     Les commandes manuelles dont l'id est déjà un VICT gardent le leur.
-      const toAssign = orders
-        .filter(o => o.status === 'nouveau' && victNum(o.id) === 0)
-        .sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
-
-      const assign = new Map();
-      toAssign.forEach((o, i) => assign.set(o.id, 'VICT' + String(base + 1 + i).padStart(4, '0')));
-      // Le compteur repart exactement après le dernier numéro attribué.
-      resetVictCounter(base + toAssign.length);
-
-      const ops = [
-        ...toRevert.map(o => [o.id, o.ozoneTracking || null]),
-        ...toAssign.map(o => [o.id, assign.get(o.id)]),
-      ];
-      const BATCH = 20;
-      for (let i = 0; i < ops.length; i += BATCH) {
-        if (cancelled) return;
-        await Promise.all(ops.slice(i, i + BATCH).map(([id, val]) =>
-          supabase.from('orders').update({ tracking_number: val }).eq('id', id).then(() => {}).catch(() => {})
-        ));
-      }
-      setOrders(prev => prev.map(o => {
-        if (assign.has(o.id)) return { ...o, trackingNumber: assign.get(o.id) };
-        if (!isVict(o.id) && badVict(o.trackingNumber)) return { ...o, trackingNumber: o.ozoneTracking || null };
-        return o;
-      }));
-    })();
-    return () => { cancelled = true; };
-  }, [session, orders.length]);
-
-  /* ── Correctif permanent des DOUBLONS de code VICT ──
-     Un compteur retombé à 0 (liste partielle) a pu réémettre des numéros déjà pris
-     (ex. deux VICT0001). À chaque chargement on détecte les codes utilisés par
-     plusieurs commandes : la plus ANCIENNE garde le numéro, les autres sont
-     renumérotées à la suite du plus grand VICT existant. Pas de flag : c'est un
-     garde-fou permanent, sans effet quand il n'y a aucun doublon. */
-  useEffect(() => {
-    if (!session || orders.length < 2) return;
-    // Attendre la fin du nettoyage (migration) : sinon on renumérote à partir d'un
-    // compteur encore gonflé par les anciens numéros erronés.
-    if (localStorage.getItem('vict_migration_v6') !== 'done') return;
-    // UNE SEULE passe par chargement : sinon l'effet (dépendant de `orders`) se
-    // relance à chaque mise à jour d'état et « brûle » des numéros à chaque fois.
-    if (dedupeRunRef.current) return;
-    let cancelled = false;
-    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-    const byCode = new Map();
-    for (const o of orders) {
-      const n = victNum(o.trackingNumber);
-      if (!n) continue;
-      if (!byCode.has(n)) byCode.set(n, []);
-      byCode.get(n).push(o);
-    }
-    const dupes = [];
-    for (const [, list] of byCode) {
-      if (list.length < 2) continue;
-      // La plus ancienne conserve le code ; les suivantes sont renumérotées.
-      const sorted = [...list].sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
-      dupes.push(...sorted.slice(1));
-    }
-    if (!dupes.length) return;
-    dedupeRunRef.current = true;
     (async () => {
       recalcVictCounter(orders);
       const assign = new Map();
-      for (const o of dupes) assign.set(o.id, generateVictId());
+      for (const o of missing) assign.set(o.id, generateVictId());
       const entries = [...assign.entries()];
       const BATCH = 20;
       for (let i = 0; i < entries.length; i += BATCH) {
@@ -552,7 +460,7 @@ export default function App() {
       setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
     })();
     return () => { cancelled = true; };
-  }, [session, orders]);
+  }, [session, orders.length]);
 
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
      Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
