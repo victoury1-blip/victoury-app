@@ -143,6 +143,7 @@ export default function App() {
   const deletedIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
   const lastOrdersSigRef = useRef(null);
+  const dedupeRunRef = useRef(false);
   // id -> timestamp du dernier changement LOCAL. Pendant une courte fenêtre, une
   // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
   // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
@@ -441,15 +442,15 @@ export default function App() {
      Flag GLOBAL (cloud) : tourne une seule fois pour tous les appareils. Par lots. */
   useEffect(() => {
     if (!session || !orders.length) return;
-    if (localStorage.getItem('vict_migration_v5') === 'done') return;
+    if (localStorage.getItem('vict_migration_v6') === 'done') return;
     let cancelled = false;
     (async () => {
       let remoteDone = false;
-      try { remoteDone = (await cloudGet('vict_migration_v5')) === 'done'; } catch {}
+      try { remoteDone = (await cloudGet('vict_migration_v6')) === 'done'; } catch {}
       if (cancelled) return;
-      if (remoteDone) { localStorage.setItem('vict_migration_v5', 'done'); return; }
-      localStorage.setItem('vict_migration_v5', 'done');
-      cloudSet('vict_migration_v5', 'done');
+      if (remoteDone) { localStorage.setItem('vict_migration_v6', 'done'); return; }
+      localStorage.setItem('vict_migration_v6', 'done');
+      cloudSet('vict_migration_v6', 'done');
 
       const isVict = (s) => /^VICT\d+$/i.test(s || '');
       const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
@@ -461,25 +462,28 @@ export default function App() {
 
       // (1) Purger les numéros erronés sur TOUTES les commandes -> suivi Ozon (ou id).
       const toRevert = orders.filter(o => !isVict(o.id) && badVict(o.trackingNumber));
-      // (3) (Re)numéroter les commandes À Confirmer sans code VICT valide.
-      const toAssign = orders
-        .filter(o => o.status === 'nouveau' && victNum(o.id) === 0
-          && (victNum(o.trackingNumber) === 0 || badVict(o.trackingNumber)))
-        // Plus ancienne d'abord : la numérotation suit l'ordre d'arrivée.
-        .sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
 
-      // (2) Compteur = plus grand numéro LÉGITIME restant (< 100) -> la série
-      //     continue juste après (ex. 34 -> 35), sans jamais repartir de 1.
-      let cleanMax = 0;
+      // (2) Base = plus grand numéro DÉJÀ UTILISÉ par une commande sortie du stade
+      //     « À Confirmer » (code déjà communiqué/imprimé : intouchable).
+      let base = 0;
       for (const o of orders) {
+        if (o.status === 'nouveau') continue;
         for (const n of [victNum(o.id), victNum(o.trackingNumber)]) {
-          if (n > 0 && n < GARBAGE && n > cleanMax) cleanMax = n;
+          if (n > 0 && n < GARBAGE && n > base) base = n;
         }
       }
-      resetVictCounter(cleanMax);
+
+      // (3) Renuméroter TOUTES les commandes À Confirmer d'un bloc CONTIGU à partir
+      //     de base+1 (fini les trous 35..39 laissés par les numéros « brûlés »).
+      //     Les commandes manuelles dont l'id est déjà un VICT gardent le leur.
+      const toAssign = orders
+        .filter(o => o.status === 'nouveau' && victNum(o.id) === 0)
+        .sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
 
       const assign = new Map();
-      for (const o of toAssign) assign.set(o.id, generateVictId());
+      toAssign.forEach((o, i) => assign.set(o.id, 'VICT' + String(base + 1 + i).padStart(4, '0')));
+      // Le compteur repart exactement après le dernier numéro attribué.
+      resetVictCounter(base + toAssign.length);
 
       const ops = [
         ...toRevert.map(o => [o.id, o.ozoneTracking || null]),
@@ -511,7 +515,10 @@ export default function App() {
     if (!session || orders.length < 2) return;
     // Attendre la fin du nettoyage (migration) : sinon on renumérote à partir d'un
     // compteur encore gonflé par les anciens numéros erronés.
-    if (localStorage.getItem('vict_migration_v5') !== 'done') return;
+    if (localStorage.getItem('vict_migration_v6') !== 'done') return;
+    // UNE SEULE passe par chargement : sinon l'effet (dépendant de `orders`) se
+    // relance à chaque mise à jour d'état et « brûle » des numéros à chaque fois.
+    if (dedupeRunRef.current) return;
     let cancelled = false;
     const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
     const byCode = new Map();
@@ -529,6 +536,7 @@ export default function App() {
       dupes.push(...sorted.slice(1));
     }
     if (!dupes.length) return;
+    dedupeRunRef.current = true;
     (async () => {
       recalcVictCounter(orders);
       const assign = new Map();
