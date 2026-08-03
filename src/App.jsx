@@ -406,96 +406,80 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
-  /* ── Restauration UNIQUE des numéros de suivi de la Liste des Colis ──
-     Rétablit le VRAI numéro Ozon (colonne ozone_tracking, jamais modifiée) comme
-     numéro de suivi affiché. Volontairement CONSERVATEUR : on ne touche QUE les
-     commandes qui possèdent réellement un numéro Ozon différent de celui affiché.
-     Rien n'est effacé, aucune autre commande n'est modifiée. Flag global : une
-     seule exécution, jamais de boucle (après coup les deux valeurs sont égales). */
+  /* ── Maintenance UNIQUE des numéros de suivi (une seule passe, jamais interrompue) ──
+     1) Liste des Colis : on rétablit le VRAI numéro Ozon (ozone_tracking, colonne
+        jamais modifiée) comme numéro affiché. Conservateur : uniquement les colis
+        qui possèdent réellement un numéro Ozon différent ; rien n'est effacé.
+     2) Commandes (À Confirmer / En Suivi / Reporté / Confirmé) : série propre et
+        continue à partir de VICT0030, dans l'ordre d'ajout. Les numéros déjà
+        utilisés par des colis sont sautés -> aucun doublon.
+     Le drapeau « terminé » n'est posé QU'APRÈS succès, et un garde-fou mémoire
+     empêche toute ré-entrée : une passe annulée en cours de route (la liste des
+     commandes change pendant le chargement) se rejouera au prochain démarrage. */
+  const victMaintRef = useRef(false);
   useEffect(() => {
-    if (!session || !orders.length) return;
-    if (localStorage.getItem('colis_restore_ozon_v1') === 'done') return;
-    let cancelled = false;
+    if (!session || !orders.length || victMaintRef.current) return;
+    if (localStorage.getItem('vict_maint_v1') === 'done') return;
+    victMaintRef.current = true;
     (async () => {
-      let remoteDone = false;
-      try { remoteDone = (await cloudGet('colis_restore_ozon_v1')) === 'done'; } catch {}
-      if (cancelled) return;
-      localStorage.setItem('colis_restore_ozon_v1', 'done');
-      if (remoteDone) return;
-      cloudSet('colis_restore_ozon_v1', 'done');
-      const affected = orders.filter(o =>
-        o.ozoneTracking && String(o.ozoneTracking).trim() &&
-        o.trackingNumber !== o.ozoneTracking
-      );
-      if (!affected.length) return;
-      const BATCH = 20;
-      for (let i = 0; i < affected.length; i += BATCH) {
-        if (cancelled) return;
-        await Promise.all(affected.slice(i, i + BATCH).map(o =>
-          supabase.from('orders').update({ tracking_number: o.ozoneTracking }).eq('id', o.id)
-            .then(() => {}).catch(() => {})
-        ));
+      try {
+        let remoteDone = false;
+        try { remoteDone = (await cloudGet('vict_maint_v1')) === 'done'; } catch {}
+        if (remoteDone) { localStorage.setItem('vict_maint_v1', 'done'); return; }
+
+        const COLIS = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse',
+          'pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu']);
+        const isColis = (o) => COLIS.has(o.status) || !!(o.trackingNumber && o.validated);
+        const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+        const ts = (s) => {
+          const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+          return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+        };
+
+        const updates = new Map(); // id -> nouveau tracking_number
+
+        // (1) Colis : rétablir le numéro Ozon réel.
+        for (const o of orders) {
+          if (!isColis(o)) continue;
+          const oz = String(o.ozoneTracking || '').trim();
+          if (oz && o.trackingNumber !== oz) updates.set(o.id, oz);
+        }
+
+        // (2) Commandes hors colis : série continue depuis 0030 en sautant les
+        //     numéros déjà pris par les colis.
+        const used = new Set();
+        for (const o of orders) {
+          if (!isColis(o)) continue;
+          const tn = updates.get(o.id) ?? o.trackingNumber;
+          for (const n of [victNum(o.id), victNum(tn)]) if (n) used.add(n);
+        }
+        const targets = orders.filter(o => !isColis(o)).sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded));
+        let n = 29;
+        for (const o of targets) {
+          do { n += 1; } while (used.has(n));
+          used.add(n);
+          const code = 'VICT' + String(n).padStart(4, '0');
+          if (o.trackingNumber !== code) updates.set(o.id, code);
+        }
+
+        const entries = [...updates.entries()];
+        if (entries.length) {
+          const BATCH = 20;
+          for (let i = 0; i < entries.length; i += BATCH) {
+            await Promise.all(entries.slice(i, i + BATCH).map(([id, val]) =>
+              supabase.from('orders').update({ tracking_number: val }).eq('id', id)
+                .then(() => {}).catch(() => {})
+            ));
+          }
+          setOrders(prev => prev.map(o => updates.has(o.id) ? { ...o, trackingNumber: updates.get(o.id) } : o));
+        }
+        // Succès : on marque terminé (local + cloud) pour ne plus jamais rejouer.
+        localStorage.setItem('vict_maint_v1', 'done');
+        cloudSet('vict_maint_v1', 'done');
+      } catch {
+        victMaintRef.current = false; // échec : on réessaiera au prochain démarrage
       }
-      const fixed = new Map(affected.map(o => [o.id, o.ozoneTracking]));
-      setOrders(prev => prev.map(o => fixed.has(o.id) ? { ...o, trackingNumber: fixed.get(o.id) } : o));
     })();
-    return () => { cancelled = true; };
-  }, [session, orders.length]);
-
-  /* ── Renumérotation UNIQUE des COMMANDES (hors Liste des Colis) à partir de 30 ──
-     Les commandes des onglets À Confirmer / En Suivi / Reporté / Confirmé reçoivent
-     une série propre VICT0030, 0031, … dans l'ordre d'ajout. Les colis ne sont
-     JAMAIS touchés, et les numéros qu'ils utilisent déjà sont sautés pour éviter
-     tout doublon. Flag global : une seule exécution, jamais de boucle. */
-  useEffect(() => {
-    if (!session || !orders.length) return;
-    if (localStorage.getItem('vict_renum_from30_v1') === 'done') return;
-    let cancelled = false;
-    (async () => {
-      let remoteDone = false;
-      try { remoteDone = (await cloudGet('vict_renum_from30_v1')) === 'done'; } catch {}
-      if (cancelled) return;
-      localStorage.setItem('vict_renum_from30_v1', 'done');
-      if (remoteDone) return;
-      cloudSet('vict_renum_from30_v1', 'done');
-
-      const COLIS = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse',
-        'pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu']);
-      const isColis = (o) => COLIS.has(o.status) || !!(o.trackingNumber && o.validated);
-      const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-      const ts = (s) => {
-        const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-        return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
-      };
-
-      // Numéros déjà pris par les colis (intouchables) -> on les saute.
-      const used = new Set();
-      for (const o of orders) {
-        if (!isColis(o)) continue;
-        for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
-      }
-
-      const targets = orders.filter(o => !isColis(o)).sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded));
-      if (!targets.length) return;
-
-      let n = 29;
-      const assign = new Map();
-      for (const o of targets) {
-        do { n += 1; } while (used.has(n));
-        used.add(n);
-        assign.set(o.id, 'VICT' + String(n).padStart(4, '0'));
-      }
-      const entries = [...assign.entries()];
-      const BATCH = 20;
-      for (let i = 0; i < entries.length; i += BATCH) {
-        if (cancelled) return;
-        await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
-          supabase.from('orders').update({ tracking_number: vict }).eq('id', id).then(() => {}).catch(() => {})
-        ));
-      }
-      setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
-    })();
-    return () => { cancelled = true; };
   }, [session, orders.length]);
 
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
