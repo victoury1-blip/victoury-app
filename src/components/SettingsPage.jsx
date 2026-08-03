@@ -386,6 +386,69 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     setAuzone((p) => ({ ...p, saved: true }));
   }
 
+  /* ── Restauration des codes de suivi depuis Ozon (action MANUELLE) ──
+     Ozon détient le code VICT réellement enregistré pour chaque colis. On balaie
+     la série VICT0001..VICT0400, on lit le téléphone du destinataire renvoyé par
+     Ozon, et on remet ce code sur la commande correspondante. Aucun effacement. */
+  const [ozonRestore, setOzonRestore] = useState({ running: false, message: '' });
+
+  async function restoreOzonCodes() {
+    const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
+    if (!cfg.customerId || !cfg.apiKey) return;
+    setOzonRestore({ running: true, message: 'Recherche des colis chez Ozon…' });
+    const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
+    const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^212/, '0');
+    const byPhone = new Map();
+    for (const o of orders || []) {
+      const p = digits(o.recipient?.phone);
+      if (p && !byPhone.has(p)) byPhone.set(p, o);
+    }
+
+    const found = [];              // { code, order }
+    const MAX = 400, CONC = 10;
+    try {
+      for (let start = 1; start <= MAX; start += CONC) {
+        const batch = [];
+        for (let i = start; i < start + CONC && i <= MAX; i++) batch.push(i);
+        await Promise.all(batch.map(async (n) => {
+          const code = 'VICT' + String(n).padStart(4, '0');
+          try {
+            const fd = new FormData();
+            fd.append('tracking-number', code);
+            const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: fd });
+            if (!res.ok) return;
+            const json = await res.json();
+            const parcel = json['PARCEL-INFO'] || json;
+            const infos = parcel['INFOS'] || parcel;
+            const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
+            if (!phone) return;
+            const order = byPhone.get(phone);
+            if (order) found.push({ code, order });
+          } catch {}
+        }));
+        setOzonRestore({ running: true, message: `Analyse ${Math.min(start + CONC - 1, MAX)}/${MAX} — ${found.length} colis retrouvé(s)` });
+      }
+
+      const toFix = found.filter(({ code, order }) => order.trackingNumber !== code);
+      if (!toFix.length) {
+        setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger.` });
+        return;
+      }
+      const B = 20;
+      for (let i = 0; i < toFix.length; i += B) {
+        await Promise.all(toFix.slice(i, i + B).map(({ code, order }) =>
+          supabase.from('orders').update({ tracking_number: code, ozone_tracking: code }).eq('id', order.id)
+            .then(() => {}).catch(() => {})
+        ));
+      }
+      const map = new Map(toFix.map(({ code, order }) => [order.id, code]));
+      setOrders(prev => prev.map(o => map.has(o.id) ? { ...o, trackingNumber: map.get(o.id), ozoneTracking: map.get(o.id) } : o));
+      setOzonRestore({ running: false, message: `✅ ${toFix.length} code(s) restauré(s) depuis Ozon.` });
+    } catch (e) {
+      setOzonRestore({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
+    }
+  }
+
   /* ── Settings cards config ── */
   const CARDS = [
     {
@@ -829,6 +892,23 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               <Save size={12} /> Enregistrer
             </button>
             {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
+          </div>
+
+          {/* Récupération des VRAIS codes de suivi depuis Ozon (action manuelle) */}
+          <div className="border-t border-gray-100 pt-3 mt-1 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Restaurer les codes de suivi depuis Ozon</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Interroge Ozon pour retrouver le code VICT réellement enregistré pour chaque colis
+              (recherche par numéro de téléphone) et le remet dans l'application. Aucun code n'est
+              effacé : seules les commandes dont le code diffère sont corrigées.
+            </p>
+            <div className="flex items-center gap-2">
+              <button onClick={restoreOzonCodes} disabled={ozonRestore.running || !auzone.customerId || !auzone.apiKey}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-40 transition">
+                {ozonRestore.running ? 'Recherche…' : 'Restaurer les codes'}
+              </button>
+              {ozonRestore.message && <span className="text-xs text-gray-600">{ozonRestore.message}</span>}
+            </div>
           </div>
         </div>
       </Modal>
