@@ -91,7 +91,9 @@ function Badge({ statusKey }) {
   const light = isLight(color);
   return (
     <span
-      className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold whitespace-nowrap"
+      // Le libellé peut être long (« En Attente Ramassage ») : on l'autorise à passer
+      // à la ligne pour qu'il ne déborde jamais sur la colonne Note.
+      className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold leading-tight text-left"
       style={{ backgroundColor: color, color: light ? '#111' : '#fff' }}
     >
       {live.label || statusKey}
@@ -1247,7 +1249,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   </td>
 
                   {/* État — click to change */}
-                  <td className="px-4 py-3 min-w-[160px] align-top">
+                  <td className="px-4 py-3 w-[170px] min-w-[170px] max-w-[170px] align-top">
                     <div className="flex flex-col items-start gap-1">
                     <button
                       onClick={() => setEditOrder(o)}
@@ -1337,7 +1339,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   </td>
 
                   {/* Note */}
-                  <td className="px-4 py-3 min-w-[200px] max-w-[250px] align-top">
+                  <td className="px-4 py-3 w-[230px] min-w-[230px] max-w-[230px] align-top break-words">
                     <div className="flex flex-col gap-3">
                       {note && <span className="block text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">Note interne:<br/>{note}</span>}
                       {o.noteLivraison && (
