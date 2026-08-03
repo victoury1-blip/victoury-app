@@ -398,8 +398,13 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     setOzonRestore({ running: true, message: 'Recherche des colis chez Ozon…' });
     const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
     const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^212/, '0');
+    // Les codes contenant « MIMA » sont gérés ailleurs : on ne les touche JAMAIS.
+    const isProtected = (o) => /mima/i.test(
+      `${o.trackingNumber || ''} ${o.ozoneTracking || ''} ${o.id || ''}`
+    );
     const byPhone = new Map();
     for (const o of orders || []) {
+      if (isProtected(o)) continue;
       const p = digits(o.recipient?.phone);
       if (p && !byPhone.has(p)) byPhone.set(p, o);
     }
@@ -429,7 +434,8 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         setOzonRestore({ running: true, message: `Analyse ${Math.min(start + CONC - 1, MAX)}/${MAX} — ${found.length} colis retrouvé(s)` });
       }
 
-      const toFix = found.filter(({ code, order }) => order.trackingNumber !== code);
+      // Double sécurité : jamais un code « MIMA », et seulement si le code diffère.
+      const toFix = found.filter(({ code, order }) => !isProtected(order) && order.trackingNumber !== code);
       if (!toFix.length) {
         setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger.` });
         return;
@@ -901,6 +907,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               Interroge Ozon pour retrouver le code VICT réellement enregistré pour chaque colis
               (recherche par numéro de téléphone) et le remet dans l'application. Aucun code n'est
               effacé : seules les commandes dont le code diffère sont corrigées.
+              <strong className="text-gray-700"> Les codes contenant « MIMA » ne sont jamais modifiés.</strong>
             </p>
             <div className="flex items-center gap-2">
               <button onClick={restoreOzonCodes} disabled={ozonRestore.running || !auzone.customerId || !auzone.apiKey}
