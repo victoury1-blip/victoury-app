@@ -23,18 +23,23 @@ function maxVictIn(orders) {
  *  renumérotage a fait redescendre les VICT, le compteur suit les commandes réelles
  *  (et non un compteur gonflé qui ferait sauter les numéros). `orders` doit être la
  *  liste COMPLÈTE chargée depuis Supabase (max global tous appareils confondus). */
+const stored = () => parseInt(localStorage.getItem('vict_counter') || '0', 10) || 0;
+
+/** Initialise le compteur. MONOTONE : max(commandes, valeur stockée) — ne descend
+ *  jamais, sinon un numéro déjà émis serait réattribué (doublons VICT). Seule la
+ *  migration peut forcer une valeur, via resetVictCounter(). */
 export function initVictCounter(orders) {
   if (_victCounter !== null) return;
-  _victCounter = maxVictIn(orders);
+  _victCounter = Math.max(maxVictIn(orders), stored());
   localStorage.setItem('vict_counter', String(_victCounter));
   cloudSet('vict_counter', _victCounter);
 }
 
-/** Recalage AUTORITAIRE : le compteur = plus grand VICT réellement présent dans les
- *  commandes. Autorise la DESCENTE (ex. après nettoyage d'anciens numéros erronés) :
- *  ainsi la numérotation reprend juste après le dernier VICT légitime, sans sauter. */
+/** Recalage MONOTONE : ne descend JAMAIS sous la valeur déjà atteinte. Indispensable
+ *  car `orders` peut être partiel (liste pas encore chargée quand un import Woo
+ *  arrive) : sans ce garde-fou le compteur retombait à 0 et réémettait VICT0001. */
 export function recalcVictCounter(orders) {
-  _victCounter = maxVictIn(orders);
+  _victCounter = Math.max(maxVictIn(orders), stored(), _victCounter || 0);
   localStorage.setItem('vict_counter', String(_victCounter));
   cloudSet('vict_counter', _victCounter);
 }

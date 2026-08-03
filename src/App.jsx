@@ -54,6 +54,9 @@ function parseAppDate(str) {
 }
 
 function assignVictTracking(freshOrders, allOrders) {
+  // Ne pas numéroter tant que la liste complète n'est pas chargée : le compteur
+  // serait calculé sur une liste vide/partielle (risque de doublons).
+  if (!allOrders || !allOrders.length) return freshOrders;
   recalcVictCounter(allOrders);
   freshOrders.forEach((o) => {
     if (!/^VICT\d+$/i.test(o.trackingNumber || '') && !/^VICT\d+$/i.test(o.id || '')) {
@@ -490,6 +493,48 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [session, orders.length]);
+
+  /* ── Correctif permanent des DOUBLONS de code VICT ──
+     Un compteur retombé à 0 (liste partielle) a pu réémettre des numéros déjà pris
+     (ex. deux VICT0001). À chaque chargement on détecte les codes utilisés par
+     plusieurs commandes : la plus ANCIENNE garde le numéro, les autres sont
+     renumérotées à la suite du plus grand VICT existant. Pas de flag : c'est un
+     garde-fou permanent, sans effet quand il n'y a aucun doublon. */
+  useEffect(() => {
+    if (!session || orders.length < 2) return;
+    let cancelled = false;
+    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+    const byCode = new Map();
+    for (const o of orders) {
+      const n = victNum(o.trackingNumber);
+      if (!n) continue;
+      if (!byCode.has(n)) byCode.set(n, []);
+      byCode.get(n).push(o);
+    }
+    const dupes = [];
+    for (const [, list] of byCode) {
+      if (list.length < 2) continue;
+      // La plus ancienne conserve le code ; les suivantes sont renumérotées.
+      const sorted = [...list].sort((a, b) => (parseAppDate(a.dateAdded) || 0) - (parseAppDate(b.dateAdded) || 0));
+      dupes.push(...sorted.slice(1));
+    }
+    if (!dupes.length) return;
+    (async () => {
+      recalcVictCounter(orders);
+      const assign = new Map();
+      for (const o of dupes) assign.set(o.id, generateVictId());
+      const entries = [...assign.entries()];
+      const BATCH = 20;
+      for (let i = 0; i < entries.length; i += BATCH) {
+        if (cancelled) return;
+        await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
+          supabase.from('orders').update({ tracking_number: vict }).eq('id', id).then(() => {}).catch(() => {})
+        ));
+      }
+      setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
+    })();
+    return () => { cancelled = true; };
+  }, [session, orders]);
 
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
      Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
