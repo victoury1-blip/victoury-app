@@ -71,7 +71,10 @@ export function buildWhatsappMessage(order, status) {
   const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
   const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
   const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
-  const tn = order.ozoneTracking || order.trackingNumber || order.id;
+  // On envoie au client le code AFFICHÉ dans l'application (`trackingNumber || id`),
+  // pas l'ancien code Ozon : sinon une correction manuelle du « Code d'envoi » reste
+  // sans effet sur le message et le client reçoit un numéro obsolète.
+  const tn = order.trackingNumber || order.ozoneTracking || order.id;
   const isOzon = /ozon/i.test(order.recipient?.delivery || '');
   // Numéro livreur : d'abord l'agent Ozon RÉEL (dp, récupéré via Livraison), sinon
   // le livreur PERSONNEL de la liste — mais JAMAIS le numéro Ozon générique de la
