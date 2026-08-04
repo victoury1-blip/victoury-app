@@ -56,10 +56,27 @@ function parseAppDate(str) {
 
 function assignVictTracking(freshOrders, allOrders) {
   if (!allOrders || !allOrders.length) return freshOrders;
-  recalcVictCounter(allOrders);
   const isVict = (s) => /^VICT\d+$/i.test(s || '');
+  const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+
+  // Un numéro déjà porté par une commande — que ce soit comme ID ou comme code de
+  // suivi — ne doit JAMAIS être réattribué. Le compteur seul ne suffit pas : s'il
+  // repart bas, il redonne des numéros déjà pris (VICT0002, 0003…) et crée des
+  // doublons avec d'anciennes commandes dont l'ID est justement VICTxxxx.
+  const used = new Set();
+  for (const o of allOrders) {
+    for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
+  }
+
+  recalcVictCounter(allOrders);
   freshOrders.forEach((o) => {
-    if (!isVict(o.trackingNumber) && !isVict(o.id)) o.trackingNumber = generateVictId();
+    if (isVict(o.trackingNumber) || isVict(o.id)) return;
+    let code = generateVictId();
+    // Tant que le numéro proposé est déjà pris, on avance jusqu'au premier libre.
+    let guard = 0;
+    while (used.has(victNum(code)) && guard++ < 10000) code = generateVictId();
+    used.add(victNum(code));
+    o.trackingNumber = code;
   });
   return freshOrders;
 }
@@ -463,8 +480,20 @@ export default function App() {
     (async () => {
       try {
         recalcVictCounter(orders);
+        // Ne jamais réutiliser un numéro déjà porté (comme id OU comme code de suivi).
+        const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+        const used = new Set();
+        for (const o of orders) {
+          for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
+        }
         const assign = new Map();
-        for (const o of missing) assign.set(o.id, generateVictId());
+        for (const o of missing) {
+          let code = generateVictId();
+          let guard = 0;
+          while (used.has(victNum(code)) && guard++ < 10000) code = generateVictId();
+          used.add(victNum(code));
+          assign.set(o.id, code);
+        }
         const entries = [...assign.entries()];
         const BATCH = 20;
         for (let i = 0; i < entries.length; i += BATCH) {
