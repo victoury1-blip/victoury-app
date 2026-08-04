@@ -851,6 +851,21 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     return filtered.sort(cmp);
   }, [orders, debouncedSearch, appliedFilter, showArchived]);
 
+  /* Détection (LECTURE SEULE) des codes de suivi partagés par plusieurs commandes.
+     On signale, on ne corrige jamais automatiquement. */
+  const duplicateTracking = useMemo(() => {
+    const byCode = new Map();
+    for (const o of orders) {
+      const code = (o.trackingNumber || '').trim();
+      if (!code) continue;
+      if (!byCode.has(code)) byCode.set(code, []);
+      byCode.get(code).push(o.recipient?.name || o.id);
+    }
+    return [...byCode.entries()]
+      .filter(([, names]) => names.length > 1)
+      .map(([code, names]) => ({ code, names }));
+  }, [orders]);
+
   const archivedCount = useMemo(() => orders.reduce((n, o) => {
     const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
     return n + (inPipeline && isArchived(o) ? 1 : 0);
@@ -1155,6 +1170,29 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
           </div>
         );
       })()}
+
+      {/* Alerte LECTURE SEULE : codes de suivi utilisés par plusieurs commandes.
+          Aucune correction automatique — c'est à l'utilisateur de trancher. */}
+      {duplicateTracking.length > 0 && (
+        <div className="mx-4 mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <p className="text-sm font-bold text-red-700 mb-1">
+            ⚠️ {duplicateTracking.length} code(s) de suivi en double
+          </p>
+          <p className="text-xs text-red-600 mb-2">
+            Le même code est utilisé par plusieurs commandes. Corrigez-le à la main
+            (ouvrir la commande → « Code d'envoi »).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {duplicateTracking.map(({ code, names }) => (
+              <button key={code} onClick={() => setSearch(code)}
+                className="text-xs bg-white border border-red-300 text-red-700 rounded-lg px-2 py-1 font-mono font-semibold hover:bg-red-100 transition"
+                title={names.join(' • ')}>
+                {code} ({names.length})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 overflow-auto px-4 pb-4">
