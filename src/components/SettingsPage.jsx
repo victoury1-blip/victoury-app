@@ -559,7 +559,10 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     for (const o of rows) {
       for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
     }
-    let next = Math.max(0, ...used);
+    // On attribue le PLUS PETIT numéro libre (on comble les trous de la série)
+    // au lieu de repartir du plus grand : sinon d'anciens numéros erronés très
+    // élevés (VICT14xx) feraient bondir la numérotation.
+    let next = 0;
     const nextFreeCode = () => { do { next += 1; } while (used.has(next)); used.add(next); return 'VICT' + String(next).padStart(4, '0'); };
 
     const base = cfg.customerId && cfg.apiKey
@@ -598,6 +601,14 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         }
         setDupFix({ running: true, message: `Analyse… ${updates.length} commande(s) à renuméroter` });
       }
+
+      // Ramener aussi les numéros ABERRANTS (>= 1000, issus de l'ancien incident)
+      // dans la série normale, en comblant les trous.
+      const already = new Set(updates.map(u => u.id));
+      const aberrant = rows
+        .filter(o => !isProtected(o) && !already.has(o.id) && victNum(o.trackingNumber) >= 1000)
+        .sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded));
+      for (const o of aberrant) updates.push({ id: o.id, code: nextFreeCode() });
 
       if (!updates.length) { setDupFix({ running: false, message: 'Aucun changement nécessaire.' }); return; }
 
