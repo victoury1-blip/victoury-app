@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
-import { Search, X, ChevronDown, Check, Trash2, Phone, Pencil, Truck, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock, ScanLine, Copy } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Trash2, Phone, Pencil, Truck, User, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock, ScanLine, Copy } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { openLabelPage } from './LabelPrint';
@@ -1218,15 +1218,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     <div className="text-sm text-gray-500 mt-0.5 break-words">{o.recipient.address}</div>
                     <div className="text-sm font-bold text-gray-800">{o.recipient.city}</div>
                     <PhoneChip phone={o.recipient.phone} allOrders={orders} />
+                    {/* Le camion identifie une livraison OZON. Un livreur PERSONNEL
+                        (ex. Mohamed Afkyr) n'a rien à voir avec Ozon : icône personne. */}
                     {delivery !== '—' && (
                       <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
-                        <Truck size={11} />
+                        {/ozon/i.test(delivery) ? <Truck size={11} /> : <User size={11} />}
                         <LivreurTag name={delivery} variant="inline" />
                       </div>
                     )}
                     {o.trackingNumber && (
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-green-600 font-mono font-semibold">
-                        <Truck size={10} />
+                        {/ozon/i.test(delivery) && <Truck size={10} />}
                         <span>{o.trackingNumber}</span>
                       </div>
                     )}

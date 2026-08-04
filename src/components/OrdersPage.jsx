@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   BookmarkPlus,
   Bookmark,
+  User,
 } from 'lucide-react';
 import OrderModal from './OrderModal';
 import Toggle from './Toggle';
@@ -1016,7 +1017,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <PhoneChip phone={order.recipient.phone} allOrders={externalOrders} />
                   {order.recipient.delivery && (
                     <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-500">
-                      <Truck size={11} />
+                      {/* Camion = livraison Ozon uniquement ; livreur personnel = icône personne. */}
+                      {/ozon/i.test(order.recipient.delivery) ? <Truck size={11} /> : <User size={11} />}
                       <span>{order.recipient.delivery}</span>
                     </div>
                   )}
