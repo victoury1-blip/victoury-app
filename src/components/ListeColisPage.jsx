@@ -858,16 +858,18 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   /* Détection (LECTURE SEULE) des codes de suivi partagés par plusieurs commandes.
      On signale, on ne corrige jamais automatiquement. */
   const duplicateTracking = useMemo(() => {
+    // On compte des COMMANDES DISTINCTES (par id) : la liste `orders` peut contenir
+    // plusieurs copies de la même commande, ce qui ferait croire à un faux doublon.
     const byCode = new Map();
     for (const o of orders) {
       const code = (o.trackingNumber || '').trim();
       if (!code) continue;
-      if (!byCode.has(code)) byCode.set(code, []);
-      byCode.get(code).push(o.recipient?.name || o.id);
+      if (!byCode.has(code)) byCode.set(code, new Map());
+      byCode.get(code).set(o.id, o.recipient?.name || o.id);
     }
     return [...byCode.entries()]
-      .filter(([, names]) => names.length > 1)
-      .map(([code, names]) => ({ code, names }));
+      .filter(([, m]) => m.size > 1)
+      .map(([code, m]) => ({ code, names: [...m.values()] }));
   }, [orders]);
 
   const archivedCount = useMemo(() => orders.reduce((n, o) => {

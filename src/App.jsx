@@ -532,7 +532,10 @@ export default function App() {
             const editedAt = recentEditsRef.current.get(o.id);
             return editedAt && nowTs - editedAt < GRACE;
           });
-          return [...localOnly, ...merged];
+          // Dédoublonnage final par id (sécurité) : jamais deux copies d'une commande.
+          const out = [...localOnly, ...merged];
+          const seen = new Set();
+          return out.filter(o => (seen.has(o.id) ? false : seen.add(o.id)));
         });
       } catch {}
       syncing = false;
@@ -1060,6 +1063,9 @@ export default function App() {
       // Ne jamais réintroduire une commande supprimée (liste noire) via un ré-import :
       // on ne garde une commande absente de `prev` que si elle n'est pas en liste noire.
       next = next.filter(o => prevIds.has(o.id) || !deletedIdsRef.current.has(o.id));
+      // Dédoublonnage par id : une même commande ne doit JAMAIS figurer deux fois
+      // dans l'état (sinon elle s'affiche/compte en double et paraît « en doublon »).
+      { const seen = new Set(); next = next.filter(o => (seen.has(o.id) ? false : seen.add(o.id))); }
       const prevMap = new Map(prev.map(o => [o.id, o]));
       const brandNew = next.filter(o => !prevMap.has(o.id));
       const changed = next.filter((o) => {
