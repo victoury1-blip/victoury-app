@@ -568,20 +568,38 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       if (!updates.length) { setDupFix({ running: false, message: 'Aucun changement nécessaire.' }); return; }
 
       let failed = 0;
+      let lastError = '';
       const okIds = new Map();
       const B = 20;
       for (let i = 0; i < updates.length; i += B) {
         await Promise.all(updates.slice(i, i + B).map(({ id, code }) =>
           supabase.from('orders').update({ tracking_number: code }).eq('id', id)
-            .then(({ error }) => { if (error) failed++; else okIds.set(id, code); })
-            .catch(() => { failed++; })
+            .then(({ error }) => { if (error) { failed++; lastError = error.message; } else okIds.set(id, code); })
+            .catch((e) => { failed++; lastError = e?.message || 'réseau'; })
         ));
       }
-      setOrders(prev => prev.map(o => okIds.has(o.id) ? { ...o, trackingNumber: okIds.get(o.id) } : o));
-      setDupFix({
-        running: false,
-        message: `✅ ${okIds.size} commande(s) renumérotée(s) — ${byOzon} propriétaire(s) confirmé(s) par Ozon${failed ? ` — ⚠️ ${failed} échec(s)` : ''}.`,
-      });
+
+      // VÉRIFICATION : on relit depuis Supabase pour confirmer que la valeur a bien
+      // été enregistrée (une écriture « acceptée » mais non persistée expliquerait
+      // que les doublons réapparaissent après un rechargement).
+      setDupFix({ running: true, message: 'Vérification en base…' });
+      const ids = [...okIds.keys()];
+      const persisted = new Map();
+      for (let i = 0; i < ids.length; i += 100) {
+        const { data } = await supabase.from('orders').select('id, tracking_number').in('id', ids.slice(i, i + 100));
+        for (const row of (data || [])) persisted.set(row.id, row.tracking_number);
+      }
+      const notPersisted = ids.filter(id => persisted.get(id) !== okIds.get(id));
+
+      // On n'applique en local QUE ce qui est réellement en base.
+      const applied = new Map([...okIds].filter(([id, code]) => persisted.get(id) === code));
+      setOrders(prev => prev.map(o => applied.has(o.id) ? { ...o, trackingNumber: applied.get(o.id) } : o));
+
+      const parts = [`✅ ${applied.size} commande(s) corrigée(s) et vérifiée(s) en base`];
+      if (byOzon) parts.push(`${byOzon} propriétaire(s) confirmé(s) par Ozon`);
+      if (failed) parts.push(`⚠️ ${failed} refus d'écriture${lastError ? ` (${lastError})` : ''}`);
+      if (notPersisted.length) parts.push(`⛔ ${notPersisted.length} non enregistré(s) en base — droits d'écriture ?`);
+      setDupFix({ running: false, message: parts.join(' — ') });
     } catch (e) {
       setDupFix({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
     }

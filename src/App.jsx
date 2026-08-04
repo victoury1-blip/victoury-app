@@ -1026,7 +1026,12 @@ export default function App() {
     }, { onConflict: 'id' });
     // Écriture en ligne échouée (RLS, réseau transitoire…) : on met la mutation en file
     // pour rejouer, sinon le changement local ne rejoindrait jamais la base.
-    if (error) { try { await queueSync('update', order); } catch {} }
+    if (error) {
+      // L'échec ne doit plus être invisible : sans cela, une modification semble
+      // enregistrée puis « revient » au rechargement (rien n'a été écrit en base).
+      logError('Enregistrement commande', `${order.id} : ${error.message}`);
+      try { await queueSync('update', order); } catch {}
+    }
   }
 
   const setOrdersWithSync = (updater) => {
