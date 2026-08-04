@@ -496,6 +496,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      GARDE ; les autres reçoivent un nouveau numéro libre. Si Ozon ne connaît pas
      le code, la commande la plus ANCIENNE le garde. Les codes « MIMA » sont exclus. */
   const [dupFix, setDupFix] = useState({ running: false, message: '' });
+  const [queueMsg, setQueueMsg] = useState('');
 
   async function fixDuplicateCodes() {
     const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
@@ -1083,6 +1084,29 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                 {dupFix.running ? 'Correction…' : 'Corriger les doublons'}
               </button>
               {dupFix.message && <span className="text-xs text-gray-600">{dupFix.message}</span>}
+            </div>
+          </div>
+
+          {/* File d'attente hors-ligne : des instantanés périmés peuvent réécrire
+              d'anciennes valeurs (codes de suivi qui « reviennent »). */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Vider la file d'attente de synchronisation</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              À utiliser si des modifications reviennent à leur ancienne valeur après un
+              rechargement : d'anciennes copies en attente sont alors réécrites en base.
+            </p>
+            <div className="flex items-center gap-2">
+              <button onClick={async () => {
+                try {
+                  const { clearSyncQueue } = await import('../lib/offlineStore');
+                  await clearSyncQueue();
+                  setQueueMsg('✅ File d\'attente vidée.');
+                } catch (e) { setQueueMsg('Erreur : ' + (e?.message || 'échec')); }
+              }}
+                className="px-4 py-2 rounded-lg bg-gray-800 text-white text-xs font-medium hover:bg-gray-900 transition">
+                Vider la file
+              </button>
+              {queueMsg && <span className="text-xs text-gray-600">{queueMsg}</span>}
             </div>
           </div>
         </div>

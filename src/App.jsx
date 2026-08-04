@@ -199,11 +199,30 @@ export default function App() {
       try {
         const pending = await getPendingSync();
         if (!pending.length) return;
+        // Purge des éléments trop anciens (> 24 h) : ils ne représentent plus l'état
+        // voulu et ne feraient que ressusciter d'anciennes valeurs.
+        const DAY = 24 * 60 * 60 * 1000;
+        const fresh = [];
         for (const item of pending) {
+          const t = Number(item.timestamp || 0);
+          if (t && Date.now() - t > DAY) { try { await deleteSyncItem(item.id); } catch {} }
+          else fresh.push(item);
+        }
+        for (const item of fresh) {
           try {
             let error = null;
             if (item.action === 'update') {
               const o = item.data;
+              // GARDE-FOU : ne pas rejouer un instantané PÉRIMÉ. Si la ligne en base a
+              // été modifiée après cet élément de file, le rejouer écraserait la valeur
+              // récente par une ancienne (c'est ainsi que d'anciens codes de suivi
+              // « revenaient » après chaque rechargement).
+              const { data: cur } = await supabase.from('orders')
+                .select('date_updated').eq('id', o.id).maybeSingle();
+              if (cur?.date_updated && parseAppDate(cur.date_updated) > parseAppDate(o.dateUpdated)) {
+                await deleteSyncItem(item.id);
+                continue;
+              }
               const r = await supabase.from('orders').upsert({
                 id: o.id, status: o.status, note: o.note, validated: o.validated,
                 recipient: o.recipient || {}, product: o.product || {}, products: o.products || null,
