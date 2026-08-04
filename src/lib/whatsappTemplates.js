@@ -76,19 +76,24 @@ export function buildWhatsappMessage(order, status) {
   // sans effet sur le message et le client reçoit un numéro obsolète.
   const tn = order.trackingNumber || order.ozoneTracking || order.id;
   const isOzon = /ozon/i.test(order.recipient?.delivery || '');
-  // Numéro livreur : d'abord l'agent Ozon RÉEL (dp, récupéré via Livraison), sinon
-  // le livreur PERSONNEL de la liste — mais JAMAIS le numéro Ozon générique de la
-  // liste (on ne prend l'entrée liste que si la livraison n'est pas Ozon).
-  const personalPhone = isOzon ? '' : (livreur?.telephone || '');
-  const personalName = isOzon ? '' : (livreur?.nom || order.recipient?.delivery || '');
-  const dpPhone = dp.phone || personalPhone || '';
+  // Le livreur annoncé au client doit être CELUI de la commande :
+  //  - livraison Ozon  -> l'agent Ozon réel (récupéré via la fenêtre Livraison) ;
+  //  - livreur PERSONNEL -> celui de la liste des livreurs. On n'utilise JAMAIS
+  //    l'agent Ozon dans ce cas (sinon le client reçoit le nom/numéro d'un livreur
+  //    Ozon alors que le colis est confié à un livreur personnel).
+  const livreurName = isOzon
+    ? (dp.name || order.recipient?.delivery || '')
+    : (livreur?.nom || order.recipient?.delivery || '');
+  const livreurPhone = isOzon
+    ? (dp.phone || '')
+    : (livreur?.telephone || '');
 
   const msg = tpl.message
     .replace(/\{name\}/g, order.recipient.name || '')
     .replace(/\{tracking\}/g, tn)
     .replace(/\{price\}/g, order.price || '0')
-    .replace(/\{livreur\}/g, dp.name || personalName || '')
-    .replace(/\{livreurPhone\}/g, dpPhone)
+    .replace(/\{livreur\}/g, livreurName)
+    .replace(/\{livreurPhone\}/g, livreurPhone)
     .replace(/\{city\}/g, order.recipient?.city || '')
     .replace(/\{address\}/g, order.recipient?.address || '');
 

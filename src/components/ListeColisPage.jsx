@@ -1322,11 +1322,14 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       //  - livreur PERSONNEL nommé (liste `livreurs`) avec téléphone.
                       let hasInfo = false;
                       const delivery = o.recipient?.delivery || '';
-                      try {
-                        const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
-                        if (dp.name || dp.phone) hasInfo = true;
-                      } catch {}
-                      if (!hasInfo && delivery && !/ozon/i.test(delivery)) {
+                      if (/ozon/i.test(delivery)) {
+                        // Ozon : il faut l'agent RÉEL récupéré via la fenêtre Livraison.
+                        try {
+                          const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
+                          if (dp.name || dp.phone) hasInfo = true;
+                        } catch {}
+                      } else if (delivery) {
+                        // Livreur personnel : on prend SES coordonnées, jamais celles d'Ozon.
                         try {
                           const lvs = JSON.parse(localStorage.getItem('livreurs') || '[]');
                           if (lvs.some(l => l.nom === delivery && l.telephone)) hasInfo = true;
