@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';
-import { Search, X, ChevronDown, Check, Trash2, Phone, Pencil, Truck, User, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock, ScanLine, Copy } from 'lucide-react';
+import { Search, X, ChevronDown, Check, Trash2, Phone, Pencil, Truck, User, Package, MapPin, Download, Printer, BookmarkPlus, Bookmark, Clock, ScanLine, Copy } from 'lucide-react';
 import OrderModal from './OrderModal';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { openLabelPage } from './LabelPrint';
@@ -1404,7 +1404,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     {delivery !== '—' ? (
                       <div className="flex flex-col gap-1 items-start">
                         <LivreurTag name={delivery} />
-                        {o.ozoneLastStatus && (() => {
+                        {/* Le statut Ozon n'a de sens que pour une livraison Ozon. */}
+                        {o.ozoneLastStatus && /ozon/i.test(delivery) && (() => {
                           const ls = (o.ozoneLastStatus || '').toLowerCase();
                           const ozColor = ls.includes('livr') ? 'bg-green-100 text-green-700'
                             : ls.includes('refus') ? 'bg-red-100 text-red-700'
@@ -1450,7 +1451,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         title="Statut livraison"
                         aria-label="Livraison"
                       >
-                        <Truck size={13} />
+                        {/* Camion = Ozon ; livreur personnel = colis. */}
+                        {/ozon/i.test(delivery) ? <Truck size={13} /> : <Package size={13} />}
                       </button>
                       <button
                         onClick={() => setHistoryOrder(o)}

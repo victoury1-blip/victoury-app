@@ -830,7 +830,10 @@ export default function App() {
           setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
           supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
         };
-        const toSync = ordersRef.current.filter(o => o.validated && (o.ozoneTracking || o.trackingNumber));
+        // UNIQUEMENT les livraisons Ozon : interroger Ozon pour une commande confiée à
+        // un livreur personnel lui collait un statut Ozon (« Livré ») qui n'a aucun sens.
+        const toSync = ordersRef.current.filter(o =>
+          o.validated && (o.ozoneTracking || o.trackingNumber) && /ozon/i.test(o.recipient?.delivery || ''));
         // Phase 1 — API officielle de suivi (par numéro, avec variantes du 0).
         const stillPending = [];
         for (const o of toSync) {

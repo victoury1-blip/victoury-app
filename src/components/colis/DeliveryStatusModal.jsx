@@ -26,7 +26,9 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
   const current = DELIVERY_STATUSES.find(s => s.value === status);
   const localStatus = DELIVERY_STATUSES.find(s => s.value === order.status);
 
-  useEffect(() => { fetchOzone(); }, []);
+  // Livraison confiée à un livreur PERSONNEL : rien à demander à Ozon.
+  const isOzonDelivery = /ozon/i.test(order.recipient?.delivery || '');
+  useEffect(() => { if (isOzonDelivery) fetchOzone(); else setOzoneState('not_ozon'); }, []);
 
   async function fetchOzone(customTn) {
     setOzoneState('loading');
@@ -145,7 +147,8 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
             <p className="text-[10px] text-gray-400 mt-1">{order.dateUpdated || order.dateAdded}</p>
           </div>
 
-          {/* Ozone section */}
+          {/* Section Ozon — masquée pour une livraison par livreur personnel */}
+          {isOzonDelivery && (
           <div className="border border-amber-200 rounded-lg overflow-hidden">
             <div className="bg-amber-50 px-3 py-2 flex items-center justify-between">
               <span className="text-xs font-bold text-amber-700">Ozone Express</span>
@@ -225,6 +228,14 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
               )}
             </div>
           </div>
+          )}
+
+          {!isOzonDelivery && (
+            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              Livraison confiée à <strong className="text-gray-700">{order.recipient?.delivery || 'un livreur'}</strong> —
+              aucun suivi Ozon pour cette commande.
+            </p>
+          )}
 
           {/* Manual status change */}
           <details className="border border-gray-200 rounded-lg overflow-hidden">
