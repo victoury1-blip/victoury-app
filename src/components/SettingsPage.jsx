@@ -402,11 +402,22 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     const isProtected = (o) => /mima/i.test(
       `${o.trackingNumber || ''} ${o.ozoneTracking || ''} ${o.id || ''}`
     );
-    const byPhone = new Map();
+    // Un téléphone peut porter PLUSIEURS commandes (client fidèle, échange…).
+    // Dans ce cas on ne peut pas savoir laquelle correspond : on l'IGNORE plutôt
+    // que d'écrire le code sur la mauvaise commande.
+    const phoneGroups = new Map();
     for (const o of orders || []) {
       if (isProtected(o)) continue;
       const p = digits(o.recipient?.phone);
-      if (p && !byPhone.has(p)) byPhone.set(p, o);
+      if (!p) continue;
+      if (!phoneGroups.has(p)) phoneGroups.set(p, []);
+      phoneGroups.get(p).push(o);
+    }
+    const byPhone = new Map();
+    let ambiguous = 0;
+    for (const [p, list] of phoneGroups) {
+      if (list.length === 1) byPhone.set(p, list[0]);
+      else ambiguous += list.length;
     }
 
     const found = [];              // { code, order }
@@ -434,22 +445,46 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         setOzonRestore({ running: true, message: `Analyse ${Math.min(start + CONC - 1, MAX)}/${MAX} — ${found.length} colis retrouvé(s)` });
       }
 
-      // Double sécurité : jamais un code « MIMA », et seulement si le code diffère.
-      const toFix = found.filter(({ code, order }) => !isProtected(order) && order.trackingNumber !== code);
+      // Sécurités : jamais un code « MIMA » ; seulement si le code diffère ; un code
+      // déjà porté par une AUTRE commande n'est pas réattribué (pas de doublon) ; et
+      // une commande ne peut recevoir qu'un seul code.
+      const takenBy = new Map();
+      for (const o of orders || []) if (o.trackingNumber) takenBy.set(o.trackingNumber, o.id);
+      const seenOrders = new Set();
+      const toFix = [];
+      let skipped = 0;
+      for (const { code, order } of found) {
+        if (isProtected(order) || order.trackingNumber === code) continue;
+        const owner = takenBy.get(code);
+        if ((owner && owner !== order.id) || seenOrders.has(order.id)) { skipped++; continue; }
+        seenOrders.add(order.id);
+        toFix.push({ code, order });
+      }
+      const notes = [];
+      if (ambiguous) notes.push(`${ambiguous} commande(s) ignorée(s) (même téléphone)`);
+      if (skipped) notes.push(`${skipped} conflit(s) ignoré(s)`);
+      const suffix = notes.length ? ` — ${notes.join(', ')}` : '';
       if (!toFix.length) {
-        setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger.` });
+        setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger${suffix}.` });
         return;
       }
       const B = 20;
+      let failed = 0;
+      const okIds = new Set();
       for (let i = 0; i < toFix.length; i += B) {
         await Promise.all(toFix.slice(i, i + B).map(({ code, order }) =>
           supabase.from('orders').update({ tracking_number: code, ozone_tracking: code }).eq('id', order.id)
-            .then(() => {}).catch(() => {})
+            .then(({ error }) => { if (error) failed++; else okIds.add(order.id); })
+            .catch(() => { failed++; })
         ));
       }
-      const map = new Map(toFix.map(({ code, order }) => [order.id, code]));
+      // On n'applique en local QUE les écritures réellement réussies.
+      const map = new Map(toFix.filter(({ order }) => okIds.has(order.id)).map(({ code, order }) => [order.id, code]));
       setOrders(prev => prev.map(o => map.has(o.id) ? { ...o, trackingNumber: map.get(o.id), ozoneTracking: map.get(o.id) } : o));
-      setOzonRestore({ running: false, message: `✅ ${toFix.length} code(s) restauré(s) depuis Ozon.` });
+      setOzonRestore({
+        running: false,
+        message: `✅ ${map.size} code(s) restauré(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}${suffix}.`,
+      });
     } catch (e) {
       setOzonRestore({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
     }

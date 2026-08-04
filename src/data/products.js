@@ -42,8 +42,11 @@ export function loadProducts() {
           ];
         }
         if (!p.statut) p.statut = 'Active';
-        if (p.source === 'chic-affiliate' && p.variations.every(v => !v.stock)) {
+        // Amorçage UNE SEULE FOIS : un article chic réellement épuisé doit rester
+        // à 0 (sinon on vend de la marchandise qui n'existe pas).
+        if (p.source === 'chic-affiliate' && !p.stockSeeded && p.variations.every(v => !v.stock)) {
           p.variations = p.variations.map(v => ({ ...v, stock: 10 }));
+          p.stockSeeded = true;
         }
         return p;
       });
@@ -70,8 +73,12 @@ export async function loadProductsRemote() {
         ];
       }
       if (!p.statut) p.statut = 'Active';
-      if (p.source === 'chic-affiliate' && p.variations.every(v => !v.stock)) {
+      // NB: on ne « recharge » plus artificiellement le stock des produits
+      // chic-affiliate à 10 : un article réellement épuisé doit rester à 0,
+      // sinon on accepte des commandes pour de la marchandise inexistante.
+      if (p.source === 'chic-affiliate' && !p.stockSeeded && p.variations.every(v => !v.stock)) {
         p.variations = p.variations.map(v => ({ ...v, stock: 10 }));
+        p.stockSeeded = true;
       }
       return p;
     });

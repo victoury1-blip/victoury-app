@@ -573,7 +573,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       if (!currentStatuses.includes(o.status)) return false;
       /* Search */
       const q = debouncedSearch.toLowerCase();
+      // On cherche AUSSI sur le code de suivi : c'est le numéro affiché à l'écran
+      // (trackingNumber || id), donc celui que l'utilisateur recopie.
       if (q && !o.id.toLowerCase().includes(q)
+            && !(o.trackingNumber || '').toLowerCase().includes(q)
             && !(o.recipient?.name || '').toLowerCase().includes(q)
             && !(o.recipient?.phone || '').includes(q)
             && !(o.products?.[0]?.name || o.product?.name || '').toLowerCase().includes(q)) return false;
@@ -674,8 +677,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     if (prev && prev.status !== updated.status) {
       recordHistory(updated.id, updated.status, currentUser, prev.status);
     }
-    if (prev && prev.recipient?.delivery?.nom !== updated.recipient?.delivery?.nom) {
-      const livreurNote = `Livreur: ${prev.recipient?.delivery?.nom || '—'} → ${updated.recipient?.delivery?.nom || '—'}`;
+    // `delivery` est une CHAÎNE (nom du livreur), pas un objet : comparer `.nom`
+    // renvoyait toujours undefined === undefined, donc aucun changement n'était tracé.
+    if (prev && prev.recipient?.delivery !== updated.recipient?.delivery) {
+      const livreurNote = `Livreur: ${prev.recipient?.delivery || '—'} → ${updated.recipient?.delivery || '—'}`;
       recordHistory(updated.id, updated.status, currentUser, null, livreurNote);
     }
     // Ne pas figer l'ID de commande comme numéro de suivi : l'affichage utilise

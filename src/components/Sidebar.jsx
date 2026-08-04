@@ -336,7 +336,9 @@ export default function Sidebar({ orders = [], session }) {
                 {openMenus[item.path] && showLabel && (
                   <div className="pl-8">
                     {item.children.map((child) => {
-                      const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','annule','pas_rep_lv','pret_retour','retour_recu','echange_recu']);
+                      // Doit rester IDENTIQUE à COLIS_PIPELINE_SET (OrdersPage) : sinon le
+                      // badge et la liste ne comptent pas les mêmes commandes.
+                      const COLIS_PIPE = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu']);
                       // Certains sous-menus (Ramassage, Retour) n'ont pas de `statuses` :
                       // pas de badge de comptage pour eux (sinon .includes plante).
                       const count = child.statuses ? orders.filter(o => {

@@ -118,7 +118,7 @@ function ScannerPage({ orders, setOrders }) {
       const existing = prev[livreur];
       if (existing?.colis?.some(c => c.id === order.id)) return prev;
       const bonId = existing?.bonId
-        || `BRA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+        || `BRA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${(crypto.randomUUID?.() || String(Math.random())).replace(/-/g, '').slice(0, 8).toUpperCase()}`;
       const createdAt = existing?.created_at || new Date().toISOString();
       const colis = [...(existing?.colis || []), newColis];
       // Création/mise à jour AUTOMATIQUE du bon dans Supabase : il apparaît aussitôt
@@ -192,7 +192,7 @@ function ScannerPage({ orders, setOrders }) {
 
     // Filet de sécurité : si le bon n'a pas d'id (ancienne session), on le crée.
     const bonId = bonData.bonId
-      || `BRA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      || `BRA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${(crypto.randomUUID?.() || String(Math.random())).replace(/-/g, '').slice(0, 8).toUpperCase()}`;
     const payload = {
       id: bonId, livreur,
       colis_ids: bonData.colis.map(c => c.id),

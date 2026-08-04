@@ -680,7 +680,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     }).catch(() => cloudSet('victoury_recu_ids', [...next]));
     // source de vérité : colonne recu de la table orders (synchro realtime)
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, recu: !removing } : o));
-    supabase.from('orders').update({ recu: !removing }).eq('id', orderId).then(() => {});
+    // L'erreur doit être VISIBLE : sinon le badge affiche « reçu » alors que la base
+    // n'a pas changé (les autres appareils ne le verront jamais).
+    supabase.from('orders').update({ recu: !removing }).eq('id', orderId).then(({ error }) => {
+      if (error) toast.error('Statut « reçu » non enregistré : ' + error.message);
+    });
   }
 
   function sendLivreurInfo(order) {
@@ -894,7 +898,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       const prevNote = o.note || '';
       const addedNote = note ? `\nNote interne: ${note}` : '';
       const updated = { ...o, status: newStatus, dateUpdated: ts, note: prevNote + addedNote, reportDate: newStatus === 'reporter' ? (reportDate || o.reportDate) : null };
-      if (leavePipeline) { updated.validated = false; updated.trackingNumber = null; }
+      // On sort le colis du circuit, mais on GARDE son code de suivi : l'effacer
+      // ferait perdre définitivement le numéro déjà communiqué au transporteur.
+      if (leavePipeline) updated.validated = false;
       return updated;
     }));
     if (order && order.recipient?.phone) {
@@ -911,7 +917,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   function deactivateOrder(orderId) {
     const ts = getTs();
     setOrders(prev => prev.map(o => o.id === orderId
-      ? { ...o, status: 'confirme', dateUpdated: ts, validated: false, trackingNumber: null }
+      // Désactivation : le code de suivi est CONSERVÉ (il reste connu du transporteur).
+      ? { ...o, status: 'confirme', dateUpdated: ts, validated: false }
       : o
     ));
   }

@@ -455,7 +455,8 @@ export default function App() {
           ));
         }
         setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
-      } catch { victFillRef.current = false; }
+      } catch { /* on NE réarme PAS : un nouvel essai risquerait d'attribuer des
+                   codes en double. Le rattrapage se refera au prochain démarrage. */ }
     })();
   }, [session, orders.length]);
 
@@ -745,7 +746,9 @@ export default function App() {
           });
           /* Persist price changes to Supabase */
           changedWC.forEach(o =>
-            supabase.from('orders').upsert({ id: o.id, price: o.price, product: o.product, products: o.products }, { onConflict: 'id' })
+            // UPDATE (jamais upsert) : un upsert créerait une ligne fantôme sans
+            // statut ni destinataire si la commande n'existe pas encore en base.
+            supabase.from('orders').update({ price: o.price, product: o.product, products: o.products }).eq('id', o.id)
               .then(({ error }) => { if (error) logError('supabase_price_update', `Failed to update price for ${o.id}: ${error.message}`, { order_id: o.id, error: error.message }); })
           );
           /* Log success */

@@ -72,13 +72,19 @@ export async function cloudSet(key, value) {
       }
     }
 
-    // NULL user_id: upsert won't dedupe NULLs, so delete+insert
-    await supabase.from('settings').delete().eq('key', key).is('user_id', null);
-    if (userId) {
-      await supabase.from('settings').delete().eq('key', key).eq('user_id', userId);
-    }
+    // NULL user_id : l'upsert ne dédoublonne pas les NULL. On INSÈRE D'ABORD, puis on
+    // supprime les anciennes lignes SEULEMENT si l'insertion a réussi.
+    // (Avant : delete puis insert — si l'insert échouait, la donnée était perdue
+    //  définitivement côté cloud. C'est ce qui pouvait effacer factures/produits.)
     const { error: e2 } = await supabase.from('settings').insert(row);
     if (e2) throw e2;
+    // Nettoyage des doublons antérieurs (jamais avant l'insertion).
+    const { data: rows } = await supabase.from('settings').select('id, updated_at').eq('key', key)
+      .is('user_id', null).order('updated_at', { ascending: false });
+    if (Array.isArray(rows) && rows.length > 1) {
+      const stale = rows.slice(1).map(r => r.id).filter(Boolean);
+      if (stale.length) await supabase.from('settings').delete().in('id', stale);
+    }
   } catch (e) {
     console.error('cloudSet failed:', key, e?.message || e);
   }
