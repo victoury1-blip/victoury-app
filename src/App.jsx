@@ -41,6 +41,28 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
+import { recalcVictCounter, generateVictId } from './lib/victId';
+
+/** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
+ *  nouvelle commande porte son numéro dès son entrée dans À Confirmer. L'id interne
+ *  reste WC-xxxx (déduplication) ; l'affichage utilise `trackingNumber || id`.
+ *  SÉCURITÉ : on ne numérote pas tant que la liste complète n'est pas chargée,
+ *  sinon le compteur serait calculé sur une liste vide (risque de doublons). */
+/** Parse une date applicative « JJ/MM/AAAA HH:mm(:ss) » -> timestamp (0 si invalide). */
+function parseAppDate(str) {
+  const m = String(str || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+}
+
+function assignVictTracking(freshOrders, allOrders) {
+  if (!allOrders || !allOrders.length) return freshOrders;
+  recalcVictCounter(allOrders);
+  const isVict = (s) => /^VICT\d+$/i.test(s || '');
+  freshOrders.forEach((o) => {
+    if (!isVict(o.trackingNumber) && !isVict(o.id)) o.trackingNumber = generateVictId();
+  });
+  return freshOrders;
+}
 
 const TAB_FROM_PARAM = {
   'a-confirmer': 'a_confirmer',
@@ -406,6 +428,37 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
+  /* ── Rattrapage : une commande À Confirmer SANS code VICT en reçoit un ──
+     Sert aux commandes entrées pendant que l'attribution à l'import était absente.
+     Uniquement le statut « nouveau », uniquement celles SANS code : aucune commande
+     déjà numérotée n'est jamais modifiée. Une seule passe par chargement. */
+  const victFillRef = useRef(false);
+  useEffect(() => {
+    if (!session || !orders.length || victFillRef.current) return;
+    const isVict = (s) => /^VICT\d+$/i.test(s || '');
+    const missing = orders
+      .filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber))
+      .sort((a, b) => parseAppDate(a.dateAdded) - parseAppDate(b.dateAdded));
+    if (!missing.length) return;
+    victFillRef.current = true;
+    (async () => {
+      try {
+        recalcVictCounter(orders);
+        const assign = new Map();
+        for (const o of missing) assign.set(o.id, generateVictId());
+        const entries = [...assign.entries()];
+        const BATCH = 20;
+        for (let i = 0; i < entries.length; i += BATCH) {
+          await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
+            supabase.from('orders').update({ tracking_number: vict }).eq('id', id)
+              .then(() => {}).catch(() => {})
+          ));
+        }
+        setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));
+      } catch { victFillRef.current = false; }
+    })();
+  }, [session, orders.length]);
+
   /* ── Catch-up sync: re-fetch orders when the app regains focus ──
      Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
      arrière-plan la connexion se coupe et les changements faits ailleurs (PC)
@@ -651,6 +704,7 @@ export default function App() {
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
+            assignVictTracking(fresh, prev); // code VICT dès l'entrée
             /* Browser push notification for first new order */
             if (initialLoadDoneRef.current) fresh.slice(0, 1).forEach(notifyNewOrder);
             /* Play notification sound — only after initial DB load */
@@ -1010,7 +1064,7 @@ export default function App() {
       const existingIds = new Set(prev.map((o) => o.id));
       // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
       const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
-      if (fresh.length) saveOrdersToSupabase(fresh);
+      if (fresh.length) { assignVictTracking(fresh, prev); saveOrdersToSupabase(fresh); }
       return fresh.length ? [...fresh, ...prev] : prev;
     });
     navigate('/commandes/a-confirmer');
