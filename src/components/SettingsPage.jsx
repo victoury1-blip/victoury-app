@@ -505,6 +505,50 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      le code, la commande la plus ANCIENNE le garde. Les codes « MIMA » sont exclus. */
   const [dupFix, setDupFix] = useState({ running: false, message: '' });
   const [queueMsg, setQueueMsg] = useState('');
+  const [diag, setDiag] = useState({ running: false, lines: [] });
+
+  /* Diagnostic LECTURE SEULE : que contient la base pour les codes en double ? */
+  async function runDupDiagnostic() {
+    setDiag({ running: true, lines: [] });
+    try {
+      let all = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase.from('orders')
+          .select('id, tracking_number, ozone_tracking, date_updated, status, recipient, is_deleted')
+          .order('id', { ascending: true }).range(from, from + PAGE - 1);
+        if (error) { setDiag({ running: false, lines: ['Erreur : ' + error.message] }); return; }
+        const b = data || [];
+        all = all.concat(b);
+        if (b.length < PAGE) break;
+      }
+      const active = all.filter(r => !r.is_deleted);
+      const m = new Map();
+      for (const r of active) {
+        const c = (r.tracking_number || '').trim();
+        if (!c) continue;
+        if (!m.has(c)) m.set(c, []);
+        m.get(c).push(r);
+      }
+      const dups = [...m.entries()].filter(([, l]) => l.length > 1);
+      const lines = [
+        `Lignes en base : ${all.length} (actives ${active.length})`,
+        `Codes en double EN BASE : ${dups.length}`,
+        '',
+      ];
+      for (const [code, list] of dups.slice(0, 3)) {
+        lines.push(`── ${code} ──`);
+        for (const r of list) {
+          lines.push(`  id=${r.id} | ${r.recipient?.name || '?'} | maj=${r.date_updated || '?'} | ozon=${r.ozone_tracking || '-'} | ${r.status}`);
+        }
+        lines.push('');
+      }
+      if (!dups.length) lines.push('🎉 Aucun doublon en base : l’alerte affichée vient de données locales périmées (rechargez).');
+      setDiag({ running: false, lines });
+    } catch (e) {
+      setDiag({ running: false, lines: ['Erreur : ' + (e?.message || 'échec')] });
+    }
+  }
 
   async function fixDuplicateCodes() {
     const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
@@ -1188,6 +1232,26 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               </button>
               {queueMsg && <span className="text-xs text-gray-600">{queueMsg}</span>}
             </div>
+          </div>
+
+          {/* Diagnostic : montre ce que contient RÉELLEMENT la base pour un doublon */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Diagnostic des doublons</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Lit la base et affiche, pour le premier code en double, les commandes
+              concernées avec leur date de mise à jour. Aucune écriture.
+            </p>
+            <div className="flex items-center gap-2">
+              <button onClick={runDupDiagnostic} disabled={diag.running}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition">
+                {diag.running ? 'Lecture…' : 'Diagnostic'}
+              </button>
+            </div>
+            {diag.lines.length > 0 && (
+              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
+                {diag.lines.join('\n')}
+              </pre>
+            )}
           </div>
         </div>
       </Modal>
