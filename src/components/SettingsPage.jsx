@@ -490,6 +490,103 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     }
   }
 
+  /* ── Correction des codes de suivi EN DOUBLE ──
+     Pour chaque code partagé par plusieurs commandes : on demande à Ozon à qui
+     appartient réellement ce code (téléphone du destinataire). Cette commande le
+     GARDE ; les autres reçoivent un nouveau numéro libre. Si Ozon ne connaît pas
+     le code, la commande la plus ANCIENNE le garde. Les codes « MIMA » sont exclus. */
+  const [dupFix, setDupFix] = useState({ running: false, message: '' });
+
+  async function fixDuplicateCodes() {
+    const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
+    const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^212/, '0');
+    const isProtected = (o) => /mima/i.test(`${o.trackingNumber || ''} ${o.ozoneTracking || ''} ${o.id || ''}`);
+    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
+    const ts = (s) => {
+      const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+      return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+    };
+
+    // Groupes de commandes partageant le même code.
+    const groups = new Map();
+    for (const o of orders || []) {
+      const code = (o.trackingNumber || '').trim();
+      if (!code || isProtected(o)) continue;
+      if (!groups.has(code)) groups.set(code, []);
+      groups.get(code).push(o);
+    }
+    const dupes = [...groups.entries()].filter(([, list]) => list.length > 1);
+    if (!dupes.length) { setDupFix({ running: false, message: 'Aucun doublon à corriger.' }); return; }
+
+    setDupFix({ running: true, message: `Analyse de ${dupes.length} code(s) en double…` });
+
+    // Numéros déjà utilisés (tous codes confondus) pour n'en réattribuer aucun.
+    const used = new Set();
+    for (const o of orders || []) {
+      for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
+    }
+    let next = Math.max(0, ...used);
+    const nextFreeCode = () => { do { next += 1; } while (used.has(next)); used.add(next); return 'VICT' + String(next).padStart(4, '0'); };
+
+    const base = cfg.customerId && cfg.apiKey
+      ? `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}` : null;
+
+    const updates = []; // { id, code }
+    let byOzon = 0;
+    try {
+      for (const [code, list] of dupes) {
+        // Qui possède vraiment ce code d'après Ozon ?
+        let ownerId = null;
+        if (base) {
+          try {
+            const fd = new FormData();
+            fd.append('tracking-number', code);
+            const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: fd });
+            if (res.ok) {
+              const json = await res.json();
+              const parcel = json['PARCEL-INFO'] || json;
+              const infos = parcel['INFOS'] || parcel;
+              const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
+              if (phone) {
+                const match = list.find(o => digits(o.recipient?.phone) === phone);
+                if (match) { ownerId = match.id; byOzon++; }
+              }
+            }
+          } catch {}
+        }
+        // Sinon : la plus ancienne garde le code.
+        if (!ownerId) {
+          ownerId = [...list].sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded))[0].id;
+        }
+        for (const o of list) {
+          if (o.id === ownerId) continue;
+          updates.push({ id: o.id, code: nextFreeCode() });
+        }
+        setDupFix({ running: true, message: `Analyse… ${updates.length} commande(s) à renuméroter` });
+      }
+
+      if (!updates.length) { setDupFix({ running: false, message: 'Aucun changement nécessaire.' }); return; }
+
+      let failed = 0;
+      const okIds = new Map();
+      const B = 20;
+      for (let i = 0; i < updates.length; i += B) {
+        await Promise.all(updates.slice(i, i + B).map(({ id, code }) =>
+          supabase.from('orders').update({ tracking_number: code }).eq('id', id)
+            .then(({ error }) => { if (error) failed++; else okIds.set(id, code); })
+            .catch(() => { failed++; })
+        ));
+      }
+      setOrders(prev => prev.map(o => okIds.has(o.id) ? { ...o, trackingNumber: okIds.get(o.id) } : o));
+      setDupFix({
+        running: false,
+        message: `✅ ${okIds.size} commande(s) renumérotée(s) — ${byOzon} propriétaire(s) confirmé(s) par Ozon${failed ? ` — ⚠️ ${failed} échec(s)` : ''}.`,
+      });
+    } catch (e) {
+      setDupFix({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
+    }
+  }
+
   /* ── Settings cards config ── */
   const CARDS = [
     {
@@ -950,6 +1047,24 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                 {ozonRestore.running ? 'Recherche…' : 'Restaurer les codes'}
               </button>
               {ozonRestore.message && <span className="text-xs text-gray-600">{ozonRestore.message}</span>}
+            </div>
+          </div>
+
+          {/* Correction des codes en double */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Corriger les codes de suivi en double</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Quand un même code est porté par plusieurs commandes, Ozon indique à qui il
+              appartient réellement : cette commande garde le code, les autres reçoivent un
+              nouveau numéro libre (jamais un numéro déjà utilisé).
+              <strong className="text-gray-700"> Les codes « MIMA » sont exclus.</strong>
+            </p>
+            <div className="flex items-center gap-2">
+              <button onClick={fixDuplicateCodes} disabled={dupFix.running}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-40 transition">
+                {dupFix.running ? 'Correction…' : 'Corriger les doublons'}
+              </button>
+              {dupFix.message && <span className="text-xs text-gray-600">{dupFix.message}</span>}
             </div>
           </div>
         </div>
