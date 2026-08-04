@@ -392,6 +392,14 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      Ozon, et on remet ce code sur la commande correspondante. Aucun effacement. */
   const [ozonRestore, setOzonRestore] = useState({ running: false, message: '' });
 
+  /* Horodatage au format de l'application. Indispensable sur toute correction de
+     code : sans nouvelle date de mise à jour, la file de synchronisation croit que
+     son ancien instantané est encore valable et réécrit l'ancien code. */
+  const stampNow = () => new Date().toLocaleString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).replace(',', '');
+
   async function restoreOzonCodes() {
     const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
     if (!cfg.customerId || !cfg.apiKey) return;
@@ -473,7 +481,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const okIds = new Set();
       for (let i = 0; i < toFix.length; i += B) {
         await Promise.all(toFix.slice(i, i + B).map(({ code, order }) =>
-          supabase.from('orders').update({ tracking_number: code, ozone_tracking: code }).eq('id', order.id)
+          supabase.from('orders').update({ tracking_number: code, ozone_tracking: code, date_updated: stampNow() }).eq('id', order.id)
             .then(({ error }) => { if (error) failed++; else okIds.add(order.id); })
             .catch(() => { failed++; })
         ));
@@ -599,7 +607,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const B = 20;
       for (let i = 0; i < updates.length; i += B) {
         await Promise.all(updates.slice(i, i + B).map(({ id, code }) =>
-          supabase.from('orders').update({ tracking_number: code }).eq('id', id)
+          supabase.from('orders').update({ tracking_number: code, date_updated: stampNow() }).eq('id', id)
             .then(({ error }) => { if (error) { failed++; lastError = error.message; } else okIds.set(id, code); })
             .catch((e) => { failed++; lastError = e?.message || 'réseau'; })
         ));
@@ -620,6 +628,10 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       // On n'applique en local QUE ce qui est réellement en base.
       const applied = new Map([...okIds].filter(([id, code]) => persisted.get(id) === code));
       setOrders(prev => prev.map(o => applied.has(o.id) ? { ...o, trackingNumber: applied.get(o.id) } : o));
+
+      // La file de synchronisation peut contenir d'anciens instantanés qui
+      // réécriraient les codes qu'on vient de corriger : on la vide.
+      try { const { clearSyncQueue } = await import('../lib/offlineStore'); await clearSyncQueue(); } catch {}
 
       // CONTRÔLE FINAL : on recompte les doublons directement en base. S'il en
       // reste, c'est qu'un autre appareil (onglet resté ouvert avec une ancienne
@@ -653,8 +665,11 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       if (notPersisted.length) parts.push(`⛔ ${notPersisted.length} non enregistré(s) — droits d'écriture ?`);
       parts.push(after.length
         ? `⛔ il reste ${after.length} doublon(s) EN BASE — fermez l'application sur les autres appareils puis relancez`
-        : '🎉 plus aucun doublon en base');
+        : '🎉 plus aucun doublon en base — rechargement…');
       setDupFix({ running: false, message: parts.join(' — ') });
+      // Succès : on recharge pour repartir des données de la base (l'affichage
+      // conservait sinon l'ancienne liste locale et semblait « inchangé »).
+      if (!after.length) setTimeout(() => window.location.reload(), 2500);
     } catch (e) {
       setDupFix({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
     }
