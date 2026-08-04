@@ -508,14 +508,39 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
     };
 
-    // Groupes de commandes partageant le même code.
+    // On travaille sur les données FRAÎCHES de la base (pas sur l'état local, qui
+    // peut être périmé ou différent d'un appareil à l'autre).
+    setDupFix({ running: true, message: 'Lecture des commandes depuis la base…' });
+    let dbOrders = [];
+    try {
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase.from('orders')
+          .select('id, tracking_number, ozone_tracking, recipient, date_added, status')
+          .or('is_deleted.is.null,is_deleted.eq.false')
+          .order('id', { ascending: true }).range(from, from + PAGE - 1);
+        if (error) { setDupFix({ running: false, message: 'Lecture impossible : ' + error.message }); return; }
+        const batch = data || [];
+        dbOrders = dbOrders.concat(batch);
+        if (batch.length < PAGE) break;
+      }
+    } catch (e) {
+      setDupFix({ running: false, message: 'Lecture impossible : ' + (e?.message || 'échec') }); return;
+    }
+    const rows = dbOrders.map(r => ({
+      id: r.id, trackingNumber: r.tracking_number, ozoneTracking: r.ozone_tracking,
+      recipient: r.recipient || {}, dateAdded: r.date_added, status: r.status,
+    }));
+
+    // Groupes de commandes partageant le même code (ids DISTINCTS uniquement).
     const groups = new Map();
-    for (const o of orders || []) {
+    for (const o of rows) {
       const code = (o.trackingNumber || '').trim();
       if (!code || isProtected(o)) continue;
-      if (!groups.has(code)) groups.set(code, []);
-      groups.get(code).push(o);
+      if (!groups.has(code)) groups.set(code, new Map());
+      groups.get(code).set(o.id, o);
     }
+    for (const [code, m] of groups) groups.set(code, [...m.values()]);
     const dupes = [...groups.entries()].filter(([, list]) => list.length > 1);
     if (!dupes.length) { setDupFix({ running: false, message: 'Aucun doublon à corriger.' }); return; }
 
@@ -523,7 +548,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
     // Numéros déjà utilisés (tous codes confondus) pour n'en réattribuer aucun.
     const used = new Set();
-    for (const o of orders || []) {
+    for (const o of rows) {
       for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
     }
     let next = Math.max(0, ...used);
@@ -596,10 +621,39 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const applied = new Map([...okIds].filter(([id, code]) => persisted.get(id) === code));
       setOrders(prev => prev.map(o => applied.has(o.id) ? { ...o, trackingNumber: applied.get(o.id) } : o));
 
+      // CONTRÔLE FINAL : on recompte les doublons directement en base. S'il en
+      // reste, c'est qu'un autre appareil (onglet resté ouvert avec une ancienne
+      // version) réécrit les anciennes valeurs — on le dit clairement.
+      setDupFix({ running: true, message: 'Contrôle final…' });
+      let after = [];
+      try {
+        const PAGE = 1000;
+        let all = [];
+        for (let from = 0; ; from += PAGE) {
+          const { data } = await supabase.from('orders').select('id, tracking_number')
+            .or('is_deleted.is.null,is_deleted.eq.false')
+            .order('id', { ascending: true }).range(from, from + PAGE - 1);
+          const batch = data || [];
+          all = all.concat(batch);
+          if (batch.length < PAGE) break;
+        }
+        const m = new Map();
+        for (const r of all) {
+          const c = (r.tracking_number || '').trim();
+          if (!c) continue;
+          if (!m.has(c)) m.set(c, new Set());
+          m.get(c).add(r.id);
+        }
+        after = [...m.entries()].filter(([, s]) => s.size > 1);
+      } catch {}
+
       const parts = [`✅ ${applied.size} commande(s) corrigée(s) et vérifiée(s) en base`];
       if (byOzon) parts.push(`${byOzon} propriétaire(s) confirmé(s) par Ozon`);
       if (failed) parts.push(`⚠️ ${failed} refus d'écriture${lastError ? ` (${lastError})` : ''}`);
-      if (notPersisted.length) parts.push(`⛔ ${notPersisted.length} non enregistré(s) en base — droits d'écriture ?`);
+      if (notPersisted.length) parts.push(`⛔ ${notPersisted.length} non enregistré(s) — droits d'écriture ?`);
+      parts.push(after.length
+        ? `⛔ il reste ${after.length} doublon(s) EN BASE — fermez l'application sur les autres appareils puis relancez`
+        : '🎉 plus aucun doublon en base');
       setDupFix({ running: false, message: parts.join(' — ') });
     } catch (e) {
       setDupFix({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
