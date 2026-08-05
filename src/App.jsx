@@ -867,7 +867,8 @@ export default function App() {
         const applyStatus = (o, status) => {
           if (!shouldApply(o.ozoneLastStatus, status)) return;
           setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
-          supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id).then(() => {});
+          supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id)
+            .then(({ error }) => { if (error) console.warn('[ozon] statut non enregistré:', o.id, error.message); });
         };
         // UNIQUEMENT les livraisons Ozon : interroger Ozon pour une commande confiée à
         // un livreur personnel lui collait un statut Ozon (« Livré ») qui n'a aucun sens.
@@ -876,7 +877,8 @@ export default function App() {
         // Phase 1 — API officielle de suivi (par numéro, avec variantes du 0).
         const stillPending = [];
         for (const o of toSync) {
-          const tn = o.ozoneTracking || o.trackingNumber || o.id;
+          // Le code affiché prime : une correction manuelle doit être suivie.
+          const tn = o.trackingNumber || o.ozoneTracking || o.id;
           try {
             let status = await trackByNumber(tn);
             if (!status) {

@@ -812,7 +812,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           <button onClick={() => exportToExcel(filtered, `commandes_${activeTab}_${new Date().toISOString().slice(0,10)}`)} className="p-2 rounded-lg border border-teal-100 bg-teal-50 text-teal-600 hover:bg-teal-100 transition-colors" title="Exporter Excel">
             <Download size={14} />
           </button>
-          <button onClick={() => exportToPDF(filtered, `commandes_${activeTab}`)} className="p-2 rounded-lg border border-rose-100 bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Exporter PDF">
+          <button onClick={() => { if (exportToPDF(filtered, `commandes_${activeTab}`) === false) toast.error('Popup bloquée — autorisez les popups pour ce site.'); }} className="p-2 rounded-lg border border-rose-100 bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Exporter PDF">
             <Printer size={14} />
           </button>
           <button className="p-2 rounded-lg border border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors" title="Paramètres">

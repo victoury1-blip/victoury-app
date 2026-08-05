@@ -1540,7 +1540,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                       };
                       for (let i = 0; i < validatedOrders.length; i++) {
                         const o = validatedOrders[i];
-                        const tn = o.ozoneTracking || o.trackingNumber || o.id;
+                        const tn = o.trackingNumber || o.ozoneTracking || o.id;
                         setOzoneSyncState(p => ({ ...p, message: `${i + 1}/${validatedOrders.length}: ${tn}` }));
                         try {
                           const trackBody = new FormData();

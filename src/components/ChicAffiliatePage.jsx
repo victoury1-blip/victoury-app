@@ -1,3 +1,4 @@
+import { useToast } from './Toast';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Store, Settings, Search, ChevronDown, ChevronRight, RefreshCw,
@@ -1559,6 +1560,7 @@ function SendOrderTab() {
    Regroupe les commandes Livrées/Facturées, calcule ventes/revendeur/bénéfice,
    permet de marquer « Facturée » et d'imprimer — comme les Factures Victoury. */
 function ChicFacturesTab({ orders = [], setOrders }) {
+  const toast = useToast();
   const list = orders.filter(o => o.status === 'chic_livre' || o.status === 'chic_facture');
   const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 
@@ -1600,7 +1602,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
   }
   function imprimer() {
     const w = window.open('', '_blank');
-    if (!w) return;
+    if (!w) { toast.error('Popup bloquée — autorisez les popups pour ce site.'); return; }
     const rowsHtml = rows.map(r => `<tr>
       <td>${r.o.id}</td><td>${r.o.recipient?.name || '—'}</td><td>${r.prodName}</td>
       <td>${r.o.product?.size || '—'}</td><td>${r.qty}</td>

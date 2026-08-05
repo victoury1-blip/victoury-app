@@ -490,7 +490,7 @@ function BonDetailPage({ orders }) {
             <ArrowLeft size={16} />
             Retour à la liste
           </button>
-          <button onClick={() => printBon(bon, colisDetails, 'ramassage')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+          <button onClick={() => { if (printBon(bon, colisDetails, 'ramassage') === false) showMessage('Popup bloquée — autorisez les popups pour ce site.', 'error'); }} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
             <Printer size={16} />
             Imprimer
           </button>

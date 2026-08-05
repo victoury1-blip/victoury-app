@@ -277,14 +277,34 @@ export default function FournisseurPage({ orders = [] }) {
       const d = parseFrDate(o.dateUpdated) || parseFrDate(o.dateAdded);
       const inWeek = d && d >= weekStart;
       for (const p of prods) {
-        // Chaque pièce vendue est attribuée à UN SEUL article (le premier qui matche).
-        const item = allItems.find(it => matchProduct(p, it));
-        if (!item) continue;
-        const q = parseInt(p.qty, 10) || 1;
-        map[item.id].total += q;
-        if (inWeek) map[item.id].semaine += q;
+        // Répartition FIFO : si le même modèle a été acheté sur PLUSIEURS factures
+        // fournisseur, on épuise d'abord la plus ancienne. Sans cela, tout était
+        // imputé au premier article (reste négatif) et les autres restaient à 100 %.
+        let q = parseInt(p.qty, 10) || 1;
         const sz = (p.size || '').toString().trim().toUpperCase();
-        if (sz) map[item.id].bySize[sz] = (map[item.id].bySize[sz] || 0) + q;
+        const candidates = allItems.filter(it => matchProduct(p, it));
+        for (const item of candidates) {
+          if (q <= 0) break;
+          // Capacité restante : sur la taille précise si connue, sinon sur le total.
+          const cap = sz
+            ? (parseInt((item.sizes || []).find(x => (x.taille || '').toUpperCase() === sz)?.qte, 10) || 0)
+              - (map[item.id].bySize[sz] || 0)
+            : itemQty(item) - map[item.id].total;
+          const take = Math.max(0, Math.min(q, cap));
+          if (!take) continue;
+          q -= take;
+          map[item.id].total += take;
+          if (inWeek) map[item.id].semaine += take;
+          if (sz) map[item.id].bySize[sz] = (map[item.id].bySize[sz] || 0) + take;
+        }
+        // Vendu au-delà du stock acheté : on l'impute quand même au 1er article
+        // correspondant pour que le « reste » négatif reste visible.
+        if (q > 0 && candidates.length) {
+          const item = candidates[0];
+          map[item.id].total += q;
+          if (inWeek) map[item.id].semaine += q;
+          if (sz) map[item.id].bySize[sz] = (map[item.id].bySize[sz] || 0) + q;
+        }
       }
     }
     return map;
