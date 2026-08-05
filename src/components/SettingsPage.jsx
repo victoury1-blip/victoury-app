@@ -429,6 +429,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     }
 
     const found = [];              // { code, order }
+    // Code Ozon -> téléphone du destinataire chez Ozon. Sert à PROUVER qu'un code
+    // porté par une commande appartient en réalité à quelqu'un d'autre.
+    const codePhone = new Map();
     const MAX = 400, CONC = 10;
     try {
       for (let start = 1; start <= MAX; start += CONC) {
@@ -454,6 +457,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               const infos = parcel['INFOS'] || parcel;
               const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
               if (!phone) continue;
+              codePhone.set(code.toUpperCase(), phone);
               const order = byPhone.get(phone);
               if (order) found.push({ code, order });
             } catch {}
@@ -466,20 +470,44 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       // déjà porté par une AUTRE commande n'est pas réattribué (pas de doublon) ; et
       // une commande ne peut recevoir qu'un seul code.
       const takenBy = new Map();
-      for (const o of orders || []) if (o.trackingNumber) takenBy.set(o.trackingNumber, o.id);
+      for (const o of orders || []) if (o.trackingNumber) takenBy.set(o.trackingNumber.toUpperCase(), o.id);
+
+      // Codes PROUVÉS faux : le colis existe chez Ozon mais au nom d'un AUTRE
+      // téléphone. Ces commandes ne doivent plus bloquer la réattribution du code
+      // à son vrai propriétaire, et leur propre code doit être corrigé.
+      const wrongHolders = new Set();
+      for (const o of orders || []) {
+        if (isProtected(o) || !o.trackingNumber) continue;
+        const ozPhone = codePhone.get(o.trackingNumber.toUpperCase());
+        if (!ozPhone) continue;
+        if (ozPhone !== digits(o.recipient?.phone)) wrongHolders.add(o.id);
+      }
+
       const seenOrders = new Set();
       const toFix = [];
       let skipped = 0;
       for (const { code, order } of found) {
         if (isProtected(order) || order.trackingNumber === code) continue;
-        const owner = takenBy.get(code);
-        if ((owner && owner !== order.id) || seenOrders.has(order.id)) { skipped++; continue; }
+        const owner = takenBy.get(code.toUpperCase());
+        // Un détenteur dont le code est prouvé faux n'est pas un vrai conflit.
+        if ((owner && owner !== order.id && !wrongHolders.has(owner)) || seenOrders.has(order.id)) { skipped++; continue; }
         seenOrders.add(order.id);
         toFix.push({ code, order });
+      }
+      // Commandes au code prouvé faux et pour lesquelles Ozon n'a AUCUN colis :
+      // on retire le code erroné (l'app réaffiche l'identifiant d'origine) plutôt
+      // que de laisser un code qui appartient à un autre client.
+      let cleared = 0;
+      for (const o of orders || []) {
+        if (!wrongHolders.has(o.id) || seenOrders.has(o.id)) continue;
+        seenOrders.add(o.id);
+        toFix.push({ code: null, order: o });
+        cleared++;
       }
       const notes = [];
       if (ambiguous) notes.push(`${ambiguous} commande(s) ignorée(s) (même téléphone)`);
       if (skipped) notes.push(`${skipped} conflit(s) ignoré(s)`);
+      if (cleared) notes.push(`${cleared} code(s) erroné(s) retiré(s)`);
       const suffix = notes.length ? ` — ${notes.join(', ')}` : '';
       if (!toFix.length) {
         setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger${suffix}.` });
@@ -497,6 +525,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       }
       // On n'applique en local QUE les écritures réellement réussies.
       const map = new Map(toFix.filter(({ order }) => okIds.has(order.id)).map(({ code, order }) => [order.id, code]));
+      // Le livreur mémorisé appartenait à l'ancien code : on le supprime pour
+      // qu'il soit re-récupéré depuis la fenêtre « Livraison ».
+      for (const id of map.keys()) { try { localStorage.removeItem(`ozone_dp_${id}`); } catch {} }
       setOrders(prev => prev.map(o => map.has(o.id) ? { ...o, trackingNumber: map.get(o.id), ozoneTracking: map.get(o.id) } : o));
       setOzonRestore({
         running: false,
