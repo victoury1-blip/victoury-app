@@ -503,8 +503,12 @@ export default function App() {
         if (!olderOwner.has(n) || d < olderOwner.get(n).d) olderOwner.set(n, { d, id: o.id });
       }
     }
+    // « confirme » est inclus : le code n'est réellement remis au transporteur
+    // qu'à l'étape suivante (att_ramassage, où `validated` passe à true) — un
+    // colis confirmé mais pas encore validé peut donc encore être renuméroté
+    // sans casser un envoi réel.
     const toRepair = orders.filter(o => {
-      if (o.status !== 'nouveau' || o.validated) return false;
+      if (!['nouveau', 'confirme'].includes(o.status) || o.validated) return false;
       if (/mima/i.test(`${o.trackingNumber || ''} ${o.id || ''}`)) return false;
       const n = victNum(o.trackingNumber);
       if (!n || victNum(o.id)) return false;        // pas de code VICT propre à corriger
