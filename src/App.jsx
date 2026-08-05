@@ -168,6 +168,9 @@ export default function App() {
   // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
   const recentEditsRef = useRef(new Map());
   const wooConfigRef = useRef(null);
+  // Un aléa réseau isolé (30s de polling) ne doit pas afficher un bandeau rouge
+  // à chaque fois : on n'alerte qu'après 2 échecs CONSÉCUTIFS.
+  const wooFailCountRef = useRef(0);
   const notifConfigRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const ordersRef = useRef(orders);
@@ -709,6 +712,9 @@ export default function App() {
           data = j.orders || [];
         } catch (apiErr) {
           // Repli : appel direct via le rewrite Vercel (query-string + header).
+          // Un AbortError renvoie le message brut du navigateur (« signal is
+          // aborted without reason ») : on le reformule pour rester lisible.
+          const friendly = (err) => (err?.name === 'AbortError' ? 'serveur WooCommerce trop lent (délai dépassé)' : (err?.message || 'erreur réseau'));
           const wcHeaders = { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) };
           const wcAuthQs = `consumer_key=${encodeURIComponent(config.consumerKey)}&consumer_secret=${encodeURIComponent(config.consumerSecret)}`;
           const controller = new AbortController();
@@ -719,12 +725,18 @@ export default function App() {
           } catch (directErr) {
             // Les deux voies ont échoué : afficher le message le plus utile
             // (celui de l'API serveur, qui explique la vraie cause).
-            setWooError('⚠️ WooCommerce: ' + (apiErr.message || directErr.message || 'connexion impossible'));
+            wooFailCountRef.current += 1;
+            if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || friendly(directErr) || 'connexion impossible'));
             return;
           } finally { clearTimeout(to); }
-          if (!res.ok) { setWooError('⚠️ WooCommerce: ' + (apiErr.message || 'erreur ' + res.status) + ' — vérifiez vos clés API'); return; }
+          if (!res.ok) {
+            wooFailCountRef.current += 1;
+            if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || 'erreur ' + res.status) + ' — vérifiez vos clés API');
+            return;
+          }
           data = await res.json();
         }
+        wooFailCountRef.current = 0;
         setWooError(null);
         const getMeta = (meta, ...keys) => {
           if (!meta) return '';
@@ -852,7 +864,8 @@ export default function App() {
       } catch (e) {
         const isTimeout = e?.name === 'AbortError';
         const msg = isTimeout ? 'serveur WooCommerce lent (délai dépassé) — réessai automatique' : (e?.message || 'erreur réseau');
-        setWooError('⚠️ WooCommerce: ' + msg);
+        wooFailCountRef.current += 1;
+        if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + msg);
         logWcSync({ status: 'error', error: msg });
         logError('wc_poll', msg, { timeout: isTimeout });
       } finally {
