@@ -528,7 +528,13 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       // Le livreur mémorisé appartenait à l'ancien code : on le supprime pour
       // qu'il soit re-récupéré depuis la fenêtre « Livraison ».
       for (const id of map.keys()) { try { localStorage.removeItem(`ozone_dp_${id}`); } catch {} }
-      setOrders(prev => prev.map(o => map.has(o.id) ? { ...o, trackingNumber: map.get(o.id), ozoneTracking: map.get(o.id) } : o));
+      // On aligne AUSSI la date locale sur celle écrite en base : sinon la copie
+      // locale reste « plus ancienne » et une re-synchronisation peut réécrire
+      // l'ancien code par-dessus la correction (effet « ça ne se sauvegarde pas »).
+      const stamped = stampNow();
+      setOrders(prev => prev.map(o => map.has(o.id)
+        ? { ...o, trackingNumber: map.get(o.id), ozoneTracking: map.get(o.id), dateUpdated: stamped }
+        : o));
       setOzonRestore({
         running: false,
         message: `✅ ${map.size} code(s) restauré(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}${suffix}.`,
@@ -571,8 +577,33 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         m.get(c).push(r);
       }
       const dups = [...m.entries()].filter(([, l]) => l.length > 1);
+
+      /* Où en est la série VICT ? (question la plus fréquente) */
+      const victNum = (v) => { const x = /^VICT(\d+)$/i.exec(String(v || '').trim()); return x ? parseInt(x[1], 10) : 0; };
+      const nums = new Set();
+      for (const r of active) {
+        for (const n of [victNum(r.id), victNum(r.tracking_number)]) if (n) nums.add(n);
+      }
+      const sorted = [...nums].sort((a, b) => a - b);
+      const normal = sorted.filter(n => n < 1000);
+      const aberrants = sorted.filter(n => n >= 1000);
+      const maxNormal = normal.length ? normal[normal.length - 1] : 0;
+      const libres = [];
+      for (let n = 1; n <= maxNormal && libres.length < 10; n++) if (!nums.has(n)) libres.push('VICT' + String(n).padStart(4, '0'));
+      const fmt = (n) => 'VICT' + String(n).padStart(4, '0');
+
       const lines = [
         `Lignes en base : ${all.length} (actives ${active.length})`,
+        '',
+        '── SÉRIE VICT ──',
+        `Dernier numéro de la série : ${maxNormal ? fmt(maxNormal) : '—'}`,
+        `Prochain numéro attribué   : ${fmt(maxNormal + 1)}`,
+        `Numéros VICT utilisés      : ${nums.size}`,
+        aberrants.length
+          ? `Numéros aberrants (>= 1000) : ${aberrants.length} — ${aberrants.slice(0, 8).map(fmt).join(', ')}${aberrants.length > 8 ? '…' : ''}`
+          : 'Numéros aberrants (>= 1000) : aucun',
+        libres.length ? `Trous dans la série : ${libres.join(', ')}${libres.length === 10 ? '…' : ''}` : 'Trous dans la série : aucun',
+        '',
         `Codes en double EN BASE : ${dups.length}`,
         '',
       ];
