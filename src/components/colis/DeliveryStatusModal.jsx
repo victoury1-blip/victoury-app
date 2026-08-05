@@ -16,13 +16,18 @@ export const DELIVERY_STATUSES = [
   { value: 'manque_stock',  label: 'Manque de Stock',      color: '#b45309' },
 ];
 
+import { ozonDpPayload } from '../../lib/ozonDp';
+
 export default function DeliveryStatusModal({ order, onClose, onSave }) {
-  const ozTn = order.ozoneTracking || order.trackingNumber;
+  // Le code AFFICHÉ (trackingNumber) prime : s'il a été corrigé à la main, c'est
+  // lui qui fait foi, pas l'ancien code Ozon mémorisé.
+  const ozTn = order.trackingNumber || order.ozoneTracking;
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState('');
   const [ozoneState, setOzoneState] = useState('idle');
   const [ozoneData, setOzoneData] = useState(null);
   const [manualTn, setManualTn] = useState('');
+  const [phoneMismatch, setPhoneMismatch] = useState(null);
   const current = DELIVERY_STATUSES.find(s => s.value === status);
   const localStatus = DELIVERY_STATUSES.find(s => s.value === order.status);
 
@@ -47,7 +52,7 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
       const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
       const tns = customTn
         ? [customTn]
-        : [...new Set([ozTn, order.trackingNumber, order.id].filter(Boolean))];
+        : [...new Set([order.trackingNumber, order.ozoneTracking, order.id].filter(Boolean))];
 
       for (const tn of tns) {
         try {
@@ -109,8 +114,18 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
             deliveryPerson,
             deliveryPhone,
           });
-          if (deliveryPerson || deliveryPhone) {
-            try { localStorage.setItem(`ozone_dp_${order.id}`, JSON.stringify({ name: deliveryPerson, phone: deliveryPhone })); cloudSet(`ozone_dp_${order.id}`, { name: deliveryPerson, phone: deliveryPhone }); } catch {}
+          // Le colis Ozon doit bien être CELUI du client : si le téléphone ne
+          // correspond pas, le code d'envoi appartient à une autre commande — on
+          // n'enregistre surtout pas son livreur (sinon le client reçoit les
+          // coordonnées du livreur de quelqu'un d'autre).
+          const dig = (v) => String(v || '').replace(/\D/g, '').replace(/^212/, '0');
+          const ozPhone = dig(parcelInfos['PHONE'] || parcelInfos['RECIPIENT-PHONE']);
+          const ourPhone = dig(order.recipient?.phone);
+          const samePhone = !ozPhone || !ourPhone || ozPhone === ourPhone;
+          setPhoneMismatch(samePhone ? null : { ozPhone, tn });
+          if (samePhone && (deliveryPerson || deliveryPhone)) {
+            const payload = ozonDpPayload({ ...order, trackingNumber: realTn || tn }, deliveryPerson, deliveryPhone);
+            try { localStorage.setItem(`ozone_dp_${order.id}`, JSON.stringify(payload)); cloudSet(`ozone_dp_${order.id}`, payload); } catch {}
           }
           if (ozStatus) onSave(order.id, order.status, '', realTn, ozStatus);
           setOzoneState('ok');
@@ -205,6 +220,16 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
                     <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
                     <span className="text-sm font-bold text-green-700">{ozoneData.status}</span>
                   </div>
+                  {phoneMismatch && (
+                    <div className="mb-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2">
+                      <p className="text-[11px] font-bold text-red-700">⚠️ Ce code d'envoi appartient à une autre commande</p>
+                      <p className="text-[10px] text-red-600 mt-0.5">
+                        Chez Ozon, le colis <span className="font-mono">{phoneMismatch.tn}</span> est au n° {phoneMismatch.ozPhone},
+                        alors que cette commande est au n° {order.recipient?.phone || '—'}.
+                        Corrigez le code d'envoi : le livreur affiché ici n'est PAS celui de ce client (non enregistré).
+                      </p>
+                    </div>
+                  )}
                   {ozoneData.tracking && <p className="text-[10px] text-gray-500">N° suivi: <span className="font-mono text-amber-700">{ozoneData.tracking}</span></p>}
                   {ozoneData.cod && <p className="text-[10px] text-gray-500">COD: <span className="font-semibold text-gray-700">{ozoneData.cod} DH</span></p>}
                   {ozoneData.history.length > 0 && (

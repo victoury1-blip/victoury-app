@@ -1,3 +1,4 @@
+import { getOzonDp } from './ozonDp';
 const DEFAULT_TEMPLATES = {
   confirme: {
     enabled: true,
@@ -70,7 +71,9 @@ export function buildWhatsappMessage(order, status) {
 
   const livreurs = (() => { try { return JSON.parse(localStorage.getItem('livreurs') || '[]'); } catch { return []; } })();
   const livreur = livreurs.find(l => l.nom === order.recipient?.delivery);
-  const dp = (() => { try { return JSON.parse(localStorage.getItem(`ozone_dp_${order.id}`) || '{}'); } catch { return {}; } })();
+  // Livreur Ozon mémorisé — ignoré si le code d'envoi a changé depuis (sinon on
+  // annonce au client le livreur d'un ancien code, donc d'une autre commande).
+  const dp = getOzonDp(order);
   // On envoie au client le code AFFICHÉ dans l'application (`trackingNumber || id`),
   // pas l'ancien code Ozon : sinon une correction manuelle du « Code d'envoi » reste
   // sans effet sur le message et le client reçoit un numéro obsolète.

@@ -9,6 +9,7 @@ import { openLabelPage } from './LabelPrint';
 import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import PhoneChip, { normalizePhone } from './PhoneChip';
+import { getOzonDp } from '../lib/ozonDp';
 import { useToast } from './Toast';
 import Toggle from './Toggle';
 import { findOrderByCode } from '../lib/scanUtils';
@@ -1301,10 +1302,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       const delivery = o.recipient?.delivery || '';
                       if (/ozon/i.test(delivery)) {
                         // Ozon : il faut l'agent RÉEL récupéré via la fenêtre Livraison.
-                        try {
-                          const dp = JSON.parse(localStorage.getItem(`ozone_dp_${o.id}`) || '{}');
-                          if (dp.name || dp.phone) hasInfo = true;
-                        } catch {}
+                        const dp = getOzonDp(o);
+                        if (dp.name || dp.phone) hasInfo = true;
                       } else if (delivery) {
                         // Livreur personnel : on prend SES coordonnées, jamais celles d'Ozon.
                         try {

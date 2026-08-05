@@ -435,20 +435,29 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         const batch = [];
         for (let i = start; i < start + CONC && i <= MAX; i++) batch.push(i);
         await Promise.all(batch.map(async (n) => {
-          const code = 'VICT' + String(n).padStart(4, '0');
-          try {
-            const fd = new FormData();
-            fd.append('tracking-number', code);
-            const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: fd });
-            if (!res.ok) return;
-            const json = await res.json();
-            const parcel = json['PARCEL-INFO'] || json;
-            const infos = parcel['INFOS'] || parcel;
-            const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
-            if (!phone) return;
-            const order = byPhone.get(phone);
-            if (order) found.push({ code, order });
-          } catch {}
+          // Chez Ozon, le même numéro existe sous plusieurs longueurs de
+          // remplissage (VICT0050 créé par l'app, VICT00050 saisi sur le tableau
+          // de bord). En ne testant que 4 chiffres, on ratait le vrai colis et la
+          // commande héritait du code — donc du livreur — de quelqu'un d'autre.
+          const variants = [...new Set([
+            'VICT' + String(n).padStart(4, '0'),
+            'VICT' + String(n).padStart(5, '0'),
+          ])];
+          for (const code of variants) {
+            try {
+              const fd = new FormData();
+              fd.append('tracking-number', code);
+              const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: fd });
+              if (!res.ok) continue;
+              const json = await res.json();
+              const parcel = json['PARCEL-INFO'] || json;
+              const infos = parcel['INFOS'] || parcel;
+              const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
+              if (!phone) continue;
+              const order = byPhone.get(phone);
+              if (order) found.push({ code, order });
+            } catch {}
+          }
         }));
         setOzonRestore({ running: true, message: `Analyse ${Math.min(start + CONC - 1, MAX)}/${MAX} — ${found.length} colis retrouvé(s)` });
       }
