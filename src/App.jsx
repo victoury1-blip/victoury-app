@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { recalcVictCounter, generateVictId } from './lib/victId';
+import { recalcVictCounter, generateVictId, VICT_ABERRANT_FROM } from './lib/victId';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
  *  nouvelle commande porte son numéro dès son entrée dans À Confirmer. L'id interne
@@ -482,21 +482,54 @@ export default function App() {
   useEffect(() => {
     if (!session || !orders.length || victFillRef.current) return;
     const isVict = (s) => /^VICT\d+$/i.test(s || '');
+    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
     const missing = orders
       .filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber))
       .sort((a, b) => parseAppDate(a.dateAdded) - parseAppDate(b.dateAdded));
-    if (!missing.length) return;
+
+    /* RÉPARATION — uniquement les commandes « nouveau » (jamais un colis déjà
+       validé/expédié, dont le code est connu du transporteur) : un code en DOUBLE
+       avec une commande plus ancienne, ou un numéro aberrant issu de l'incident de
+       renumérotage (VICT1393…), est remplacé par le numéro suivant de la vraie
+       série. Les codes contenant « MIMA » ne sont jamais touchés. */
+    const olderOwner = new Map(); // numéro -> commande la plus ancienne qui le porte
+    for (const o of orders) {
+      for (const n of [victNum(o.id), victNum(o.trackingNumber)]) {
+        if (!n) continue;
+        const d = parseAppDate(o.dateAdded) || 0;
+        if (!olderOwner.has(n) || d < olderOwner.get(n).d) olderOwner.set(n, { d, id: o.id });
+      }
+    }
+    const toRepair = orders.filter(o => {
+      if (o.status !== 'nouveau' || o.validated) return false;
+      if (/mima/i.test(`${o.trackingNumber || ''} ${o.id || ''}`)) return false;
+      const n = victNum(o.trackingNumber);
+      if (!n || victNum(o.id)) return false;        // pas de code VICT propre à corriger
+      if (n >= VICT_ABERRANT_FROM) return true;     // numéro aberrant
+      const owner = olderOwner.get(n);
+      return !!owner && owner.id !== o.id;          // doublon : la plus ancienne garde
+    }).sort((a, b) => parseAppDate(a.dateAdded) - parseAppDate(b.dateAdded));
+
+    if (!missing.length && !toRepair.length) return;
     victFillRef.current = true;
     (async () => {
       try {
         recalcVictCounter(orders);
         // Ne jamais réutiliser un numéro déjà porté (comme id OU comme code de suivi).
-        const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
         const used = new Set();
         for (const o of orders) {
           for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
         }
         const assign = new Map();
+
+        for (const o of toRepair) {
+          let code = generateVictId();
+          let guard = 0;
+          while (used.has(victNum(code)) && guard++ < 10000) code = generateVictId();
+          used.add(victNum(code));
+          assign.set(o.id, code);
+        }
+
         for (const o of missing) {
           let code = generateVictId();
           let guard = 0;

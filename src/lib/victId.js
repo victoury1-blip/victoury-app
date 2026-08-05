@@ -7,12 +7,22 @@ let _victCounter = null;
  *  ET le trackingNumber (les commandes confirmées portent leur VICT dans
  *  trackingNumber, pas dans l'id). Sans ça, le compteur ignore des numéros
  *  déjà émis et les réattribue -> collisions avec Ozon. */
+/* Numéros ABERRANTS : lors d'un incident de renumérotage, des commandes ont reçu
+ * des VICT à 4 chiffres bien au-dessus de la vraie série (VICT1393…). S'ils entrent
+ * dans le calcul du maximum, chaque nouvelle commande repart de 1394 au lieu de
+ * suivre la série réelle. On les exclut du compteur (sans jamais les modifier ici). */
+export const VICT_ABERRANT_FROM = 1000;
+
 function maxVictIn(orders) {
   let max = 0;
   for (const o of orders || []) {
     for (const val of [o.id, o.trackingNumber]) {
       const m = String(val || '').match(/^VICT(\d+)$/i);
-      if (m) { const n = parseInt(m[1], 10); if (n > max) max = n; }
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (n >= VICT_ABERRANT_FROM) continue;
+        if (n > max) max = n;
+      }
     }
   }
   return max;
