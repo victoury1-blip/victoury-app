@@ -124,7 +124,9 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
           const samePhone = !ozPhone || !ourPhone || ozPhone === ourPhone;
           setPhoneMismatch(samePhone ? null : { ozPhone, tn });
           if (samePhone && (deliveryPerson || deliveryPhone)) {
-            const payload = ozonDpPayload({ ...order, trackingNumber: realTn || tn }, deliveryPerson, deliveryPhone);
+            // On garde le code interrogé ET celui renvoyé par Ozon : les deux
+            // désignent ce colis, donc les deux valident l'info livreur.
+            const payload = ozonDpPayload(order, deliveryPerson, deliveryPhone, [tn, realTn]);
             try { localStorage.setItem(`ozone_dp_${order.id}`, JSON.stringify(payload)); cloudSet(`ozone_dp_${order.id}`, payload); } catch {}
           }
           if (ozStatus) onSave(order.id, order.status, '', realTn, ozStatus);
