@@ -1,4 +1,9 @@
+import { isAuthenticated } from './_auth.js';
+
 export default async function handler(req, res) {
+  // Authentification obligatoire : sans cela, l'endpoint est un relais ouvert
+  // (n'importe qui peut faire transiter des requêtes par votre domaine).
+  if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
   const { path, xsrf, session, mode } = req.query;
   if (!path || !session) {
     return res.status(400).json({ error: 'Missing path or session' });

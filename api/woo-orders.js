@@ -15,7 +15,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Config WooCommerce manquante (URL / clés)' });
   }
 
-  const base = String(siteUrl).replace(/\/$/, '');
+  // Anti-SSRF : uniquement HTTPS et un hôte autorisé. Sans ce contrôle, l'URL
+  // fournie par le client permettait d'atteindre des adresses internes.
+  let base;
+  try {
+    const u = new URL(String(siteUrl));
+    const allowed = String(process.env.WOO_ALLOWED_HOSTS || 'victoury-maroc.com,www.victoury-maroc.com')
+      .split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+    if (u.protocol !== 'https:' || !allowed.includes(u.hostname.toLowerCase())) {
+      return res.status(400).json({ error: 'URL de boutique non autorisée' });
+    }
+    base = `${u.origin}${u.pathname.replace(/\/$/, '')}`.replace(/\/$/, '');
+  } catch {
+    return res.status(400).json({ error: 'URL de boutique invalide' });
+  }
   const qs = new URLSearchParams({
     status,
     per_page: String(perPage),
@@ -44,7 +57,9 @@ export default async function handler(req, res) {
     });
     const text = await r.text();
     if (!r.ok) {
-      return res.status(502).json({ error: `WooCommerce ${r.status}: ${text.slice(0, 250)}` });
+      // Ne pas relayer le corps distant (fuite d'informations) : statut seulement.
+      console.error('woo-orders upstream:', r.status, text.slice(0, 250));
+      return res.status(502).json({ error: `WooCommerce a répondu ${r.status}` });
     }
     let data;
     try { data = JSON.parse(text); } catch { return res.status(502).json({ error: 'Réponse WooCommerce invalide (pas du JSON) — REST API désactivée ?' }); }

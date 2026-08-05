@@ -38,11 +38,27 @@ export function PermissionsProvider({ children, session }) {
     }).catch(() => {}).finally(() => setLoading(false));
   }, [session]);
 
-  const email = session?.user?.email;
-  const currentModerator = moderators.find(m => m.email === email);
-  const isAdmin = !currentModerator || currentModerator.role === 'admin';
+  const email = (session?.user?.email || '').toLowerCase();
+  const currentModerator = moderators.find(m => (m.email || '').toLowerCase() === email);
+  // Compte désactivé -> aucun droit, même s'il figure encore dans la liste.
+  const disabled = currentModerator ? currentModerator.active === false : false;
+
+  // Liste d'admins optionnelle (VITE_ADMIN_EMAILS="a@x.com,b@x.com").
+  // Si elle est définie, seuls ces emails obtiennent le repli « non listé = admin »
+  // (le propriétaire n'apparaît jamais dans la table des modérateurs).
+  const allowlist = String(import.meta.env.VITE_ADMIN_EMAILS || '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+  const isAdmin = disabled
+    ? false
+    : currentModerator
+      ? currentModerator.role === 'admin'
+      // Tant que la liste n'est pas chargée on n'accorde pas les droits admin
+      // (sinon un modérateur voit l'interface complète pendant le chargement).
+      : !loading && (allowlist.length ? allowlist.includes(email) : true);
 
   function hasPermission(perm) {
+    if (disabled) return false;
     if (isAdmin) return true;
     return currentModerator?.permissions?.includes(perm) || false;
   }

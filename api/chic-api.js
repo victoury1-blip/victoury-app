@@ -1,3 +1,5 @@
+import { isAuthenticated } from './_auth.js';
+
 /* Proxy vers l'API officielle de Chic Affiliate (Clé API « CHIC_... » du
    profil affilié — celle utilisée par l'intégration urlanding).
    La clé est envoyée par le client dans l'en-tête x-chic-key.
@@ -8,6 +10,9 @@
 const ALLOWED_HOSTS = ['www.chic-affiliate.com', 'api.chic-affiliate.com', 'chic-affiliate.com'];
 
 export default async function handler(req, res) {
+  // Authentification obligatoire : sans cela, l'endpoint est un relais ouvert
+  // (n'importe qui peut faire transiter des requêtes par votre domaine).
+  if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
   const { path, host = 'www.chic-affiliate.com', auth = 'bearer' } = req.query;
   const key = req.headers['x-chic-key'];
   if (!path || !key) return res.status(400).json({ error: 'Missing path or key' });

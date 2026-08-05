@@ -109,11 +109,16 @@ function ColisHistoryModal({ order, onClose }) {
     if (local.length) setHist(local);
     supabase.from('order_history').select('*').eq('order_id', order.id).order('timestamp', { ascending: true })
       .then(({ data }) => {
-        if (data?.length) {
-          const mapped = data.map(r => ({ timestamp: r.timestamp, status: r.status, user: r.user_name }));
-          setHist(mapped);
-          localStorage.setItem(`order_history_${order.id}`, JSON.stringify(mapped));
-        }
+        if (!data?.length) return;
+        const mapped = data.map(r => ({ timestamp: r.timestamp, status: r.status, user: r.user_name }));
+        // Fusion : la copie locale porte des détails absents de Supabase
+        // (fromStatus, note livreur). On ne l'écrase pas, on complète.
+        const key = (h) => `${h.timestamp}|${h.status}`;
+        const merged = [...local];
+        const seen = new Map(local.map(h => [key(h), h]));
+        for (const r of mapped) if (!seen.has(key(r))) { seen.set(key(r), r); merged.push(r); }
+        setHist(merged);
+        localStorage.setItem(`order_history_${order.id}`, JSON.stringify(merged));
       });
   }, [order.id]);
   const displayHist = hist.length > 0 ? hist : [
@@ -271,6 +276,7 @@ function StatusModal({ order, onClose, onSave }) {
 /* ── Delivery status modal ── */
 function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, onDeleteOrder, onBulkFacture }) {
   const { statuses } = useStatuses();
+  const toast = useToast();
   const [showStatus, setShowStatus] = useState(false);
   const [showLivreur, setShowLivreur] = useState(false);
   const statusRef = useRef(null);
@@ -298,9 +304,15 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
 
   function bulkChangeStatus(newStatus) {
     const ts = getTs();
+    // Même règle que la modification unitaire : un statut hors circuit colis
+    // (sauf « reporté » et « annulé ») sort le colis de la Liste des Colis.
+    const leavePipeline = !COLIS_PIPELINE.includes(newStatus) && newStatus !== 'reporter' && newStatus !== 'annule';
     setOrders(prev => prev.map(o => {
       if (!selected.includes(o.id)) return o;
-      return { ...o, status: newStatus, dateUpdated: ts };
+      const updated = { ...o, status: newStatus, dateUpdated: ts };
+      if (newStatus !== 'reporter') updated.reportDate = null;
+      if (leavePipeline) updated.validated = false;
+      return updated;
     }));
     setShowStatus(false);
     setSelected([]);
@@ -326,7 +338,12 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
     const data = selectedOrders;
     const header = ['ID','Tracking','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
     const csvRows = [header.join(',')];
-    const qf = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // Préfixe ' sur =,+,-,@ : empêche Excel d'exécuter le contenu comme formule.
+    const qf = (v) => {
+      let t = String(v ?? '');
+      if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+      return `"${t.replace(/"/g, '""')}"`;
+    };
     data.forEach(o => {
       const st = statuses.find(s => s.value === o.status);
       csvRows.push([
@@ -381,7 +398,7 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
     <script>window.onload=()=>window.print();</script>
     </body></html>`;
     const w = window.open('', '_blank');
-    if (!w) return; // popup bloquée par le navigateur
+    if (!w) { toast.error('Popup bloquée — autorisez les popups pour ce site.'); return; }
     w.document.write(html);
     w.document.close();
   }

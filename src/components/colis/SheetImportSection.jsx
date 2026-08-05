@@ -19,6 +19,22 @@ const SHEET_STATUSES = [
   { value: 'pas_rep',    label: 'Pas Répondu',  color: '#6b7280' },
 ];
 
+/* Montant tel qu'écrit dans un tableur marocain : « 350,50 », « 1 200,00 DH »,
+   « 1,200.00 ». On garde la dernière virgule/point comme séparateur décimal. */
+export function parseAmount(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  let s = String(v ?? '').replace(/[^\d.,-]/g, '');
+  if (!s) return 0;
+  const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+  const dec = Math.max(lastComma, lastDot);
+  if (dec === -1) return parseFloat(s) || 0;
+  const intPart = s.slice(0, dec).replace(/[.,]/g, '');
+  const decPart = s.slice(dec + 1).replace(/[^\d]/g, '');
+  // « 1,200 » / « 1.200 » = milliers, pas des décimales.
+  if (decPart.length === 3 && !/[.,]/.test(s.slice(0, dec))) return parseFloat(intPart + decPart) || 0;
+  return parseFloat(`${intPart}.${decPart}`) || 0;
+}
+
 const PRODUCT_KEYS = ['produit','product','article','designation','désignation','nom produit','libelle','libellé'];
 const NOTE_KEYS    = ['note','remarque','observation','msg','message','commentaire'];
 
@@ -223,7 +239,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
     setModifiedIds(prev => new Set([...prev, id]));
     setRows(prev => {
       const next = prev.map(r => r._id === id ? { ...r, ...patch } : r);
-      const gsData = { headers, rows: next };
+      const gsData = { headers, rows: next, colMap };
       localStorage.setItem('gs_import', JSON.stringify(gsData));
       cloudSet('gs_import', gsData);
       return next;
@@ -344,7 +360,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       if (existingIds.has(code)) { skipped++; continue; }
       const city = (cityCol && row[cityCol]) || '';
       const address = (addressCol && row[addressCol]) || '';
-      const price = parseFloat((priceCol && row[priceCol]) || '0') || 0;
+      const price = parseAmount((priceCol && row[priceCol]) || '0');
       const product = (productCol && row[productCol]) || '';
       // Statut : uniquement la colonne LIVRAISON (celle qui remonte dans la Liste des Colis).
       // La colonne de confirmation est volontairement ignorée.

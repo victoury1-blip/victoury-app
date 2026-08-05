@@ -1,4 +1,15 @@
 import { cloudSet } from './cloudSettings';
+import { supabase } from './supabase';
+
+/* Les routes serveur /api/chic-* exigent un utilisateur connecté : on joint le
+   jeton Supabase à chaque appel. */
+async function authFetch(url, opts = {}) {
+  let token = '';
+  try { token = (await supabase.auth.getSession())?.data?.session?.access_token || ''; } catch { /* hors ligne */ }
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(url, { ...opts, headers });
+}
 
 const STORAGE_KEY = 'chic_config';
 
@@ -90,14 +101,14 @@ export async function fetchChicOrders(startDate, endDate, start = 0, length = 50
   if (startDate) params.set('startDate', startDate);
   if (endDate) params.set('endDate', endDate);
 
-  const res = await fetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
+  const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   return res.json();
 }
 
 export async function fetchChicProducts() {
-  const res = await fetch(proxyUrl('/affiliate/products', 'html'));
+  const res = await authFetch(proxyUrl('/affiliate/products', 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
@@ -237,7 +248,7 @@ function harvestProduct(root) {
 /* Diagnostic de la LISTE des produits : montre comment les produits sont liés
    (URL, data-attributs) pour extraire le chicId de façon fiable. */
 export async function diagnoseChicList() {
-  const res = await fetch(proxyUrl('/affiliate/products', 'html'));
+  const res = await authFetch(proxyUrl('/affiliate/products', 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
@@ -259,7 +270,7 @@ export async function diagnoseChicList() {
 /* Cherche dans dashboard.js comment le Tarif de livraison est récupéré à la
    sélection d'une ville (endpoint AJAX + paramètres) pour l'automatiser. */
 export async function diagnoseChicJs() {
-  const res = await fetch(proxyUrl('/js/dashboard.js?ver=0.3', 'html'));
+  const res = await authFetch(proxyUrl('/js/dashboard.js?ver=0.3', 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html: js } = await res.json();
@@ -287,7 +298,7 @@ export async function diagnoseChicJs() {
 export async function fetchChicCityFees(villeId, token) {
   if (!villeId) return 0;
   const body = new URLSearchParams({ id: String(villeId), _token: token || '' });
-  const res = await fetch(proxyUrl('/affiliate/city/fees'), {
+  const res = await authFetch(proxyUrl('/affiliate/city/fees'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -299,7 +310,7 @@ export async function fetchChicCityFees(villeId, token) {
 }
 
 export async function fetchChicProductDetails(chicProductId) {
-  const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
+  const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
@@ -418,7 +429,7 @@ export async function fetchChicProductDetails(chicProductId) {
    (JSON Inertia présent ? clés de haut niveau ? extrait HTML autour de taille
    et couleur) pour corriger le parsing si des variantes manquent encore. */
 export async function diagnoseChicProduct(chicProductId) {
-  const res = await fetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
+  const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
   if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
@@ -482,7 +493,7 @@ export async function createChicOrder(orderData) {
     frais_refus: '',
   });
 
-  const res = await fetch(proxyUrl('/affiliate/orders/store'), {
+  const res = await authFetch(proxyUrl('/affiliate/orders/store'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -506,7 +517,7 @@ export async function chicApi(path, { method = 'GET', body, host, auth, keyOverr
   if (auth) params.set('auth', auth);
   const opts = { method, headers: { 'x-chic-key': key } };
   if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-  const res = await fetch(`/api/chic-api?${params}`, opts);
+  const res = await authFetch(`/api/chic-api?${params}`, opts);
   return res.json();
 }
 
@@ -641,7 +652,7 @@ export async function fetchChicCounts() {
     'order[0][column]': '0',
     'order[0][dir]': 'desc',
   });
-  const res = await fetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
+  const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const data = await res.json();
   return { total: data.recordsTotal || 0 };

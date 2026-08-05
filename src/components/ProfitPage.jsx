@@ -93,7 +93,17 @@ export default function ProfitPage({ orders = [] }) {
       }
     });
     cloudGet('victoury_factures').then(data => {
-      if (Array.isArray(data)) setFactures(data);
+      if (!Array.isArray(data)) return;
+      // Dédoublonnage par id/ref : une facture dupliquée par la synchro cloud
+      // doublait le chiffre d'affaires affiché.
+      const seen = new Set();
+      setFactures(data.filter(f => {
+        const k = f?.id || f?.ref;
+        if (!k) return true;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      }));
     });
   }, []);
 
@@ -196,7 +206,16 @@ export default function ProfitPage({ orders = [] }) {
         factureRef: '— sans facture',
       });
     }
-    return colis;
+    // Un même colis peut figurer dans deux factures (ré-édition, doublon de
+    // synchro) : sans dédoublonnage, son chiffre d'affaires est compté deux fois.
+    const seen = new Set();
+    return colis.filter(c => {
+      const k = c.orderId;
+      if (!k) return true;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   }, [factures, orders, applied]);
 
   const livresColis = allFactureColis.filter(c => c.status === 'livre');
@@ -265,7 +284,10 @@ export default function ProfitPage({ orders = [] }) {
   const coutAchat = livresColis.reduce((s, c) => s + getProductCost(c), 0);
   const fraisLiv = allFactureColis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
   const sousTotal = ca - coutAchat - fraisLiv;
-  const totalPub = adTransfers.reduce((s, t) => s + (t.amount || 0), 0);
+  const inPeriod = (d) => (!applied.dateFrom || d >= applied.dateFrom) && (!applied.dateTo || d <= applied.dateTo);
+  // La publicité doit couvrir la MÊME période que le chiffre d'affaires, sinon le
+  // profit du mois est amputé de toutes les dépenses des mois précédents.
+  const totalPub = adTransfers.filter(t => inPeriod(String(t.date || ''))).reduce((s, t) => s + (t.amount || 0), 0);
   const profitNet = sousTotal - totalPub;
 
   const totalRefuse = allFactureColis.filter(c => c.status === 'refuse').length;

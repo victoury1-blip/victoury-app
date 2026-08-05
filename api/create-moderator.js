@@ -7,11 +7,21 @@
 //
 // Sécurité : l'appelant doit être authentifié (admin connecté) — vérifié via _auth.
 
-import { isAuthenticatedStrict } from './_auth.js';
+import { isAdmin, adminEmails } from './_auth.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
-  if (!(await isAuthenticatedStrict(req))) return res.status(401).json({ error: 'Non autorisé' });
+  // ADMIN uniquement : cet endpoint utilise la clé service-role et peut donc
+  // CRÉER un compte ou RÉINITIALISER le mot de passe d'un compte existant.
+  // Un simple jeton valide ne suffit pas : sinon n'importe quel modérateur
+  // pourrait redéfinir le mot de passe du propriétaire et prendre le contrôle.
+  if (!(await isAdmin(req))) {
+    return res.status(403).json({
+      error: adminEmails().length
+        ? 'Réservé aux administrateurs'
+        : "ADMIN_EMAILS non configurée sur le serveur (Vercel → Environment Variables)",
+    });
+  }
 
   const SUPA_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '');
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -40,15 +50,14 @@ export default async function handler(req, res) {
     // 2) Déjà existant → retrouver l'id et mettre à jour le mot de passe.
     const listRes = await fetch(`${SUPA_URL}/auth/v1/admin/users?per_page=200`, { headers: adminHeaders });
     if (!listRes.ok) {
-      const t = await listRes.text().catch(() => '');
-      return res.status(500).json({ error: `Supabase admin: ${listRes.status} ${t.slice(0, 200)}` });
+      // On ne renvoie PAS le corps distant (fuite d'informations internes).
+      return res.status(500).json({ error: `Supabase admin: erreur ${listRes.status}` });
     }
     const data = await listRes.json();
     const users = data?.users || data || [];
     const found = users.find(u => (u.email || '').toLowerCase() === String(email).toLowerCase());
     if (!found) {
-      const t = await createRes.text().catch(() => '');
-      return res.status(500).json({ error: `Création impossible: ${t.slice(0, 200)}` });
+      return res.status(500).json({ error: 'Création impossible' });
     }
     const updRes = await fetch(`${SUPA_URL}/auth/v1/admin/users/${found.id}`, {
       method: 'PUT',
@@ -56,11 +65,11 @@ export default async function handler(req, res) {
       body: JSON.stringify({ password, email_confirm: true }),
     });
     if (!updRes.ok) {
-      const t = await updRes.text().catch(() => '');
-      return res.status(500).json({ error: `Mise à jour mot de passe: ${updRes.status} ${t.slice(0, 200)}` });
+      return res.status(500).json({ error: `Mise à jour du mot de passe: erreur ${updRes.status}` });
     }
     return res.status(200).json({ ok: true, updated: true });
   } catch (e) {
-    return res.status(500).json({ error: e?.message || 'Erreur serveur' });
+    console.error('create-moderator:', e?.message || e);
+    return res.status(500).json({ error: 'Erreur serveur' });
   }
 }

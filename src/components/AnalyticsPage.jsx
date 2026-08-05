@@ -68,7 +68,10 @@ export default function AnalyticsPage({ orders = [] }) {
 
   const kpis = useMemo(() => {
     const total = filtered.length;
-    const ca = filtered.reduce((s, o) => s + (parseFloat(o.price) || 0), 0);
+    // Chiffre d'affaires = seulement l'encaissé (livré / échangé), pas les
+    // commandes annulées, refusées ou encore en cours.
+    const CA_STATUSES = new Set(['livre', 'change', 'echange_recu']);
+    const ca = filtered.reduce((s, o) => (CA_STATUSES.has(o.status) ? s + (parseFloat(o.price) || 0) : s), 0);
     const livre = filtered.filter(o => o.status === 'livre').length;
     const refuse = filtered.filter(o => o.status === 'refuse').length;
     const annule = filtered.filter(o => o.status === 'annule').length;
@@ -205,7 +208,7 @@ export default function AnalyticsPage({ orders = [] }) {
 
     const summary = [
       { Indicateur: 'Total commandes', Valeur: kpis.total },
-      { Indicateur: "Chiffre d'affaires (MAD)", Valeur: kpis.ca },
+      { Indicateur: "Chiffre d'affaires livré (MAD)", Valeur: kpis.ca },
       { Indicateur: 'Taux de livraison', Valeur: `${kpis.tauxLiv}%` },
       { Indicateur: 'Taux de refus', Valeur: `${kpis.tauxRef}%` },
     ];
@@ -250,7 +253,7 @@ export default function AnalyticsPage({ orders = [] }) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={ShoppingCart} value={kpis.total} label="Total commandes" color="bg-blue-500" />
-        <KpiCard icon={DollarSign} value={`${kpis.ca.toLocaleString('fr-MA')} MAD`} label="Chiffre d'affaires" color="bg-emerald-500" />
+        <KpiCard icon={DollarSign} value={`${kpis.ca.toLocaleString('fr-MA')} MAD`} label="Chiffre d'affaires (livré)" color="bg-emerald-500" />
         <KpiCard icon={TrendingUp} value={`${kpis.tauxLiv}%`} label="Taux de livraison" color="bg-green-500" />
         <KpiCard icon={TrendingDown} value={`${kpis.tauxRef}%`} label="Taux de refus" color="bg-red-500" />
       </div>

@@ -78,7 +78,7 @@ export function printBon(bon, colis, type = 'ramassage') {
 </html>`;
 
   const w = window.open('', '_blank');
-  if (!w) return;
+  if (!w) return false; // popup bloquée
   w.document.write(html);
   w.document.close();
 }

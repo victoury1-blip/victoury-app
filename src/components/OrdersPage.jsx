@@ -137,6 +137,7 @@ function Toast({ toasts, onDismiss }) {
 /* ─── Bulk Action Bar ─── */
 function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder, currentUser, filtered }) {
   const { statuses } = useStatuses();
+  const toast = useToast();
   const [showStatus, setShowStatus] = useState(false);
   const [showLivreur, setShowLivreur] = useState(false);
   const statusRef = useRef(null);
@@ -164,9 +165,23 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     // (StrictMode le ré-exécute et brûlerait/dupliquerait des ids).
     const newIds = new Map();
     if (VICT_ON_STATUS.has(newStatus)) {
+      // Un numéro déjà porté (comme id OU comme code) ne doit jamais être réattribué.
+      const usedNums = new Set();
+      for (const o of orders) {
+        for (const v of [o.id, o.trackingNumber]) {
+          const m = /^VICT(\d+)$/i.exec(v || '');
+          if (m) usedNums.add(parseInt(m[1], 10));
+        }
+      }
+      const numOf = (c) => { const m = /^VICT(\d+)$/i.exec(c || ''); return m ? parseInt(m[1], 10) : 0; };
       for (const o of orders) {
         const alreadyVict = /^VICT\d+$/i.test(o.trackingNumber || '') || /^VICT\d+$/i.test(o.id || '');
-        if (selected.includes(o.id) && !alreadyVict) newIds.set(o.id, generateVictId());
+        if (!selected.includes(o.id) || alreadyVict) continue;
+        let code = generateVictId();
+        let guard = 0;
+        while (usedNums.has(numOf(code)) && guard++ < 10000) code = generateVictId();
+        usedNums.add(numOf(code));
+        newIds.set(o.id, code);
       }
     }
     setOrders(prev => prev.map(o => {
@@ -202,7 +217,12 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     const header = ['ID','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Taille','Qty','Prix','Statut','Date ajout'];
     const csvRows = [header.join(',')];
     // Chaque champ est quoté : une virgule dans un nom/produit décalerait les colonnes.
-    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // Préfixe ' sur =,+,-,@ : empêche Excel d'exécuter le contenu comme formule.
+    const q = (v) => {
+      let t = String(v ?? '');
+      if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+      return `"${t.replace(/"/g, '""')}"`;
+    };
     data.forEach(o => {
       const st = statuses.find(s => s.value === o.status);
       csvRows.push([
@@ -264,7 +284,7 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     </body></html>`;
 
     const w = window.open('', '_blank');
-    if (!w) return; // popup bloquée par le navigateur
+    if (!w) { toast.error('Popup bloquée — autorisez les popups pour ce site.'); return; }
     w.document.write(html);
     w.document.close();
   }
@@ -358,7 +378,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
      PAS de backfill de masse au montage : cela déclenchait des milliers d'écritures
      d'un coup (appli qui rame / compteur VICT qui explose) et faisait disparaître
      certaines commandes confirmées de l'onglet. */
-  const { toast } = useToast();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
   const searchRef = useRef(null);
@@ -696,7 +716,12 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   function exportOrdersCSV(data) {
     const header = ['ID','Nom','Téléphone','Ville','Adresse','Livreur','Produit','Prix','Statut','Date ajout'];
     const csvRows = [header.join(',')];
-    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // Préfixe ' sur =,+,-,@ : empêche Excel d'exécuter le contenu comme formule.
+    const q = (v) => {
+      let t = String(v ?? '');
+      if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+      return `"${t.replace(/"/g, '""')}"`;
+    };
     data.forEach(o => {
       const st = statuses.find(s => s.value === o.status);
       csvRows.push([
@@ -1350,7 +1375,20 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             const target = orders.find(o => o.id === orderId);
             const alreadyVict = /^VICT\d+$/i.test(target?.trackingNumber || '') || /^VICT\d+$/i.test(target?.id || '');
             const needsVict = VICT_ON_STATUS.has(newStatus) && !alreadyVict;
-            const newVict = needsVict ? generateVictId() : null;
+            let newVict = null;
+            if (needsVict) {
+              const usedNums = new Set();
+              for (const o of orders) {
+                for (const v of [o.id, o.trackingNumber]) {
+                  const m = /^VICT(\d+)$/i.exec(v || '');
+                  if (m) usedNums.add(parseInt(m[1], 10));
+                }
+              }
+              const numOf = (c) => { const m = /^VICT(\d+)$/i.exec(c || ''); return m ? parseInt(m[1], 10) : 0; };
+              newVict = generateVictId();
+              let guard = 0;
+              while (usedNums.has(numOf(newVict)) && guard++ < 10000) newVict = generateVictId();
+            }
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';

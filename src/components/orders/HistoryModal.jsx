@@ -11,11 +11,16 @@ export default function HistoryModal({ order, onClose }) {
     if (local.length) setHist(local);
     supabase.from('order_history').select('*').eq('order_id', order.id).order('timestamp', { ascending: true })
       .then(({ data }) => {
-        if (data?.length) {
-          const mapped = data.map(r => ({ timestamp: r.timestamp, status: r.status, user: r.user_name }));
-          setHist(mapped);
-          localStorage.setItem(`order_history_${order.id}`, JSON.stringify(mapped));
-        }
+        if (!data?.length) return;
+        const mapped = data.map(r => ({ timestamp: r.timestamp, status: r.status, user: r.user_name }));
+        // Fusion : la copie locale porte des détails absents de Supabase
+        // (fromStatus, note livreur). On ne l'écrase pas, on complète.
+        const key = (h) => `${h.timestamp}|${h.status}`;
+        const merged = [...local];
+        const seen = new Map(local.map(h => [key(h), h]));
+        for (const r of mapped) if (!seen.has(key(r))) { seen.set(key(r), r); merged.push(r); }
+        setHist(merged);
+        localStorage.setItem(`order_history_${order.id}`, JSON.stringify(merged));
       });
   }, [order.id]);
   const displayHist = hist.length > 0 ? hist : [

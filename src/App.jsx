@@ -155,7 +155,12 @@ export default function App() {
   const [dbError, setDbError] = useState(null);
   const [offline, setOffline] = useState(!navigator.onLine);
   const modifiedIdsRef = useRef(new Set());
-  const deletedIdsRef = useRef(new Set());
+  // Initialisée dès le premier rendu depuis le localStorage : sinon un import
+  // WooCommerce déclenché avant la fin du chargement ressuscite des commandes
+  // supprimées.
+  const deletedIdsRef = useRef(new Set((() => {
+    try { return JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'); } catch { return []; }
+  })()));
   const initialLoadDoneRef = useRef(false);
   const lastOrdersSigRef = useRef(null);
   // id -> timestamp du dernier changement LOCAL. Pendant une courte fenêtre, une
@@ -236,7 +241,12 @@ export default function App() {
               // « revenaient » après chaque rechargement).
               const { data: cur } = await supabase.from('orders')
                 .select('date_updated').eq('id', o.id).maybeSingle();
-              if (cur?.date_updated && parseAppDate(cur.date_updated) > parseAppDate(o.dateUpdated)) {
+              // Date de l'instantané : celle de la commande, ou à défaut l'heure de
+              // mise en file (sinon un format de date inattendu vaut 0 et l'élément
+              // serait rejeté — ou pire, rejoué — à tort).
+              const snapTs = parseAppDate(o.dateUpdated) || item.timestamp || 0;
+              const curTs = cur?.date_updated ? parseAppDate(cur.date_updated) : 0;
+              if (curTs && snapTs && curTs > snapTs) {
                 await deleteSyncItem(item.id);
                 continue;
               }

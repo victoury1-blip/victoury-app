@@ -221,12 +221,12 @@ export default function FournisseurPage({ orders = [] }) {
     let next;
     if (modalItem) {
       // édition d'un article existant
-      next = factures.map(f => ({ ...f, items: f.items.map(i => i.id === item.id ? item : i) }));
+      next = factures.map(f => ({ ...f, items: (f.items || []).map(i => i.id === item.id ? item : i) }));
       toast.success('Article modifié');
     } else {
       const targetId = targetFactureId || openFacture?.id;
       if (targetId) {
-        next = factures.map(f => f.id === targetId ? { ...f, items: [...f.items, item] } : f);
+        next = factures.map(f => f.id === targetId ? { ...f, items: [...(f.items || []), item] } : f);
         toast.success('Article ajouté à la facture');
       } else {
         const facture = {
@@ -261,7 +261,7 @@ export default function FournisseurPage({ orders = [] }) {
 
   function deleteItem(factureId, itemId) {
     if (!confirm('Supprimer cet article ?')) return;
-    persist(factures.map(f => f.id === factureId ? { ...f, items: f.items.filter(i => i.id !== itemId) } : f));
+    persist(factures.map(f => f.id === factureId ? { ...f, items: (f.items || []).filter(i => i.id !== itemId) } : f));
   }
 
   const weekStart = useMemo(() => startOfWeek(), []);

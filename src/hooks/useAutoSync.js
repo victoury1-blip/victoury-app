@@ -62,6 +62,10 @@ function getDynamicKeys() {
 
 export default function useAutoSync(session) {
   const lastSyncRef = useRef(0);
+  // Dernière valeur connue du cloud par clé : on ne repousse que ce que CE
+  // device a réellement modifié depuis, sinon un appareil avec des données
+  // périmées écrase les factures/produits créés ailleurs.
+  const lastPulledRef = useRef({});
 
   useEffect(() => {
     if (!session) return;
@@ -115,6 +119,7 @@ export default function useAutoSync(session) {
             if (localRaw !== remoteJson) {
               localStorage.setItem(row.key, remoteJson);
             }
+            lastPulledRef.current[row.key] = remoteJson;
           }
         }
       } catch (e) { console.warn('[sync] pull failed:', e?.message); }
@@ -126,8 +131,11 @@ export default function useAutoSync(session) {
         for (const key of allKeys) {
           const raw = localStorage.getItem(key);
           if (!raw) continue;
+          // Inchangé depuis le dernier pull -> rien à pousser.
+          if (lastPulledRef.current[key] === raw) continue;
           try {
             await cloudSet(key, JSON.parse(raw));
+            lastPulledRef.current[key] = raw;
           } catch {}
         }
       } catch (e) { console.warn('[sync] push failed:', e?.message); }
