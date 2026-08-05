@@ -707,6 +707,14 @@ export default function App() {
               body: JSON.stringify({ siteUrl: config.siteUrl || 'https://victoury-maroc.com', consumerKey: config.consumerKey, consumerSecret: config.consumerSecret }),
             });
           } finally { clearTimeout(to); }
+          const ct = apiRes.headers.get('content-type') || '';
+          // Une réponse NON-JSON avec un statut d'erreur veut dire que la requête
+          // n'a même pas atteint notre fonction serveur (bloquée en amont, ex.
+          // pare-feu / protection anti-bot Vercel) : le message « vérifiez vos
+          // clés » serait trompeur, la config WooCommerce n'y est pour rien.
+          if (!apiRes.ok && !ct.includes('json')) {
+            throw new Error(`Requête bloquée avant le serveur (HTTP ${apiRes.status}) — vérifiez le pare-feu/la protection Vercel du projet`);
+          }
           const j = await apiRes.json().catch(() => ({}));
           if (!apiRes.ok) throw new Error(j.error || `API ${apiRes.status}`);
           data = j.orders || [];
@@ -873,7 +881,7 @@ export default function App() {
       }
     }
     fetchWooOrders();
-    const interval = setInterval(fetchWooOrders, 30000);
+    const interval = setInterval(fetchWooOrders, 45000);
     return () => clearInterval(interval);
   }, [session]);
 

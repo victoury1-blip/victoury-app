@@ -322,6 +322,10 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
         body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, status }),
       });
+      const ct = r.headers.get('content-type') || '';
+      if (!r.ok && !ct.includes('json')) {
+        throw new Error(`Requête bloquée avant le serveur (HTTP ${r.status}) — vérifiez le pare-feu/la protection Vercel du projet`);
+      }
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `API ${r.status}`);
       return j.orders || [];
