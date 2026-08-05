@@ -390,7 +390,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      Ozon détient le code VICT réellement enregistré pour chaque colis. On balaie
      la série VICT0001..VICT0400, on lit le téléphone du destinataire renvoyé par
      Ozon, et on remet ce code sur la commande correspondante. Aucun effacement. */
-  const [ozonRestore, setOzonRestore] = useState({ running: false, message: '' });
+  const [ozonRestore, setOzonRestore] = useState({ running: false, message: '', lines: [] });
 
   /* Horodatage au format de l'application. Indispensable sur toute correction de
      code : sans nouvelle date de mise à jour, la file de synchronisation croit que
@@ -423,9 +423,13 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     }
     const byPhone = new Map();
     let ambiguous = 0;
+    const ambiguousSample = [];
     for (const [p, list] of phoneGroups) {
       if (list.length === 1) byPhone.set(p, list[0]);
-      else ambiguous += list.length;
+      else {
+        ambiguous += list.length;
+        if (ambiguousSample.length < 10) ambiguousSample.push(`${p} → ${list.map(o => o.recipient?.name || o.id).join(', ')}`);
+      }
     }
 
     const found = [];              // { code, order }
@@ -486,11 +490,20 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const seenOrders = new Set();
       const toFix = [];
       let skipped = 0;
+      const skippedSample = [];
       for (const { code, order } of found) {
         if (isProtected(order) || order.trackingNumber === code) continue;
         const owner = takenBy.get(code.toUpperCase());
         // Un détenteur dont le code est prouvé faux n'est pas un vrai conflit.
-        if ((owner && owner !== order.id && !wrongHolders.has(owner)) || seenOrders.has(order.id)) { skipped++; continue; }
+        if (owner && owner !== order.id && !wrongHolders.has(owner)) {
+          skipped++;
+          if (skippedSample.length < 10) {
+            const ownerOrder = (orders || []).find(o => o.id === owner);
+            skippedSample.push(`${code} : ${order.recipient?.name || order.id} (réel chez Ozon) vs ${ownerOrder?.recipient?.name || owner} (déjà en base, code non contredit)`);
+          }
+          continue;
+        }
+        if (seenOrders.has(order.id)) { skipped++; continue; }
         seenOrders.add(order.id);
         toFix.push({ code, order });
       }
@@ -498,19 +511,26 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       // on retire le code erroné (l'app réaffiche l'identifiant d'origine) plutôt
       // que de laisser un code qui appartient à un autre client.
       let cleared = 0;
+      const clearedSample = [];
       for (const o of orders || []) {
         if (!wrongHolders.has(o.id) || seenOrders.has(o.id)) continue;
         seenOrders.add(o.id);
         toFix.push({ code: null, order: o });
         cleared++;
+        if (clearedSample.length < 10) clearedSample.push(`${o.trackingNumber} : ${o.recipient?.name || o.id}`);
       }
       const notes = [];
       if (ambiguous) notes.push(`${ambiguous} commande(s) ignorée(s) (même téléphone)`);
       if (skipped) notes.push(`${skipped} conflit(s) ignoré(s)`);
       if (cleared) notes.push(`${cleared} code(s) erroné(s) retiré(s)`);
       const suffix = notes.length ? ` — ${notes.join(', ')}` : '';
+      const detailLines = [
+        ...(ambiguousSample.length ? ['Téléphones ambigus (ignorés) :', ...ambiguousSample.map(l => '  ' + l)] : []),
+        ...(skippedSample.length ? ['Conflits ignorés (le code existant n’est pas contredit par Ozon) :', ...skippedSample.map(l => '  ' + l)] : []),
+        ...(clearedSample.length ? ['Codes erronés retirés :', ...clearedSample.map(l => '  ' + l)] : []),
+      ];
       if (!toFix.length) {
-        setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger${suffix}.` });
+        setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger${suffix}.`, lines: detailLines });
         return;
       }
       const B = 20;
@@ -535,9 +555,12 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       setOrders(prev => prev.map(o => map.has(o.id)
         ? { ...o, trackingNumber: map.get(o.id), ozoneTracking: map.get(o.id), dateUpdated: stamped }
         : o));
+      const fixedSample = toFix.filter(({ order, code }) => okIds.has(order.id) && code)
+        .slice(0, 10).map(({ code, order }) => `${order.trackingNumber} → ${code} : ${order.recipient?.name || order.id}`);
       setOzonRestore({
         running: false,
         message: `✅ ${map.size} code(s) restauré(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}${suffix}.`,
+        lines: [...detailLines, ...(fixedSample.length ? ['Codes corrigés :', ...fixedSample.map(l => '  ' + l)] : [])],
       });
     } catch (e) {
       setOzonRestore({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
@@ -1283,6 +1306,11 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               </button>
               {ozonRestore.message && <span className="text-xs text-gray-600">{ozonRestore.message}</span>}
             </div>
+            {ozonRestore.lines?.length > 0 && (
+              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
+                {ozonRestore.lines.join('\n')}
+              </pre>
+            )}
           </div>
 
           {/* Correction des codes en double */}
