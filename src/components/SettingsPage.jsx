@@ -656,12 +656,20 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     }));
 
     // Groupes de commandes partageant le même code (ids DISTINCTS uniquement).
+    // Le code d'une commande peut être porté par son `tracking_number` OU par son
+    // identifiant (les anciennes commandes s'appellent VICT0002). Les deux doivent
+    // entrer dans le même groupe, sinon le doublon passe inaperçu.
     const groups = new Map();
     for (const o of rows) {
-      const code = (o.trackingNumber || '').trim();
-      if (!code || isProtected(o)) continue;
-      if (!groups.has(code)) groups.set(code, new Map());
-      groups.get(code).set(o.id, o);
+      const codes = new Set();
+      const tn = (o.trackingNumber || '').trim();
+      if (tn) codes.add(tn.toUpperCase());
+      if (victNum(o.id)) codes.add(String(o.id).trim().toUpperCase());
+      if (!codes.size || isProtected(o)) continue;
+      for (const code of codes) {
+        if (!groups.has(code)) groups.set(code, new Map());
+        groups.get(code).set(o.id, o);
+      }
     }
     for (const [code, m] of groups) groups.set(code, [...m.values()]);
     const dupes = [...groups.entries()].filter(([, list]) => list.length > 1);
@@ -706,13 +714,18 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             }
           } catch {}
         }
-        // Sinon : la plus ancienne garde le code.
+        // Sinon : la commande dont l'IDENTIFIANT est ce code en est la
+        // propriétaire naturelle ; à défaut, la plus ancienne le garde.
         if (!ownerId) {
-          ownerId = [...list].sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded))[0].id;
+          const byId = list.find(o => String(o.id).trim().toUpperCase() === code.toUpperCase());
+          ownerId = byId ? byId.id : [...list].sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded))[0].id;
         }
         for (const o of list) {
           if (o.id === ownerId) continue;
-          updates.push({ id: o.id, code: nextFreeCode() });
+          // Le perdant ne doit pas garder ce code, ni comme suivi ni comme
+          // référence Ozon (ce colis appartient à quelqu'un d'autre).
+          const dropOzon = String(o.ozoneTracking || '').trim().toUpperCase() === code.toUpperCase();
+          updates.push({ id: o.id, code: nextFreeCode(), dropOzon });
         }
         setDupFix({ running: true, message: `Analyse… ${updates.length} commande(s) à renuméroter` });
       }
@@ -732,8 +745,10 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const okIds = new Map();
       const B = 20;
       for (let i = 0; i < updates.length; i += B) {
-        await Promise.all(updates.slice(i, i + B).map(({ id, code }) =>
-          supabase.from('orders').update({ tracking_number: code, date_updated: stampNow() }).eq('id', id)
+        await Promise.all(updates.slice(i, i + B).map(({ id, code, dropOzon }) =>
+          supabase.from('orders')
+            .update({ tracking_number: code, date_updated: stampNow(), ...(dropOzon ? { ozone_tracking: null } : {}) })
+            .eq('id', id)
             .then(({ error }) => { if (error) { failed++; lastError = error.message; } else okIds.set(id, code); })
             .catch((e) => { failed++; lastError = e?.message || 'réseau'; })
         ));
@@ -753,7 +768,13 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
       // On n'applique en local QUE ce qui est réellement en base.
       const applied = new Map([...okIds].filter(([id, code]) => persisted.get(id) === code));
-      setOrders(prev => prev.map(o => applied.has(o.id) ? { ...o, trackingNumber: applied.get(o.id) } : o));
+      const dropped = new Set(updates.filter(u => u.dropOzon).map(u => u.id));
+      // Le livreur mémorisé appartenait à l'ancien code : on l'oublie.
+      for (const id of applied.keys()) { try { localStorage.removeItem(`ozone_dp_${id}`); } catch {} }
+      const stamped = stampNow();
+      setOrders(prev => prev.map(o => applied.has(o.id)
+        ? { ...o, trackingNumber: applied.get(o.id), dateUpdated: stamped, ...(dropped.has(o.id) ? { ozoneTracking: null } : {}) }
+        : o));
 
       // La file de synchronisation peut contenir d'anciens instantanés qui
       // réécriraient les codes qu'on vient de corriger : on la vide.
