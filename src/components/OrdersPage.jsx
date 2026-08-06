@@ -59,11 +59,13 @@ const tabs = [
   { id: 'confirme', label: 'Confirmé', status: 'confirme' },
 ];
 
-// Statuts qui donnent droit à un code de suivi VICT (commande réellement
-// confirmée / expédiée). Les statuts de SUIVI (pas de réponse, en suivi,
-// injoignable, annulé, reporté…) n'en consomment PAS — sinon le compteur VICT
-// grimpe inutilement.
-const VICT_ON_STATUS = new Set(['confirme', 'att_ramassage', 'expedier', 'recu_livreur', 'livre', 'change']);
+// Seul « confirmé » — la PORTE D'ENTRÉE du circuit colis — peut déclencher
+// l'attribution d'un code de suivi. Les statuts suivants (att_ramassage,
+// expédié, reçu livreur, livré, échange) appartiennent déjà à la Liste des
+// Colis : leur code est connu du transporteur, on n'en fabrique JAMAIS un
+// nouveau à ce stade. Les statuts de suivi (pas de réponse, injoignable,
+// annulé, reporté…) n'en consomment pas non plus.
+const VICT_ON_STATUS = new Set(['confirme']);
 
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' }, { id: '3', name: 'Fès' },

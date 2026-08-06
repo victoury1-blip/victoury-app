@@ -686,6 +686,50 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       // Cible : code actuel VICTOURY, alors que le code Ozon d'origine est un
       // VICT. C'est exactement la signature d'un code écrasé.
       const targets = rows.filter(r => isVictoury(r.tracking_number) && isOldVict(r.ozone_tracking));
+
+      /* 2e source — Ozon lui-même. Certaines commandes écrasées n'ont pas de
+         `ozone_tracking` en base : leur ancien code n'existe plus que chez le
+         transporteur. On le retrouve en interrogeant Ozon par TÉLÉPHONE, et on
+         ne restaure que si Ozon confirme un code VICT pour ce numéro. */
+      const digits = (v) => String(v || '').replace(/\D/g, '').replace(/^212/, '0');
+      const orphans = rows.filter(r => isVictoury(r.tracking_number) && !isOldVict(r.ozone_tracking) && digits(r.recipient?.phone));
+      if (orphans.length && auzone.customerId && auzone.apiKey) {
+        // Un même téléphone sur plusieurs commandes = impossible de trancher.
+        const byPhone = new Map();
+        for (const r of orphans) {
+          const p = digits(r.recipient?.phone);
+          if (!byPhone.has(p)) byPhone.set(p, []);
+          byPhone.get(p).push(r);
+        }
+        const unique = new Map([...byPhone].filter(([, l]) => l.length === 1).map(([p, l]) => [p, l[0]]));
+        if (unique.size) {
+          const base = `https://api.ozonexpress.ma/customers/${auzone.customerId}/${auzone.apiKey}`;
+          const MAX = 400, CONC = 10;
+          for (let start = 1; start <= MAX; start += CONC) {
+            const batch = [];
+            for (let i = start; i < start + CONC && i <= MAX; i++) batch.push(i);
+            await Promise.all(batch.map(async (n) => {
+              for (const code of [...new Set(['VICT' + String(n).padStart(4, '0'), 'VICT' + String(n).padStart(5, '0')])]) {
+                try {
+                  const fd = new FormData();
+                  fd.append('tracking-number', code);
+                  const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: fd });
+                  if (!res.ok) continue;
+                  const json = await res.json();
+                  const parcel = json['PARCEL-INFO'] || json;
+                  const infos = parcel['INFOS'] || parcel;
+                  const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
+                  if (!phone) continue;
+                  const order = unique.get(phone);
+                  if (order && !targets.some(t => t.id === order.id)) targets.push({ ...order, ozone_tracking: code });
+                } catch {}
+              }
+            }));
+            setRestoreOld({ running: true, message: `Recherche chez Ozon ${Math.min(start + CONC - 1, MAX)}/${MAX} — ${targets.length} code(s) retrouvé(s)`, lines: [] });
+          }
+        }
+      }
+
       if (!targets.length) {
         setRestoreOld({ running: false, message: '✅ Aucun code écrasé : rien à restaurer.', lines: [] });
         return;
