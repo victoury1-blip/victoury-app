@@ -1,5 +1,3 @@
-import { cloudGet, cloudSet } from './cloudSettings';
-
 /* ── Nouvelle série : VICTOURYxxxx ──────────────────────────────────────────
  * L'ancienne série VICTxxxx a accumulé un historique de doublons et de
  * numéros aberrants (incident de renumérotage) : chaque commande qui en
@@ -36,20 +34,15 @@ export function isVictCode(s) {
   return /^VICT(OURY)?\d+$/i.test(String(s || '').trim());
 }
 
-/** Compat : plus de compteur à initialiser, la numérotation se déduit des
- *  commandes actives à chaque génération (voir generateVictId). Conservé
- *  pour ne pas casser les appels existants. */
-export function initVictCounter() {}
-
-/** Compat : ne fait plus rien (la numérotation n'a plus de compteur figé),
- *  conservé pour ne pas casser les appels existants. */
-export function recalcVictCounter() {}
-
 /** Numéro VICTOURY libre le plus petit parmi les commandes ACTIVES fournies.
  *  Une commande supprimée n'apparaît plus dans `orders` -> son numéro est
  *  automatiquement réutilisé par la prochaine commande créée. */
 export function generateVictId(orders) {
   const used = victouryNumsIn(orders);
+  // Un numéro déjà porté par une commande est suivi par `used` : le garder en
+  // plus dans la réservation de session empêcherait de le réutiliser après une
+  // suppression. On ne réserve donc que ce qui n'est pas encore enregistré.
+  for (const n of _seenThisSession) if (used.has(n)) _seenThisSession.delete(n);
   let n = 1;
   while (used.has(n) || _seenThisSession.has(n)) n++;
   _seenThisSession.add(n);

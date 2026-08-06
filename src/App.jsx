@@ -490,10 +490,6 @@ export default function App() {
         if (!olderOwner.has(n) || d < olderOwner.get(n).d) olderOwner.set(n, { d, id: o.id });
       }
     }
-    // « confirme » est inclus : le code n'est réellement remis au transporteur
-    // qu'à l'étape suivante (att_ramassage, où `validated` passe à true) — un
-    // colis confirmé mais pas encore validé peut donc encore être renuméroté
-    // sans casser un envoi réel.
     const toRepair = orders.filter(o => {
       // UNIQUEMENT « nouveau » : une commande déjà confirmée ne doit plus jamais
       // recevoir un numéro différent, quel que soit l'état de son code actuel.
