@@ -1,4 +1,5 @@
 import { esc } from './htmlUtils';
+import { fmtDate } from './dateUtils';
 
 function getShopName() {
   try { return JSON.parse(localStorage.getItem('victoury_shop_config') || '{}').shopName || 'VICTOURY'; }
@@ -57,7 +58,7 @@ export function printBon(bon, colis, type = 'ramassage') {
   </div>
   <div class="meta">
     <div><span>Société / Livreur</span><b>${esc(bon.livreur || '-')}</b></div>
-    <div><span>Date</span><b>${new Date(bon.created_at).toLocaleString('fr-MA')}</b></div>
+    <div><span>Date</span><b>${fmtDate(bon.created_at)}</b></div>
     <div><span>Nombre de colis</span><b>${colis.length}</b></div>
   </div>
   <table>

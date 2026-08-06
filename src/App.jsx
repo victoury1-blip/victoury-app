@@ -42,6 +42,7 @@ import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
 import { generateVictId, isVictCode, VICT_ABERRANT_FROM } from './lib/victId';
+import { now, fmtDate } from './lib/dateUtils';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
  *  nouvelle commande porte son numéro dès son entrée dans À Confirmer. L'id interne
@@ -247,7 +248,7 @@ export default function App() {
                 // On rejoue l'instantané AVEC SA DATE : l'horodater à « maintenant »
                 // ferait passer un contenu ancien pour le plus récent, et la
                 // prochaine re-synchro le préférerait à la valeur réelle.
-                date_updated: o.dateUpdated || new Date().toLocaleString('fr-MA'),
+                date_updated: o.dateUpdated || now(),
                 echange: o.echange || false, report_date: o.reportDate || null,
                 note_livraison: o.noteLivraison || '', tracking_number: o.trackingNumber || null,
                 manually_modified: o.manuallyModified || false,
@@ -779,8 +780,8 @@ export default function App() {
               price: parseFloat(o.total) || 0,
               status: products.some(p => isChicProduct(p.name)) || isChicProduct(firstItem.name) ? 'chic_nouveau' : 'nouveau',
               note: o.customer_note || '',
-              dateAdded: new Date(o.date_created).toLocaleString('fr-MA'),
-              dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'),
+              dateAdded: fmtDate(o.date_created),
+              dateUpdated: fmtDate(o.date_modified),
               validated: false,
             });
           } catch (orderErr) {
@@ -981,7 +982,7 @@ export default function App() {
           const updates = computeChicStatusUpdates(chicOrders, prev);
           if (!updates.length) return prev;
           const m = new Map(updates.map(u => [u.id, u.status]));
-          const ts = new Date().toLocaleString('fr-MA');
+          const ts = now();
           return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: ts, manuallyModified: true } : o);
         });
       } catch (e) {
@@ -1107,7 +1108,7 @@ export default function App() {
       // Utiliser la date de màj DÉJÀ posée localement (par le changement de statut)
       // pour que la valeur en base == la valeur locale : la signature de re-synchro
       // reste stable et on évite un remplacement inutile au prochain focus.
-      date_updated: order.dateUpdated || new Date().toLocaleString('fr-MA'),
+      date_updated: order.dateUpdated || now(),
       echange: order.echange || false,
       report_date: order.reportDate || null,
       note_livraison: order.noteLivraison || '',

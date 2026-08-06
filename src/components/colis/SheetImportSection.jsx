@@ -6,6 +6,7 @@ import { useToast } from '../Toast';
 import { mapToAppStatus } from '../../lib/sheetStatus';
 import { hasHeaderRow, detectColumns, pickStatusHeader } from '../../lib/sheetDetect';
 import { getStatusByValue } from '../../data/statuses';
+import { now } from '../../lib/dateUtils';
 
 
 /* ── Google Sheets status config ── */
@@ -377,7 +378,7 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const noteLivraison = (noteLivCol && row[noteLivCol]) || '';
       // Livreur par défaut : Ozon Express (la colonne est retirée du modèle).
       const livreur = (livreurCol && String(row[livreurCol] || '').trim()) || 'Ozon Express';
-      const ts = new Date().toLocaleString('fr-MA');
+      const ts = now();
       // Date issue du Sheet si présente, sinon l'heure d'import.
       const sheetDate = (dateCol && String(row[dateCol] || '').trim()) || '';
       newOrders.push({

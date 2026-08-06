@@ -6,6 +6,7 @@ import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { printBon } from '../lib/printBon';
 import { findOrderByCode, checkRetourScan } from '../lib/scanUtils';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
+import { fmtDate } from '../lib/dateUtils';
 
 
 function ScannerRetourPage({ orders, setOrders }) {
@@ -470,7 +471,7 @@ function BonRetourDetailPage({ orders }) {
           <div><span className="text-gray-500">Référence:</span><p className="font-semibold text-gray-800">{bon.id}</p></div>
           <div><span className="text-gray-500">Société:</span><p className="font-semibold text-gray-800">{bon.livreur || '-'}</p></div>
           <div><span className="text-gray-500">Nb. Colis:</span><p className="font-semibold text-gray-800">{bon.colis_count}</p></div>
-          <div><span className="text-gray-500">Date:</span><p className="font-semibold text-gray-800">{new Date(bon.created_at).toLocaleString('fr-MA')}</p></div>
+          <div><span className="text-gray-500">Date:</span><p className="font-semibold text-gray-800">{fmtDate(bon.created_at)}</p></div>
           <div><span className="text-gray-500">Statut:</span><p><span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[bon.status] || 'bg-gray-100 text-gray-600'}`}>{statusLabels[bon.status] || bon.status}</span></p></div>
         </div>
       </div>
@@ -584,7 +585,7 @@ function BonsRetourListPage() {
                   <tr key={bon.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-orange-600">{bon.id}</td>
                     <td className="px-4 py-3 text-gray-700">{bon.livreur || '-'}</td>
-                    <td className="px-4 py-3 text-gray-600">{new Date(bon.created_at).toLocaleString('fr-MA')}</td>
+                    <td className="px-4 py-3 text-gray-600">{fmtDate(bon.created_at)}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{bon.colis_count} colis</span>
                     </td>

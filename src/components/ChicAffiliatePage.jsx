@@ -23,6 +23,7 @@ import {
 } from '../lib/chicAffiliate';
 import { loadProducts, saveProducts } from '../data/products';
 import { cloudSet, cloudGet } from '../lib/cloudSettings';
+import { now, fmtDate } from '../lib/dateUtils';
 
 /* Statuts propres aux commandes Chic (pipeline site -> livraison -> facture). */
 const CHIC_ORDER_STATUSES = [
@@ -680,7 +681,7 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
       count = updates.length;
       if (!updates.length) return prev;
       const m = new Map(updates.map(u => [u.id, u.status]));
-      return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true } : o);
+      return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: now(), manuallyModified: true } : o);
     });
     setSyncMsg(`${count} commande(s) passée(s) à « Livrée ».${orders.length ? '' : ' Cliquez d\'abord sur « Charger ».'}`);
   }
@@ -758,8 +759,8 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
         price: parseFloat(stripHtml(o.sale_price || '0')),
         status: 'nouveau',
         note: o.comment || '',
-        dateAdded: new Date(o.created_at).toLocaleString('fr-MA'),
-        dateUpdated: new Date().toLocaleString('fr-MA'),
+        dateAdded: fmtDate(o.created_at),
+        dateUpdated: now(),
         validated: false,
         source: 'chic-affiliate',
       };
@@ -1132,7 +1133,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
   }
   function setStatus(id, status) {
     setOrders?.(prev => prev.map(o => o.id === id
-      ? { ...o, status, dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true } : o));
+      ? { ...o, status, dateUpdated: now(), manuallyModified: true } : o));
   }
   const StatusSelect = ({ o }) => (
     <select
@@ -1242,7 +1243,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
 
   function onSent(orderId, extra = {}) {
     setOrders?.(prev => prev.map(o => o.id === orderId
-      ? { ...o, status: 'chic_envoye', chicFrais: extra.fraisLivraison ?? o.chicFrais, price: extra.price ?? o.price, dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true }
+      ? { ...o, status: 'chic_envoye', chicFrais: extra.fraisLivraison ?? o.chicFrais, price: extra.price ?? o.price, dateUpdated: now(), manuallyModified: true }
       : o));
     setSendModal(null);
     setResult({ id: orderId, ok: true, msg: `Commande ${orderId} envoyée à Chic Affiliate ✅` });
@@ -1593,7 +1594,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
     setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status: 'chic_facture', manuallyModified: true } : o));
   }
   function setStatus(id, status) {
-    setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status, dateUpdated: new Date().toLocaleString('fr-MA'), manuallyModified: true } : o));
+    setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status, dateUpdated: now(), manuallyModified: true } : o));
   }
   function facturerTout() {
     const ids = new Set(rows.filter(r => r.o.status === 'chic_livre').map(r => r.o.id));

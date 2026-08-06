@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
+import { fmtDate } from '../lib/dateUtils';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -96,7 +97,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         alert('Fichier de sauvegarde invalide.');
         return;
       }
-      const when = data._exportedAt ? new Date(data._exportedAt).toLocaleString('fr-MA') : '?';
+      const when = data._exportedAt ? fmtDate(data._exportedAt) : '?';
       if (!window.confirm(`Restaurer les réglages de la sauvegarde du ${when} ?\n(livreurs, produits, factures, frais, configuration)\nLes commandes sur le cloud ne sont pas écrasées.`)) return;
       // ne pas restaurer la liste noire des suppressions (évite de ressusciter/masquer par erreur)
       const skip = new Set(['deleted_order_ids']);
@@ -381,7 +382,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           product: { name: firstItem.name || 'Produit WC', size: getMeta(firstItem.meta_data, 'pa_taille', 'taille', 'size'), color: getMeta(firstItem.meta_data, 'pa_couleur', 'couleur', 'color'), qty: (o.line_items || []).reduce((s, i) => s + (i.quantity || 1), 0), stock: 0 },
           products: products.length > 0 ? products : null,
           price: parseFloat(o.total) || 0, status: 'nouveau', note: o.customer_note || '',
-          dateAdded: new Date(o.date_created).toLocaleString('fr-MA'), dateUpdated: new Date(o.date_modified).toLocaleString('fr-MA'), validated: false,
+          dateAdded: fmtDate(o.date_created), dateUpdated: fmtDate(o.date_modified), validated: false,
         };
       });
       onWooOrdersImported(mapped);
