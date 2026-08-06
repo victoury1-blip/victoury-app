@@ -10,6 +10,7 @@ import {
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
+import { A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES } from '../data/colisPipeline';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -588,6 +589,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      GARDE ; les autres reçoivent un nouveau numéro libre. Si Ozon ne connaît pas
      le code, la commande la plus ANCIENNE le garde. Les codes « MIMA » sont exclus. */
   const [dupFix, setDupFix] = useState({ running: false, message: '' });
+  const [renum, setRenum] = useState({ running: false, message: '', lines: [] });
   const [queueMsg, setQueueMsg] = useState('');
   const [diag, setDiag] = useState({ running: false, lines: [] });
 
@@ -656,6 +658,116 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       setDiag({ running: false, lines });
     } catch (e) {
       setDiag({ running: false, lines: ['Erreur : ' + (e?.message || 'échec')] });
+    }
+  }
+
+  /* ── Renumérotation VICTOURY des onglets « À Confirmer » et « En Suivi » ──
+     Action MANUELLE et ponctuelle : les commandes encore en cours de traitement
+     (donc PAS remises au transporteur) reçoivent les plus petits numéros
+     VICTOURY libres, dans l'ordre chronologique.
+     Jamais touché : les colis déjà validés/expédiés (leur code est connu du
+     transporteur), les codes contenant « MIMA », et tout numéro VICTOURY déjà
+     porté par une autre commande (aucun doublon créé). */
+  async function renumberActiveOrders() {
+    const TARGET = new Set([...A_CONFIRMER_STATUSES, ...EN_SUIVI_STATUSES]);
+    setRenum({ running: true, message: 'Lecture des commandes…', lines: [] });
+    try {
+      let rows = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase.from('orders')
+          .select('id, tracking_number, ozone_tracking, recipient, status, validated, date_added')
+          .or('is_deleted.is.null,is_deleted.eq.false')
+          .order('id', { ascending: true }).range(from, from + PAGE - 1);
+        if (error) { setRenum({ running: false, message: 'Lecture impossible : ' + error.message, lines: [] }); return; }
+        const batch = data || [];
+        rows = rows.concat(batch);
+        if (batch.length < PAGE) break;
+      }
+
+      const isProtected = (r) => /mima/i.test(`${r.tracking_number || ''} ${r.ozone_tracking || ''} ${r.id || ''}`);
+      const ts = (v) => {
+        const m = String(v || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+      };
+
+      // Cibles : uniquement les commandes de ces deux onglets, non validées.
+      const targets = rows
+        .filter(r => TARGET.has(r.status) && !r.validated && !isProtected(r))
+        .sort((a, b) => ts(a.date_added) - ts(b.date_added));
+
+      if (!targets.length) {
+        setRenum({ running: false, message: 'Aucune commande à renuméroter.', lines: [] });
+        return;
+      }
+
+      // Numéros VICTOURY portés par les AUTRES commandes : intouchables.
+      const targetIds = new Set(targets.map(r => r.id));
+      const taken = new Set();
+      for (const r of rows) {
+        if (targetIds.has(r.id)) continue;
+        for (const v of [r.id, r.tracking_number]) {
+          const m = /^VICTOURY(\d+)$/i.exec(String(v || '').trim());
+          if (m) taken.add(parseInt(m[1], 10));
+        }
+      }
+
+      let n = 0;
+      const nextFree = () => { do { n += 1; } while (taken.has(n)); taken.add(n); return 'VICTOURY' + String(n).padStart(4, '0'); };
+
+      const updates = [];
+      for (const r of targets) {
+        const code = nextFree();
+        if (String(r.tracking_number || '').toUpperCase() === code.toUpperCase()) continue; // déjà bon
+        updates.push({ id: r.id, code, from: r.tracking_number || r.id, name: r.recipient?.name || r.id });
+      }
+
+      if (!updates.length) {
+        setRenum({ running: false, message: `✅ Les ${targets.length} commandes sont déjà numérotées correctement.`, lines: [] });
+        return;
+      }
+
+      setRenum({ running: true, message: `Renumérotation de ${updates.length} commande(s)…`, lines: [] });
+      let failed = 0;
+      const okIds = new Map();
+      const B = 20;
+      for (let i = 0; i < updates.length; i += B) {
+        await Promise.all(updates.slice(i, i + B).map(({ id, code }) =>
+          supabase.from('orders').update({ tracking_number: code, date_updated: stampNow() }).eq('id', id)
+            .then(({ error }) => { if (error) failed++; else okIds.set(id, code); })
+            .catch(() => { failed++; })
+        ));
+      }
+
+      // Vérification en base : on n'applique en local que ce qui est confirmé.
+      setRenum({ running: true, message: 'Vérification en base…', lines: [] });
+      const ids = [...okIds.keys()];
+      const persisted = new Map();
+      for (let i = 0; i < ids.length; i += 100) {
+        const { data } = await supabase.from('orders').select('id, tracking_number').in('id', ids.slice(i, i + 100));
+        for (const row of (data || [])) persisted.set(row.id, row.tracking_number);
+      }
+      const applied = new Map([...okIds].filter(([id, code]) => persisted.get(id) === code));
+
+      // Le livreur mémorisé appartenait à l'ancien code.
+      for (const id of applied.keys()) { try { localStorage.removeItem(`ozone_dp_${id}`); } catch {} }
+      const stamped = stampNow();
+      setOrders(prev => prev.map(o => applied.has(o.id)
+        ? { ...o, trackingNumber: applied.get(o.id), dateUpdated: stamped }
+        : o));
+
+      // La file de synchronisation peut contenir d'anciens instantanés qui
+      // réécriraient les codes qu'on vient d'attribuer.
+      try { const { clearSyncQueue } = await import('../lib/offlineStore'); await clearSyncQueue(); } catch {}
+
+      setRenum({
+        running: false,
+        message: `✅ ${applied.size} commande(s) renumérotée(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}. Rechargement…`,
+        lines: updates.filter(u => applied.has(u.id)).slice(0, 30).map(u => `  ${u.from} → ${u.code} : ${u.name}`),
+      });
+      if (applied.size) setTimeout(() => window.location.reload(), 3000);
+    } catch (e) {
+      setRenum({ running: false, message: 'Erreur : ' + (e?.message || 'échec'), lines: [] });
     }
   }
 
@@ -1324,6 +1436,40 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             {ozonRestore.lines?.length > 0 && (
               <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
                 {ozonRestore.lines.join('\n')}
+              </pre>
+            )}
+          </div>
+
+          {/* Renumérotation VICTOURY des commandes en cours */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Renuméroter « À Confirmer » et « En Suivi » en VICTOURY</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Donne aux commandes de ces deux onglets les plus petits numéros
+              <strong> VICTOURY</strong> libres, dans l'ordre d'ajout (la plus ancienne d'abord).
+              <strong className="text-gray-700"> Les colis déjà validés/expédiés ne sont jamais touchés</strong> (leur
+              code est connu du transporteur), pas plus que les codes « MIMA » ni un numéro
+              déjà utilisé par une autre commande.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (window.confirm(
+                    "Renuméroter les commandes « À Confirmer » et « En Suivi » en VICTOURY ?\n\n"
+                    + "• Les colis déjà expédiés ne sont PAS touchés\n"
+                    + "• Les codes MIMA ne sont PAS touchés\n\n"
+                    + "Fermez l'application sur les autres appareils avant de continuer.\n"
+                    + "Cette action est définitive."
+                  )) renumberActiveOrders();
+                }}
+                disabled={renum.running}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-40 transition">
+                {renum.running ? 'Renumérotation…' : 'Renuméroter en VICTOURY'}
+              </button>
+              {renum.message && <span className="text-xs text-gray-600">{renum.message}</span>}
+            </div>
+            {renum.lines?.length > 0 && (
+              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
+                {renum.lines.join('\n')}
               </pre>
             )}
           </div>

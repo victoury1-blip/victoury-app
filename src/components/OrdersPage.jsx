@@ -43,7 +43,7 @@ import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { now } from '../lib/dateUtils';
 import { generateVictId, isVictCode } from '../lib/victId';
-import { COLIS_PIPELINE_SET } from '../data/colisPipeline';
+import { COLIS_PIPELINE_SET, A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES } from '../data/colisPipeline';
 import { recordHistory } from '../lib/orderHistory';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
@@ -54,8 +54,8 @@ import NewOrderModal from './orders/NewOrderModal';
 
 
 const tabs = [
-  { id: 'a_confirmer', label: 'À Confirmer', status: ['nouveau'] },
-  { id: 'en_suivi', label: 'En Suivi', status: ['en_attente', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste', 'injoignable', 'pas_reponse', 'pas_rep_1', 'pas_rep_2', 'pas_rep_3', 'pas_rep_4', 'pas_rep_5', 'manque_stock', 'dem_suivi', 'annule'] },
+  { id: 'a_confirmer', label: 'À Confirmer', status: A_CONFIRMER_STATUSES },
+  { id: 'en_suivi', label: 'En Suivi', status: EN_SUIVI_STATUSES },
   { id: 'reporter', label: 'Reporté', status: 'reporter' },
   { id: 'confirme', label: 'Confirmé', status: 'confirme' },
 ];
