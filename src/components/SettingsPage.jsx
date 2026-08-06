@@ -346,11 +346,13 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
   async function testWoo() {
     if (!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret) return;
-    setWoo((p) => ({ ...p, testStatus: 'loading' }));
+    setWoo((p) => ({ ...p, testStatus: 'loading', testError: '' }));
     try {
       await wcGetOrders('any');
-      setWoo((p) => ({ ...p, testStatus: 'success' }));
-    } catch { setWoo((p) => ({ ...p, testStatus: 'error' })); }
+      setWoo((p) => ({ ...p, testStatus: 'success', testError: '' }));
+    } catch (e) {
+      setWoo((p) => ({ ...p, testStatus: 'error', testError: e?.message || 'échec' }));
+    }
   }
 
   function saveWoo() {
@@ -1091,7 +1093,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               </button>
             </>}
             {woo.testStatus === 'success' && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Connexion OK</span>}
-            {woo.testStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-600"><XCircle size={12} /> Échec</span>}
+            {woo.testStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-600"><XCircle size={12} /> Échec{woo.testError ? ` — ${woo.testError}` : ''}</span>}
             {woo.syncStatus === 'success' && <span className="flex items-center gap-1 text-xs text-purple-600"><CheckCircle2 size={12} /> Importées</span>}
           </div>
         </div>
