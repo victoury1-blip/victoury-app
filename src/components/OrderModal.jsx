@@ -282,7 +282,9 @@ export default function OrderModal({ order, onClose, onSave }) {
                 const selProd = stockProducts.find(p => p.name === prod.name);
                 // Par défaut : tailles vêtements (S…5XL). On ne montre les tailles
                 // numériques (36-47) que si la taille déjà saisie est un nombre.
-                const sizes = selProd
+                // `variations` peut manquer sur un produit mal formé : sans ce
+                // garde-fou, la fenêtre de commande plante et devient inutilisable.
+                const sizes = selProd?.variations?.length
                   ? selProd.variations.map(v => v.taille)
                   : (prod.size && !isNaN(prod.size) ? NUMERIC_SIZES : SIZE_OPTIONS);
                 const sizeOptions = sizes.includes(prod.size || '') || !prod.size ? sizes : [prod.size, ...sizes];

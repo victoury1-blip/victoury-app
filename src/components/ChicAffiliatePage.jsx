@@ -425,7 +425,7 @@ function ProductsTab() {
       const sale = parseFloat((p.salePrice || '0').toString().replace(/[^\d.]/g, ''));
       const purchase = parseFloat((p.resellerPrice || '0').toString().replace(/[^\d.]/g, ''));
 
-      const sizes = details.sizes.length > 0 ? details.sizes : ['S', 'M', 'L', 'XL'];
+      const sizes = details?.sizes?.length ? details.sizes : ['S', 'M', 'L', 'XL'];
       const variations = sizes.map(t => ({ taille: t, stock: 10, prix: sale, compareAt: sale, ajust: 0 }));
 
       const allImages = details.images.length > 0 ? details.images : (p.image ? [p.image] : []);
