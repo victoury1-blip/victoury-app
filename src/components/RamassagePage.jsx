@@ -23,8 +23,13 @@ function ScannerPage({ orders, setOrders }) {
   ));
   const navigate = useNavigate();
 
+  // Miroir synchrone de la session : permet de préparer les écritures Supabase
+  // AVANT setBonsSession, sans dépendre d'un état capturé par une closure.
+  const bonsSessionRef = useRef(bonsSession);
+
   // Persiste la session à chaque changement (scan, retrait, enregistrement).
   useEffect(() => {
+    bonsSessionRef.current = bonsSession;
     try { localStorage.setItem('ramassage_session', JSON.stringify(bonsSession)); } catch {}
   }, [bonsSession]);
 
@@ -114,13 +119,15 @@ function ScannerPage({ orders, setOrders }) {
       time: new Date().toLocaleTimeString('fr-MA'),
     };
 
-    setBonsSession(prev => {
-      const existing = prev[livreur];
-      if (existing?.colis?.some(c => c.id === order.id)) return prev;
-      const bonId = existing?.bonId
+    // L'écriture Supabase est calculée AVANT setBonsSession : un updater doit
+    // rester pur (React le ré-exécute en mode strict, ce qui enverrait la
+    // requête deux fois et créerait un bon en double).
+    const existingBon = bonsSessionRef.current[livreur];
+    if (!existingBon?.colis?.some(c => c.id === order.id)) {
+      const bonId = existingBon?.bonId
         || `BRA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${(crypto.randomUUID?.() || String(Math.random())).replace(/-/g, '').slice(0, 8).toUpperCase()}`;
-      const createdAt = existing?.created_at || new Date().toISOString();
-      const colis = [...(existing?.colis || []), newColis];
+      const createdAt = existingBon?.created_at || new Date().toISOString();
+      const colis = [...(existingBon?.colis || []), newColis];
       // Création/mise à jour AUTOMATIQUE du bon dans Supabase : il apparaît aussitôt
       // dans « Liste des Bons » (statut Ouvert). L'utilisateur n'a plus qu'à le clôturer.
       supabase.from('bons_ramassage').upsert({
@@ -129,8 +136,12 @@ function ScannerPage({ orders, setOrders }) {
       }, { onConflict: 'id' }).then(({ error }) => {
         if (error) showMessage('⚠️ Bon non synchronisé: ' + error.message, 'error');
       });
-      return { ...prev, [livreur]: { bonId, created_at: createdAt, colis } };
-    });
+      // Le miroir est mis à jour tout de suite : deux scans rapprochés (avant
+      // le re-rendu) doivent voir le bon déjà commencé, sinon le second en
+      // recrée un nouveau et écrase le premier.
+      bonsSessionRef.current = { ...bonsSessionRef.current, [livreur]: { bonId, created_at: createdAt, colis } };
+      setBonsSession(prev => ({ ...prev, [livreur]: { bonId, created_at: createdAt, colis } }));
+    }
 
     showMessage(`${order.recipient?.name || code} ajouté au bon ${livreur}`);
   }, [orders, setOrders]);
@@ -155,29 +166,28 @@ function ScannerPage({ orders, setOrders }) {
   }
 
   function removeFromBon(livreur, colisId) {
-    setBonsSession(prev => {
-      const updated = { ...prev };
-      const bon = updated[livreur];
-      if (!bon) return prev;
-      const newColis = bon.colis.filter(c => c.id !== colisId);
-      scannedIdsRef.current.delete(colisId);
-      // Répercuter le retrait sur le bon auto-créé dans Supabase.
-      if (bon.bonId) {
-        if (newColis.length === 0) {
-          supabase.from('bons_ramassage').delete().eq('id', bon.bonId).then(() => {});
-        } else {
-          supabase.from('bons_ramassage').update({
+    // Idem : l'écriture Supabase est faite HORS de l'updater (qui doit rester pur).
+    const bon = bonsSessionRef.current[livreur];
+    if (!bon) return;
+    const newColis = bon.colis.filter(c => c.id !== colisId);
+    scannedIdsRef.current.delete(colisId);
+    // Répercuter le retrait sur le bon auto-créé dans Supabase.
+    if (bon.bonId) {
+      const q = newColis.length === 0
+        ? supabase.from('bons_ramassage').delete().eq('id', bon.bonId)
+        : supabase.from('bons_ramassage').update({
             colis_ids: newColis.map(c => c.id), colis_count: newColis.length,
-          }).eq('id', bon.bonId).then(() => {});
-        }
-      }
-      if (newColis.length === 0) {
-        delete updated[livreur];
-      } else {
-        updated[livreur] = { ...bon, colis: newColis };
-      }
+          }).eq('id', bon.bonId);
+      q.then(({ error }) => { if (error) showMessage('⚠️ Bon non synchronisé: ' + error.message, 'error'); });
+    }
+    const applyRemoval = (src) => {
+      const updated = { ...src };
+      if (newColis.length === 0) delete updated[livreur];
+      else updated[livreur] = { ...bon, colis: newColis };
       return updated;
-    });
+    };
+    bonsSessionRef.current = applyRemoval(bonsSessionRef.current);
+    setBonsSession(applyRemoval);
     // remettre le colis en attente de ramassage pour pouvoir le rescanner
     setOrders(prev => prev.map(o => o.id === colisId ? { ...o, status: 'att_ramassage' } : o));
     supabase.from('orders').update({ status: 'att_ramassage' }).eq('id', colisId).then(({ error }) => {

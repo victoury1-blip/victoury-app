@@ -784,8 +784,11 @@ export default function App() {
             logError('wc_order_mapping', `Failed to map WC order #${o.id}: ${orderErr.message}`, { wc_id: o.id, error: orderErr.message });
           }
         }
-        /* Use localStorage which is already synced with Supabase on startup */
-        setOrders((prev) => {
+        /* Tout est calculé et envoyé ICI, hors de setOrders : un updater doit
+           rester pur. Sinon chaque sondage réattribue des codes VICTOURY (numéros
+           brûlés), rejoue la notification et le son, et écrit deux fois en base. */
+        {
+          const prev = ordersRef.current;
           const existingIds = new Set(prev.map((o) => o.id));
           const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
           if (fresh.length) {
@@ -837,8 +840,12 @@ export default function App() {
           );
           /* Log success */
           if (fresh.length || changedWC.length) logWcSync({ status: 'success', newOrders: fresh.length, updatedOrders: changedWC.length });
-          return fresh.length ? [...fresh, ...updated] : updated;
-        });
+          if (fresh.length || changedWC.length) {
+            const next = fresh.length ? [...fresh, ...updated] : updated;
+            ordersRef.current = next;
+            setOrders(next);
+          }
+        }
       } catch (e) {
         const isTimeout = e?.name === 'AbortError';
         const msg = isTimeout ? 'serveur WooCommerce lent (délai dépassé) — réessai automatique' : (e?.message || 'erreur réseau');
@@ -1124,8 +1131,15 @@ export default function App() {
     }
   }
 
+  /* Point d'écriture PRINCIPAL de l'application.
+     Le calcul et les envois vers Supabase sont faits ICI, en dehors de
+     setOrders : un updater React doit rester pur (il peut être ré-exécuté),
+     sinon chaque modification part deux fois vers la base.
+     `ordersRef` est réaligné tout de suite pour que deux appels dans le même
+     cycle voient bien le résultat du premier. */
   const setOrdersWithSync = (updater) => {
-    setOrders((prev) => {
+    {
+      const prev = ordersRef.current;
       let next = typeof updater === 'function' ? updater(prev) : updater;
       const prevIds = new Set(prev.map(o => o.id));
       // Ne jamais réintroduire une commande supprimée (liste noire) via un ré-import :
@@ -1156,18 +1170,26 @@ export default function App() {
       });
       // Cache updated orders to IndexedDB
       saveOrdersOffline(next).catch(e => console.error('Failed to cache orders offline:', e));
-      return next;
-    });
+      ordersRef.current = next;
+      setOrders(next);
+    }
   };
 
   function handleWooImport(newOrders) {
-    setOrders((prev) => {
-      const existingIds = new Set(prev.map((o) => o.id));
-      // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
-      const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
-      if (fresh.length) { assignVictTracking(fresh, prev); saveOrdersToSupabase(fresh); }
-      return fresh.length ? [...fresh, ...prev] : prev;
-    });
+    // Attribution des codes et écriture en base AVANT setOrders : un updater doit
+    // rester pur, sinon les codes sont générés deux fois (numéros brûlés) et
+    // l'import part en double vers Supabase.
+    const prev = ordersRef.current;
+    const existingIds = new Set(prev.map((o) => o.id));
+    // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
+    const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
+    if (fresh.length) {
+      assignVictTracking(fresh, prev);
+      saveOrdersToSupabase(fresh).catch(e => console.error('save imported orders:', e));
+      const next = [...fresh, ...prev];
+      ordersRef.current = next;
+      setOrders(next);
+    }
     navigate('/commandes/a-confirmer');
   }
 
