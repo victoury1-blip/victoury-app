@@ -495,7 +495,9 @@ export default function App() {
     // colis confirmé mais pas encore validé peut donc encore être renuméroté
     // sans casser un envoi réel.
     const toRepair = orders.filter(o => {
-      if (!['nouveau', 'confirme'].includes(o.status) || o.validated) return false;
+      // UNIQUEMENT « nouveau » : une commande déjà confirmée ne doit plus jamais
+      // recevoir un numéro différent, quel que soit l'état de son code actuel.
+      if (o.status !== 'nouveau' || o.validated) return false;
       if (/mima/i.test(`${o.trackingNumber || ''} ${o.id || ''}`)) return false;
       const n = victNum(o.trackingNumber);
       if (!n || victNum(o.id)) return false;        // pas de code VICT propre à corriger
