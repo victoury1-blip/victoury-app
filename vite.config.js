@@ -2,7 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/* Identifiant de build affiché dans Réglages. Il permet de vérifier d'un coup
+   d'œil quelle version tourne réellement sur un appareil — sans quoi on ne peut
+   pas distinguer « le correctif ne marche pas » de « le navigateur sert encore
+   l'ancien cache ». Sur Vercel, le SHA du commit est fourni par l'environnement. */
+const BUILD_ID = (process.env.VERCEL_GIT_COMMIT_SHA || 'local').slice(0, 7)
+  + ' · ' + new Date().toISOString().slice(0, 16).replace('T', ' ');
+
 export default defineConfig({
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   test: {
     globals: true,
     environment: 'jsdom',

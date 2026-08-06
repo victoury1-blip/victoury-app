@@ -1308,6 +1308,11 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       <div className="flex items-center gap-2 mb-6">
         <Settings size={22} className="text-gray-700" />
         <h1 className="text-2xl font-bold text-gray-800">Réglages</h1>
+        {/* Version réellement chargée par CET appareil : permet de distinguer
+            « le correctif ne marche pas » de « le navigateur sert l'ancien cache ». */}
+        <span className="ml-auto text-[10px] font-mono text-gray-400" title="Version chargée sur cet appareil">
+          v{typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : '?'}
+        </span>
       </div>
 
       {/* Cache / DB section */}
