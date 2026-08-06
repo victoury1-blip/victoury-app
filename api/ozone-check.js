@@ -1,27 +1,10 @@
 import { isAuthenticated } from './_auth.js';
-
-const rateLimitMap = new Map();
-
-function rateLimit(ip, maxRequests = 10, windowMs = 60000) {
-  const now = Date.now();
-  // purge des entrées expirées pour ne pas croître indéfiniment
-  if (rateLimitMap.size > 500) {
-    for (const [k, v] of rateLimitMap) if (now - v.start > windowMs) rateLimitMap.delete(k);
-  }
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now - entry.start > windowMs) {
-    rateLimitMap.set(ip, { start: now, count: 1 });
-    return false;
-  }
-  entry.count++;
-  return entry.count > maxRequests;
-}
+import { rateLimited, clientIp } from './_rateLimit.js';
 
 export default async function handler(req, res) {
   if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
 
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
-  if (rateLimit(clientIp)) {
+  if (rateLimited(`ozone-check:${clientIp(req)}`, 10, 60000)) {
     return res.status(429).json({ error: 'Trop de requêtes. Réessayez dans une minute.' });
   }
 

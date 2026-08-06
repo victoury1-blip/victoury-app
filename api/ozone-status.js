@@ -3,19 +3,7 @@
 // Renvoie uniquement { found, status } — pas de HTML tiers brut.
 
 import { isAuthenticated } from './_auth.js';
-
-const rateLimitMap = new Map();
-function rateLimit(ip, maxRequests = 15, windowMs = 60000) {
-  const now = Date.now();
-  // purge des entrées expirées pour ne pas croître indéfiniment
-  if (rateLimitMap.size > 500) {
-    for (const [k, v] of rateLimitMap) if (now - v.start > windowMs) rateLimitMap.delete(k);
-  }
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now - entry.start > windowMs) { rateLimitMap.set(ip, { start: now, count: 1 }); return false; }
-  entry.count++;
-  return entry.count > maxRequests;
-}
+import { rateLimited, clientIp } from './_rateLimit.js';
 
 // Libellés de statut Ozon, du plus « final » au moins prioritaire.
 const STATUS_KEYWORDS = [
@@ -57,8 +45,9 @@ function fmtTime(d) {
 export default async function handler(req, res) {
   if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
 
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
-  if (rateLimit(clientIp)) return res.status(429).json({ error: 'Trop de requêtes. Réessayez dans une minute.' });
+  if (rateLimited(`ozone-status:${clientIp(req)}`)) {
+    return res.status(429).json({ error: 'Trop de requêtes. Réessayez dans une minute.' });
+  }
 
   // Recherche unique (?code= / ?phone=) OU lot (?codes=A,B,C — jusqu'à 40).
   // Le lot ne se connecte qu'UNE fois à Ozon puis interroge chaque valeur.

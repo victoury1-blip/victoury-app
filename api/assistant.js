@@ -5,6 +5,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { isAuthenticated } from './_auth.js';
+import { rateLimited, clientIp } from './_rateLimit.js';
 
 const SYSTEM = `Tu es l'assistant intelligent de "Victoury", une boutique e-commerce marocaine de vêtements avec livraison à domicile (COD).
 Tu reçois un résumé JSON des données réelles du magasin (commandes, statuts, CA, villes, produits, livreurs, périodes).
@@ -18,6 +19,11 @@ Règles :
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
   if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
+  // Chaque appel coûte des crédits API : on plafonne pour qu'une boucle
+  // emballée ou un jeton fuité ne puisse pas les consommer sans fin.
+  if (rateLimited(`assistant:${clientIp(req)}`, 10, 60000)) {
+    return res.status(429).json({ error: 'Trop de questions à la suite. Réessayez dans une minute.' });
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -52,7 +58,12 @@ export default async function handler(req, res) {
     const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
     return res.status(200).json({ answer: text || '—' });
   } catch (e) {
-    const msg = e?.status === 401 ? 'Clé API invalide' : (e?.message || 'Erreur inconnue');
-    return res.status(500).json({ error: `Assistant indisponible: ${msg}` });
+    // Le détail de l'erreur reste côté serveur (il peut exposer des informations
+    // internes) ; le client reçoit une cause générique.
+    console.error('assistant:', e?.status, e?.message || e);
+    const msg = e?.status === 401 ? 'clé API invalide'
+      : e?.status === 429 ? 'quota momentanément dépassé'
+      : 'service indisponible';
+    return res.status(e?.status === 429 ? 429 : 502).json({ error: `Assistant : ${msg}` });
   }
 }
