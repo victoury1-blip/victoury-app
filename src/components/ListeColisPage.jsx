@@ -10,6 +10,7 @@ import { useStatuses } from '../contexts/StatusContext';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import PhoneChip, { normalizePhone } from './PhoneChip';
 import { getOzonDp } from '../lib/ozonDp';
+import { COLIS_PIPELINE } from '../data/colisPipeline';
 import { useToast } from './Toast';
 import Toggle from './Toggle';
 import { findOrderByCode } from '../lib/scanUtils';
@@ -497,7 +498,6 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
 }
 
 /* ── Main page ── */
-const COLIS_PIPELINE = ['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu'];
 const isCasa = (city) => {
   if (!city) return false;
   const c = city.toLowerCase().replace(/[\s\-]/g, '');

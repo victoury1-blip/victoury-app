@@ -43,6 +43,7 @@ import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { now } from '../lib/dateUtils';
 import { generateVictId, isVictCode } from '../lib/victId';
+import { COLIS_PIPELINE_SET } from '../data/colisPipeline';
 import { recordHistory } from '../lib/orderHistory';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
@@ -544,7 +545,6 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const currentStatusRaw = tabs.find((t) => t.id === activeTab)?.status || 'nouveau';
   const currentStatuses = Array.isArray(currentStatusRaw) ? currentStatusRaw : [currentStatusRaw];
 
-  const COLIS_PIPELINE_SET = new Set(['att_ramassage','expedier','recu_livreur','livre','change','refuse','pas_rep_lv','pret_retour','en_suivi','retour_recu','echange_recu']);
 
   const isCasa = (city) => {
     if (!city) return false;
