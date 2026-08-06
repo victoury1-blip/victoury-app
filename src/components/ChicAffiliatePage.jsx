@@ -1,4 +1,5 @@
 import { useToast } from './Toast';
+import { esc } from '../lib/htmlUtils';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Store, Settings, Search, ChevronDown, ChevronRight, RefreshCw,
@@ -1604,9 +1605,11 @@ function ChicFacturesTab({ orders = [], setOrders }) {
   function imprimer() {
     const w = window.open('', '_blank');
     if (!w) { toast.error('Popup bloquée — autorisez les popups pour ce site.'); return; }
+    // Nom du client, produit et taille viennent de la saisie : sans échappement,
+    // un « < » suffit à casser le document imprimé (voire à y injecter du script).
     const rowsHtml = rows.map(r => `<tr>
-      <td>${r.o.id}</td><td>${r.o.recipient?.name || '—'}</td><td>${r.prodName}</td>
-      <td>${r.o.product?.size || '—'}</td><td>${r.qty}</td>
+      <td>${esc(r.o.id)}</td><td>${esc(r.o.recipient?.name || '—')}</td><td>${esc(r.prodName)}</td>
+      <td>${esc(r.o.product?.size || '—')}</td><td>${esc(r.qty)}</td>
       <td style="text-align:right">${r.vente.toFixed(2)}</td>
       <td style="text-align:right">${r.revendeur.toFixed(2)}</td>
       <td style="text-align:right">${r.frais.toFixed(2)}</td>
