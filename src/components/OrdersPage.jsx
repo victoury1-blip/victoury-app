@@ -42,7 +42,7 @@ import { fetchChicProductDetails, fetchChicProducts, createChicOrder, getChicCon
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { now } from '../lib/dateUtils';
-import { initVictCounter, recalcVictCounter, generateVictId, isVictCode } from '../lib/victId';
+import { generateVictId, isVictCode } from '../lib/victId';
 import { recordHistory } from '../lib/orderHistory';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
@@ -165,25 +165,13 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
     // (StrictMode le ré-exécute et brûlerait/dupliquerait des ids).
     const newIds = new Map();
     if (VICT_ON_STATUS.has(newStatus)) {
-      // Un numéro déjà porté (comme id OU comme code) ne doit jamais être réattribué.
-      const usedNums = new Set();
-      for (const o of orders) {
-        for (const v of [o.id, o.trackingNumber]) {
-          const m = /^VICT(\d+)$/i.exec(v || '');
-          if (m) usedNums.add(parseInt(m[1], 10));
-        }
-      }
-      const numOf = (c) => { const m = /^VICT(\d+)$/i.exec(c || ''); return m ? parseInt(m[1], 10) : 0; };
       for (const o of orders) {
         // Ancienne série (VICT) OU nouvelle (VICTOURY) : dans les deux cas, la
         // commande a déjà un code, on ne lui en donne pas un second.
         const alreadyVict = isVictCode(o.trackingNumber) || isVictCode(o.id);
         if (!selected.includes(o.id) || alreadyVict) continue;
-        let code = generateVictId();
-        let guard = 0;
-        while (usedNums.has(numOf(code)) && guard++ < 10000) code = generateVictId();
-        usedNums.add(numOf(code));
-        newIds.set(o.id, code);
+        // Plus petit numéro VICTOURY libre parmi les commandes actives.
+        newIds.set(o.id, generateVictId(orders));
       }
     }
     setOrders(prev => prev.map(o => {
@@ -205,12 +193,10 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
 
   function bulkDelete() {
     if (!window.confirm(`Supprimer définitivement ${selected.length} commande${selected.length > 1 ? 's' : ''} ?`)) return;
-    const remaining = orders.filter(o => !selected.includes(o.id));
-    for (const id of selected) {
+      for (const id of selected) {
       setOrders(prev => prev.filter(o => o.id !== id));
       onDeleteOrder?.(id);
     }
-    recalcVictCounter(remaining);
     setSelected([]);
   }
 
@@ -370,7 +356,6 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
 export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading, onDeleteOrder, currentUser }) {
   const { statuses } = useStatuses();
   const orders = externalOrders;
-  useEffect(() => { if (orders.length) initVictCounter(orders); }, [orders]);
   function setOrders(updater) {
     setExternalOrders(updater);
   }
@@ -1188,11 +1173,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                     <button
                       onClick={() => {
                         if (window.confirm(`Supprimer la commande ${order.id} ?`)) {
-                          setOrders(prev => {
-                            const next = prev.filter(o => o.id !== order.id);
-                            recalcVictCounter(next);
-                            return next;
-                          });
+                          setOrders(prev => prev.filter(o => o.id !== order.id));
                           onDeleteOrder?.(order.id);
                         }
                       }}
@@ -1305,11 +1286,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <button
                     onClick={() => {
                       if (window.confirm(`Supprimer la commande ${order.id} ?`)) {
-                        setOrders(prev => {
-                          const next = prev.filter(o => o.id !== order.id);
-                          recalcVictCounter(next);
-                          return next;
-                        });
+                        setOrders(prev => prev.filter(o => o.id !== order.id));
                         onDeleteOrder?.(order.id);
                       }
                     }}
@@ -1377,20 +1354,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             const target = orders.find(o => o.id === orderId);
             const alreadyVict = isVictCode(target?.trackingNumber) || isVictCode(target?.id);
             const needsVict = VICT_ON_STATUS.has(newStatus) && !alreadyVict;
-            let newVict = null;
-            if (needsVict) {
-              const usedNums = new Set();
-              for (const o of orders) {
-                for (const v of [o.id, o.trackingNumber]) {
-                  const m = /^VICT(\d+)$/i.exec(v || '');
-                  if (m) usedNums.add(parseInt(m[1], 10));
-                }
-              }
-              const numOf = (c) => { const m = /^VICT(\d+)$/i.exec(c || ''); return m ? parseInt(m[1], 10) : 0; };
-              newVict = generateVictId();
-              let guard = 0;
-              while (usedNums.has(numOf(newVict)) && guard++ < 10000) newVict = generateVictId();
-            }
+            const newVict = needsVict ? generateVictId(orders) : null;
             setOrders((prev) => prev.map((o) => {
               if (o.id !== orderId) return o;
               const prevNote = o.note || '';
@@ -1426,6 +1390,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       {/* New Order Modal */}
       {newOrderOpen && (
         <NewOrderModal
+          orders={orders}
           onClose={() => setNewOrderOpen(false)}
           onSave={(ordersList) => {
             setOrders((prev) => [...ordersList, ...prev]);

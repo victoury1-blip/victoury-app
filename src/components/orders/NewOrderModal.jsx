@@ -70,7 +70,7 @@ function CityAutocomplete({ value, onChange, livreur }) {
   );
 }
 
-export default function NewOrderModal({ onClose, onSave }) {
+export default function NewOrderModal({ onClose, onSave, orders = [] }) {
   const [stockProducts, setStockProducts] = useState(loadProducts());
   useEffect(() => {
     loadProductsRemote().then(remote => {
@@ -104,7 +104,9 @@ export default function NewOrderModal({ onClose, onSave }) {
     const firstProd = form.products[0] || {};
     const createdOrders = [];
     for (let i = 0; i < count; i++) {
-      const id = await generateVictId();
+      // Plus petit numéro VICTOURY libre parmi les commandes actives (une
+      // commande supprimée libère son numéro pour la prochaine création).
+      const id = generateVictId([...orders, ...createdOrders]);
       createdOrders.push({
         id,
         recipient: { name: form.nom, phone: form.telephone, city: form.ville, address: form.adresse, delivery: form.livreur || null },

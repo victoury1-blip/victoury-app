@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { recalcVictCounter, generateVictId, isVictCode, VICT_ABERRANT_FROM } from './lib/victId';
+import { generateVictId, isVictCode, VICT_ABERRANT_FROM } from './lib/victId';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
  *  nouvelle commande porte son numéro dès son entrée dans À Confirmer. L'id interne
@@ -58,27 +58,12 @@ function assignVictTracking(freshOrders, allOrders) {
   if (!allOrders || !allOrders.length) return freshOrders;
   // Reconnaît un code de l'ancienne série (VICT) OU de la nouvelle (VICTOURY) :
   // une commande qui a déjà l'une ou l'autre ne doit jamais en recevoir une 2e.
-  const isVict = isVictCode;
-  const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-
-  // Un numéro déjà porté par une commande — que ce soit comme ID ou comme code de
-  // suivi — ne doit JAMAIS être réattribué. Le compteur seul ne suffit pas : s'il
-  // repart bas, il redonne des numéros déjà pris (VICT0002, 0003…) et crée des
-  // doublons avec d'anciennes commandes dont l'ID est justement VICTxxxx.
-  const used = new Set();
-  for (const o of allOrders) {
-    for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
-  }
-
-  recalcVictCounter(allOrders);
   freshOrders.forEach((o) => {
-    if (isVict(o.trackingNumber) || isVict(o.id)) return;
-    let code = generateVictId();
-    // Tant que le numéro proposé est déjà pris, on avance jusqu'au premier libre.
-    let guard = 0;
-    while (used.has(victNum(code)) && guard++ < 10000) code = generateVictId();
-    used.add(victNum(code));
-    o.trackingNumber = code;
+    if (isVictCode(o.trackingNumber) || isVictCode(o.id)) return;
+    // generateVictId() prend le plus petit numéro VICTOURY libre parmi les
+    // commandes ACTIVES connues (allOrders) : une commande supprimée libère
+    // son numéro pour la prochaine.
+    o.trackingNumber = generateVictId(allOrders);
   });
   return freshOrders;
 }
@@ -523,29 +508,10 @@ export default function App() {
     victFillRef.current = true;
     (async () => {
       try {
-        recalcVictCounter(orders);
-        // Ne jamais réutiliser un numéro déjà porté (comme id OU comme code de suivi).
-        const used = new Set();
-        for (const o of orders) {
-          for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
-        }
         const assign = new Map();
-
-        for (const o of toRepair) {
-          let code = generateVictId();
-          let guard = 0;
-          while (used.has(victNum(code)) && guard++ < 10000) code = generateVictId();
-          used.add(victNum(code));
-          assign.set(o.id, code);
-        }
-
-        for (const o of missing) {
-          let code = generateVictId();
-          let guard = 0;
-          while (used.has(victNum(code)) && guard++ < 10000) code = generateVictId();
-          used.add(victNum(code));
-          assign.set(o.id, code);
-        }
+        // generateVictId(orders) prend toujours le plus petit numéro VICTOURY
+        // libre parmi les commandes actives connues à cet instant.
+        for (const o of [...toRepair, ...missing]) assign.set(o.id, generateVictId(orders));
         const entries = [...assign.entries()];
         const BATCH = 20;
         for (let i = 0; i < entries.length; i += BATCH) {
