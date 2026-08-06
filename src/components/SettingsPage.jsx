@@ -692,35 +692,58 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
          le transporteur. On le demande par TÉLÉPHONE (recherche exacte côté
          Ozon, qui renvoie le code du colis). Un numéro portant plusieurs colis
          est signalé ambigu par le serveur et n'est jamais deviné. */
-      const digits = (v) => String(v || '').replace(/\D/g, '').replace(/^212/, '0');
-      const orphans = rows.filter(r => isVictoury(r.tracking_number) && !isOldVict(r.ozone_tracking) && digits(r.recipient?.phone));
+      /* Numéro marocain normalisé : on ne garde que les chiffres, on retire un
+         éventuel indicatif 212, et on ne conserve que les 9 derniers chiffres
+         significatifs (certaines fiches contiennent « 0/0626272627 »). */
+      const digits = (v) => {
+        const raw = String(v || '').replace(/\D/g, '').replace(/^00/, '').replace(/^212/, '');
+        const nine = raw.slice(-9);
+        return nine.length === 9 ? '0' + nine : '';
+      };
+      // Un livreur PERSONNEL n'a pas de colis chez Ozon : rien à y chercher.
+      const isOzon = (r) => /ozon/i.test(r.recipient?.delivery || '');
+      const orphans = rows.filter(r => isVictoury(r.tracking_number) && !isOldVict(r.ozone_tracking) && isOzon(r) && digits(r.recipient?.phone));
       const ambiguous = [];
+      const notFound = [];
       if (orphans.length) {
         const { data: { session } } = await supabase.auth.getSession();
         const auth = session?.access_token ? { headers: { Authorization: `Bearer ${session.access_token}` } } : undefined;
-        const byPhone = new Map();
+
+        // Ozon peut stocker le numéro sous plusieurs formes : on essaie chaque
+        // variante et on retient la première qui donne un colis unique.
+        const variantsOf = (p) => [...new Set([p, p.slice(1), '212' + p.slice(1)])].filter(v => v.length >= 3);
+        const byVariant = new Map();
         for (const r of orphans) {
-          const p = digits(r.recipient?.phone);
-          if (!byPhone.has(p)) byPhone.set(p, r);   // 1 commande par téléphone suffit ici
+          for (const v of variantsOf(digits(r.recipient?.phone))) {
+            if (!byVariant.has(v)) byVariant.set(v, r);
+          }
         }
-        const phones = [...byPhone.keys()];
-        for (let i = 0; i < phones.length; i += 20) {
-          const chunk = phones.slice(i, i + 20);
-          setRestoreOld({ running: true, message: `Recherche chez Ozon ${Math.min(i + 20, phones.length)}/${phones.length}…`, lines: [] });
+        const queries = [...byVariant.keys()];
+        const found = new Map();      // id de commande -> code trouvé
+        const seenAmbiguous = new Set();
+        for (let i = 0; i < queries.length; i += 20) {
+          const chunk = queries.slice(i, i + 20);
+          setRestoreOld({ running: true, message: `Recherche chez Ozon ${Math.min(i + 20, queries.length)}/${queries.length}…`, lines: [] });
           try {
             const r = await fetch(`/api/ozone-status?phones=${encodeURIComponent(chunk.join(','))}`, auth);
             if (!r.ok) continue;
             const d = await r.json();
             for (const row of (d.results || [])) {
-              const order = byPhone.get(row.q);
-              if (!order) continue;
-              if (row.ambiguous) { ambiguous.push(`${order.tracking_number} : ${order.recipient?.name || order.id} (plusieurs colis pour ce numéro)`); continue; }
+              const order = byVariant.get(row.q);
+              if (!order || found.has(order.id)) continue;
+              if (row.ambiguous) { seenAmbiguous.add(order.id); continue; }
               // On ne restaure que si Ozon donne un code DIFFÉRENT de l'actuel.
               const code = String(row.code || '').trim();
               if (!code || code.toUpperCase() === String(order.tracking_number).toUpperCase()) continue;
-              if (!targets.some(t => t.id === order.id)) targets.push({ ...order, ozone_tracking: code });
+              found.set(order.id, code);
             }
           } catch {}
+        }
+        for (const r of orphans) {
+          const code = found.get(r.id);
+          if (code) { if (!targets.some(t => t.id === r.id)) targets.push({ ...r, ozone_tracking: code }); continue; }
+          if (seenAmbiguous.has(r.id)) ambiguous.push(`${r.tracking_number} : ${r.recipient?.name || r.id} (plusieurs colis pour ce numéro)`);
+          else notFound.push(`${r.tracking_number} : ${r.recipient?.name || r.id} — ${r.recipient?.phone || '?'} (aucun colis trouvé chez Ozon)`);
         }
       }
 
@@ -773,6 +796,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
             ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
             ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
+            ...(notFound.length ? ['Introuvables chez Ozon (à vérifier à la main) :', ...notFound.slice(0, 15).map(l => '  ' + l)] : []),
           ],
         });
         return;
@@ -800,6 +824,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
         ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
         ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
+        ...(notFound.length ? ['Introuvables chez Ozon (à vérifier à la main) :', ...notFound.slice(0, 15).map(l => '  ' + l)] : []),
       ];
       setRestoreOld({
         running: false,
