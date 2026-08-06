@@ -371,15 +371,46 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     }
   }
 
+  /* Le test interroge UNIQUEMENT la route serveur, sans repli sur l'appel
+     direct : c'est ce repli qui masquait la vraie cause derrière un
+     « signal is aborted » du navigateur. La route serveur, elle, tourne chez
+     Vercel — elle n'est donc pas soumise au réseau local, au bloqueur ou au
+     pare-feu de l'appareil, et elle rapporte l'erreur exacte de la boutique. */
   async function testWoo() {
     if (!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret) return;
     setWoo((p) => ({ ...p, testStatus: 'loading', testError: '' }));
+    const ac = new AbortController();
+    const to = setTimeout(() => ac.abort(), 30000);
     try {
-      await wcGetOrders('any');
-      setWoo((p) => ({ ...p, testStatus: 'success', testError: '' }));
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch('/api/woo-orders', {
+        method: 'POST',
+        signal: ac.signal,
+        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, status: 'any' }),
+      });
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('json')) {
+        setWoo((p) => ({
+          ...p, testStatus: 'error',
+          testError: `réponse non-JSON (HTTP ${r.status}) — la requête est bloquée AVANT le serveur (pare-feu / protection Vercel)`,
+        }));
+        return;
+      }
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setWoo((p) => ({ ...p, testStatus: 'error', testError: `${j.error || 'erreur'} (HTTP ${r.status})` }));
+        return;
+      }
+      setWoo((p) => ({ ...p, testStatus: 'success', testError: `${(j.orders || []).length} commande(s) lue(s)` }));
     } catch (e) {
-      setWoo((p) => ({ ...p, testStatus: 'error', testError: e?.message || 'échec' }));
-    }
+      setWoo((p) => ({
+        ...p, testStatus: 'error',
+        testError: e?.name === 'AbortError'
+          ? "pas de réponse de /api/woo-orders en 30 s — la fonction serveur ne répond pas"
+          : `impossible de joindre /api/woo-orders : ${e?.message || 'réseau'}`,
+      }));
+    } finally { clearTimeout(to); }
   }
 
   function saveWoo() {
