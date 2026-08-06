@@ -724,10 +724,8 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         }
       }
 
-      if (!targets.length) {
-        setRestoreOld({ running: false, message: '✅ Aucun code écrasé : rien à restaurer.', lines: [] });
-        return;
-      }
+      // Pas de sortie anticipée ici : même sans code à restaurer, la réparation
+      // des codes abîmés (plus bas) doit pouvoir s'exécuter.
 
       // Un code VICT déjà porté par une AUTRE commande ne doit pas être rendu
       // en double : on l'ignore et on le signale.
@@ -737,13 +735,47 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         if (c) takenBy.set(c, r.id);
       }
 
+      // GARDE-FOU : un code de colis est un jeton simple. Tout ce qui contient
+      // un espace, un accent ou du texte (nom de livreur, téléphone collés par
+      // une cellule HTML) est REFUSÉ — jamais écrit en base.
+      const isValidCode = (v) => /^[A-Za-z0-9_-]{3,30}$/.test(String(v || '').trim());
+
       const toApply = [];
       const conflicts = [];
+      const rejected = [];
       for (const r of targets) {
         const code = String(r.ozone_tracking).trim();
+        if (!isValidCode(code)) { rejected.push(`${r.tracking_number} : valeur illisible « ${code.slice(0, 40)} »`); continue; }
         const owner = takenBy.get(code.toUpperCase());
         if (owner && owner !== r.id) { conflicts.push(`${r.tracking_number} → ${code} : déjà porté par ${owner}`); continue; }
         toApply.push({ id: r.id, code, from: r.tracking_number, name: r.recipient?.name || r.id });
+      }
+
+      /* Réparation des codes déjà abîmés par une exécution précédente : un
+         tracking_number qui contient du texte parasite est ramené à son premier
+         jeton (le vrai code). */
+      for (const r of rows) {
+        const cur = String(r.tracking_number || '').trim();
+        if (!cur || isValidCode(cur)) continue;
+        const m = cur.match(/^[A-Za-z0-9_-]{3,30}/);
+        if (!m) continue;
+        const clean = m[0];
+        const owner = takenBy.get(clean.toUpperCase());
+        if (owner && owner !== r.id) { conflicts.push(`${cur.slice(0, 30)} → ${clean} : déjà porté par ${owner}`); continue; }
+        toApply.push({ id: r.id, code: clean, from: cur.slice(0, 30) + '…', name: r.recipient?.name || r.id });
+      }
+
+      if (!toApply.length) {
+        setRestoreOld({
+          running: false,
+          message: '✅ Rien à restaurer.',
+          lines: [
+            ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
+            ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
+            ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
+          ],
+        });
+        return;
       }
 
       setRestoreOld({ running: true, message: `Restauration de ${toApply.length} code(s)…`, lines: [] });
@@ -767,6 +799,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         ...toApply.filter(t => okIds.has(t.id)).slice(0, 20).map(t => `  ${t.from} → ${t.code} : ${t.name}`),
         ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
         ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
+        ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
       ];
       setRestoreOld({
         running: false,

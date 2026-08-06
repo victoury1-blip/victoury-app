@@ -209,8 +209,17 @@ export default async function handler(req, res) {
       const rows = data.aaData || data.data || [];
       if (!rows.length) return { code: null, ambiguous: false };
       if (rows.length > 1) return { code: null, ambiguous: true };
-      const code = ((rows[0].PARCEL_CODE || '') + '').replace(/<[^>]*>/g, '').trim();
-      return { code: code || null, ambiguous: false, status: pickStatus(rows[0].PARCEL_STATUT) || null };
+      // PARCEL_CODE est une cellule HTML qui contient le code ET, en dessous, le
+      // livreur et son téléphone. Après suppression des balises, tout se
+      // retrouve collé : on ne garde donc que le PREMIER jeton, et seulement
+      // s'il a la forme d'un code de colis.
+      const raw = ((rows[0].PARCEL_CODE || '') + '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .trim();
+      const m = raw.match(/^[A-Za-z0-9_-]{3,30}/);
+      const code = m ? m[0] : null;
+      return { code, ambiguous: false, status: pickStatus(rows[0].PARCEL_STATUT) || null };
     }
 
     if (phonesRaw) {
