@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { recalcVictCounter, generateVictId, VICT_ABERRANT_FROM } from './lib/victId';
+import { recalcVictCounter, generateVictId, isVictCode, VICT_ABERRANT_FROM } from './lib/victId';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
  *  nouvelle commande porte son numéro dès son entrée dans À Confirmer. L'id interne
@@ -56,7 +56,9 @@ function parseAppDate(str) {
 
 function assignVictTracking(freshOrders, allOrders) {
   if (!allOrders || !allOrders.length) return freshOrders;
-  const isVict = (s) => /^VICT\d+$/i.test(s || '');
+  // Reconnaît un code de l'ancienne série (VICT) OU de la nouvelle (VICTOURY) :
+  // une commande qui a déjà l'une ou l'autre ne doit jamais en recevoir une 2e.
+  const isVict = isVictCode;
   const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
 
   // Un numéro déjà porté par une commande — que ce soit comme ID ou comme code de
@@ -484,7 +486,7 @@ export default function App() {
   const victFillRef = useRef(false);
   useEffect(() => {
     if (!session || !orders.length || victFillRef.current) return;
-    const isVict = (s) => /^VICT\d+$/i.test(s || '');
+    const isVict = isVictCode;
     const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
     const missing = orders
       .filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber))

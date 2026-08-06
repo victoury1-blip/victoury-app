@@ -42,7 +42,7 @@ import { fetchChicProductDetails, fetchChicProducts, createChicOrder, getChicCon
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { now } from '../lib/dateUtils';
-import { initVictCounter, recalcVictCounter, generateVictId } from '../lib/victId';
+import { initVictCounter, recalcVictCounter, generateVictId, isVictCode } from '../lib/victId';
 import { recordHistory } from '../lib/orderHistory';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
@@ -175,7 +175,9 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
       }
       const numOf = (c) => { const m = /^VICT(\d+)$/i.exec(c || ''); return m ? parseInt(m[1], 10) : 0; };
       for (const o of orders) {
-        const alreadyVict = /^VICT\d+$/i.test(o.trackingNumber || '') || /^VICT\d+$/i.test(o.id || '');
+        // Ancienne série (VICT) OU nouvelle (VICTOURY) : dans les deux cas, la
+        // commande a déjà un code, on ne lui en donne pas un second.
+        const alreadyVict = isVictCode(o.trackingNumber) || isVictCode(o.id);
         if (!selected.includes(o.id) || alreadyVict) continue;
         let code = generateVictId();
         let guard = 0;
@@ -1373,7 +1375,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             // livraison (VICT_ON_STATUS) et qu'elle n'en a pas déjà un — ni dans
             // trackingNumber ni dans l'id. Généré AVANT setOrders pour garder l'updater pur.
             const target = orders.find(o => o.id === orderId);
-            const alreadyVict = /^VICT\d+$/i.test(target?.trackingNumber || '') || /^VICT\d+$/i.test(target?.id || '');
+            const alreadyVict = isVictCode(target?.trackingNumber) || isVictCode(target?.id);
             const needsVict = VICT_ON_STATUS.has(newStatus) && !alreadyVict;
             let newVict = null;
             if (needsVict) {
