@@ -61,14 +61,14 @@ export default function ProfitPage({ orders = [] }) {
   function setProductCost(name, value) {
     const key = (name || '').trim().toLowerCase();
     if (!key) return;
-    setManualCost(prev => {
-      const next = { ...prev };
-      const v = parseFloat(value);
-      if (value === '' || isNaN(v)) delete next[key]; else next[key] = v;
-      localStorage.setItem('victoury_product_cost', JSON.stringify(next));
-      cloudSet('victoury_product_cost', next);
-      return next;
-    });
+    // Persistance hors de l'updater : celui-ci doit rester pur (React peut le
+    // ré-exécuter, ce qui enverrait deux écritures cloud concurrentes).
+    const next = { ...manualCost };
+    const v = parseFloat(value);
+    if (value === '' || isNaN(v)) delete next[key]; else next[key] = v;
+    localStorage.setItem('victoury_product_cost', JSON.stringify(next));
+    cloudSet('victoury_product_cost', next);
+    setManualCost(next);
   }
 
   const [adTransfers, setAdTransfers] = useState(() => {

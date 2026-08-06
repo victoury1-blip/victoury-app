@@ -711,14 +711,15 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     else toast.error("Aucune info livreur disponible (ouvrez Livraison 🚚 pour récupérer le livreur Ozon)");
   }
 
+  // La persistance est faite HORS de l'updater (qui doit rester pur) : sinon
+  // l'écriture cloud peut partir deux fois et se télescoper avec elle-même.
   function markLivreurSent(orderId) {
-    setSentLivreurInfo(prev => {
-      const next = new Set(prev);
-      next.add(orderId);
-      localStorage.setItem('victoury_sent_livreur', JSON.stringify([...next]));
-      cloudSet('victoury_sent_livreur', [...next]);
-      return next;
-    });
+    const next = new Set(sentLivreurInfo);
+    if (next.has(orderId)) return;
+    next.add(orderId);
+    localStorage.setItem('victoury_sent_livreur', JSON.stringify([...next]));
+    cloudSet('victoury_sent_livreur', [...next]);
+    setSentLivreurInfo(next);
   }
 
   const [paidOrderIds, setPaidOrderIds] = useState(() => {
@@ -756,25 +757,21 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   const facturedIds = useMemo(() => new Set([...manualFacture, ...paidOrderIds]), [manualFacture, paidOrderIds]);
 
   function toggleFacture(orderId) {
-    setManualFacture(prev => {
-      const next = new Set(prev);
-      if (next.has(orderId)) { next.delete(orderId); } else { next.add(orderId); }
-      localStorage.setItem('victoury_manual_facture', JSON.stringify([...next]));
-      cloudSet('victoury_manual_facture', [...next]);
-      return next;
-    });
+    const next = new Set(manualFacture);
+    if (next.has(orderId)) next.delete(orderId); else next.add(orderId);
+    localStorage.setItem('victoury_manual_facture', JSON.stringify([...next]));
+    cloudSet('victoury_manual_facture', [...next]);
+    setManualFacture(next);
   }
 
   // Marque en bloc « Facturé » les commandes LIVRÉES sélectionnées.
   function bulkFacture() {
     const ids = colis.filter(o => selected.includes(o.id) && o.status === 'livre').map(o => o.id);
     if (!ids.length) { toast.warning('Aucune commande livrée dans la sélection'); return; }
-    setManualFacture(prev => {
-      const next = new Set([...prev, ...ids]);
-      localStorage.setItem('victoury_manual_facture', JSON.stringify([...next]));
-      cloudSet('victoury_manual_facture', [...next]);
-      return next;
-    });
+    const next = new Set([...manualFacture, ...ids]);
+    localStorage.setItem('victoury_manual_facture', JSON.stringify([...next]));
+    cloudSet('victoury_manual_facture', [...next]);
+    setManualFacture(next);
     toast.success(`${ids.length} commande(s) marquée(s) facturée(s)`);
     setSelected([]);
   }
