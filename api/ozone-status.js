@@ -63,9 +63,16 @@ export default async function handler(req, res) {
   // Recherche unique (?code= / ?phone=) OU lot (?codes=A,B,C — jusqu'à 40).
   // Le lot ne se connecte qu'UNE fois à Ozon puis interroge chaque valeur.
   const batchRaw = (req.query.codes || '').toString().trim();
-  const queries = batchRaw
-    ? batchRaw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 40)
-    : [(req.query.code || req.query.phone || '').toString().trim()].filter(Boolean);
+  // Recherche par TÉLÉPHONE renvoyant le CODE réel du colis chez Ozon
+  // (?phones=06..,06..). Sert à retrouver le code d'envoi d'une commande dont
+  // le code local a été écrasé. Un téléphone portant plusieurs colis est
+  // signalé « ambigu » et jamais deviné.
+  const phonesRaw = (req.query.phones || '').toString().trim();
+  const queries = phonesRaw
+    ? phonesRaw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 40)
+    : batchRaw
+      ? batchRaw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 40)
+      : [(req.query.code || req.query.phone || '').toString().trim()].filter(Boolean);
   if (!queries.length) return res.status(400).json({ error: 'code, phone or codes required' });
   if (queries.some(q => !/^[A-Za-z0-9]{3,30}$/.test(q))) return res.status(400).json({ error: 'Format invalide' });
 
@@ -189,6 +196,30 @@ export default async function handler(req, res) {
       if (!row) return null;
       // PARCEL_STATUT peut être un libellé, un badge HTML ou un code interne.
       return pickStatus(row.PARCEL_STATUT) || pickStatus(JSON.stringify(row)) || null;
+    }
+
+    /* Code réel du colis pour un téléphone donné. Renvoie le code UNIQUEMENT
+       si la recherche remonte exactement une ligne : avec plusieurs colis pour
+       le même numéro, impossible de savoir lequel correspond. */
+    async function codeFor(query) {
+      const pr = await queryParcels(query);
+      if (!pr.ok || !pr.text.trim()) return { code: null, ambiguous: false };
+      let data;
+      try { data = JSON.parse(pr.text); } catch { return { code: null, ambiguous: false }; }
+      const rows = data.aaData || data.data || [];
+      if (!rows.length) return { code: null, ambiguous: false };
+      if (rows.length > 1) return { code: null, ambiguous: true };
+      const code = ((rows[0].PARCEL_CODE || '') + '').replace(/<[^>]*>/g, '').trim();
+      return { code: code || null, ambiguous: false, status: pickStatus(rows[0].PARCEL_STATUT) || null };
+    }
+
+    if (phonesRaw) {
+      const results = [];
+      for (const q of queries) {
+        const r = await codeFor(q);
+        results.push({ q, code: r.code, ambiguous: r.ambiguous, status: r.status || null });
+      }
+      return res.json({ results, source: 'ozone' });
     }
 
     // Lot → tableau de résultats. Requête unique → objet simple (compat).
