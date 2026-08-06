@@ -10,7 +10,7 @@ import {
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
-import { A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES } from '../data/colisPipeline';
+import { A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES, COLIS_PIPELINE_SET } from '../data/colisPipeline';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -590,6 +590,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      le code, la commande la plus ANCIENNE le garde. Les codes « MIMA » sont exclus. */
   const [dupFix, setDupFix] = useState({ running: false, message: '' });
   const [renum, setRenum] = useState({ running: false, message: '', lines: [] });
+  const [restoreOld, setRestoreOld] = useState({ running: false, message: '', lines: [] });
   const [queueMsg, setQueueMsg] = useState('');
   const [diag, setDiag] = useState({ running: false, lines: [] });
 
@@ -691,9 +692,14 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
       };
 
-      // Cibles : uniquement les commandes de ces deux onglets, non validées.
+      /* Cibles : les commandes de ces deux onglets UNIQUEMENT.
+         Double verrou sur la Liste des Colis — on reprend sa règle d'affichage
+         exacte (statut du circuit OU code + validé) pour qu'aucune commande
+         visible là-bas ne puisse être renumérotée : son code est déjà déposé
+         chez le transporteur. */
+      const inColisList = (r) => COLIS_PIPELINE_SET.has(r.status) || (!!r.tracking_number && !!r.validated);
       const targets = rows
-        .filter(r => TARGET.has(r.status) && !r.validated && !isProtected(r))
+        .filter(r => TARGET.has(r.status) && !r.validated && !inColisList(r) && !isProtected(r))
         .sort((a, b) => ts(a.date_added) - ts(b.date_added));
 
       if (!targets.length) {
@@ -768,6 +774,183 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       if (applied.size) setTimeout(() => window.location.reload(), 3000);
     } catch (e) {
       setRenum({ running: false, message: 'Erreur : ' + (e?.message || 'échec'), lines: [] });
+    }
+  }
+
+  /* ── Restauration des codes VICT écrasés par un code VICTOURY ──
+     Lors du passage à la nouvelle série, des commandes DÉJÀ confirmées (donc
+     déjà déclarées chez Ozon sous leur code VICTxxxx) ont pu recevoir un code
+     VICTOURY. Leur code Ozon d'origine est toujours en base dans la colonne
+     `ozone_tracking` : on le remet comme code de suivi.
+     Aucune commande dont `ozone_tracking` est vide n'est touchée. */
+  async function restoreOverwrittenCodes() {
+    setRestoreOld({ running: true, message: 'Lecture des commandes…', lines: [] });
+    const isVictoury = (v) => /^VICTOURY\d+$/i.test(String(v || '').trim());
+    const isOldVict = (v) => /^VICT\d+$/i.test(String(v || '').trim());
+    try {
+      let rows = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase.from('orders')
+          .select('id, tracking_number, ozone_tracking, recipient, status')
+          .or('is_deleted.is.null,is_deleted.eq.false')
+          .order('id', { ascending: true }).range(from, from + PAGE - 1);
+        if (error) { setRestoreOld({ running: false, message: 'Lecture impossible : ' + error.message, lines: [] }); return; }
+        const batch = data || [];
+        rows = rows.concat(batch);
+        if (batch.length < PAGE) break;
+      }
+
+      // Cible : code actuel VICTOURY, alors que le code Ozon d'origine est un
+      // VICT. C'est exactement la signature d'un code écrasé.
+      const targets = rows.filter(r => isVictoury(r.tracking_number) && isOldVict(r.ozone_tracking));
+
+      /* 2e source — le tableau de bord Ozon. Certaines commandes écrasées n'ont
+         pas de `ozone_tracking` en base : leur code réel n'existe plus que chez
+         le transporteur. On le demande par TÉLÉPHONE (recherche exacte côté
+         Ozon, qui renvoie le code du colis). Un numéro portant plusieurs colis
+         est signalé ambigu par le serveur et n'est jamais deviné. */
+      /* Numéro marocain normalisé : on ne garde que les chiffres, on retire un
+         éventuel indicatif 212, et on ne conserve que les 9 derniers chiffres
+         significatifs (certaines fiches contiennent « 0/0626272627 »). */
+      const digits = (v) => {
+        const raw = String(v || '').replace(/\D/g, '').replace(/^00/, '').replace(/^212/, '');
+        const nine = raw.slice(-9);
+        return nine.length === 9 ? '0' + nine : '';
+      };
+      // Un livreur PERSONNEL n'a pas de colis chez Ozon : rien à y chercher.
+      const isOzon = (r) => /ozon/i.test(r.recipient?.delivery || '');
+      const orphans = rows.filter(r => isVictoury(r.tracking_number) && !isOldVict(r.ozone_tracking) && isOzon(r) && digits(r.recipient?.phone));
+      const ambiguous = [];
+      const notFound = [];
+      if (orphans.length) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const auth = session?.access_token ? { headers: { Authorization: `Bearer ${session.access_token}` } } : undefined;
+
+        // Ozon peut stocker le numéro sous plusieurs formes : on essaie chaque
+        // variante et on retient la première qui donne un colis unique.
+        const variantsOf = (p) => [...new Set([p, p.slice(1), '212' + p.slice(1)])].filter(v => v.length >= 3);
+        const byVariant = new Map();
+        for (const r of orphans) {
+          for (const v of variantsOf(digits(r.recipient?.phone))) {
+            if (!byVariant.has(v)) byVariant.set(v, r);
+          }
+        }
+        const queries = [...byVariant.keys()];
+        const found = new Map();      // id de commande -> code trouvé
+        const seenAmbiguous = new Set();
+        for (let i = 0; i < queries.length; i += 20) {
+          const chunk = queries.slice(i, i + 20);
+          setRestoreOld({ running: true, message: `Recherche chez Ozon ${Math.min(i + 20, queries.length)}/${queries.length}…`, lines: [] });
+          try {
+            const r = await fetch(`/api/ozone-status?phones=${encodeURIComponent(chunk.join(','))}`, auth);
+            if (!r.ok) continue;
+            const d = await r.json();
+            for (const row of (d.results || [])) {
+              const order = byVariant.get(row.q);
+              if (!order || found.has(order.id)) continue;
+              if (row.ambiguous) { seenAmbiguous.add(order.id); continue; }
+              // On ne restaure que si Ozon donne un code DIFFÉRENT de l'actuel.
+              const code = String(row.code || '').trim();
+              if (!code || code.toUpperCase() === String(order.tracking_number).toUpperCase()) continue;
+              found.set(order.id, code);
+            }
+          } catch {}
+        }
+        for (const r of orphans) {
+          const code = found.get(r.id);
+          if (code) { if (!targets.some(t => t.id === r.id)) targets.push({ ...r, ozone_tracking: code }); continue; }
+          if (seenAmbiguous.has(r.id)) ambiguous.push(`${r.tracking_number} : ${r.recipient?.name || r.id} (plusieurs colis pour ce numéro)`);
+          else notFound.push(`${r.tracking_number} : ${r.recipient?.name || r.id} — ${r.recipient?.phone || '?'} (aucun colis trouvé chez Ozon)`);
+        }
+      }
+
+      // Pas de sortie anticipée ici : même sans code à restaurer, la réparation
+      // des codes abîmés (plus bas) doit pouvoir s'exécuter.
+
+      // Un code VICT déjà porté par une AUTRE commande ne doit pas être rendu
+      // en double : on l'ignore et on le signale.
+      const takenBy = new Map();
+      for (const r of rows) {
+        const c = String(r.tracking_number || '').trim().toUpperCase();
+        if (c) takenBy.set(c, r.id);
+      }
+
+      // GARDE-FOU : un code de colis est un jeton simple. Tout ce qui contient
+      // un espace, un accent ou du texte (nom de livreur, téléphone collés par
+      // une cellule HTML) est REFUSÉ — jamais écrit en base.
+      const isValidCode = (v) => /^[A-Za-z0-9_-]{3,30}$/.test(String(v || '').trim());
+
+      const toApply = [];
+      const conflicts = [];
+      const rejected = [];
+      for (const r of targets) {
+        const code = String(r.ozone_tracking).trim();
+        if (!isValidCode(code)) { rejected.push(`${r.tracking_number} : valeur illisible « ${code.slice(0, 40)} »`); continue; }
+        const owner = takenBy.get(code.toUpperCase());
+        if (owner && owner !== r.id) { conflicts.push(`${r.tracking_number} → ${code} : déjà porté par ${owner}`); continue; }
+        toApply.push({ id: r.id, code, from: r.tracking_number, name: r.recipient?.name || r.id });
+      }
+
+      /* Réparation des codes déjà abîmés par une exécution précédente : un
+         tracking_number qui contient du texte parasite est ramené à son premier
+         jeton (le vrai code). */
+      for (const r of rows) {
+        const cur = String(r.tracking_number || '').trim();
+        if (!cur || isValidCode(cur)) continue;
+        const m = cur.match(/^[A-Za-z0-9_-]{3,30}/);
+        if (!m) continue;
+        const clean = m[0];
+        const owner = takenBy.get(clean.toUpperCase());
+        if (owner && owner !== r.id) { conflicts.push(`${cur.slice(0, 30)} → ${clean} : déjà porté par ${owner}`); continue; }
+        toApply.push({ id: r.id, code: clean, from: cur.slice(0, 30) + '…', name: r.recipient?.name || r.id });
+      }
+
+      if (!toApply.length) {
+        setRestoreOld({
+          running: false,
+          message: '✅ Rien à restaurer.',
+          lines: [
+            ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
+            ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
+            ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
+            ...(notFound.length ? ['Introuvables chez Ozon (à vérifier à la main) :', ...notFound.slice(0, 15).map(l => '  ' + l)] : []),
+          ],
+        });
+        return;
+      }
+
+      setRestoreOld({ running: true, message: `Restauration de ${toApply.length} code(s)…`, lines: [] });
+      let failed = 0;
+      const okIds = new Map();
+      const B = 20;
+      for (let i = 0; i < toApply.length; i += B) {
+        await Promise.all(toApply.slice(i, i + B).map(({ id, code }) =>
+          supabase.from('orders').update({ tracking_number: code, date_updated: stampNow() }).eq('id', id)
+            .then(({ error }) => { if (error) failed++; else okIds.set(id, code); })
+            .catch(() => { failed++; })
+        ));
+      }
+
+      const stamped = stampNow();
+      setOrders(prev => prev.map(o => okIds.has(o.id)
+        ? { ...o, trackingNumber: okIds.get(o.id), dateUpdated: stamped }
+        : o));
+
+      const lines = [
+        ...toApply.filter(t => okIds.has(t.id)).slice(0, 20).map(t => `  ${t.from} → ${t.code} : ${t.name}`),
+        ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
+        ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
+        ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
+        ...(notFound.length ? ['Introuvables chez Ozon (à vérifier à la main) :', ...notFound.slice(0, 15).map(l => '  ' + l)] : []),
+      ];
+      setRestoreOld({
+        running: false,
+        message: `✅ ${okIds.size} code(s) restauré(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}${conflicts.length ? ` — ${conflicts.length} conflit(s)` : ''}.`,
+        lines,
+      });
+    } catch (e) {
+      setRestoreOld({ running: false, message: 'Erreur : ' + (e?.message || 'échec'), lines: [] });
     }
   }
 
@@ -1436,6 +1619,29 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             {ozonRestore.lines?.length > 0 && (
               <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
                 {ozonRestore.lines.join('\n')}
+              </pre>
+            )}
+          </div>
+
+          {/* Restauration des codes VICT écrasés par un code VICTOURY */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Restaurer les anciens codes VICT écrasés</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Pour les commandes déjà déclarées chez Ozon sous un code <strong>VICTxxxx</strong> mais
+              qui affichent aujourd'hui un code <strong>VICTOURYxxxx</strong> : leur code Ozon d'origine
+              (conservé en base) est remis comme code de suivi.
+              <strong className="text-gray-700"> Aucune commande sans code Ozon d'origine n'est touchée.</strong>
+            </p>
+            <div className="flex items-center gap-2">
+              <button onClick={restoreOverwrittenCodes} disabled={restoreOld.running}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-40 transition">
+                {restoreOld.running ? 'Restauration…' : 'Restaurer les anciens codes'}
+              </button>
+              {restoreOld.message && <span className="text-xs text-gray-600">{restoreOld.message}</span>}
+            </div>
+            {restoreOld.lines?.length > 0 && (
+              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
+                {restoreOld.lines.join('\n')}
               </pre>
             )}
           </div>
