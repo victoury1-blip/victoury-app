@@ -299,6 +299,23 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   /* ── WooCommerce handlers ── */
   function updateWoo(field, val) { setWoo((p) => ({ ...p, [field]: val, testStatus: 'idle', saved: false })); }
 
+  /* Message d'erreur COMPRÉHENSIBLE. Un abandon de requête produit côté
+     navigateur « signal is aborted without reason », qui n'apprend rien à
+     l'utilisateur : on le traduit en cause probable. */
+  function wooErrorText(...errs) {
+    for (const e of errs) {
+      if (!e) continue;
+      if (e.name === 'AbortError' || /aborted/i.test(e.message || '')) {
+        return 'serveur WooCommerce trop lent (délai dépassé)';
+      }
+      if (/failed to fetch|networkerror|load failed/i.test(e.message || '')) {
+        return 'connexion impossible — vérifiez le réseau, un bloqueur ou le pare-feu';
+      }
+      if (e.message) return e.message;
+    }
+    return 'échec de connexion';
+  }
+
   // fetch WooCommerce : timeout 25s + auth query-string (au cas où l'hébergeur
   // supprime l'en-tête Authorization) EN PLUS du header Basic.
   async function wcFetch(path) {
@@ -340,8 +357,16 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       if (!r.ok) throw new Error(j.error || `API ${r.status}`);
       return j.orders || [];
     } catch (apiErr) {
-      const res = await wcFetch(`/wc-api/wp-json/wc/v3/orders?status=${status}&per_page=50`);
-      if (!res.ok) throw new Error(apiErr.message || `HTTP ${res.status}`);
+      // Repli : appel direct via le rewrite Vercel. Si CE chemin échoue aussi,
+      // son erreur remontait telle quelle — d'où le « signal is aborted without
+      // reason » du navigateur, illisible pour l'utilisateur.
+      let res;
+      try {
+        res = await wcFetch(`/wc-api/wp-json/wc/v3/orders?status=${status}&per_page=50`);
+      } catch (directErr) {
+        throw new Error(wooErrorText(apiErr, directErr));
+      }
+      if (!res.ok) throw new Error(`${wooErrorText(apiErr)} (HTTP ${res.status})`);
       return res.json();
     }
   }
