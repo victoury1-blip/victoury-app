@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+# Plusieurs poussées rapprochées empilaient autant d'exécutions dans la file ;
+# faute de runner disponible, certaines finissaient annulées après ~15 min.
+# Seule la dernière exécution par branche est conservée.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
