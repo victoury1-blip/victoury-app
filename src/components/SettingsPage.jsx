@@ -317,11 +317,19 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   async function wcGetOrders(status = 'processing,pending') {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const r = await fetch('/api/woo-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-        body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, status }),
-      });
+      // Sans limite de temps, un serveur qui ne répond jamais bloquait le bouton
+      // « Tester » indéfiniment (aucun repli, aucune erreur affichée).
+      const ac = new AbortController();
+      const to = setTimeout(() => ac.abort(), 15000);
+      let r;
+      try {
+        r = await fetch('/api/woo-orders', {
+          method: 'POST',
+          signal: ac.signal,
+          headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+          body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, status }),
+        });
+      } finally { clearTimeout(to); }
       const ct = r.headers.get('content-type') || '';
       if (!r.ok && !ct.includes('json')) {
         throw new Error(`Requête bloquée avant le serveur (HTTP ${r.status}) — vérifiez le pare-feu/la protection Vercel du projet`);
