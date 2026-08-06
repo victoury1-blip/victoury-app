@@ -11,6 +11,7 @@ import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import PhoneChip, { normalizePhone } from './PhoneChip';
 import { getOzonDp } from '../lib/ozonDp';
 import { COLIS_PIPELINE } from '../data/colisPipeline';
+import { now } from '../lib/dateUtils';
 import { useToast } from './Toast';
 import Toggle from './Toggle';
 import { findOrderByCode } from '../lib/scanUtils';
@@ -299,13 +300,8 @@ function ColisBulkActionBar({ selected, setSelected, orders, setOrders, colis, o
 
   const selectedOrders = orders.filter(o => selected.includes(o.id));
 
-  function getTs() {
-    let tz; try { const raw = localStorage.getItem('system_timezone'); tz = raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
-    return new Date().toLocaleString('fr-FR', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
-  }
-
   function bulkChangeStatus(newStatus) {
-    const ts = getTs();
+    const ts = now();
     // Même règle que la modification unitaire : un statut hors circuit colis
     // (sauf « reporté » et « annulé ») sort le colis de la Liste des Colis.
     const leavePipeline = !COLIS_PIPELINE.includes(newStatus) && newStatus !== 'reporter' && newStatus !== 'annule';
@@ -881,13 +877,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   }, [pgPage, maxPage, colis.length]);
   const pagedColis = useMemo(() => paginate(colis, Math.min(pgPage, maxPage), pgPer), [colis, pgPage, maxPage, pgPer]);
 
-  function getTs() {
-    let tz; try { const raw = localStorage.getItem('system_timezone'); tz = raw ? JSON.parse(raw) : 'Africa/Casablanca'; } catch { tz = localStorage.getItem('system_timezone') || 'Africa/Casablanca'; }
-    return new Date().toLocaleString('fr-FR', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
-  }
-
   function handleStatusSave(orderId, newStatus, note, reportDate) {
-    const ts = getTs();
+    const ts = now();
     const order = orders.find(o => o.id === orderId);
     // « Reporté » depuis la Liste des Colis : le colis reste un colis (on garde
     // validated/trackingNumber) pour qu'il demeure dans la Liste des Colis et ne
@@ -910,12 +901,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   }
 
   function saveOrderFull(updated) {
-    setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+    // Horodater la modification est INDISPENSABLE : la date sert d'arbitre lors
+    // des re-synchronisations (Realtime, rattrapage, file hors ligne). Sans elle,
+    // la commande garde une date ancienne et un instantané périmé venu d'un autre
+    // appareil est jugé « plus récent » — il écrase alors la correction (c'est
+    // ainsi qu'un code de suivi rectifié à la main pouvait revenir en arrière).
+    setOrders(prev => prev.map(o => o.id === updated.id ? { ...updated, dateUpdated: now() } : o));
     setEditOrderFull(null);
   }
 
   function deactivateOrder(orderId) {
-    const ts = getTs();
+    const ts = now();
     setOrders(prev => prev.map(o => o.id === orderId
       // Désactivation : le code de suivi est CONSERVÉ (il reste connu du transporteur).
       ? { ...o, status: 'confirme', dateUpdated: ts, validated: false }
