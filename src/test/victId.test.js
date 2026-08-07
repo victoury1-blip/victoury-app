@@ -65,6 +65,20 @@ describe('numérotation VICTOURY', () => {
     expect(hasCode({ id: 'WC-2064', trackingNumber: '   ' })).toBe(false);
   });
 
+  it('la création du colis Ozon ne retombe pas sur l’identifiant WooCommerce', () => {
+    // Reproduit le repli d'OzoneModal : quand Ozon ne renvoie pas de code, on
+    // garde celui déjà porté par la commande — pas son identifiant (WC-2074),
+    // qui remplacerait le code de suivi dans la Liste des Colis.
+    const resolve = (data, order) =>
+      data['TRACKING-NUMBER'] || data['tracking-number'] || order.trackingNumber || order.id;
+
+    const order = { id: 'WC-2074', trackingNumber: 'VICTOURY0048' };
+    expect(resolve({}, order)).toBe('VICTOURY0048');
+    expect(resolve({ 'TRACKING-NUMBER': 'OZ-123' }, order)).toBe('OZ-123');
+    // Sans code du tout, l'identifiant reste le dernier recours.
+    expect(resolve({}, { id: 'WC-2074', trackingNumber: '' })).toBe('WC-2074');
+  });
+
   it('émet des numéros distincts à la suite', () => {
     const orders = [];
     const a = generateVictId(orders);

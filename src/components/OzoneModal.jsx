@@ -237,7 +237,10 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
       const data = raw['ADD-PARCEL'] || raw;
       const result = (data['RESULT'] || '').toUpperCase();
       const msg   = data['MESSAGE'] || data['message'] || '';
-      const tn    = data['TRACKING-NUMBER'] || data['tracking-number'] || order.id;
+      // Repli sur le code DÉJÀ porté par la commande — c'est celui qu'on vient
+      // d'envoyer à Ozon. Retomber sur `order.id` (WC-2074…) écrasait le code de
+      // suivi par l'identifiant WooCommerce dès qu'Ozon ne le renvoyait pas.
+      const tn    = data['TRACKING-NUMBER'] || data['tracking-number'] || order.trackingNumber || order.id;
 
       const isSuccess = result === 'SUCCESS'
         || msg.toLowerCase().includes('added')
