@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { generateVictId, isVictCode, initVictCounter, VICT_ABERRANT_FROM } from './lib/victId';
+import { generateVictId, isVictCode, initVictCounter } from './lib/victId';
 import { now, fmtDate } from './lib/dateUtils';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
@@ -475,58 +475,32 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session]);
 
-  /* ── Rattrapage : une commande À Confirmer SANS code VICT en reçoit un ──
-     Sert aux commandes entrées pendant que l'attribution à l'import était absente.
-     Uniquement le statut « nouveau », uniquement celles SANS code : aucune commande
-     déjà numérotée n'est jamais modifiée. Une seule passe par chargement. */
+  /* ── Rattrapage : une commande « À Confirmer » SANS AUCUN code en reçoit un ──
+     Le test porte sur l'ABSENCE de code, pas sur sa forme : après un alignement
+     sur Ozon, beaucoup de commandes portent un code du transporteur (WC-1959,
+     MIMA2125…) qui n'a pas la forme VICTxxxx. Les considérer comme « sans code »
+     leur réattribuait un VICTOURY à chaque chargement — les codes importés
+     d'Ozon semblaient donc revenir en arrière après chaque rafraîchissement.
+     Aucune commande déjà numérotée n'est touchée. Une seule passe par chargement. */
   const victFillRef = useRef(false);
   useEffect(() => {
     if (!session || !orders.length || victFillRef.current) return;
-    const isVict = isVictCode;
-    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
     const missing = orders
-      .filter(o => o.status === 'nouveau' && !isVict(o.id) && !isVict(o.trackingNumber))
+      .filter(o => o.status === 'nouveau' && !String(o.trackingNumber || '').trim() && !isVictCode(o.id))
       .sort((a, b) => parseAppDate(a.dateAdded) - parseAppDate(b.dateAdded));
-
-    /* RÉPARATION — uniquement les commandes « nouveau » (jamais un colis déjà
-       validé/expédié, dont le code est connu du transporteur) : un code en DOUBLE
-       avec une commande plus ancienne, ou un numéro aberrant issu de l'incident de
-       renumérotage (VICT1393…), est remplacé par le numéro suivant de la vraie
-       série. Les codes contenant « MIMA » ne sont jamais touchés. */
-    const olderOwner = new Map(); // numéro -> commande la plus ancienne qui le porte
-    for (const o of orders) {
-      for (const n of [victNum(o.id), victNum(o.trackingNumber)]) {
-        if (!n) continue;
-        const d = parseAppDate(o.dateAdded) || 0;
-        if (!olderOwner.has(n) || d < olderOwner.get(n).d) olderOwner.set(n, { d, id: o.id });
-      }
-    }
-    const toRepair = orders.filter(o => {
-      // UNIQUEMENT « nouveau » : une commande déjà confirmée ne doit plus jamais
-      // recevoir un numéro différent, quel que soit l'état de son code actuel.
-      if (o.status !== 'nouveau' || o.validated) return false;
-      if (/mima/i.test(`${o.trackingNumber || ''} ${o.id || ''}`)) return false;
-      const n = victNum(o.trackingNumber);
-      if (!n || victNum(o.id)) return false;        // pas de code VICT propre à corriger
-      if (n >= VICT_ABERRANT_FROM) return true;     // numéro aberrant
-      const owner = olderOwner.get(n);
-      return !!owner && owner.id !== o.id;          // doublon : la plus ancienne garde
-    }).sort((a, b) => parseAppDate(a.dateAdded) - parseAppDate(b.dateAdded));
-
-    if (!missing.length && !toRepair.length) return;
+    if (!missing.length) return;
     victFillRef.current = true;
     (async () => {
       try {
         const assign = new Map();
-        // generateVictId(orders) prend toujours le plus petit numéro VICTOURY
-        // libre parmi les commandes actives connues à cet instant.
-        for (const o of [...toRepair, ...missing]) assign.set(o.id, generateVictId(orders));
+        for (const o of missing) assign.set(o.id, generateVictId(orders));
         const entries = [...assign.entries()];
         const BATCH = 20;
         for (let i = 0; i < entries.length; i += BATCH) {
           await Promise.all(entries.slice(i, i + BATCH).map(([id, vict]) =>
             supabase.from('orders').update({ tracking_number: vict }).eq('id', id)
-              .then(() => {}).catch(() => {})
+              .then(({ error }) => { if (error) logError('vict_fill', `${id} : ${error.message}`); })
+              .catch(() => {})
           ));
         }
         setOrders(prev => prev.map(o => assign.has(o.id) ? { ...o, trackingNumber: assign.get(o.id) } : o));

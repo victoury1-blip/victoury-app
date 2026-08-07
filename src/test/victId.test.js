@@ -38,6 +38,18 @@ describe('numérotation VICTOURY', () => {
     expect(generateVictId([withCode('VICT00050'), { id: 'WC-1959' }])).toBe('VICTOURY0050');
   });
 
+  it('reconnaît qu’un code Ozon (WC-…, MIMA…) est bien un code', () => {
+    // Le rattrapage de démarrage ne doit PAS voir ces commandes comme « sans
+    // code » : sinon il leur réattribue un VICTOURY et l'alignement sur Ozon
+    // paraît revenir en arrière à chaque rafraîchissement.
+    const hasCode = (o) => !!String(o.trackingNumber || '').trim() || isVictCode(o.id);
+    expect(hasCode({ id: 'WC-1', trackingNumber: 'WC-1959' })).toBe(true);
+    expect(hasCode({ id: 'WC-2', trackingNumber: 'MIMA2125' })).toBe(true);
+    expect(hasCode({ id: 'WC-3', trackingNumber: 'VICT00050' })).toBe(true);
+    expect(hasCode({ id: 'WC-4', trackingNumber: '' })).toBe(false);
+    expect(hasCode({ id: 'VICT0002', trackingNumber: '' })).toBe(true);
+  });
+
   it('émet des numéros distincts à la suite', () => {
     const orders = [];
     const a = generateVictId(orders);

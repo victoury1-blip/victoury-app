@@ -65,9 +65,3 @@ export function initVictCounter(orders) {
   const maxUsed = used.size ? Math.max(...used) : 0;
   if (maxUsed > readHighWater()) saveHighWater(maxUsed);
 }
-
-/* ── Ancienne série : conservée pour les commandes déjà numérotées ──────────
- * Utilisée uniquement par les outils de réparation (Réglages → Restaurer les
- * codes / Corriger les doublons) qui réconcilient l'historique avec Ozon.
- * Plus aucun nouveau code n'est émis dans cette série. */
-export const VICT_ABERRANT_FROM = 1000;
