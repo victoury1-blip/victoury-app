@@ -1366,6 +1366,33 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           >
             <Trash2 size={12} /> Réinitialiser le cache
           </button>
+          {/* Mise à jour FORCÉE : ne touche à aucune donnée, se contente de
+              désinstaller le Service Worker et de vider les caches de fichiers.
+              À utiliser quand l'appareil continue d'afficher une ancienne
+              version malgré les rechargements. */}
+          <button
+            onClick={async () => {
+              if (!window.confirm("Forcer la mise à jour de l'application ?\n\nAucune donnée n'est supprimée : seuls les fichiers mis en cache sont rechargés depuis le serveur.")) return;
+              try {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  await Promise.all(regs.map(r => r.unregister()));
+                }
+                if ('caches' in window) {
+                  const names = await caches.keys();
+                  await Promise.all(names.map(n => caches.delete(n)));
+                }
+              } catch {}
+              // `reload(true)` est ignoré par les navigateurs modernes : on force
+              // une URL différente pour court-circuiter tout cache de navigation.
+              const u = new URL(window.location.href);
+              u.searchParams.set('maj', Date.now().toString(36));
+              window.location.replace(u.toString());
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition"
+          >
+            <RefreshCw size={12} /> Forcer la mise à jour
+          </button>
         </div>
       </div>
 
