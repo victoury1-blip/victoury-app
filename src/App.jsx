@@ -150,6 +150,9 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'); } catch { return []; }
   })()));
   const initialLoadDoneRef = useRef(false);
+  // Version « état » du drapeau : un ref ne déclenche pas de re-rendu, donc
+  // l'effet de sondage ne repartirait jamais une fois le chargement terminé.
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const lastOrdersSigRef = useRef(null);
   // id -> timestamp du dernier changement LOCAL. Pendant une courte fenêtre, une
   // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
@@ -422,6 +425,7 @@ export default function App() {
       setOrders(data.map(mapRow));
       setIsLoading(false);
       initialLoadDoneRef.current = true;
+      setInitialLoadDone(true);
       // Cache orders to IndexedDB for offline use
       saveOrdersOffline(data.map((o) => ({
         id: o.id, recipient: o.recipient || {}, product: o.product || {}, products: o.products || null,
@@ -627,9 +631,15 @@ export default function App() {
     });
   }
 
-  /* ── WooCommerce polling ── */
+  /* ── WooCommerce polling ──
+     ATTEND que les commandes soient chargées depuis Supabase. Sans cela, le
+     sondage pouvait s'exécuter alors que la liste locale était encore vide :
+     toutes les commandes WooCommerce paraissaient alors NOUVELLES, recevaient
+     un code de suivi tout neuf et étaient réenregistrées par-dessus l'existant.
+     C'est ainsi que des codes déjà déposés chez le transporteur se retrouvaient
+     remplacés par des VICTOURY fraîchement émis, à chaque rechargement. */
   useEffect(() => {
-    if (!session) return;
+    if (!session || !initialLoadDone) return;
     async function fetchWooOrders() {
       try {
         if (!wooConfigRef.current) {
@@ -838,7 +848,7 @@ export default function App() {
     fetchWooOrders();
     const interval = setInterval(fetchWooOrders, 45000);
     return () => clearInterval(interval);
-  }, [session]);
+  }, [session, initialLoadDone]);
 
   /* ── Ozone background sync (every 5 min) ── */
   useEffect(() => {
