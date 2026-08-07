@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { generateVictId, isVictCode, initVictCounter } from './lib/victId';
+import { generateVictId, isVictCode } from './lib/victId';
 import { now, fmtDate } from './lib/dateUtils';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
@@ -298,10 +298,6 @@ export default function App() {
       'auzone_config', 'woo_config', 'livreurs', 'victoury_statuses',
       'phone_colors', 'notification_sound', 'system_timezone',
       'victoury_manual_facture',
-      // Repère de numérotation : sans lui, un appareil qui n'a jamais servi
-      // repartirait d'un compteur vide et pourrait réémettre un numéro déjà
-      // attribué ailleurs.
-      'victoury_seq_counter',
     ];
     // NB: 'victoury_sent_livreur' et 'victoury_recu_ids' sont volontairement EXCLUS.
     // Ce sont des ensembles alimentés côté client (colis « info envoyée » / « reçu »).
@@ -419,9 +415,6 @@ export default function App() {
         .filter(id => !activeIds.has(id));
       deletedIdsRef.current = new Set(deletedIds);
       localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
-      // Le repère de numérotation ne doit jamais redescendre sous ce qui existe
-      // déjà en base (un appareil neuf part sinon de zéro et réémet des numéros).
-      initVictCounter(data.map(mapRow));
       setOrders(data.map(mapRow));
       setIsLoading(false);
       initialLoadDoneRef.current = true;

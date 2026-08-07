@@ -1,5 +1,3 @@
-import { cloudSet } from './cloudSettings';
-
 /* ── Nouvelle série : VICTOURYxxxx ──────────────────────────────────────────
  * L'ancienne série VICTxxxx a accumulé un historique de doublons et de
  * numéros aberrants (incident de renumérotage) : chaque commande qui en
@@ -13,23 +11,20 @@ import { cloudSet } from './cloudSettings';
  */
 const NEW_PREFIX = 'VICTOURY';
 
-/* Plus haut numéro DÉJÀ ÉMIS. La numérotation ne revient jamais en arrière :
- * un numéro libéré (commande supprimée, ou code remplacé par celui d'Ozon) n'est
- * pas redonné. Sans ce repère, une commande récente pouvait recevoir un petit
- * numéro devenu libre et se retrouver hors d'ordre par rapport à sa date.
- * Conservé localement ET dans le cloud pour que deux appareils n'émettent pas
- * le même numéro chacun de leur côté. */
-const HIGH_WATER_KEY = 'victoury_seq_counter';
-
-function readHighWater() {
-  const n = parseInt(localStorage.getItem(HIGH_WATER_KEY) || '0', 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-function saveHighWater(n) {
-  try { localStorage.setItem(HIGH_WATER_KEY, String(n)); } catch { /* quota */ }
-  cloudSet(HIGH_WATER_KEY, n);
-}
+/* Numéros émis pendant CETTE session mais pas encore visibles dans la liste des
+ * commandes (le temps de l'enregistrement). Sans cela, deux créations
+ * rapprochées recevraient le même numéro.
+ *
+ * Volontairement NON persisté : un compteur mémorisé ne redescend jamais, si
+ * bien qu'une attribution erronée le gonfle définitivement — c'est ce qui a fait
+ * sauter la série à 0193 alors que les commandes étaient revenues à 0047. En
+ * repartant des commandes réelles, la numérotation se corrige d'elle-même. */
+let _issuedThisSession = [];
+/* Dernier maximum observé. S'il RECULE, c'est que des numéros ont été corrigés
+   (alignement sur Ozon, correction manuelle) : les réservations en cours
+   deviennent caduques, sinon elles maintiendraient la série au-dessus de
+   l'erreur qu'on vient justement de réparer. */
+let _lastMaxUsed = 0;
 
 function victouryNumsIn(orders) {
   const nums = new Set();
@@ -47,21 +42,19 @@ export function isVictCode(s) {
   return /^VICT(OURY)?\d+$/i.test(String(s || '').trim());
 }
 
-/** Numéro VICTOURY SUIVANT : toujours au-dessus de tout ce qui a déjà été émis.
- *  Les numéros se suivent donc dans l'ordre des commandes, et aucun n'est jamais
- *  réattribué — y compris après une suppression ou un alignement sur Ozon. */
+/** Numéro VICTOURY SUIVANT : au-dessus du plus grand numéro RÉELLEMENT porté par
+ *  une commande. Les numéros suivent donc l'ordre des commandes, et la série se
+ *  recale automatiquement si des numéros erronés ont été corrigés. */
 export function generateVictId(orders) {
   const used = victouryNumsIn(orders);
   const maxUsed = used.size ? Math.max(...used) : 0;
-  const n = Math.max(maxUsed, readHighWater()) + 1;
-  saveHighWater(n);
+  if (maxUsed < _lastMaxUsed) _issuedThisSession = [];
+  _lastMaxUsed = maxUsed;
+  // On ignore les réservations devenues visibles dans la liste : seules comptent
+  // celles encore en attente d'enregistrement.
+  _issuedThisSession = _issuedThisSession.filter(n => !used.has(n) && n > maxUsed);
+  const maxPending = _issuedThisSession.length ? Math.max(..._issuedThisSession) : 0;
+  const n = Math.max(maxUsed, maxPending) + 1;
+  _issuedThisSession.push(n);
   return NEW_PREFIX + String(n).padStart(4, '0');
-}
-
-/** Aligne le repère sur les commandes chargées (au démarrage). Ne le fait
- *  jamais redescendre : il ne peut que monter. */
-export function initVictCounter(orders) {
-  const used = victouryNumsIn(orders);
-  const maxUsed = used.size ? Math.max(...used) : 0;
-  if (maxUsed > readHighWater()) saveHighWater(maxUsed);
 }
