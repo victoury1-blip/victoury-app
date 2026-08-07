@@ -10,7 +10,6 @@ import {
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
-import { A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES, COLIS_PIPELINE_SET } from '../data/colisPipeline';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -462,347 +461,111 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      Ozon détient le code VICT réellement enregistré pour chaque colis. On balaie
      la série VICT0001..VICT0400, on lit le téléphone du destinataire renvoyé par
      Ozon, et on remet ce code sur la commande correspondante. Aucun effacement. */
-  const [ozonRestore, setOzonRestore] = useState({ running: false, message: '', lines: [] });
 
-  /* Horodatage au format de l'application. Indispensable sur toute correction de
-     code : sans nouvelle date de mise à jour, la file de synchronisation croit que
-     son ancien instantané est encore valable et réécrit l'ancien code. */
-  const stampNow = () => new Date().toLocaleString('fr-FR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }).replace(',', '');
+  const [ozImport, setOzImport] = useState({ running: false, message: '', lines: [] });
 
-  async function restoreOzonCodes() {
-    const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
-    if (!cfg.customerId || !cfg.apiKey) return;
-    setOzonRestore({ running: true, message: 'Recherche des colis chez Ozon…' });
-    const base = `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}`;
-    const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^212/, '0');
-    // Les codes contenant « MIMA » sont gérés ailleurs : on ne les touche JAMAIS.
-    const isProtected = (o) => /mima/i.test(
-      `${o.trackingNumber || ''} ${o.ozoneTracking || ''} ${o.id || ''}`
-    );
-    // Un téléphone peut porter PLUSIEURS commandes (client fidèle, échange…).
-    // Dans ce cas on ne peut pas savoir laquelle correspond : on l'IGNORE plutôt
-    // que d'écrire le code sur la mauvaise commande.
-    const phoneGroups = new Map();
-    for (const o of orders || []) {
-      if (isProtected(o)) continue;
-      const p = digits(o.recipient?.phone);
-      if (!p) continue;
-      if (!phoneGroups.has(p)) phoneGroups.set(p, []);
-      phoneGroups.get(p).push(o);
-    }
-    const byPhone = new Map();
-    let ambiguous = 0;
-    const ambiguousSample = [];
-    for (const [p, list] of phoneGroups) {
-      if (list.length === 1) byPhone.set(p, list[0]);
-      else {
-        ambiguous += list.length;
-        if (ambiguousSample.length < 10) ambiguousSample.push(`${p} → ${list.map(o => o.recipient?.name || o.id).join(', ')}`);
-      }
-    }
-
-    const found = [];              // { code, order }
-    // Code Ozon -> téléphone du destinataire chez Ozon. Sert à PROUVER qu'un code
-    // porté par une commande appartient en réalité à quelqu'un d'autre.
-    const codePhone = new Map();
-    const MAX = 400, CONC = 10;
+  /* ── Import des codes de suivi réels depuis Ozon (action MANUELLE) ──
+     Ozon est la source de vérité : c'est lui qui connaît le code sous lequel
+     chaque colis circule. On récupère son inventaire page par page, on
+     reconstitue la correspondance téléphone → code, puis on aligne les
+     commandes dessus.
+     Interroger Ozon commande par commande était impraticable : chaque appel
+     rouvre une session sur le tableau de bord. */
+  async function importOzonCodes() {
+    setOzImport({ running: true, message: 'Lecture des colis chez Ozon…', lines: [] });
+    const digits = (v) => {
+      const raw = String(v || '').replace(/\D/g, '').replace(/^00/, '').replace(/^212/, '');
+      const nine = raw.slice(-9);
+      return nine.length === 9 ? '0' + nine : '';
+    };
     try {
-      for (let start = 1; start <= MAX; start += CONC) {
-        const batch = [];
-        for (let i = start; i < start + CONC && i <= MAX; i++) batch.push(i);
-        await Promise.all(batch.map(async (n) => {
-          // Chez Ozon, le même numéro existe sous plusieurs longueurs de
-          // remplissage (VICT0050 créé par l'app, VICT00050 saisi sur le tableau
-          // de bord). En ne testant que 4 chiffres, on ratait le vrai colis et la
-          // commande héritait du code — donc du livreur — de quelqu'un d'autre.
-          const variants = [...new Set([
-            'VICT' + String(n).padStart(4, '0'),
-            'VICT' + String(n).padStart(5, '0'),
-          ])];
-          for (const code of variants) {
-            try {
-              const fd = new FormData();
-              fd.append('tracking-number', code);
-              const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: fd });
-              if (!res.ok) continue;
-              const json = await res.json();
-              const parcel = json['PARCEL-INFO'] || json;
-              const infos = parcel['INFOS'] || parcel;
-              const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
-              if (!phone) continue;
-              codePhone.set(code.toUpperCase(), phone);
-              const order = byPhone.get(phone);
-              if (order) found.push({ code, order });
-            } catch {}
-          }
-        }));
-        setOzonRestore({ running: true, message: `Analyse ${Math.min(start + CONC - 1, MAX)}/${MAX} — ${found.length} colis retrouvé(s)` });
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const auth = session?.access_token ? { headers: { Authorization: `Bearer ${session.access_token}` } } : undefined;
 
-      // Sécurités : jamais un code « MIMA » ; seulement si le code diffère ; un code
-      // déjà porté par une AUTRE commande n'est pas réattribué (pas de doublon) ; et
-      // une commande ne peut recevoir qu'un seul code.
-      const takenBy = new Map();
-      for (const o of orders || []) if (o.trackingNumber) takenBy.set(o.trackingNumber.toUpperCase(), o.id);
-
-      // Codes PROUVÉS faux : le colis existe chez Ozon mais au nom d'un AUTRE
-      // téléphone. Ces commandes ne doivent plus bloquer la réattribution du code
-      // à son vrai propriétaire, et leur propre code doit être corrigé.
-      const wrongHolders = new Set();
-      for (const o of orders || []) {
-        if (isProtected(o) || !o.trackingNumber) continue;
-        const ozPhone = codePhone.get(o.trackingNumber.toUpperCase());
-        if (!ozPhone) continue;
-        if (ozPhone !== digits(o.recipient?.phone)) wrongHolders.add(o.id);
-      }
-
-      const seenOrders = new Set();
-      const toFix = [];
-      let skipped = 0;
-      const skippedSample = [];
-      for (const { code, order } of found) {
-        if (isProtected(order) || order.trackingNumber === code) continue;
-        const owner = takenBy.get(code.toUpperCase());
-        // Un détenteur dont le code est prouvé faux n'est pas un vrai conflit.
-        if (owner && owner !== order.id && !wrongHolders.has(owner)) {
-          skipped++;
-          if (skippedSample.length < 10) {
-            const ownerOrder = (orders || []).find(o => o.id === owner);
-            skippedSample.push(`${code} : ${order.recipient?.name || order.id} (réel chez Ozon) vs ${ownerOrder?.recipient?.name || owner} (déjà en base, code non contredit)`);
-          }
-          continue;
+      // 1) Inventaire Ozon, page par page.
+      const PAGE = 100;
+      const byPhone = new Map();      // téléphone -> code (unique)
+      const multi = new Set();        // téléphones portant plusieurs colis
+      let start = 0, total = null, seen = 0;
+      for (let guard = 0; guard < 200; guard++) {
+        const r = await fetch(`/api/ozone-status?list=1&start=${start}&length=${PAGE}`, auth);
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          setOzImport({ running: false, message: `Lecture Ozon impossible : ${j.error || r.status}`, lines: [] });
+          return;
         }
-        if (seenOrders.has(order.id)) { skipped++; continue; }
-        seenOrders.add(order.id);
-        toFix.push({ code, order });
+        const d = await r.json();
+        const parcels = d.parcels || [];
+        if (total === null) total = d.total;
+        for (const p of parcels) {
+          const ph = digits(p.phone);
+          if (!ph || !p.code) continue;
+          if (byPhone.has(ph) && byPhone.get(ph) !== p.code) multi.add(ph);
+          else byPhone.set(ph, p.code);
+        }
+        seen += parcels.length;
+        setOzImport({ running: true, message: `Lecture des colis chez Ozon… ${seen}${total ? '/' + total : ''}`, lines: [] });
+        if (parcels.length < PAGE) break;
+        start += PAGE;
+        if (total !== null && start >= total) break;
       }
-      // Commandes au code prouvé faux et pour lesquelles Ozon n'a AUCUN colis :
-      // on retire le code erroné (l'app réaffiche l'identifiant d'origine) plutôt
-      // que de laisser un code qui appartient à un autre client.
-      let cleared = 0;
-      const clearedSample = [];
-      for (const o of orders || []) {
-        if (!wrongHolders.has(o.id) || seenOrders.has(o.id)) continue;
-        seenOrders.add(o.id);
-        toFix.push({ code: null, order: o });
-        cleared++;
-        if (clearedSample.length < 10) clearedSample.push(`${o.trackingNumber} : ${o.recipient?.name || o.id}`);
-      }
-      const notes = [];
-      if (ambiguous) notes.push(`${ambiguous} commande(s) ignorée(s) (même téléphone)`);
-      if (skipped) notes.push(`${skipped} conflit(s) ignoré(s)`);
-      if (cleared) notes.push(`${cleared} code(s) erroné(s) retiré(s)`);
-      const suffix = notes.length ? ` — ${notes.join(', ')}` : '';
-      const detailLines = [
-        ...(ambiguousSample.length ? ['Téléphones ambigus (ignorés) :', ...ambiguousSample.map(l => '  ' + l)] : []),
-        ...(skippedSample.length ? ['Conflits ignorés (le code existant n’est pas contredit par Ozon) :', ...skippedSample.map(l => '  ' + l)] : []),
-        ...(clearedSample.length ? ['Codes erronés retirés :', ...clearedSample.map(l => '  ' + l)] : []),
-      ];
-      if (!toFix.length) {
-        setOzonRestore({ running: false, message: `Terminé : ${found.length} colis vérifié(s), aucun code à corriger${suffix}.`, lines: detailLines });
+      for (const ph of multi) byPhone.delete(ph);
+
+      if (!byPhone.size) {
+        setOzImport({ running: false, message: 'Aucun colis exploitable trouvé chez Ozon.', lines: [] });
         return;
       }
-      const B = 20;
-      let failed = 0;
-      const okIds = new Set();
-      for (let i = 0; i < toFix.length; i += B) {
-        await Promise.all(toFix.slice(i, i + B).map(({ code, order }) =>
-          supabase.from('orders').update({ tracking_number: code, ozone_tracking: code, date_updated: stampNow() }).eq('id', order.id)
-            .then(({ error }) => { if (error) failed++; else okIds.add(order.id); })
-            .catch(() => { failed++; })
-        ));
-      }
-      // On n'applique en local QUE les écritures réellement réussies.
-      const map = new Map(toFix.filter(({ order }) => okIds.has(order.id)).map(({ code, order }) => [order.id, code]));
-      // Le livreur mémorisé appartenait à l'ancien code : on le supprime pour
-      // qu'il soit re-récupéré depuis la fenêtre « Livraison ».
-      for (const id of map.keys()) { try { localStorage.removeItem(`ozone_dp_${id}`); } catch {} }
-      // On aligne AUSSI la date locale sur celle écrite en base : sinon la copie
-      // locale reste « plus ancienne » et une re-synchronisation peut réécrire
-      // l'ancien code par-dessus la correction (effet « ça ne se sauvegarde pas »).
-      const stamped = stampNow();
-      setOrders(prev => prev.map(o => map.has(o.id)
-        ? { ...o, trackingNumber: map.get(o.id), ozoneTracking: map.get(o.id), dateUpdated: stamped }
-        : o));
-      const fixedSample = toFix.filter(({ order, code }) => okIds.has(order.id) && code)
-        .slice(0, 10).map(({ code, order }) => `${order.trackingNumber} → ${code} : ${order.recipient?.name || order.id}`);
-      setOzonRestore({
-        running: false,
-        message: `✅ ${map.size} code(s) restauré(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}${suffix}.`,
-        lines: [...detailLines, ...(fixedSample.length ? ['Codes corrigés :', ...fixedSample.map(l => '  ' + l)] : [])],
-      });
-    } catch (e) {
-      setOzonRestore({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
-    }
-  }
 
-  /* ── Correction des codes de suivi EN DOUBLE ──
-     Pour chaque code partagé par plusieurs commandes : on demande à Ozon à qui
-     appartient réellement ce code (téléphone du destinataire). Cette commande le
-     GARDE ; les autres reçoivent un nouveau numéro libre. Si Ozon ne connaît pas
-     le code, la commande la plus ANCIENNE le garde. Les codes « MIMA » sont exclus. */
-  const [dupFix, setDupFix] = useState({ running: false, message: '' });
-  const [renum, setRenum] = useState({ running: false, message: '', lines: [] });
-  const [restoreOld, setRestoreOld] = useState({ running: false, message: '', lines: [] });
-  const [queueMsg, setQueueMsg] = useState('');
-  const [diag, setDiag] = useState({ running: false, lines: [] });
-
-  /* Diagnostic LECTURE SEULE : que contient la base pour les codes en double ? */
-  async function runDupDiagnostic() {
-    setDiag({ running: true, lines: [] });
-    try {
-      let all = [];
-      const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase.from('orders')
-          .select('id, tracking_number, ozone_tracking, date_updated, status, recipient, is_deleted')
-          .order('id', { ascending: true }).range(from, from + PAGE - 1);
-        if (error) { setDiag({ running: false, lines: ['Erreur : ' + error.message] }); return; }
-        const b = data || [];
-        all = all.concat(b);
-        if (b.length < PAGE) break;
-      }
-      const active = all.filter(r => !r.is_deleted);
-      const m = new Map();
-      for (const r of active) {
-        const c = (r.tracking_number || '').trim();
-        if (!c) continue;
-        if (!m.has(c)) m.set(c, []);
-        m.get(c).push(r);
-      }
-      const dups = [...m.entries()].filter(([, l]) => l.length > 1);
-
-      /* Où en est la série VICT ? (question la plus fréquente) */
-      const victNum = (v) => { const x = /^VICT(\d+)$/i.exec(String(v || '').trim()); return x ? parseInt(x[1], 10) : 0; };
-      const nums = new Set();
-      for (const r of active) {
-        for (const n of [victNum(r.id), victNum(r.tracking_number)]) if (n) nums.add(n);
-      }
-      const sorted = [...nums].sort((a, b) => a - b);
-      const normal = sorted.filter(n => n < 1000);
-      const aberrants = sorted.filter(n => n >= 1000);
-      const maxNormal = normal.length ? normal[normal.length - 1] : 0;
-      const libres = [];
-      for (let n = 1; n <= maxNormal && libres.length < 10; n++) if (!nums.has(n)) libres.push('VICT' + String(n).padStart(4, '0'));
-      const fmt = (n) => 'VICT' + String(n).padStart(4, '0');
-
-      const lines = [
-        `Lignes en base : ${all.length} (actives ${active.length})`,
-        '',
-        '── SÉRIE VICT ──',
-        `Dernier numéro de la série : ${maxNormal ? fmt(maxNormal) : '—'}`,
-        `Prochain numéro attribué   : ${fmt(maxNormal + 1)}`,
-        `Numéros VICT utilisés      : ${nums.size}`,
-        aberrants.length
-          ? `Numéros aberrants (>= 1000) : ${aberrants.length} — ${aberrants.slice(0, 8).map(fmt).join(', ')}${aberrants.length > 8 ? '…' : ''}`
-          : 'Numéros aberrants (>= 1000) : aucun',
-        libres.length ? `Trous dans la série : ${libres.join(', ')}${libres.length === 10 ? '…' : ''}` : 'Trous dans la série : aucun',
-        '',
-        `Codes en double EN BASE : ${dups.length}`,
-        '',
-      ];
-      for (const [code, list] of dups.slice(0, 3)) {
-        lines.push(`── ${code} ──`);
-        for (const r of list) {
-          lines.push(`  id=${r.id} | ${r.recipient?.name || '?'} | maj=${r.date_updated || '?'} | ozon=${r.ozone_tracking || '-'} | ${r.status}`);
-        }
-        lines.push('');
-      }
-      if (!dups.length) lines.push('🎉 Aucun doublon en base : l’alerte affichée vient de données locales périmées (rechargez).');
-      setDiag({ running: false, lines });
-    } catch (e) {
-      setDiag({ running: false, lines: ['Erreur : ' + (e?.message || 'échec')] });
-    }
-  }
-
-  /* ── Renumérotation VICTOURY des onglets « À Confirmer » et « En Suivi » ──
-     Action MANUELLE et ponctuelle : les commandes encore en cours de traitement
-     (donc PAS remises au transporteur) reçoivent les plus petits numéros
-     VICTOURY libres, dans l'ordre chronologique.
-     Jamais touché : les colis déjà validés/expédiés (leur code est connu du
-     transporteur), les codes contenant « MIMA », et tout numéro VICTOURY déjà
-     porté par une autre commande (aucun doublon créé). */
-  async function renumberActiveOrders() {
-    const TARGET = new Set([...A_CONFIRMER_STATUSES, ...EN_SUIVI_STATUSES]);
-    setRenum({ running: true, message: 'Lecture des commandes…', lines: [] });
-    try {
+      // 2) Commandes de la base.
+      setOzImport({ running: true, message: `${byPhone.size} colis lus — lecture des commandes…`, lines: [] });
       let rows = [];
-      const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
+      const DB = 1000;
+      for (let from = 0; ; from += DB) {
         const { data, error } = await supabase.from('orders')
-          .select('id, tracking_number, ozone_tracking, recipient, status, validated, date_added')
+          .select('id, tracking_number, recipient')
           .or('is_deleted.is.null,is_deleted.eq.false')
-          .order('id', { ascending: true }).range(from, from + PAGE - 1);
-        if (error) { setRenum({ running: false, message: 'Lecture impossible : ' + error.message, lines: [] }); return; }
-        const batch = data || [];
-        rows = rows.concat(batch);
-        if (batch.length < PAGE) break;
+          .order('id', { ascending: true }).range(from, from + DB - 1);
+        if (error) { setOzImport({ running: false, message: 'Lecture des commandes impossible : ' + error.message, lines: [] }); return; }
+        const b = data || [];
+        rows = rows.concat(b);
+        if (b.length < DB) break;
       }
 
-      const isProtected = (r) => /mima/i.test(`${r.tracking_number || ''} ${r.ozone_tracking || ''} ${r.id || ''}`);
-      const ts = (v) => {
-        const m = String(v || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-        return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
-      };
-
-      /* Cibles : les commandes de ces deux onglets UNIQUEMENT.
-         Double verrou sur la Liste des Colis — on reprend sa règle d'affichage
-         exacte (statut du circuit OU code + validé) pour qu'aucune commande
-         visible là-bas ne puisse être renumérotée : son code est déjà déposé
-         chez le transporteur. */
-      const inColisList = (r) => COLIS_PIPELINE_SET.has(r.status) || (!!r.tracking_number && !!r.validated);
-      const targets = rows
-        .filter(r => TARGET.has(r.status) && !r.validated && !inColisList(r) && !isProtected(r))
-        .sort((a, b) => ts(a.date_added) - ts(b.date_added));
-
-      if (!targets.length) {
-        setRenum({ running: false, message: 'Aucune commande à renuméroter.', lines: [] });
-        return;
-      }
-
-      // Numéros VICTOURY portés par les AUTRES commandes : intouchables.
-      const targetIds = new Set(targets.map(r => r.id));
-      const taken = new Set();
-      for (const r of rows) {
-        if (targetIds.has(r.id)) continue;
-        for (const v of [r.id, r.tracking_number]) {
-          const m = /^VICTOURY(\d+)$/i.exec(String(v || '').trim());
-          if (m) taken.add(parseInt(m[1], 10));
-        }
-      }
-
-      let n = 0;
-      const nextFree = () => { do { n += 1; } while (taken.has(n)); taken.add(n); return 'VICTOURY' + String(n).padStart(4, '0'); };
-
+      // 3) Alignement : seules les différences sont écrites.
       const updates = [];
-      for (const r of targets) {
-        const code = nextFree();
-        if (String(r.tracking_number || '').toUpperCase() === code.toUpperCase()) continue; // déjà bon
+      const ambiguous = [];
+      for (const r of rows) {
+        const ph = digits(r.recipient?.phone);
+        if (!ph) continue;
+        if (multi.has(ph)) { ambiguous.push(`${r.tracking_number || r.id} : ${r.recipient?.name || r.id} — ${ph}`); continue; }
+        const code = byPhone.get(ph);
+        if (!code) continue;
+        if (String(r.tracking_number || '').toUpperCase() === code.toUpperCase()) continue;
         updates.push({ id: r.id, code, from: r.tracking_number || r.id, name: r.recipient?.name || r.id });
       }
 
       if (!updates.length) {
-        setRenum({ running: false, message: `✅ Les ${targets.length} commandes sont déjà numérotées correctement.`, lines: [] });
+        setOzImport({
+          running: false,
+          message: `✅ Tout est déjà aligné sur Ozon (${byPhone.size} colis lus).`,
+          lines: ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 15).map(l => '  ' + l)] : [],
+        });
         return;
       }
 
-      setRenum({ running: true, message: `Renumérotation de ${updates.length} commande(s)…`, lines: [] });
+      setOzImport({ running: true, message: `Écriture de ${updates.length} code(s)…`, lines: [] });
       let failed = 0;
       const okIds = new Map();
       const B = 20;
       for (let i = 0; i < updates.length; i += B) {
         await Promise.all(updates.slice(i, i + B).map(({ id, code }) =>
-          supabase.from('orders').update({ tracking_number: code, date_updated: stampNow() }).eq('id', id)
+          supabase.from('orders').update({ tracking_number: code, ozone_tracking: code, date_updated: stampNow() }).eq('id', id)
             .then(({ error }) => { if (error) failed++; else okIds.set(id, code); })
             .catch(() => { failed++; })
         ));
       }
 
-      // Vérification en base : on n'applique en local que ce qui est confirmé.
-      setRenum({ running: true, message: 'Vérification en base…', lines: [] });
+      // Relecture : on n'applique en local que ce qui est réellement enregistré.
       const ids = [...okIds.keys()];
       const persisted = new Map();
       for (let i = 0; i < ids.length; i += 100) {
@@ -815,23 +578,48 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       for (const id of applied.keys()) { try { localStorage.removeItem(`ozone_dp_${id}`); } catch {} }
       const stamped = stampNow();
       setOrders(prev => prev.map(o => applied.has(o.id)
-        ? { ...o, trackingNumber: applied.get(o.id), dateUpdated: stamped }
+        ? { ...o, trackingNumber: applied.get(o.id), ozoneTracking: applied.get(o.id), dateUpdated: stamped }
         : o));
 
-      // La file de synchronisation peut contenir d'anciens instantanés qui
-      // réécriraient les codes qu'on vient d'attribuer.
+      // Des instantanés périmés réécriraient les codes qu'on vient d'aligner.
       try { const { clearSyncQueue } = await import('../lib/offlineStore'); await clearSyncQueue(); } catch {}
 
-      setRenum({
+      setOzImport({
         running: false,
-        message: `✅ ${applied.size} commande(s) renumérotée(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}. Rechargement…`,
-        lines: updates.filter(u => applied.has(u.id)).slice(0, 30).map(u => `  ${u.from} → ${u.code} : ${u.name}`),
+        message: `✅ ${applied.size} code(s) alignés sur Ozon${failed ? ` — ⚠️ ${failed} échec(s)` : ''}. Rechargement…`,
+        lines: [
+          ...updates.filter(u => applied.has(u.id)).slice(0, 30).map(u => `  ${u.from} → ${u.code} : ${u.name}`),
+          ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 15).map(l => '  ' + l)] : []),
+        ],
       });
       if (applied.size) setTimeout(() => window.location.reload(), 3000);
     } catch (e) {
-      setRenum({ running: false, message: 'Erreur : ' + (e?.message || 'échec'), lines: [] });
+      setOzImport({ running: false, message: 'Erreur : ' + (e?.message || 'échec'), lines: [] });
     }
   }
+
+  /* Horodatage au format de l'application. Indispensable sur toute correction de
+     code : sans nouvelle date de mise à jour, la file de synchronisation croit que
+     son ancien instantané est encore valable et réécrit l'ancien code. */
+  const stampNow = () => new Date().toLocaleString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).replace(',', '');
+
+  /* ── Correction des codes de suivi EN DOUBLE ──
+     Pour chaque code partagé par plusieurs commandes : on demande à Ozon à qui
+     appartient réellement ce code (téléphone du destinataire). Cette commande le
+     GARDE ; les autres reçoivent un nouveau numéro libre. Si Ozon ne connaît pas
+     le code, la commande la plus ANCIENNE le garde. Les codes « MIMA » sont exclus. */
+
+
+  /* ── Renumérotation VICTOURY des onglets « À Confirmer » et « En Suivi » ──
+     Action MANUELLE et ponctuelle : les commandes encore en cours de traitement
+     (donc PAS remises au transporteur) reçoivent les plus petits numéros
+     VICTOURY libres, dans l'ordre chronologique.
+     Jamais touché : les colis déjà validés/expédiés (leur code est connu du
+     transporteur), les codes contenant « MIMA », et tout numéro VICTOURY déjà
+     porté par une autre commande (aucun doublon créé). */
 
   /* ── Restauration des codes VICT écrasés par un code VICTOURY ──
      Lors du passage à la nouvelle série, des commandes DÉJÀ confirmées (donc
@@ -839,377 +627,6 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      VICTOURY. Leur code Ozon d'origine est toujours en base dans la colonne
      `ozone_tracking` : on le remet comme code de suivi.
      Aucune commande dont `ozone_tracking` est vide n'est touchée. */
-  async function restoreOverwrittenCodes() {
-    setRestoreOld({ running: true, message: 'Lecture des commandes…', lines: [] });
-    const isVictoury = (v) => /^VICTOURY\d+$/i.test(String(v || '').trim());
-    const isOldVict = (v) => /^VICT\d+$/i.test(String(v || '').trim());
-    try {
-      let rows = [];
-      const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase.from('orders')
-          .select('id, tracking_number, ozone_tracking, recipient, status')
-          .or('is_deleted.is.null,is_deleted.eq.false')
-          .order('id', { ascending: true }).range(from, from + PAGE - 1);
-        if (error) { setRestoreOld({ running: false, message: 'Lecture impossible : ' + error.message, lines: [] }); return; }
-        const batch = data || [];
-        rows = rows.concat(batch);
-        if (batch.length < PAGE) break;
-      }
-
-      // Cible : code actuel VICTOURY, alors que le code Ozon d'origine est un
-      // VICT. C'est exactement la signature d'un code écrasé.
-      const targets = rows.filter(r => isVictoury(r.tracking_number) && isOldVict(r.ozone_tracking));
-
-      /* 2e source — le tableau de bord Ozon. Certaines commandes écrasées n'ont
-         pas de `ozone_tracking` en base : leur code réel n'existe plus que chez
-         le transporteur. On le demande par TÉLÉPHONE (recherche exacte côté
-         Ozon, qui renvoie le code du colis). Un numéro portant plusieurs colis
-         est signalé ambigu par le serveur et n'est jamais deviné. */
-      /* Numéro marocain normalisé : on ne garde que les chiffres, on retire un
-         éventuel indicatif 212, et on ne conserve que les 9 derniers chiffres
-         significatifs (certaines fiches contiennent « 0/0626272627 »). */
-      const digits = (v) => {
-        const raw = String(v || '').replace(/\D/g, '').replace(/^00/, '').replace(/^212/, '');
-        const nine = raw.slice(-9);
-        return nine.length === 9 ? '0' + nine : '';
-      };
-      // Un livreur PERSONNEL n'a pas de colis chez Ozon : rien à y chercher.
-      const isOzon = (r) => /ozon/i.test(r.recipient?.delivery || '');
-      const orphans = rows.filter(r => isVictoury(r.tracking_number) && !isOldVict(r.ozone_tracking) && isOzon(r) && digits(r.recipient?.phone));
-      const ambiguous = [];
-      const notFound = [];
-      if (orphans.length) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const auth = session?.access_token ? { headers: { Authorization: `Bearer ${session.access_token}` } } : undefined;
-
-        // Ozon peut stocker le numéro sous plusieurs formes : on essaie chaque
-        // variante et on retient la première qui donne un colis unique.
-        const variantsOf = (p) => [...new Set([p, p.slice(1), '212' + p.slice(1)])].filter(v => v.length >= 3);
-        const byVariant = new Map();
-        for (const r of orphans) {
-          for (const v of variantsOf(digits(r.recipient?.phone))) {
-            if (!byVariant.has(v)) byVariant.set(v, r);
-          }
-        }
-        const queries = [...byVariant.keys()];
-        const found = new Map();      // id de commande -> code trouvé
-        const seenAmbiguous = new Set();
-        for (let i = 0; i < queries.length; i += 20) {
-          const chunk = queries.slice(i, i + 20);
-          setRestoreOld({ running: true, message: `Recherche chez Ozon ${Math.min(i + 20, queries.length)}/${queries.length}…`, lines: [] });
-          try {
-            const r = await fetch(`/api/ozone-status?phones=${encodeURIComponent(chunk.join(','))}`, auth);
-            if (!r.ok) continue;
-            const d = await r.json();
-            for (const row of (d.results || [])) {
-              const order = byVariant.get(row.q);
-              if (!order || found.has(order.id)) continue;
-              if (row.ambiguous) { seenAmbiguous.add(order.id); continue; }
-              // On ne restaure que si Ozon donne un code DIFFÉRENT de l'actuel.
-              const code = String(row.code || '').trim();
-              if (!code || code.toUpperCase() === String(order.tracking_number).toUpperCase()) continue;
-              found.set(order.id, code);
-            }
-          } catch {}
-        }
-        for (const r of orphans) {
-          const code = found.get(r.id);
-          if (code) { if (!targets.some(t => t.id === r.id)) targets.push({ ...r, ozone_tracking: code }); continue; }
-          if (seenAmbiguous.has(r.id)) ambiguous.push(`${r.tracking_number} : ${r.recipient?.name || r.id} (plusieurs colis pour ce numéro)`);
-          else notFound.push(`${r.tracking_number} : ${r.recipient?.name || r.id} — ${r.recipient?.phone || '?'} (aucun colis trouvé chez Ozon)`);
-        }
-      }
-
-      // Pas de sortie anticipée ici : même sans code à restaurer, la réparation
-      // des codes abîmés (plus bas) doit pouvoir s'exécuter.
-
-      // Un code VICT déjà porté par une AUTRE commande ne doit pas être rendu
-      // en double : on l'ignore et on le signale.
-      const takenBy = new Map();
-      for (const r of rows) {
-        const c = String(r.tracking_number || '').trim().toUpperCase();
-        if (c) takenBy.set(c, r.id);
-      }
-
-      // GARDE-FOU : un code de colis est un jeton simple. Tout ce qui contient
-      // un espace, un accent ou du texte (nom de livreur, téléphone collés par
-      // une cellule HTML) est REFUSÉ — jamais écrit en base.
-      const isValidCode = (v) => /^[A-Za-z0-9_-]{3,30}$/.test(String(v || '').trim());
-
-      const toApply = [];
-      const conflicts = [];
-      const rejected = [];
-      for (const r of targets) {
-        const code = String(r.ozone_tracking).trim();
-        if (!isValidCode(code)) { rejected.push(`${r.tracking_number} : valeur illisible « ${code.slice(0, 40)} »`); continue; }
-        const owner = takenBy.get(code.toUpperCase());
-        if (owner && owner !== r.id) { conflicts.push(`${r.tracking_number} → ${code} : déjà porté par ${owner}`); continue; }
-        toApply.push({ id: r.id, code, from: r.tracking_number, name: r.recipient?.name || r.id });
-      }
-
-      /* Réparation des codes déjà abîmés par une exécution précédente : un
-         tracking_number qui contient du texte parasite est ramené à son premier
-         jeton (le vrai code). */
-      for (const r of rows) {
-        const cur = String(r.tracking_number || '').trim();
-        if (!cur || isValidCode(cur)) continue;
-        const m = cur.match(/^[A-Za-z0-9_-]{3,30}/);
-        if (!m) continue;
-        const clean = m[0];
-        const owner = takenBy.get(clean.toUpperCase());
-        if (owner && owner !== r.id) { conflicts.push(`${cur.slice(0, 30)} → ${clean} : déjà porté par ${owner}`); continue; }
-        toApply.push({ id: r.id, code: clean, from: cur.slice(0, 30) + '…', name: r.recipient?.name || r.id });
-      }
-
-      if (!toApply.length) {
-        setRestoreOld({
-          running: false,
-          message: '✅ Rien à restaurer.',
-          lines: [
-            ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
-            ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
-            ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
-            ...(notFound.length ? ['Introuvables chez Ozon (à vérifier à la main) :', ...notFound.slice(0, 15).map(l => '  ' + l)] : []),
-          ],
-        });
-        return;
-      }
-
-      setRestoreOld({ running: true, message: `Restauration de ${toApply.length} code(s)…`, lines: [] });
-      let failed = 0;
-      const okIds = new Map();
-      const B = 20;
-      for (let i = 0; i < toApply.length; i += B) {
-        await Promise.all(toApply.slice(i, i + B).map(({ id, code }) =>
-          supabase.from('orders').update({ tracking_number: code, date_updated: stampNow() }).eq('id', id)
-            .then(({ error }) => { if (error) failed++; else okIds.set(id, code); })
-            .catch(() => { failed++; })
-        ));
-      }
-
-      const stamped = stampNow();
-      setOrders(prev => prev.map(o => okIds.has(o.id)
-        ? { ...o, trackingNumber: okIds.get(o.id), dateUpdated: stamped }
-        : o));
-
-      const lines = [
-        ...toApply.filter(t => okIds.has(t.id)).slice(0, 20).map(t => `  ${t.from} → ${t.code} : ${t.name}`),
-        ...(conflicts.length ? ['Ignorés (code déjà pris) :', ...conflicts.slice(0, 10).map(l => '  ' + l)] : []),
-        ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 10).map(l => '  ' + l)] : []),
-        ...(rejected.length ? ['Refusés (valeur illisible renvoyée par Ozon) :', ...rejected.slice(0, 10).map(l => '  ' + l)] : []),
-        ...(notFound.length ? ['Introuvables chez Ozon (à vérifier à la main) :', ...notFound.slice(0, 15).map(l => '  ' + l)] : []),
-      ];
-      setRestoreOld({
-        running: false,
-        message: `✅ ${okIds.size} code(s) restauré(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}${conflicts.length ? ` — ${conflicts.length} conflit(s)` : ''}.`,
-        lines,
-      });
-    } catch (e) {
-      setRestoreOld({ running: false, message: 'Erreur : ' + (e?.message || 'échec'), lines: [] });
-    }
-  }
-
-  async function fixDuplicateCodes() {
-    const cfg = { customerId: auzone.customerId, apiKey: auzone.apiKey };
-    const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^212/, '0');
-    const isProtected = (o) => /mima/i.test(`${o.trackingNumber || ''} ${o.ozoneTracking || ''} ${o.id || ''}`);
-    const victNum = (s) => { const m = /^VICT(\d+)$/i.exec(s || ''); return m ? parseInt(m[1], 10) : 0; };
-    const ts = (s) => {
-      const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-      return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
-    };
-
-    // On travaille sur les données FRAÎCHES de la base (pas sur l'état local, qui
-    // peut être périmé ou différent d'un appareil à l'autre).
-    setDupFix({ running: true, message: 'Lecture des commandes depuis la base…' });
-    let dbOrders = [];
-    try {
-      const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase.from('orders')
-          .select('id, tracking_number, ozone_tracking, recipient, date_added, status')
-          .or('is_deleted.is.null,is_deleted.eq.false')
-          .order('id', { ascending: true }).range(from, from + PAGE - 1);
-        if (error) { setDupFix({ running: false, message: 'Lecture impossible : ' + error.message }); return; }
-        const batch = data || [];
-        dbOrders = dbOrders.concat(batch);
-        if (batch.length < PAGE) break;
-      }
-    } catch (e) {
-      setDupFix({ running: false, message: 'Lecture impossible : ' + (e?.message || 'échec') }); return;
-    }
-    const rows = dbOrders.map(r => ({
-      id: r.id, trackingNumber: r.tracking_number, ozoneTracking: r.ozone_tracking,
-      recipient: r.recipient || {}, dateAdded: r.date_added, status: r.status,
-    }));
-
-    // Groupes de commandes partageant le même code (ids DISTINCTS uniquement).
-    // Le code d'une commande peut être porté par son `tracking_number` OU par son
-    // identifiant (les anciennes commandes s'appellent VICT0002). Les deux doivent
-    // entrer dans le même groupe, sinon le doublon passe inaperçu.
-    const groups = new Map();
-    for (const o of rows) {
-      const codes = new Set();
-      const tn = (o.trackingNumber || '').trim();
-      if (tn) codes.add(tn.toUpperCase());
-      if (victNum(o.id)) codes.add(String(o.id).trim().toUpperCase());
-      if (!codes.size || isProtected(o)) continue;
-      for (const code of codes) {
-        if (!groups.has(code)) groups.set(code, new Map());
-        groups.get(code).set(o.id, o);
-      }
-    }
-    for (const [code, m] of groups) groups.set(code, [...m.values()]);
-    const dupes = [...groups.entries()].filter(([, list]) => list.length > 1);
-    if (!dupes.length) { setDupFix({ running: false, message: 'Aucun doublon à corriger.' }); return; }
-
-    setDupFix({ running: true, message: `Analyse de ${dupes.length} code(s) en double…` });
-
-    // Numéros déjà utilisés (tous codes confondus) pour n'en réattribuer aucun.
-    const used = new Set();
-    for (const o of rows) {
-      for (const n of [victNum(o.id), victNum(o.trackingNumber)]) if (n) used.add(n);
-    }
-    // On attribue le PLUS PETIT numéro libre (on comble les trous de la série)
-    // au lieu de repartir du plus grand : sinon d'anciens numéros erronés très
-    // élevés (VICT14xx) feraient bondir la numérotation.
-    let next = 0;
-    const nextFreeCode = () => { do { next += 1; } while (used.has(next)); used.add(next); return 'VICT' + String(next).padStart(4, '0'); };
-
-    const base = cfg.customerId && cfg.apiKey
-      ? `https://api.ozonexpress.ma/customers/${cfg.customerId}/${cfg.apiKey}` : null;
-
-    const updates = []; // { id, code }
-    let byOzon = 0;
-    try {
-      for (const [code, list] of dupes) {
-        // Qui possède vraiment ce code d'après Ozon ?
-        let ownerId = null;
-        if (base) {
-          try {
-            const fd = new FormData();
-            fd.append('tracking-number', code);
-            const res = await fetch(`${base}/parcel-info`, { method: 'POST', body: fd });
-            if (res.ok) {
-              const json = await res.json();
-              const parcel = json['PARCEL-INFO'] || json;
-              const infos = parcel['INFOS'] || parcel;
-              const phone = digits(infos['PHONE'] || infos['RECIPIENT-PHONE'] || infos['RECEIVER-PHONE']);
-              if (phone) {
-                const match = list.find(o => digits(o.recipient?.phone) === phone);
-                if (match) { ownerId = match.id; byOzon++; }
-              }
-            }
-          } catch {}
-        }
-        // Sinon : la commande dont l'IDENTIFIANT est ce code en est la
-        // propriétaire naturelle ; à défaut, la plus ancienne le garde.
-        if (!ownerId) {
-          const byId = list.find(o => String(o.id).trim().toUpperCase() === code.toUpperCase());
-          ownerId = byId ? byId.id : [...list].sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded))[0].id;
-        }
-        for (const o of list) {
-          if (o.id === ownerId) continue;
-          // Le perdant ne doit pas garder ce code, ni comme suivi ni comme
-          // référence Ozon (ce colis appartient à quelqu'un d'autre).
-          const dropOzon = String(o.ozoneTracking || '').trim().toUpperCase() === code.toUpperCase();
-          updates.push({ id: o.id, code: nextFreeCode(), dropOzon });
-        }
-        setDupFix({ running: true, message: `Analyse… ${updates.length} commande(s) à renuméroter` });
-      }
-
-      // Ramener aussi les numéros ABERRANTS (>= 1000, issus de l'ancien incident)
-      // dans la série normale, en comblant les trous.
-      const already = new Set(updates.map(u => u.id));
-      const aberrant = rows
-        .filter(o => !isProtected(o) && !already.has(o.id) && victNum(o.trackingNumber) >= 1000)
-        .sort((a, b) => ts(a.dateAdded) - ts(b.dateAdded));
-      for (const o of aberrant) updates.push({ id: o.id, code: nextFreeCode() });
-
-      if (!updates.length) { setDupFix({ running: false, message: 'Aucun changement nécessaire.' }); return; }
-
-      let failed = 0;
-      let lastError = '';
-      const okIds = new Map();
-      const B = 20;
-      for (let i = 0; i < updates.length; i += B) {
-        await Promise.all(updates.slice(i, i + B).map(({ id, code, dropOzon }) =>
-          supabase.from('orders')
-            .update({ tracking_number: code, date_updated: stampNow(), ...(dropOzon ? { ozone_tracking: null } : {}) })
-            .eq('id', id)
-            .then(({ error }) => { if (error) { failed++; lastError = error.message; } else okIds.set(id, code); })
-            .catch((e) => { failed++; lastError = e?.message || 'réseau'; })
-        ));
-      }
-
-      // VÉRIFICATION : on relit depuis Supabase pour confirmer que la valeur a bien
-      // été enregistrée (une écriture « acceptée » mais non persistée expliquerait
-      // que les doublons réapparaissent après un rechargement).
-      setDupFix({ running: true, message: 'Vérification en base…' });
-      const ids = [...okIds.keys()];
-      const persisted = new Map();
-      for (let i = 0; i < ids.length; i += 100) {
-        const { data } = await supabase.from('orders').select('id, tracking_number').in('id', ids.slice(i, i + 100));
-        for (const row of (data || [])) persisted.set(row.id, row.tracking_number);
-      }
-      const notPersisted = ids.filter(id => persisted.get(id) !== okIds.get(id));
-
-      // On n'applique en local QUE ce qui est réellement en base.
-      const applied = new Map([...okIds].filter(([id, code]) => persisted.get(id) === code));
-      const dropped = new Set(updates.filter(u => u.dropOzon).map(u => u.id));
-      // Le livreur mémorisé appartenait à l'ancien code : on l'oublie.
-      for (const id of applied.keys()) { try { localStorage.removeItem(`ozone_dp_${id}`); } catch {} }
-      const stamped = stampNow();
-      setOrders(prev => prev.map(o => applied.has(o.id)
-        ? { ...o, trackingNumber: applied.get(o.id), dateUpdated: stamped, ...(dropped.has(o.id) ? { ozoneTracking: null } : {}) }
-        : o));
-
-      // La file de synchronisation peut contenir d'anciens instantanés qui
-      // réécriraient les codes qu'on vient de corriger : on la vide.
-      try { const { clearSyncQueue } = await import('../lib/offlineStore'); await clearSyncQueue(); } catch {}
-
-      // CONTRÔLE FINAL : on recompte les doublons directement en base. S'il en
-      // reste, c'est qu'un autre appareil (onglet resté ouvert avec une ancienne
-      // version) réécrit les anciennes valeurs — on le dit clairement.
-      setDupFix({ running: true, message: 'Contrôle final…' });
-      let after = [];
-      try {
-        const PAGE = 1000;
-        let all = [];
-        for (let from = 0; ; from += PAGE) {
-          const { data } = await supabase.from('orders').select('id, tracking_number')
-            .or('is_deleted.is.null,is_deleted.eq.false')
-            .order('id', { ascending: true }).range(from, from + PAGE - 1);
-          const batch = data || [];
-          all = all.concat(batch);
-          if (batch.length < PAGE) break;
-        }
-        const m = new Map();
-        for (const r of all) {
-          const c = (r.tracking_number || '').trim();
-          if (!c) continue;
-          if (!m.has(c)) m.set(c, new Set());
-          m.get(c).add(r.id);
-        }
-        after = [...m.entries()].filter(([, s]) => s.size > 1);
-      } catch {}
-
-      const parts = [`✅ ${applied.size} commande(s) corrigée(s) et vérifiée(s) en base`];
-      if (byOzon) parts.push(`${byOzon} propriétaire(s) confirmé(s) par Ozon`);
-      if (failed) parts.push(`⚠️ ${failed} refus d'écriture${lastError ? ` (${lastError})` : ''}`);
-      if (notPersisted.length) parts.push(`⛔ ${notPersisted.length} non enregistré(s) — droits d'écriture ?`);
-      parts.push(after.length
-        ? `⛔ il reste ${after.length} doublon(s) EN BASE — fermez l'application sur les autres appareils puis relancez`
-        : '🎉 plus aucun doublon en base — rechargement…');
-      setDupFix({ running: false, message: parts.join(' — ') });
-      // Succès : on recharge pour repartir des données de la base (l'affichage
-      // conservait sinon l'ancienne liste locale et semblait « inchangé »).
-      if (!after.length) setTimeout(() => window.location.reload(), 2500);
-    } catch (e) {
-      setDupFix({ running: false, message: 'Erreur : ' + (e?.message || 'échec') });
-    }
-  }
 
   /* ── Settings cards config ── */
   const CARDS = [
@@ -1688,143 +1105,34 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
           </div>
 
-          {/* Récupération des VRAIS codes de suivi depuis Ozon (action manuelle) */}
-          <div className="border-t border-gray-100 pt-3 mt-1 space-y-2">
-            <p className="text-xs font-semibold text-gray-700">Restaurer les codes de suivi depuis Ozon</p>
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              Interroge Ozon pour retrouver le code VICT réellement enregistré pour chaque colis
-              (recherche par numéro de téléphone) et le remet dans l'application. Aucun code n'est
-              effacé : seules les commandes dont le code diffère sont corrigées.
-              <strong className="text-gray-700"> Les codes contenant « MIMA » ne sont jamais modifiés.</strong>
-            </p>
-            <div className="flex items-center gap-2">
-              <button onClick={restoreOzonCodes} disabled={ozonRestore.running || !auzone.customerId || !auzone.apiKey}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-40 transition">
-                {ozonRestore.running ? 'Recherche…' : 'Restaurer les codes'}
-              </button>
-              {ozonRestore.message && <span className="text-xs text-gray-600">{ozonRestore.message}</span>}
-            </div>
-            {ozonRestore.lines?.length > 0 && (
-              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
-                {ozonRestore.lines.join('\n')}
-              </pre>
-            )}
-          </div>
-
-          {/* Restauration des codes VICT écrasés par un code VICTOURY */}
+          {/* Import des codes de suivi réels depuis Ozon */}
           <div className="border-t border-gray-100 pt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-700">Restaurer les anciens codes VICT écrasés</p>
+            <p className="text-xs font-semibold text-gray-700">Importer les codes de suivi depuis Ozon</p>
             <p className="text-[11px] text-gray-500 leading-relaxed">
-              Pour les commandes déjà déclarées chez Ozon sous un code <strong>VICTxxxx</strong> mais
-              qui affichent aujourd'hui un code <strong>VICTOURYxxxx</strong> : leur code Ozon d'origine
-              (conservé en base) est remis comme code de suivi.
-              <strong className="text-gray-700"> Aucune commande sans code Ozon d'origine n'est touchée.</strong>
-            </p>
-            <div className="flex items-center gap-2">
-              <button onClick={restoreOverwrittenCodes} disabled={restoreOld.running}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-40 transition">
-                {restoreOld.running ? 'Restauration…' : 'Restaurer les anciens codes'}
-              </button>
-              {restoreOld.message && <span className="text-xs text-gray-600">{restoreOld.message}</span>}
-            </div>
-            {restoreOld.lines?.length > 0 && (
-              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
-                {restoreOld.lines.join('\n')}
-              </pre>
-            )}
-          </div>
-
-          {/* Renumérotation VICTOURY des commandes en cours */}
-          <div className="border-t border-gray-100 pt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-700">Renuméroter « À Confirmer » et « En Suivi » en VICTOURY</p>
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              Donne aux commandes de ces deux onglets les plus petits numéros
-              <strong> VICTOURY</strong> libres, dans l'ordre d'ajout (la plus ancienne d'abord).
-              <strong className="text-gray-700"> Les colis déjà validés/expédiés ne sont jamais touchés</strong> (leur
-              code est connu du transporteur), pas plus que les codes « MIMA » ni un numéro
-              déjà utilisé par une autre commande.
+              Récupère la liste des colis chez Ozon et remet, sur chaque commande, le code
+              d'envoi <strong>réellement enregistré chez le transporteur</strong> (correspondance
+              par téléphone). Ozon fait foi : c'est son code qui est écrit dans l'application.
+              <strong className="text-gray-700"> Un numéro portant plusieurs colis chez Ozon est ignoré</strong> (impossible
+              de savoir lequel correspond) et signalé dans le rapport.
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   if (window.confirm(
-                    "Renuméroter les commandes « À Confirmer » et « En Suivi » en VICTOURY ?\n\n"
-                    + "• Les colis déjà expédiés ne sont PAS touchés\n"
-                    + "• Les codes MIMA ne sont PAS touchés\n\n"
-                    + "Fermez l'application sur les autres appareils avant de continuer.\n"
-                    + "Cette action est définitive."
-                  )) renumberActiveOrders();
+                    "Importer les codes de suivi depuis Ozon ?\n\n"
+                    + "Chaque commande reprend le code que le transporteur lui connaît.\n"
+                    + "Fermez l'application sur les autres appareils avant de continuer."
+                  )) importOzonCodes();
                 }}
-                disabled={renum.running}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-40 transition">
-                {renum.running ? 'Renumérotation…' : 'Renuméroter en VICTOURY'}
+                disabled={ozImport.running || !auzone.customerId || !auzone.apiKey}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-40 transition">
+                {ozImport.running ? 'Import…' : 'Importer les codes depuis Ozon'}
               </button>
-              {renum.message && <span className="text-xs text-gray-600">{renum.message}</span>}
+              {ozImport.message && <span className="text-xs text-gray-600">{ozImport.message}</span>}
             </div>
-            {renum.lines?.length > 0 && (
+            {ozImport.lines?.length > 0 && (
               <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
-                {renum.lines.join('\n')}
-              </pre>
-            )}
-          </div>
-
-          {/* Correction des codes en double */}
-          <div className="border-t border-gray-100 pt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-700">Corriger les codes de suivi en double</p>
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              Quand un même code est porté par plusieurs commandes, Ozon indique à qui il
-              appartient réellement : cette commande garde le code, les autres reçoivent un
-              nouveau numéro libre (jamais un numéro déjà utilisé).
-              <strong className="text-gray-700"> Les codes « MIMA » sont exclus.</strong>
-            </p>
-            <div className="flex items-center gap-2">
-              <button onClick={fixDuplicateCodes} disabled={dupFix.running}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-40 transition">
-                {dupFix.running ? 'Correction…' : 'Corriger les doublons'}
-              </button>
-              {dupFix.message && <span className="text-xs text-gray-600">{dupFix.message}</span>}
-            </div>
-          </div>
-
-          {/* File d'attente hors-ligne : des instantanés périmés peuvent réécrire
-              d'anciennes valeurs (codes de suivi qui « reviennent »). */}
-          <div className="border-t border-gray-100 pt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-700">Vider la file d'attente de synchronisation</p>
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              À utiliser si des modifications reviennent à leur ancienne valeur après un
-              rechargement : d'anciennes copies en attente sont alors réécrites en base.
-            </p>
-            <div className="flex items-center gap-2">
-              <button onClick={async () => {
-                try {
-                  const { clearSyncQueue } = await import('../lib/offlineStore');
-                  await clearSyncQueue();
-                  setQueueMsg('✅ File d\'attente vidée.');
-                } catch (e) { setQueueMsg('Erreur : ' + (e?.message || 'échec')); }
-              }}
-                className="px-4 py-2 rounded-lg bg-gray-800 text-white text-xs font-medium hover:bg-gray-900 transition">
-                Vider la file
-              </button>
-              {queueMsg && <span className="text-xs text-gray-600">{queueMsg}</span>}
-            </div>
-          </div>
-
-          {/* Diagnostic : montre ce que contient RÉELLEMENT la base pour un doublon */}
-          <div className="border-t border-gray-100 pt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-700">Diagnostic des doublons</p>
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              Lit la base et affiche, pour le premier code en double, les commandes
-              concernées avec leur date de mise à jour. Aucune écriture.
-            </p>
-            <div className="flex items-center gap-2">
-              <button onClick={runDupDiagnostic} disabled={diag.running}
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition">
-                {diag.running ? 'Lecture…' : 'Diagnostic'}
-              </button>
-            </div>
-            {diag.lines.length > 0 && (
-              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
-                {diag.lines.join('\n')}
+                {ozImport.lines.join('\n')}
               </pre>
             )}
           </div>

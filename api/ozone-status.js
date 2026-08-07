@@ -56,14 +56,17 @@ export default async function handler(req, res) {
   // (?phones=06..,06..). Sert à retrouver le code d'envoi d'une commande dont
   // le code local a été écrasé. Un téléphone portant plusieurs colis est
   // signalé « ambigu » et jamais deviné.
+  const listMode = String(req.query.list || '') === '1';
   const phonesRaw = (req.query.phones || '').toString().trim();
   const queries = phonesRaw
     ? phonesRaw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 40)
     : batchRaw
       ? batchRaw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 40)
       : [(req.query.code || req.query.phone || '').toString().trim()].filter(Boolean);
-  if (!queries.length) return res.status(400).json({ error: 'code, phone or codes required' });
-  if (queries.some(q => !/^[A-Za-z0-9]{3,30}$/.test(q))) return res.status(400).json({ error: 'Format invalide' });
+  if (!listMode) {
+    if (!queries.length) return res.status(400).json({ error: 'code, phone or codes required' });
+    if (queries.some(q => !/^[A-Za-z0-9]{3,30}$/.test(q))) return res.status(400).json({ error: 'Format invalide' });
+  }
 
   const EMAIL = process.env.OZONE_EMAIL;
   const PASS = process.env.OZONE_PASS;
@@ -133,7 +136,7 @@ export default async function handler(req, res) {
     //    colonnes, filtres et plage de dates obligatoire sur parcel_last_update.
     const fEnd = new Date(Date.now() + 2 * 86400000);   // +2 jours
     const fStart = new Date(Date.now() - 730 * 86400000); // -2 ans (large)
-    async function queryParcels(query) {
+    async function queryParcels(query, start = 0, length = 10) {
       const params = new URLSearchParams();
       params.append('draw', '1');
       DT_COLUMNS.forEach((c, i) => {
@@ -144,8 +147,8 @@ export default async function handler(req, res) {
         params.append(`columns[${i}][search][value]`, '');
         params.append(`columns[${i}][search][regex]`, 'false');
       });
-      params.append('start', '0');
-      params.append('length', '10');
+      params.append('start', String(start));
+      params.append('length', String(length));
       params.append('search[value]', query);
       params.append('search[regex]', 'false');
       params.append('filter_situation', '0');
@@ -218,6 +221,37 @@ export default async function handler(req, res) {
         results.push({ q, code: r.code, ambiguous: r.ambiguous, status: r.status || null });
       }
       return res.json({ results, source: 'ozone' });
+    }
+
+    /* Mode INVENTAIRE : renvoie une page de colis (code + téléphone), pour que
+       le client reconstitue lui-même la correspondance téléphone → code.
+       Interroger Ozon commande par commande imposerait une connexion par appel :
+       impraticable sur des milliers de commandes. */
+    if (listMode) {
+      const start = Math.max(0, parseInt(req.query.start || '0', 10) || 0);
+      const length = Math.min(200, Math.max(1, parseInt(req.query.length || '100', 10) || 100));
+      const pr = await queryParcels('', start, length);
+      if (!pr.ok || !pr.text.trim()) return res.status(502).json({ error: 'Réponse Ozon vide' });
+      let data;
+      try { data = JSON.parse(pr.text); } catch { return res.status(502).json({ error: 'Réponse Ozon illisible' }); }
+      const rows = data.aaData || data.data || [];
+      const strip = (v) => String(v || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').trim();
+      const parcels = rows.map(r => {
+        const codeRaw = strip(r.PARCEL_CODE);
+        const m = codeRaw.match(/^[A-Za-z0-9_-]{3,30}/);
+        // Le téléphone n'a pas de colonne dédiée : on le repère dans la ligne.
+        const phoneM = strip(JSON.stringify(r)).match(/0[5-7]\d{8}/);
+        return {
+          code: m ? m[0] : null,
+          phone: phoneM ? phoneM[0] : null,
+          status: pickStatus(r.PARCEL_STATUT) || null,
+        };
+      }).filter(p => p.code);
+      return res.json({
+        parcels,
+        total: data.recordsTotal ?? data.iTotalRecords ?? null,
+        start, length, source: 'ozone',
+      });
     }
 
     // Lot → tableau de résultats. Requête unique → objet simple (compat).
