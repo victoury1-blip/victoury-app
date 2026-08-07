@@ -1,3 +1,5 @@
+import { cloudSet } from './cloudSettings';
+
 /* ── Nouvelle série : VICTOURYxxxx ──────────────────────────────────────────
  * L'ancienne série VICTxxxx a accumulé un historique de doublons et de
  * numéros aberrants (incident de renumérotage) : chaque commande qui en
@@ -11,12 +13,23 @@
  */
 const NEW_PREFIX = 'VICTOURY';
 
-/* Numéros VICTOURY déjà en circulation, connus de CETTE session (toutes
- * commandes rencontrées, même après suppression) : sert uniquement à éviter
- * qu'un numéro tout juste généré ne soit reproposé avant que la commande soit
- * enregistrée en base. Ce n'est PAS un plancher — contrairement à l'ancienne
- * série, un numéro libéré par une suppression est réutilisé. */
-let _seenThisSession = new Set();
+/* Plus haut numéro DÉJÀ ÉMIS. La numérotation ne revient jamais en arrière :
+ * un numéro libéré (commande supprimée, ou code remplacé par celui d'Ozon) n'est
+ * pas redonné. Sans ce repère, une commande récente pouvait recevoir un petit
+ * numéro devenu libre et se retrouver hors d'ordre par rapport à sa date.
+ * Conservé localement ET dans le cloud pour que deux appareils n'émettent pas
+ * le même numéro chacun de leur côté. */
+const HIGH_WATER_KEY = 'victoury_seq_counter';
+
+function readHighWater() {
+  const n = parseInt(localStorage.getItem(HIGH_WATER_KEY) || '0', 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function saveHighWater(n) {
+  try { localStorage.setItem(HIGH_WATER_KEY, String(n)); } catch { /* quota */ }
+  cloudSet(HIGH_WATER_KEY, n);
+}
 
 function victouryNumsIn(orders) {
   const nums = new Set();
@@ -34,19 +47,23 @@ export function isVictCode(s) {
   return /^VICT(OURY)?\d+$/i.test(String(s || '').trim());
 }
 
-/** Numéro VICTOURY libre le plus petit parmi les commandes ACTIVES fournies.
- *  Une commande supprimée n'apparaît plus dans `orders` -> son numéro est
- *  automatiquement réutilisé par la prochaine commande créée. */
+/** Numéro VICTOURY SUIVANT : toujours au-dessus de tout ce qui a déjà été émis.
+ *  Les numéros se suivent donc dans l'ordre des commandes, et aucun n'est jamais
+ *  réattribué — y compris après une suppression ou un alignement sur Ozon. */
 export function generateVictId(orders) {
   const used = victouryNumsIn(orders);
-  // Un numéro déjà porté par une commande est suivi par `used` : le garder en
-  // plus dans la réservation de session empêcherait de le réutiliser après une
-  // suppression. On ne réserve donc que ce qui n'est pas encore enregistré.
-  for (const n of _seenThisSession) if (used.has(n)) _seenThisSession.delete(n);
-  let n = 1;
-  while (used.has(n) || _seenThisSession.has(n)) n++;
-  _seenThisSession.add(n);
+  const maxUsed = used.size ? Math.max(...used) : 0;
+  const n = Math.max(maxUsed, readHighWater()) + 1;
+  saveHighWater(n);
   return NEW_PREFIX + String(n).padStart(4, '0');
+}
+
+/** Aligne le repère sur les commandes chargées (au démarrage). Ne le fait
+ *  jamais redescendre : il ne peut que monter. */
+export function initVictCounter(orders) {
+  const used = victouryNumsIn(orders);
+  const maxUsed = used.size ? Math.max(...used) : 0;
+  if (maxUsed > readHighWater()) saveHighWater(maxUsed);
 }
 
 /* ── Ancienne série : conservée pour les commandes déjà numérotées ──────────
