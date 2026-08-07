@@ -8,13 +8,13 @@ const withCode = (code) => ({ id: 'WC-' + code, trackingNumber: code });
 // Le module garde en mémoire les numéros réservés pendant la session : chaque
 // test doit partir d'un module neuf, sinon les réservations de l'un faussent
 // le suivant.
-let generateVictId, isVictCode;
+let generateVictId, isVictCode, setNextNumber;
 
 describe('numérotation VICTOURY', () => {
   beforeEach(async () => {
     localStorage.clear();
     vi.resetModules();
-    ({ generateVictId, isVictCode } = await import('../lib/victId.js'));
+    ({ generateVictId, isVictCode, setNextNumber } = await import('../lib/victId.js'));
   });
 
   it('reconnaît les deux séries de codes', () => {
@@ -97,6 +97,23 @@ describe('numérotation VICTOURY', () => {
       { id: 'WC-3', trackingNumber: 'VICTOURY0050', status: 'livre', validated: true },
     ];
     expect(generateVictId(orders)).toBe('VICTOURY0051');
+  });
+
+  it('respecte le prochain numéro réglé, malgré un code erroné resté ailleurs', () => {
+    // Un VICTOURY0145 oublié en « En Suivi » projetait la série à 0146.
+    const orders = [
+      { id: 'WC-1', trackingNumber: 'VICTOURY0050', status: 'nouveau' },
+      { id: 'WC-2', trackingNumber: 'VICTOURY0145', status: 'pas_rep_1' },
+    ];
+    setNextNumber(51);
+    expect(generateVictId(orders)).toBe('VICTOURY0051');
+    expect(generateVictId(orders)).toBe('VICTOURY0052');
+  });
+
+  it('saute un numéro déjà pris même avec un point de départ réglé', () => {
+    const orders = [{ id: 'WC-1', trackingNumber: 'VICTOURY0051', status: 'livre', validated: true }];
+    setNextNumber(51);
+    expect(generateVictId(orders)).toBe('VICTOURY0052');
   });
 
   it('émet des numéros distincts à la suite', () => {

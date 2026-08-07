@@ -10,6 +10,7 @@ import {
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
+import { readNextNumber, setNextNumber } from '../lib/victId';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -463,6 +464,8 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      Ozon, et on remet ce code sur la commande correspondante. Aucun effacement. */
 
   const [ozImport, setOzImport] = useState({ running: false, message: '', lines: [] });
+  const [nextNum, setNextNum] = useState(() => String(readNextNumber() || ''));
+  const [nextNumMsg, setNextNumMsg] = useState('');
 
   /* ── Import des codes de suivi réels depuis Ozon (action MANUELLE) ──
      Ozon est la source de vérité : c'est lui qui connaît le code sous lequel
@@ -1103,6 +1106,44 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               <Save size={12} /> Enregistrer
             </button>
             {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
+          </div>
+
+          {/* Point de départ de la série VICTOURY */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Prochain numéro de la série VICTOURY</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Numéro que recevra la prochaine commande. Laissez vide pour que l'application
+              continue après le plus grand numéro existant.
+              <strong className="text-gray-700"> Un numéro déjà utilisé est automatiquement sauté</strong> :
+              aucun doublon n'est possible.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-mono">VICTOURY</span>
+              <input
+                type="number" min="1" value={nextNum}
+                onChange={(e) => { setNextNum(e.target.value); setNextNumMsg(''); }}
+                placeholder="auto"
+                className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              <button
+                onClick={() => {
+                  const v = parseInt(nextNum, 10);
+                  if (!nextNum.trim()) {
+                    try { localStorage.removeItem('victoury_next_number'); } catch {}
+                    cloudSet('victoury_next_number', 0);
+                    setNextNumMsg('✅ Automatique : la série suit le plus grand numéro existant.');
+                    return;
+                  }
+                  if (!Number.isFinite(v) || v < 1) { setNextNumMsg('Numéro invalide.'); return; }
+                  const saved = setNextNumber(v);
+                  setNextNum(String(saved));
+                  setNextNumMsg(`✅ La prochaine commande recevra VICTOURY${String(saved).padStart(4, '0')}.`);
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-800 text-white text-xs font-medium hover:bg-gray-900 transition">
+                Enregistrer
+              </button>
+              {nextNumMsg && <span className="text-xs text-gray-600">{nextNumMsg}</span>}
+            </div>
           </div>
 
           {/* Import des codes de suivi réels depuis Ozon */}

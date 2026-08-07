@@ -1,4 +1,5 @@
 import { COLIS_PIPELINE_SET } from '../data/colisPipeline';
+import { cloudSet } from './cloudSettings';
 
 /* ── Nouvelle série : VICTOURYxxxx ──────────────────────────────────────────
  * L'ancienne série VICTxxxx a accumulé un historique de doublons et de
@@ -72,9 +73,30 @@ export function isVictCode(s) {
   return /^VICT(OURY)?\d+$/i.test(String(s || '').trim());
 }
 
-/** Numéro VICTOURY SUIVANT : au-dessus du plus grand numéro RÉELLEMENT porté par
- *  une commande. Les numéros suivent donc l'ordre des commandes, et la série se
- *  recale automatiquement si des numéros erronés ont été corrigés. */
+/* Point de départ EXPLICITE de la série, réglable dans Réglages.
+ * Déduire le prochain numéro du maximum existant rend la série otage du moindre
+ * code erroné oublié dans un onglet : un seul VICTOURY0145 restant suffit à
+ * projeter les nouvelles commandes à 0146. Avec un point de départ explicite,
+ * la série est celle que vous décidez, et une valeur erronée se corrige à un
+ * seul endroit au lieu de devoir retrouver la commande fautive. */
+const NEXT_KEY = 'victoury_next_number';
+
+/** Prochain numéro réglé manuellement, ou 0 si aucun. */
+export function readNextNumber() {
+  const n = parseInt(localStorage.getItem(NEXT_KEY) || '0', 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Définit le prochain numéro de la série (Réglages). */
+export function setNextNumber(n) {
+  const v = Math.max(1, parseInt(n, 10) || 1);
+  try { localStorage.setItem(NEXT_KEY, String(v)); } catch { /* quota */ }
+  cloudSet(NEXT_KEY, v);
+  return v;
+}
+
+/** Numéro VICTOURY SUIVANT. Part du point de départ réglé s'il existe, sinon de
+ *  la série visible, et saute tout numéro déjà utilisé (aucun doublon). */
 export function generateVictId(orders) {
   const used = victouryNumsIn(orders);          // tous les numéros pris
   const seriesMax = seriesMaxIn(orders);        // où en est la série visible
@@ -85,8 +107,11 @@ export function generateVictId(orders) {
   _issuedThisSession = _issuedThisSession.filter(n => !used.has(n) && n > seriesMax);
   const maxPending = _issuedThisSession.length ? Math.max(..._issuedThisSession) : 0;
   // On repart de la série en cours, en sautant tout numéro déjà utilisé ailleurs.
-  let n = Math.max(seriesMax, maxPending) + 1;
+  const explicit = readNextNumber();
+  let n = explicit || Math.max(seriesMax, maxPending) + 1;
+  if (explicit && maxPending >= n) n = maxPending + 1;
   while (used.has(n) || _issuedThisSession.includes(n)) n++;
   _issuedThisSession.push(n);
+  if (explicit) setNextNumber(n + 1);
   return NEW_PREFIX + String(n).padStart(4, '0');
 }
