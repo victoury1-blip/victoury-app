@@ -1,3 +1,5 @@
+import { COLIS_PIPELINE_SET } from '../data/colisPipeline';
+
 /* ── Nouvelle série : VICTOURYxxxx ──────────────────────────────────────────
  * L'ancienne série VICTxxxx a accumulé un historique de doublons et de
  * numéros aberrants (incident de renumérotage) : chaque commande qui en
@@ -26,15 +28,43 @@ let _issuedThisSession = [];
    l'erreur qu'on vient justement de réparer. */
 let _lastMaxUsed = 0;
 
+function numOf(val) {
+  const m = String(val || '').match(/^VICTOURY(\d+)$/i);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/** Tous les numéros VICTOURY en circulation — sert à ne jamais créer de doublon. */
 function victouryNumsIn(orders) {
   const nums = new Set();
   for (const o of orders || []) {
     for (const val of [o.id, o.trackingNumber]) {
-      const m = String(val || '').match(/^VICTOURY(\d+)$/i);
-      if (m) nums.add(parseInt(m[1], 10));
+      const n = numOf(val);
+      if (n) nums.add(n);
     }
   }
   return nums;
+}
+
+/* Une commande déjà remise au transporteur (Liste des Colis) porte souvent un
+ * code hérité, parfois très au-dessus de la série en cours. La faire entrer dans
+ * le calcul du prochain numéro projetait la série loin devant : une commande
+ * suivant 0048 recevait 0146. Ces commandes sont donc exclues du CALCUL — mais
+ * leurs numéros restent réservés, pour ne pas créer de doublon. */
+function inColisList(o) {
+  return COLIS_PIPELINE_SET.has(o?.status) || (!!o?.trackingNumber && !!o?.validated);
+}
+
+/** Plus grand numéro de la série EN COURS (hors Liste des Colis). */
+function seriesMaxIn(orders) {
+  let max = 0;
+  for (const o of orders || []) {
+    if (inColisList(o)) continue;
+    for (const val of [o.id, o.trackingNumber]) {
+      const n = numOf(val);
+      if (n > max) max = n;
+    }
+  }
+  return max;
 }
 
 /** Un code déjà valide (ancienne série VICT OU nouvelle série VICTOURY). */
@@ -46,15 +76,17 @@ export function isVictCode(s) {
  *  une commande. Les numéros suivent donc l'ordre des commandes, et la série se
  *  recale automatiquement si des numéros erronés ont été corrigés. */
 export function generateVictId(orders) {
-  const used = victouryNumsIn(orders);
-  const maxUsed = used.size ? Math.max(...used) : 0;
-  if (maxUsed < _lastMaxUsed) _issuedThisSession = [];
-  _lastMaxUsed = maxUsed;
+  const used = victouryNumsIn(orders);          // tous les numéros pris
+  const seriesMax = seriesMaxIn(orders);        // où en est la série visible
+  if (seriesMax < _lastMaxUsed) _issuedThisSession = [];
+  _lastMaxUsed = seriesMax;
   // On ignore les réservations devenues visibles dans la liste : seules comptent
   // celles encore en attente d'enregistrement.
-  _issuedThisSession = _issuedThisSession.filter(n => !used.has(n) && n > maxUsed);
+  _issuedThisSession = _issuedThisSession.filter(n => !used.has(n) && n > seriesMax);
   const maxPending = _issuedThisSession.length ? Math.max(..._issuedThisSession) : 0;
-  const n = Math.max(maxUsed, maxPending) + 1;
+  // On repart de la série en cours, en sautant tout numéro déjà utilisé ailleurs.
+  let n = Math.max(seriesMax, maxPending) + 1;
+  while (used.has(n) || _issuedThisSession.includes(n)) n++;
   _issuedThisSession.push(n);
   return NEW_PREFIX + String(n).padStart(4, '0');
 }

@@ -79,6 +79,26 @@ describe('numérotation VICTOURY', () => {
     expect(resolve({}, { id: 'WC-2074', trackingNumber: '' })).toBe('WC-2074');
   });
 
+  it('ignore les codes de la Liste des Colis pour calculer le suivant', () => {
+    // Un colis expédié porte un code hérité très au-dessus de la série : il ne
+    // doit pas projeter la numérotation en avant (0048 -> 0146).
+    const orders = [
+      { id: 'WC-1', trackingNumber: 'VICTOURY0048', status: 'nouveau' },
+      { id: 'WC-2', trackingNumber: 'VICTOURY0145', status: 'livre', validated: true },
+    ];
+    expect(generateVictId(orders)).toBe('VICTOURY0049');
+  });
+
+  it('saute un numéro déjà porté par un colis, sans créer de doublon', () => {
+    const orders = [
+      { id: 'WC-1', trackingNumber: 'VICTOURY0048', status: 'nouveau' },
+      // 0049 et 0050 sont déjà pris par des colis expédiés.
+      { id: 'WC-2', trackingNumber: 'VICTOURY0049', status: 'expedier', validated: true },
+      { id: 'WC-3', trackingNumber: 'VICTOURY0050', status: 'livre', validated: true },
+    ];
+    expect(generateVictId(orders)).toBe('VICTOURY0051');
+  });
+
   it('émet des numéros distincts à la suite', () => {
     const orders = [];
     const a = generateVictId(orders);
