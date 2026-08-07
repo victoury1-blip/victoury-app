@@ -171,7 +171,10 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
       for (const o of orders) {
         // Ancienne série (VICT) OU nouvelle (VICTOURY) : dans les deux cas, la
         // commande a déjà un code, on ne lui en donne pas un second.
-        const alreadyVict = isVictCode(o.trackingNumber) || isVictCode(o.id);
+        // On teste la PRÉSENCE d'un code, pas sa forme : une commande qui porte
+        // déjà un code du transporteur (WC-1959, MIMA3350…) n'en reçoit pas un
+        // second, sinon la confirmation écraserait le code connu d'Ozon.
+        const alreadyVict = !!String(o.trackingNumber || '').trim() || isVictCode(o.id);
         if (!selected.includes(o.id) || alreadyVict) continue;
         // Plus petit numéro VICTOURY libre parmi les commandes actives.
         newIds.set(o.id, generateVictId(orders));
@@ -1354,7 +1357,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             // livraison (VICT_ON_STATUS) et qu'elle n'en a pas déjà un — ni dans
             // trackingNumber ni dans l'id. Généré AVANT setOrders pour garder l'updater pur.
             const target = orders.find(o => o.id === orderId);
-            const alreadyVict = isVictCode(target?.trackingNumber) || isVictCode(target?.id);
+            const alreadyVict = !!String(target?.trackingNumber || '').trim() || isVictCode(target?.id);
             const needsVict = VICT_ON_STATUS.has(newStatus) && !alreadyVict;
             const newVict = needsVict ? generateVictId(orders) : null;
             setOrders((prev) => prev.map((o) => {
