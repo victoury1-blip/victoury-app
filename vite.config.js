@@ -9,6 +9,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 const BUILD_ID = (process.env.VERCEL_GIT_COMMIT_SHA || 'local').slice(0, 7)
   + ' · ' + new Date().toISOString().slice(0, 16).replace('T', ' ');
 
+/* Écrit /version.txt à la racine du site. Ce fichier n'est PAS mis en cache par
+   le Service Worker (son extension n'est pas dans globPatterns) : l'ouvrir dans
+   le navigateur montre donc la version réellement servie par l'hébergeur, ce qui
+   permet de distinguer « le déploiement n'a pas eu lieu » de « l'appareil sert
+   un cache périmé ». */
+const versionFilePlugin = {
+  name: 'emit-version-txt',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'version.txt', source: BUILD_ID + '\n' });
+  },
+};
+
 export default defineConfig({
   define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   test: {
@@ -18,6 +30,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    versionFilePlugin,
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'apple-touch-icon-512.png'],
