@@ -570,21 +570,36 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       // 3) Alignement : seules les différences sont écrites.
       const updates = [];
       const ambiguous = [];
+      const noParcel = [];   // commandes sans colis correspondant chez Ozon
       for (const r of rows) {
         const ph = digits(r.recipient?.phone);
         if (!ph) continue;
         if (multi.has(ph)) { ambiguous.push(`${r.tracking_number || r.id} : ${r.recipient?.name || r.id} — ${ph}`); continue; }
         const code = byPhone.get(ph);
-        if (!code) continue;
+        if (!code) {
+          // Signalé UNIQUEMENT pour les commandes censées être chez Ozon : sinon
+          // la liste contiendrait toutes les commandes jamais expédiées.
+          if (/ozon/i.test(r.recipient?.delivery || '')) {
+            noParcel.push(`${r.tracking_number || r.id} : ${r.recipient?.name || r.id} — ${ph}`);
+          }
+          continue;
+        }
         if (String(r.tracking_number || '').toUpperCase() === code.toUpperCase()) continue;
         updates.push({ id: r.id, code, from: r.tracking_number || r.id, name: r.recipient?.name || r.id });
       }
+      const noParcelLines = noParcel.length
+        ? [`Aucun colis chez Ozon pour ces ${noParcel.length} commande(s) — rien à importer :`,
+           ...noParcel.slice(0, 15).map(l => '  ' + l)]
+        : [];
 
       if (!updates.length) {
         setOzImport({
           running: false,
           message: `✅ Tout est déjà aligné sur Ozon (${byPhone.size} colis lus).`,
-          lines: ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 15).map(l => '  ' + l)] : [],
+          lines: [
+            ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 15).map(l => '  ' + l)] : []),
+            ...noParcelLines,
+          ],
         });
         return;
       }
@@ -626,6 +641,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         lines: [
           ...updates.filter(u => applied.has(u.id)).slice(0, 30).map(u => `  ${u.from} → ${u.code} : ${u.name}`),
           ...(ambiguous.length ? ['Ignorés (plusieurs colis pour le même numéro) :', ...ambiguous.slice(0, 15).map(l => '  ' + l)] : []),
+          ...noParcelLines,
         ],
       });
       if (applied.size) setTimeout(() => window.location.reload(), 3000);
