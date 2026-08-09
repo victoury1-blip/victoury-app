@@ -404,12 +404,25 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       }
       setWoo((p) => ({ ...p, testStatus: 'success', testError: `${(j.orders || []).length} commande(s) lue(s)` }));
     } catch (e) {
-      setWoo((p) => ({
-        ...p, testStatus: 'error',
-        testError: e?.name === 'AbortError'
-          ? "pas de réponse de /api/woo-orders en 30 s — la fonction serveur ne répond pas"
-          : `impossible de joindre /api/woo-orders : ${e?.message || 'réseau'}`,
-      }));
+      // La fonction serveur ne répond pas : on vérifie la seconde voie (appel
+      // direct via le rewrite), celle qu'utilise réellement la synchronisation.
+      // Si elle marche, la boutique est joignable et l'import fonctionnera.
+      const cause = e?.name === 'AbortError'
+        ? 'la fonction serveur /api/woo-orders ne répond pas'
+        : `/api/woo-orders injoignable (${e?.message || 'réseau'})`;
+      try {
+        const res = await wcFetch('/wc-api/wp-json/wc/v3/orders?status=any&per_page=1');
+        if (res.ok) {
+          setWoo((p) => ({
+            ...p, testStatus: 'success',
+            testError: `boutique joignable en direct — ${cause}, la synchronisation utilisera la voie directe`,
+          }));
+          return;
+        }
+        setWoo((p) => ({ ...p, testStatus: 'error', testError: `${cause} ; voie directe : HTTP ${res.status}` }));
+      } catch (directErr) {
+        setWoo((p) => ({ ...p, testStatus: 'error', testError: `${cause} ; voie directe : ${wooErrorText(directErr)}` }));
+      }
     } finally { clearTimeout(to); }
   }
 

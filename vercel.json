@@ -7,6 +7,14 @@
     "api/chic-proxy.js": {
       "memory": 256,
       "maxDuration": 15
+    },
+    "api/ozone-status.js": {
+      "memory": 512,
+      "maxDuration": 60
+    },
+    "api/woo-orders.js": {
+      "memory": 256,
+      "maxDuration": 30
     }
   },
   "headers": [
