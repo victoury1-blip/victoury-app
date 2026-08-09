@@ -485,13 +485,33 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const { data: { session } } = await supabase.auth.getSession();
       const auth = session?.access_token ? { headers: { Authorization: `Bearer ${session.access_token}` } } : undefined;
 
+      /* Une page peut échouer pour un aléa réseau alors que l'inventaire compte
+         des dizaines de pages : sans reprise, tout l'import est perdu. On
+         réessaie, puis on nomme la cause au lieu du « Failed to fetch » brut. */
+      const fetchPage = async (url) => {
+        let lastErr;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            return await fetch(url, auth);
+          } catch (e) {
+            lastErr = e;
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          }
+        }
+        throw new Error(
+          /failed to fetch|networkerror|load failed/i.test(lastErr?.message || '')
+            ? "connexion impossible — vérifiez le réseau, un bloqueur de publicités ou le pare-feu"
+            : (lastErr?.message || 'réseau')
+        );
+      };
+
       // 1) Inventaire Ozon, page par page.
       const PAGE = 100;
       const byPhone = new Map();      // téléphone -> code (unique)
       const multi = new Set();        // téléphones portant plusieurs colis
       let start = 0, total = null, seen = 0;
       for (let guard = 0; guard < 200; guard++) {
-        const r = await fetch(`/api/ozone-status?list=1&start=${start}&length=${PAGE}`, auth);
+        const r = await fetchPage(`/api/ozone-status?list=1&start=${start}&length=${PAGE}`);
         if (!r.ok) {
           const j = await r.json().catch(() => ({}));
           setOzImport({ running: false, message: `Lecture Ozon impossible : ${j.error || r.status}`, lines: [] });
