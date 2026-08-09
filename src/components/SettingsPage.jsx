@@ -10,7 +10,7 @@ import {
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
-import { readNextNumber, setNextNumber } from '../lib/victId';
+import { readNextNumber, setNextNumber, peekNextVictId } from '../lib/victId';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -1161,8 +1161,12 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           <div className="border-t border-gray-100 pt-3 space-y-2">
             <p className="text-xs font-semibold text-gray-700">Prochain numéro de la série VICTOURY</p>
             <p className="text-[11px] text-gray-500 leading-relaxed">
-              Numéro que recevra la prochaine commande. Laissez vide pour que l'application
-              continue après le plus grand numéro existant.
+              <span className="block mb-1 text-gray-800 font-semibold">
+                Prochaine commande : {peekNextVictId(orders)}
+              </span>
+              Laissez vide pour que l'application continue après le plus grand numéro
+              existant — un ancien code erroné resté dans un onglet suffit alors à faire
+              sauter la série. Indiquez un numéro pour fixer la suite vous-même.
               <strong className="text-gray-700"> Un numéro déjà utilisé est automatiquement sauté</strong> :
               aucun doublon n'est possible.
             </p>

@@ -95,6 +95,17 @@ export function setNextNumber(n) {
   return v;
 }
 
+/** Numéro que recevra la prochaine commande, SANS le consommer.
+ *  Sert à afficher l'état réel de la série dans Réglages : sans cela, on ne peut
+ *  pas savoir d'où elle repartira avant qu'une commande soit créée. */
+export function peekNextVictId(orders) {
+  const used = victouryNumsIn(orders);
+  const explicit = readNextNumber();
+  let n = explicit || seriesMaxIn(orders) + 1;
+  while (used.has(n)) n++;
+  return NEW_PREFIX + String(n).padStart(4, '0');
+}
+
 /** Numéro VICTOURY SUIVANT. Part du point de départ réglé s'il existe, sinon de
  *  la série visible, et saute tout numéro déjà utilisé (aucun doublon). */
 export function generateVictId(orders) {
