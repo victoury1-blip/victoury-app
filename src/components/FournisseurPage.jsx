@@ -54,6 +54,99 @@ const fieldCls = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outl
 const inputCls = `w-full ${fieldCls}`;
 
 /* ── Modal d'ajout / édition d'un article (avec tailles) ── */
+/* ── Règlements fournisseur ─────────────────────────────────────────────────
+   Une facture fournisseur se paie rarement en une fois : on enregistre chaque
+   versement (montant, date, moyen) pour savoir à tout moment ce qui reste dû. */
+const PAY_METHODS = [
+  { value: 'especes',  label: 'Espèces',  color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { value: 'virement', label: 'Virement', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { value: 'cheque',   label: 'Chèque',   color: 'bg-amber-50 text-amber-700 border-amber-200' },
+];
+const methodOf = (v) => PAY_METHODS.find(m => m.value === v) || PAY_METHODS[0];
+
+const paidOf = (f) => (f?.paiements || []).reduce((n, p) => n + (parseFloat(p.montant) || 0), 0);
+
+/** Date du jour au format jj/mm/aaaa, pour préremplir le formulaire. */
+function todayFr() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function PaiementModal({ facture, reste, onClose, onSave }) {
+  const [form, setForm] = useState({
+    montant: reste > 0 ? String(reste) : '',
+    date: todayFr(),
+    methode: 'especes',
+    note: '',
+  });
+  const montant = parseFloat(form.montant) || 0;
+  const invalide = montant <= 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900">Ajouter un versement</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{facture.ref} · reste {reste.toLocaleString('fr-FR')} DH</p>
+          </div>
+          <button onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Montant (DH)</label>
+            <input type="number" min="0" step="0.01" value={form.montant} autoFocus
+              onChange={(e) => setForm(p => ({ ...p, montant: e.target.value }))}
+              className={fieldCls + ' w-full font-bold'} placeholder="0" />
+            {montant > reste && reste >= 0 && (
+              <p className="text-[11px] text-amber-600 mt-1">Ce versement dépasse le reste dû ({reste.toLocaleString('fr-FR')} DH).</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Date</label>
+            <input value={form.date} onChange={(e) => setForm(p => ({ ...p, date: e.target.value }))}
+              className={fieldCls + ' w-full'} placeholder="jj/mm/aaaa" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Moyen de paiement</label>
+            <div className="flex gap-2">
+              {PAY_METHODS.map(m => (
+                <button key={m.value} type="button" onClick={() => setForm(p => ({ ...p, methode: m.value }))}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
+                    form.methode === m.value ? m.color : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Note (facultatif)</label>
+            <input value={form.note} onChange={(e) => setForm(p => ({ ...p, note: e.target.value }))}
+              className={fieldCls + ' w-full'} placeholder="N° de chèque, référence…" />
+          </div>
+        </div>
+
+        <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50">Annuler</button>
+          <button onClick={() => onSave({
+              id: `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`,
+              montant, date: form.date.trim() || todayFr(), methode: form.methode, note: form.note.trim(),
+            })}
+            disabled={invalide}
+            className="flex-1 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ItemModal({ item, onClose, onSave }) {
   const [form, setForm] = useState(() => item || { modele: '', couleur: '', prix: '', sizes: [{ taille: 'M', qte: '' }] });
   const u = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -179,6 +272,7 @@ export default function FournisseurPage({ orders = [] }) {
   const [search, setSearch] = useState('');
   // Factures dépliées : le contenu n'apparaît qu'au clic sur l'œil (vue façon facture).
   const [expanded, setExpanded] = useState(() => new Set());
+  const [payFacture, setPayFacture] = useState(null);
   const toggleExpand = (id) => setExpanded(prev => {
     const n = new Set(prev);
     n.has(id) ? n.delete(id) : n.add(id);
@@ -259,6 +353,21 @@ export default function FournisseurPage({ orders = [] }) {
     persist(factures.filter(f => f.id !== id));
   }
 
+  /* ── Versements ── */
+  function addPaiement(factureId, paiement) {
+    persist(factures.map(f => f.id === factureId
+      ? { ...f, paiements: [...(f.paiements || []), paiement] }
+      : f));
+    setPayFacture(null);
+  }
+
+  function deletePaiement(factureId, paiementId) {
+    if (!confirm('Supprimer ce versement ?')) return;
+    persist(factures.map(f => f.id === factureId
+      ? { ...f, paiements: (f.paiements || []).filter(p => p.id !== paiementId) }
+      : f));
+  }
+
   function deleteItem(factureId, itemId) {
     if (!confirm('Supprimer cet article ?')) return;
     persist(factures.map(f => f.id === factureId ? { ...f, items: (f.items || []).filter(i => i.id !== itemId) } : f));
@@ -318,7 +427,8 @@ export default function FournisseurPage({ orders = [] }) {
       venduTotal += stats[it.id]?.total || 0;
       venduSemaine += stats[it.id]?.semaine || 0;
     }
-    return { cout, qte, venduTotal, venduSemaine, reste: qte - venduTotal };
+    const paye = factures.reduce((n, f) => n + paidOf(f), 0);
+    return { cout, qte, venduTotal, venduSemaine, reste: qte - venduTotal, paye, du: cout - paye };
   }, [factures, stats]);
 
   const visibleFactures = useMemo(() => {
@@ -349,6 +459,9 @@ export default function FournisseurPage({ orders = [] }) {
         <SummaryCard label="Vendu (semaine)" value={totals.venduSemaine} color="text-emerald-600" />
         <SummaryCard label="Vendu (total)" value={totals.venduTotal} color="text-emerald-700" />
         <SummaryCard label="Reste" value={totals.reste} color={totals.reste < 0 ? 'text-red-600' : 'text-amber-600'} />
+        <SummaryCard label="Payé" value={`${totals.paye.toLocaleString('fr-FR')} DH`} color="text-emerald-600" />
+        <SummaryCard label="Reste à payer" value={`${totals.du.toLocaleString('fr-FR')} DH`}
+          color={totals.du > 0 ? 'text-red-600' : 'text-emerald-700'} />
       </div>
 
       <div className="relative mb-4 max-w-xs">
@@ -371,6 +484,9 @@ export default function FournisseurPage({ orders = [] }) {
           const fCout = (f.items || []).reduce((n, it) => n + itemCost(it), 0);
           const fVendu = (f.items || []).reduce((n, it) => n + (stats[it.id]?.total || 0), 0);
           const ouverte = f.status === 'ouverte';
+          const fPaye = paidOf(f);
+          const fDu = fCout - fPaye;
+          const solde = fDu <= 0 && fCout > 0;
           return (
             <div key={f.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
               {/* En-tête façon facture */}
@@ -388,6 +504,14 @@ export default function FournisseurPage({ orders = [] }) {
                     ouverte ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'
                   }`}>
                     {ouverte ? 'Ouverte' : 'Clôturée'}
+                  </span>
+                  {/* État du règlement, visible sans ouvrir la facture. */}
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
+                    solde ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : fPaye > 0 ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-red-50 text-red-600 border-red-200'
+                  }`}>
+                    {solde ? 'Soldée' : fPaye > 0 ? `Reste ${fDu.toLocaleString('fr-FR')} DH` : 'Non payée'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -409,6 +533,10 @@ export default function FournisseurPage({ orders = [] }) {
                       Rouvrir
                     </button>
                   )}
+                  <button onClick={() => setPayFacture(f)}
+                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
+                    <Plus size={13} /> Versement
+                  </button>
                   <button onClick={() => deleteFacture(f.id)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50" title="Supprimer la facture">
                     <Trash2 size={14} />
                   </button>
@@ -479,6 +607,64 @@ export default function FournisseurPage({ orders = [] }) {
                 </table>
               </div>
               )}
+
+              {/* ── Règlement de la facture ── */}
+              {expanded.has(f.id) && (
+                <div className="border-t border-gray-200 bg-gray-50/60 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Total facture</p>
+                      <p className="text-sm font-bold text-gray-800">{fCout.toLocaleString('fr-FR')} DH</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Payé</p>
+                      <p className="text-sm font-bold text-emerald-600">{fPaye.toLocaleString('fr-FR')} DH</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Reste à payer</p>
+                      <p className={`text-sm font-bold ${fDu > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                        {fDu.toLocaleString('fr-FR')} DH
+                      </p>
+                    </div>
+                    {/* Avancement du règlement, d'un coup d'œil. */}
+                    <div className="flex-1 min-w-[140px]">
+                      <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${fDu > 0 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                          style={{ width: `${fCout > 0 ? Math.min(100, Math.round((fPaye / fCout) * 100)) : 0}%` }} />
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {fCout > 0 ? Math.min(100, Math.round((fPaye / fCout) * 100)) : 0} % réglé
+                      </p>
+                    </div>
+                  </div>
+
+                  {(f.paiements || []).length === 0 ? (
+                    <p className="text-xs text-gray-400">Aucun versement enregistré.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {(f.paiements || []).map(p => {
+                        const m = methodOf(p.methode);
+                        return (
+                          <div key={p.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                            <span className="text-sm font-bold text-gray-800 w-28 shrink-0">
+                              {(parseFloat(p.montant) || 0).toLocaleString('fr-FR')} DH
+                            </span>
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${m.color}`}>
+                              {m.label}
+                            </span>
+                            <span className="text-xs text-gray-500 shrink-0">{p.date}</span>
+                            {p.note && <span className="text-xs text-gray-400 truncate">{p.note}</span>}
+                            <button onClick={() => deletePaiement(f.id, p.id)}
+                              className="ml-auto p-1.5 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Supprimer ce versement">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -488,7 +674,18 @@ export default function FournisseurPage({ orders = [] }) {
         « Vendu » = pièces sorties (Expédié, Reçu livreur, Livré, Échange). Le « Reste » (global et par taille)
         se décrémente automatiquement à chaque commande sortie correspondante (modèle + couleur + taille).
         Une facture reste ouverte tant que vous n'appuyez pas sur « Clôturer » ; l'article suivant en crée alors une nouvelle.
+        Le règlement est indépendant : ajoutez autant de versements que nécessaire (espèces, virement, chèque),
+        le reste à payer se met à jour tout seul.
       </p>
+
+      {payFacture && (
+        <PaiementModal
+          facture={payFacture}
+          reste={(payFacture.items || []).reduce((n, it) => n + itemCost(it), 0) - paidOf(payFacture)}
+          onClose={() => setPayFacture(null)}
+          onSave={(paiement) => addPaiement(payFacture.id, paiement)}
+        />
+      )}
 
       {modalOpen && (
         <ItemModal
