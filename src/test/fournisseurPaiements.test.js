@@ -13,6 +13,14 @@ const facture = (paiements) => ({
 });
 
 describe('règlement fournisseur', () => {
+  it('le total ne dépend que des articles saisis, jamais des commandes', () => {
+    // La page est autonome : une commande expédiée ou livrée ne doit rien
+    // retrancher aux quantités ni au coût de la facture fournisseur.
+    const f = facture([]);
+    expect(totalOf(f)).toBe(2500);
+    expect(itemQty(f.items[0])).toBe(25);
+  });
+
   it('calcule le total de la facture depuis les articles', () => {
     expect(totalOf(facture([]))).toBe(2500);
   });

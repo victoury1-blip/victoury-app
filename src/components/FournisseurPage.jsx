@@ -10,45 +10,13 @@ const LEGACY_KEY = 'victoury_fournisseur'; // ancienne liste plate d'articles
 const SIZE_OPTIONS = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
 
 /* Statuts « sortis » : la pièce a quitté le stock (expédiée / livrée / échangée). */
-const SOLD_STATUSES = new Set(['expedier', 'recu_livreur', 'livre', 'change']);
 
 const norm = (s) => (s || '').toString().toLowerCase().trim();
-
-/* Parse une date "JJ/MM/AAAA HH:mm" (fr-MA) en objet Date. */
-function parseFrDate(str) {
-  if (!str) return null;
-  const m = String(str).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (!m) return null;
-  const dt = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
-  return isNaN(dt.getTime()) ? null : dt;
-}
-
-/* Lundi 00:00 de la semaine en cours. */
-function startOfWeek() {
-  const now = new Date();
-  const day = (now.getDay() + 6) % 7; // 0 = lundi
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - day, 0, 0, 0);
-}
 
 /* Quantité totale d'un article = somme des quantités par taille. */
 const itemQty = (it) => (it.sizes || []).reduce((n, s) => n + (parseInt(s.qte, 10) || 0), 0);
 const itemCost = (it) => (parseFloat(it.prix) || 0) * itemQty(it);
 
-/* Un produit de commande correspond-il à l'article fournisseur (modèle + couleur) ? */
-function matchProduct(prod, item) {
-  if (!prod) return false;
-  const pname = norm(prod.name);
-  const model = norm(item.modele);
-  // Un nom de produit vide ne doit JAMAIS matcher (sinon model.includes('') === true).
-  if (model && (!pname || !(pname.includes(model) || model.includes(pname)))) return false;
-  const color = norm(item.couleur);
-  if (color) {
-    const hay = `${norm(prod.name)} ${norm(prod.color)} ${norm(prod.size)}`;
-    const colors = color.split(',').map(c => c.trim()).filter(Boolean);
-    if (!colors.some(c => hay.includes(c))) return false;
-  }
-  return true;
-}
 
 const fieldCls = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300';
 const inputCls = `w-full ${fieldCls}`;
@@ -242,7 +210,7 @@ function ItemModal({ item, onClose, onSave }) {
   );
 }
 
-export default function FournisseurPage({ orders = [] }) {
+export default function FournisseurPage() {
   const toast = useToast();
 
   /* Factures fournisseur : { id, ref, date, status: 'ouverte'|'cloturee', items: [] } */
@@ -373,63 +341,15 @@ export default function FournisseurPage({ orders = [] }) {
     persist(factures.map(f => f.id === factureId ? { ...f, items: (f.items || []).filter(i => i.id !== itemId) } : f));
   }
 
-  const weekStart = useMemo(() => startOfWeek(), []);
-
-  /* Ventes par article (tous factures confondues) + détail par taille. */
-  const stats = useMemo(() => {
-    const map = {};
-    const allItems = [];
-    for (const f of factures) for (const it of (f.items || [])) { map[it.id] = { total: 0, semaine: 0, bySize: {} }; allItems.push(it); }
-    for (const o of orders) {
-      if (!SOLD_STATUSES.has(o.status)) continue;
-      const prods = (o.products && o.products.length) ? o.products : (o.product ? [o.product] : []);
-      const d = parseFrDate(o.dateUpdated) || parseFrDate(o.dateAdded);
-      const inWeek = d && d >= weekStart;
-      for (const p of prods) {
-        // Répartition FIFO : si le même modèle a été acheté sur PLUSIEURS factures
-        // fournisseur, on épuise d'abord la plus ancienne. Sans cela, tout était
-        // imputé au premier article (reste négatif) et les autres restaient à 100 %.
-        let q = parseInt(p.qty, 10) || 1;
-        const sz = (p.size || '').toString().trim().toUpperCase();
-        const candidates = allItems.filter(it => matchProduct(p, it));
-        for (const item of candidates) {
-          if (q <= 0) break;
-          // Capacité restante : sur la taille précise si connue, sinon sur le total.
-          const cap = sz
-            ? (parseInt((item.sizes || []).find(x => (x.taille || '').toUpperCase() === sz)?.qte, 10) || 0)
-              - (map[item.id].bySize[sz] || 0)
-            : itemQty(item) - map[item.id].total;
-          const take = Math.max(0, Math.min(q, cap));
-          if (!take) continue;
-          q -= take;
-          map[item.id].total += take;
-          if (inWeek) map[item.id].semaine += take;
-          if (sz) map[item.id].bySize[sz] = (map[item.id].bySize[sz] || 0) + take;
-        }
-        // Vendu au-delà du stock acheté : on l'impute quand même au 1er article
-        // correspondant pour que le « reste » négatif reste visible.
-        if (q > 0 && candidates.length) {
-          const item = candidates[0];
-          map[item.id].total += q;
-          if (inWeek) map[item.id].semaine += q;
-          if (sz) map[item.id].bySize[sz] = (map[item.id].bySize[sz] || 0) + q;
-        }
-      }
-    }
-    return map;
-  }, [factures, orders, weekStart]);
-
   const totals = useMemo(() => {
-    let cout = 0, qte = 0, venduTotal = 0, venduSemaine = 0;
+    let cout = 0, qte = 0;
     for (const f of factures) for (const it of (f.items || [])) {
       cout += itemCost(it);
       qte += itemQty(it);
-      venduTotal += stats[it.id]?.total || 0;
-      venduSemaine += stats[it.id]?.semaine || 0;
     }
     const paye = factures.reduce((n, f) => n + paidOf(f), 0);
-    return { cout, qte, venduTotal, venduSemaine, reste: qte - venduTotal, paye, du: cout - paye };
-  }, [factures, stats]);
+    return { cout, qte, paye, du: cout - paye };
+  }, [factures]);
 
   const visibleFactures = useMemo(() => {
     const q = norm(search);
@@ -456,9 +376,6 @@ export default function FournisseurPage({ orders = [] }) {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
         <SummaryCard label="Coût total" value={`${totals.cout.toLocaleString('fr-FR')} DH`} color="text-gray-800" />
         <SummaryCard label="Qté prise" value={totals.qte} color="text-blue-600" />
-        <SummaryCard label="Vendu (semaine)" value={totals.venduSemaine} color="text-emerald-600" />
-        <SummaryCard label="Vendu (total)" value={totals.venduTotal} color="text-emerald-700" />
-        <SummaryCard label="Reste" value={totals.reste} color={totals.reste < 0 ? 'text-red-600' : 'text-amber-600'} />
         <SummaryCard label="Payé" value={`${totals.paye.toLocaleString('fr-FR')} DH`} color="text-emerald-600" />
         <SummaryCard label="Reste à payer" value={`${totals.du.toLocaleString('fr-FR')} DH`}
           color={totals.du > 0 ? 'text-red-600' : 'text-emerald-700'} />
@@ -482,7 +399,6 @@ export default function FournisseurPage({ orders = [] }) {
         {visibleFactures.map(f => {
           const fQte = (f.items || []).reduce((n, it) => n + itemQty(it), 0);
           const fCout = (f.items || []).reduce((n, it) => n + itemCost(it), 0);
-          const fVendu = (f.items || []).reduce((n, it) => n + (stats[it.id]?.total || 0), 0);
           const ouverte = f.status === 'ouverte';
           const fPaye = paidOf(f);
           const fDu = fCout - fPaye;
@@ -515,7 +431,7 @@ export default function FournisseurPage({ orders = [] }) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">{fQte} pcs · <span className="font-bold text-gray-700">{fCout.toLocaleString('fr-FR')} DH</span> · vendu {fVendu}</span>
+                  <span className="text-xs text-gray-500">{fQte} pcs · <span className="font-bold text-gray-700">{fCout.toLocaleString('fr-FR')} DH</span></span>
                   {ouverte ? (
                     <>
                       <button onClick={() => { setModalItem(null); setTargetFactureId(f.id); setModalOpen(true); }}
@@ -546,22 +462,20 @@ export default function FournisseurPage({ orders = [] }) {
               {/* Lignes de la facture — visibles seulement quand la facture est ouverte à l'œil */}
               {expanded.has(f.id) && (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[820px]">
+                <table className="w-full text-sm min-w-[620px]">
                   <thead className="bg-white border-b border-gray-200">
                     <tr>
-                      {['Modèle', 'Couleur(s)', 'Tailles / Qté', 'Prix U.', 'Qté', 'Total', 'Vendu (sem.)', 'Vendu (tot.)', 'Reste', ''].map(h => (
+                      {['Modèle', 'Couleur(s)', 'Tailles / Qté', 'Prix U.', 'Qté', 'Total', ''].map(h => (
                         <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(f.items || []).length === 0 && (
-                      <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-400 text-xs">Facture vide — ajoutez un article.</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400 text-xs">Facture vide — ajoutez un article.</td></tr>
                     )}
                     {(f.items || []).map((it, idx) => {
-                      const s = stats[it.id] || { total: 0, semaine: 0, bySize: {} };
                       const q = itemQty(it);
-                      const reste = q - s.total;
                       return (
                         <tr key={it.id} className={idx % 2 ? 'bg-gray-50' : 'bg-white'}>
                           <td className="px-4 py-3 font-semibold text-gray-800">{it.modele}</td>
@@ -569,29 +483,18 @@ export default function FournisseurPage({ orders = [] }) {
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
                               {(it.sizes || []).length === 0 && <span className="text-gray-300 text-xs">—</span>}
-                              {(it.sizes || []).map((sz, i) => {
-                                const vendu = s.bySize[(sz.taille || '').toUpperCase()] || 0;
-                                const rest = (parseInt(sz.qte, 10) || 0) - vendu;
-                                return (
-                                  <span key={i}
-                                    className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border whitespace-nowrap ${
-                                      rest < 0 ? 'bg-red-50 text-red-600 border-red-200'
-                                        : rest === 0 ? 'bg-gray-100 text-gray-500 border-gray-200'
-                                          : 'bg-blue-50 text-blue-700 border-blue-200'
-                                    }`}
-                                    title={`Pris ${sz.qte} · vendu ${vendu} · reste ${rest}`}>
-                                    {sz.taille} : {rest}/{sz.qte}
-                                  </span>
-                                );
-                              })}
+                              {(it.sizes || []).map((sz, i) => (
+                                <span key={i}
+                                  className="text-[11px] px-2 py-0.5 rounded-full font-semibold border whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200"
+                                  title={`Quantité prise : ${sz.qte}`}>
+                                  {sz.taille} : {sz.qte}
+                                </span>
+                              ))}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{(it.prix || 0).toLocaleString('fr-FR')} DH</td>
                           <td className="px-4 py-3 text-blue-600 font-semibold">{q}</td>
                           <td className="px-4 py-3 text-gray-800 font-bold whitespace-nowrap">{itemCost(it).toLocaleString('fr-FR')} DH</td>
-                          <td className="px-4 py-3 text-emerald-600 font-semibold">{s.semaine}</td>
-                          <td className="px-4 py-3 text-emerald-700 font-semibold">{s.total}</td>
-                          <td className={`px-4 py-3 font-bold ${reste < 0 ? 'text-red-600' : 'text-amber-600'}`}>{reste}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
                               <button onClick={() => { setModalItem(it); setTargetFactureId(f.id); setModalOpen(true); }}
@@ -671,11 +574,10 @@ export default function FournisseurPage({ orders = [] }) {
       </div>
 
       <p className="text-xs text-gray-400 mt-4">
-        « Vendu » = pièces sorties (Expédié, Reçu livreur, Livré, Échange). Le « Reste » (global et par taille)
-        se décrémente automatiquement à chaque commande sortie correspondante (modèle + couleur + taille).
+        Cette page ne suit QUE les achats fournisseur : ce qui a été pris, à quel prix, et ce qui a été réglé.
+        Les commandes et les livraisons n'y touchent pas — les quantités restent telles que vous les avez saisies.
         Une facture reste ouverte tant que vous n'appuyez pas sur « Clôturer » ; l'article suivant en crée alors une nouvelle.
-        Le règlement est indépendant : ajoutez autant de versements que nécessaire (espèces, virement, chèque),
-        le reste à payer se met à jour tout seul.
+        Ajoutez autant de versements que nécessaire (espèces, virement, chèque) : le reste à payer se met à jour tout seul.
       </p>
 
       {payFacture && (
