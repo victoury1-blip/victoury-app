@@ -399,7 +399,7 @@ export default function Sidebar({ orders = [], session }) {
       {/* Mobile: hamburger button fixed top-left */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="fixed top-3 left-3 z-40 p-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 sm:hidden"
+        className="fixed top-[calc(env(safe-area-inset-top)+0.75rem)] left-3 z-40 p-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 sm:hidden"
       >
         <Menu size={20} />
       </button>
@@ -408,7 +408,7 @@ export default function Sidebar({ orders = [], session }) {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 sm:hidden" onClick={() => setMobileOpen(false)}>
           <div className="fixed inset-0 bg-black/40" />
-          <aside className="relative w-64 h-full bg-white flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+          <aside className="relative w-64 h-full bg-white flex flex-col shadow-2xl pt-[env(safe-area-inset-top)]" onClick={e => e.stopPropagation()}>
             {sidebarContent(true)}
           </aside>
         </div>

@@ -1167,7 +1167,10 @@ export default function App() {
   return (
     <ToastProvider>
     <PermissionsProvider session={session}>
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    {/* pt-safe : avec viewport-fit=cover (iOS), la page passe SOUS la barre
+        d'état — bandeaux et bouton menu se retrouvaient par-dessus l'heure et
+        la batterie. La hauteur reste celle de l'écran (box-border). */}
+    <div className="flex h-screen bg-gray-100 overflow-hidden pt-[env(safe-area-inset-top)]">
       <Sidebar orders={orders} session={session} />
       <main className="flex-1 min-w-0 overflow-auto flex flex-col">
         {offline && (
