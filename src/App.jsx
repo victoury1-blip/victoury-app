@@ -342,7 +342,9 @@ export default function App() {
         while (true) {
           const res = await supabase
             .from('orders')
-            .select('*')
+            // Colonnes de mapRow uniquement (voir plus bas) : `*` transférait des
+            // champs jamais lus, sur des milliers de lignes.
+            .select('id, recipient, product, products, price, status, note, date_added, date_updated, validated, echange, report_date, note_livraison, tracking_number, ozone_tracking, ozone_last_status, manually_modified, recu, created_at')
             // `neq('is_deleted', true)` exclut les lignes où is_deleted IS NULL (NULL <> true = NULL) :
             // on inclut explicitement NULL et false pour ne pas masquer des commandes valides.
             .or('is_deleted.is.null,is_deleted.eq.false')
@@ -514,12 +516,18 @@ export default function App() {
     let syncing = false;
     const sig = (rows) => rows.map(o => `${o.id}|${o.status}|${o.date_updated}|${o.tracking_number}|${o.validated}|${o.recu}|${o.is_deleted}`).join('~');
     async function reloadOrders() {
-      if (syncing || Date.now() - lastSync < 8000) return;
+      // Le Realtime propage déjà les changements en continu ; ce rattrapage n'est
+      // qu'un filet de sécurité pour ce qui aurait été manqué hors premier plan.
+      // À 8 s, chaque retour sur l'application relisait les milliers de commandes
+      // — c'est ce qui a épuisé le quota de bande passante de la base.
+      if (syncing || Date.now() - lastSync < 180000) return;
       syncing = true;
       try {
         const PAGE = 1000; let all = []; let from = 0;
         while (true) {
-          const res = await supabase.from('orders').select('*')
+          // Colonnes de mapRow uniquement : `*` renvoyait aussi les champs inutilisés
+          // et gonflait la bande passante à chaque rattrapage.
+          const res = await supabase.from('orders').select('id, recipient, product, products, price, status, note, date_added, date_updated, validated, echange, report_date, note_livraison, tracking_number, ozone_tracking, ozone_last_status, manually_modified, recu, created_at')
             .or('is_deleted.is.null,is_deleted.eq.false')
             .order('created_at', { ascending: false }).order('id', { ascending: false })
             .range(from, from + PAGE - 1);

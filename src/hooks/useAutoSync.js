@@ -46,7 +46,12 @@ const MERGE_KEYS = new Set([
   'chic_hidden_ids',
 ]);
 
-const SYNC_INTERVAL = 30_000;
+/* Les réglages synchronisés contiennent des blobs volumineux (produits,
+   factures). Les relire toutes les 30 s représentait un transfert permanent
+   pour des données qui changent rarement — c'est l'une des causes du quota de
+   bande passante épuisé. Un rafraîchissement a lieu de toute façon à chaque
+   retour au premier plan (visibilitychange). */
+const SYNC_INTERVAL = 5 * 60_000;
 
 function getDynamicKeys() {
   const keys = [];
