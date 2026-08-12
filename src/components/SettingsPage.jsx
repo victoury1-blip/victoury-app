@@ -10,7 +10,8 @@ import {
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
-import { readNextNumber, setNextNumber, peekNextVictId } from '../lib/victId';
+import { readNextNumber, setNextNumber, peekNextVictId, formatVictId } from '../lib/victId';
+import { A_CONFIRMER_STATUSES } from '../data/colisPipeline';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -479,6 +480,112 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   const [ozImport, setOzImport] = useState({ running: false, message: '', lines: [] });
   const [nextNum, setNextNum] = useState(() => String(readNextNumber() || ''));
   const [nextNumMsg, setNextNumMsg] = useState('');
+  const [renumNouveau, setRenumNouveau] = useState({ running: false, message: '', lines: [] });
+
+  /* ── Numérotation des commandes « À Confirmer » (action MANUELLE) ──
+     Repart de 1 et attribue la série VI aux commandes encore à confirmer, dans
+     l'ordre d'ajout. Portée volontairement étroite : rien d'autre n'est touché,
+     ni la Liste des Colis, ni « En Suivi », ni « Confirmé ». */
+  async function renumberNouveau() {
+    const TARGET = new Set(A_CONFIRMER_STATUSES);
+    setRenumNouveau({ running: true, message: 'Lecture des commandes…', lines: [] });
+    try {
+      let rows = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase.from('orders')
+          .select('id, tracking_number, recipient, status, validated, date_added')
+          .or('is_deleted.is.null,is_deleted.eq.false')
+          .order('id', { ascending: true }).range(from, from + PAGE - 1);
+        if (error) { setRenumNouveau({ running: false, message: 'Lecture impossible : ' + error.message, lines: [] }); return; }
+        const b = data || [];
+        rows = rows.concat(b);
+        if (b.length < PAGE) break;
+      }
+
+      const ts = (v) => {
+        const m = String(v || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+      };
+      const targets = rows
+        .filter(r => TARGET.has(r.status) && !r.validated)
+        .sort((a, b) => ts(a.date_added) - ts(b.date_added));
+
+      if (!targets.length) {
+        setRenumNouveau({ running: false, message: 'Aucune commande à numéroter.', lines: [] });
+        return;
+      }
+
+      // Numéros VI portés par les AUTRES commandes : on les saute pour ne créer
+      // aucun doublon, même si elles ne servent pas au calcul de la série.
+      const targetIds = new Set(targets.map(r => r.id));
+      const taken = new Set();
+      for (const r of rows) {
+        if (targetIds.has(r.id)) continue;
+        for (const v of [r.id, r.tracking_number]) {
+          const m = /^VI(\d+)$/i.exec(String(v || '').trim());
+          if (m) taken.add(parseInt(m[1], 10));
+        }
+      }
+
+      let n = 0;
+      const nextFree = () => { do { n += 1; } while (taken.has(n)); taken.add(n); return formatVictId(n); };
+
+      const updates = [];
+      for (const r of targets) {
+        const code = nextFree();
+        if (String(r.tracking_number || '').toUpperCase() === code.toUpperCase()) continue;
+        updates.push({ id: r.id, code, from: r.tracking_number || r.id, name: r.recipient?.name || r.id });
+      }
+
+      if (!updates.length) {
+        setRenumNouveau({ running: false, message: `✅ Les ${targets.length} commandes sont déjà numérotées.`, lines: [] });
+        return;
+      }
+
+      setRenumNouveau({ running: true, message: `Numérotation de ${updates.length} commande(s)…`, lines: [] });
+      let failed = 0;
+      const okIds = new Map();
+      const B = 20;
+      for (let i = 0; i < updates.length; i += B) {
+        await Promise.all(updates.slice(i, i + B).map(({ id, code }) =>
+          supabase.from('orders').update({ tracking_number: code, date_updated: stampNow() }).eq('id', id)
+            .then(({ error }) => { if (error) failed++; else okIds.set(id, code); })
+            .catch(() => { failed++; })
+        ));
+      }
+
+      // Relecture : on n'applique en local que ce qui est réellement enregistré.
+      const ids = [...okIds.keys()];
+      const persisted = new Map();
+      for (let i = 0; i < ids.length; i += 100) {
+        const { data } = await supabase.from('orders').select('id, tracking_number').in('id', ids.slice(i, i + 100));
+        for (const row of (data || [])) persisted.set(row.id, row.tracking_number);
+      }
+      const applied = new Map([...okIds].filter(([id, code]) => persisted.get(id) === code));
+
+      const stamped = stampNow();
+      setOrders(prev => prev.map(o => applied.has(o.id)
+        ? { ...o, trackingNumber: applied.get(o.id), dateUpdated: stamped }
+        : o));
+
+      // La série repart après le dernier numéro attribué.
+      setNextNumber(n + 1);
+      setNextNum(String(n + 1));
+
+      // Des instantanés périmés réécriraient les codes qu'on vient d'attribuer.
+      try { const { clearSyncQueue } = await import('../lib/offlineStore'); await clearSyncQueue(); } catch {}
+
+      setRenumNouveau({
+        running: false,
+        message: `✅ ${applied.size} commande(s) numérotée(s)${failed ? ` — ⚠️ ${failed} échec(s)` : ''}. Rechargement…`,
+        lines: updates.filter(u => applied.has(u.id)).slice(0, 30).map(u => `  ${u.from} → ${u.code} : ${u.name}`),
+      });
+      if (applied.size) setTimeout(() => window.location.reload(), 3000);
+    } catch (e) {
+      setRenumNouveau({ running: false, message: 'Erreur : ' + (e?.message || 'échec'), lines: [] });
+    }
+  }
 
   /* ── Import des codes de suivi réels depuis Ozon (action MANUELLE) ──
      Ozon est la source de vérité : c'est lui qui connaît le code sous lequel
@@ -1159,7 +1266,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
           {/* Point de départ de la série VICTOURY */}
           <div className="border-t border-gray-100 pt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-700">Prochain numéro de la série VICTOURY</p>
+            <p className="text-xs font-semibold text-gray-700">Prochain numéro de la série</p>
             <p className="text-[11px] text-gray-500 leading-relaxed">
               <span className="block mb-1 text-gray-800 font-semibold">
                 Prochaine commande : {peekNextVictId(orders)}
@@ -1171,7 +1278,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
               aucun doublon n'est possible.
             </p>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-mono">VICTOURY</span>
+              <span className="text-xs text-gray-500 font-mono">VI</span>
               <input
                 type="number" min="1" value={nextNum}
                 onChange={(e) => { setNextNum(e.target.value); setNextNumMsg(''); }}
@@ -1190,13 +1297,46 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                   if (!Number.isFinite(v) || v < 1) { setNextNumMsg('Numéro invalide.'); return; }
                   const saved = setNextNumber(v);
                   setNextNum(String(saved));
-                  setNextNumMsg(`✅ La prochaine commande recevra VICTOURY${String(saved).padStart(4, '0')}.`);
+                  setNextNumMsg(`✅ La prochaine commande recevra ${formatVictId(saved)}.`);
                 }}
                 className="px-4 py-2 rounded-lg bg-gray-800 text-white text-xs font-medium hover:bg-gray-900 transition">
                 Enregistrer
               </button>
               {nextNumMsg && <span className="text-xs text-gray-600">{nextNumMsg}</span>}
             </div>
+          </div>
+
+          {/* Numérotation des commandes À Confirmer */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">Numéroter les commandes « À Confirmer »</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Repart de <strong>VI00001</strong> et numérote, dans l'ordre d'ajout, les commandes
+              encore à confirmer. La série continue ensuite toute seule.
+              <strong className="text-gray-700"> Rien d'autre n'est touché</strong> : ni la Liste des
+              Colis, ni « En Suivi », ni « Confirmé » — leurs codes restent tels quels et leurs
+              numéros sont simplement sautés pour éviter tout doublon.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (window.confirm(
+                    "Numéroter les commandes « À Confirmer » à partir de VI00001 ?\n\n"
+                    + "• Seules les commandes À Confirmer sont modifiées\n"
+                    + "• Liste des Colis, En Suivi et Confirmé ne sont PAS touchés\n\n"
+                    + "Fermez l'application sur les autres appareils avant de continuer."
+                  )) renumberNouveau();
+                }}
+                disabled={renumNouveau.running}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-40 transition">
+                {renumNouveau.running ? 'Numérotation…' : 'Numéroter à partir de VI00001'}
+              </button>
+              {renumNouveau.message && <span className="text-xs text-gray-600">{renumNouveau.message}</span>}
+            </div>
+            {renumNouveau.lines?.length > 0 && (
+              <pre className="text-[10px] bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
+                {renumNouveau.lines.join('\n')}
+              </pre>
+            )}
           </div>
 
           {/* Import des codes de suivi réels depuis Ozon */}
