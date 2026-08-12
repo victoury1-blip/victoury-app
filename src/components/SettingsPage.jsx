@@ -5,7 +5,7 @@ import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
   ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
-  Search, ArrowDownCircle, Tag, Upload, Bell, Phone, MessageCircle,
+  Search, ArrowDownCircle, Tag, Upload, Bell, Phone, MessageCircle, FileText,
 } from 'lucide-react';
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
@@ -790,6 +790,18 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   /* ── Settings cards config ── */
   const CARDS = [
     {
+      // Carte dédiée : la numérotation était enfouie dans la fenêtre « Ozon
+      // Express », où personne ne va la chercher.
+      id: 'tracking',
+      title: 'Codes de suivi',
+      desc: 'Série des numéros de commande : prochain numéro et numérotation des commandes à confirmer.',
+      icon: <FileText size={22} className="text-amber-600" />,
+      iconBg: 'bg-amber-100',
+      cardBg: 'from-amber-50',
+      saved: true,
+      badge: { label: peekNextVictId(orders), color: 'text-amber-700 bg-amber-50 border-amber-200' },
+    },
+    {
       id: 'woocommerce',
       title: 'WooCommerce',
       desc: 'Synchronisation automatique des commandes depuis votre boutique en ligne.',
@@ -1242,30 +1254,12 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       </Modal>
 
       {/* ── Ozon Express Modal ── */}
-      <Modal open={openModal === 'ozonexpress'} onClose={() => setOpenModal(null)}
-        title="Ozon Express" icon={<Truck size={18} className="text-orange-600" />}
-        iconBg="bg-gradient-to-r from-orange-50 to-white">
+      {/* ── Codes de suivi ── */}
+      <Modal open={openModal === 'tracking'} onClose={() => setOpenModal(null)}
+        title="Codes de suivi" icon={<FileText size={18} className="text-amber-600" />}>
         <div className="space-y-4">
-          <InputField label="ID Client" value={auzone.customerId} onChange={(v) => updateAuzone('customerId', v)} placeholder="ex: 12345" />
-          <InputField label="Clé API" type="password" value={auzone.apiKey} onChange={(v) => updateAuzone('apiKey', v)} placeholder="votre-cle-api" show={auzone.showKey} onToggleShow={() => setAuzone((p) => ({ ...p, showKey: !p.showKey }))} />
-
-          <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5 text-xs text-orange-700 space-y-1">
-            <p className="font-semibold">Comment obtenir vos identifiants :</p>
-            <p>1. Connectez-vous sur <strong>client.ozonexpress.ma</strong></p>
-            <p>2. Allez dans <strong>Comptes → Generate your API key</strong></p>
-            <p>3. Copiez votre <strong>ID Client</strong> et votre <strong>Clé API</strong> ici</p>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <button onClick={saveAuzone} disabled={!auzone.customerId || !auzone.apiKey}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 text-white text-xs font-medium hover:bg-orange-600 disabled:opacity-40 transition">
-              <Save size={12} /> Enregistrer
-            </button>
-            {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
-          </div>
-
-          {/* Point de départ de la série VICTOURY */}
-          <div className="border-t border-gray-100 pt-3 space-y-2">
+          {/* Point de départ de la série */}
+          <div className="space-y-2">
             <p className="text-xs font-semibold text-gray-700">Prochain numéro de la série</p>
             <p className="text-[11px] text-gray-500 leading-relaxed">
               <span className="block mb-1 text-gray-800 font-semibold">
@@ -1337,6 +1331,31 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
                 {renumNouveau.lines.join('\n')}
               </pre>
             )}
+          </div>
+
+        </div>
+      </Modal>
+
+      <Modal open={openModal === 'ozonexpress'} onClose={() => setOpenModal(null)}
+        title="Ozon Express" icon={<Truck size={18} className="text-orange-600" />}
+        iconBg="bg-gradient-to-r from-orange-50 to-white">
+        <div className="space-y-4">
+          <InputField label="ID Client" value={auzone.customerId} onChange={(v) => updateAuzone('customerId', v)} placeholder="ex: 12345" />
+          <InputField label="Clé API" type="password" value={auzone.apiKey} onChange={(v) => updateAuzone('apiKey', v)} placeholder="votre-cle-api" show={auzone.showKey} onToggleShow={() => setAuzone((p) => ({ ...p, showKey: !p.showKey }))} />
+
+          <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5 text-xs text-orange-700 space-y-1">
+            <p className="font-semibold">Comment obtenir vos identifiants :</p>
+            <p>1. Connectez-vous sur <strong>client.ozonexpress.ma</strong></p>
+            <p>2. Allez dans <strong>Comptes → Generate your API key</strong></p>
+            <p>3. Copiez votre <strong>ID Client</strong> et votre <strong>Clé API</strong> ici</p>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <button onClick={saveAuzone} disabled={!auzone.customerId || !auzone.apiKey}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 text-white text-xs font-medium hover:bg-orange-600 disabled:opacity-40 transition">
+              <Save size={12} /> Enregistrer
+            </button>
+            {auzone.saved && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Sauvegardé</span>}
           </div>
 
           {/* Import des codes de suivi réels depuis Ozon */}
