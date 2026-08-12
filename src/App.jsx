@@ -57,13 +57,10 @@ function parseAppDate(str) {
 
 function assignVictTracking(freshOrders, allOrders) {
   if (!allOrders || !allOrders.length) return freshOrders;
-  // Reconnaît un code de l'ancienne série (VICT) OU de la nouvelle (VICTOURY) :
-  // une commande qui a déjà l'une ou l'autre ne doit jamais en recevoir une 2e.
   freshOrders.forEach((o) => {
-    if (isVictCode(o.trackingNumber) || isVictCode(o.id)) return;
-    // generateVictId() prend le plus petit numéro VICTOURY libre parmi les
-    // commandes ACTIVES connues (allOrders) : une commande supprimée libère
-    // son numéro pour la prochaine.
+    // Présence d'un code, pas sa forme : même règle que partout ailleurs, pour
+    // qu'un code du transporteur (WC-…, MIMA…) ne soit jamais recouvert.
+    if (String(o.trackingNumber || '').trim() || isVictCode(o.id)) return;
     o.trackingNumber = generateVictId(allOrders);
   });
   return freshOrders;
