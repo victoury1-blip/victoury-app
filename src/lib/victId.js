@@ -118,6 +118,11 @@ export function generateVictId(orders) {
   if (explicit && maxPending >= n) n = maxPending + 1;
   while (used.has(n) || _issuedThisSession.includes(n)) n++;
   _issuedThisSession.push(n);
-  if (explicit) setNextNumber(n + 1);
+  /* Le point de départ est TOUJOURS réenregistré, pas seulement quand il était
+     déjà posé : la suite de la série ne dépend alors plus de la liste des
+     commandes reçue à cet instant. Une création manuelle lancée avec une liste
+     encore incomplète repartait sinon du début. Le champ de Réglages permet de
+     corriger cette valeur à tout moment. */
+  setNextNumber(n + 1);
   return formatVictId(n);
 }

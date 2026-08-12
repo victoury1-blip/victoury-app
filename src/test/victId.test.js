@@ -65,6 +65,14 @@ describe('série VI', () => {
     expect(hasCode({ id: 'WC-3', trackingNumber: '   ' })).toBe(false);
   });
 
+  it('poursuit la série même si la liste des commandes est incomplète', () => {
+    // Cas d'une création manuelle lancée avant que la liste soit chargée.
+    const orders = [nouveau('VI00006')];
+    expect(generateVictId(orders)).toBe('VI00007');
+    // Liste vide au coup suivant : la série ne doit pas repartir de 1.
+    expect(generateVictId([])).toBe('VI00008');
+  });
+
   it('émet des numéros distincts à la suite', () => {
     const orders = [];
     expect(generateVictId(orders)).toBe('VI00001');
