@@ -160,6 +160,11 @@ export default function App() {
   // Un aléa réseau isolé (30s de polling) ne doit pas afficher un bandeau rouge
   // à chaque fois : on n'alerte qu'après 2 échecs CONSÉCUTIFS.
   const wooFailCountRef = useRef(0);
+  /* Prochain instant où réessayer WooCommerce. Boutique injoignable, le sondage
+     repartait toutes les 45 s : chaque tentative attend 9 s pour rien, écrit une
+     ligne d'erreur en base et fait clignoter le bandeau. L'attente double après
+     chaque échec, jusqu'à 30 min. */
+  const wooNextTryRef = useRef(0);
   const notifConfigRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const ordersRef = useRef(orders);
@@ -631,7 +636,16 @@ export default function App() {
      remplacés par des VICTOURY fraîchement émis, à chaque rechargement. */
   useEffect(() => {
     if (!session || !initialLoadDone) return;
-    async function fetchWooOrders() {
+    /* Attente avant la prochaine tentative : 45 s, puis 1 min 30, 3 min… et au
+       plus 30 min. Une boutique en panne n'est pas réparée par l'insistance. */
+    const backoff = () => {
+      wooNextTryRef.current = Date.now()
+        + Math.min(30 * 60000, 45000 * 2 ** Math.max(0, wooFailCountRef.current - 1));
+    };
+    async function fetchWooOrders(manual = false) {
+      // Boutique injoignable : on espace les tentatives au lieu d'insister
+      // toutes les 45 s. Le bouton « Réessayer » force le passage.
+      if (!manual && Date.now() < wooNextTryRef.current) return;
       try {
         if (!wooConfigRef.current) {
           const stored = localStorage.getItem('woo_config');
@@ -716,6 +730,7 @@ export default function App() {
             // Les deux voies ont échoué : afficher le message le plus utile
             // (celui de l'API serveur, qui explique la vraie cause).
             wooFailCountRef.current += 1;
+            backoff();
             if (wooFailCountRef.current >= 2) {
               const slow = apiErr?.wooTimeout || directErr?.name === 'AbortError';
               setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || friendly(directErr) || 'connexion impossible')
@@ -725,12 +740,14 @@ export default function App() {
           } finally { clearTimeout(to); }
           if (!res.ok) {
             wooFailCountRef.current += 1;
+            backoff();
             if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || 'erreur ' + res.status) + ' — vérifiez vos clés API');
             return;
           }
           data = await res.json();
         }
         wooFailCountRef.current = 0;
+        wooNextTryRef.current = 0;
         setWooError(null);
         const getMeta = (meta, ...keys) => {
           if (!meta) return '';
@@ -859,6 +876,7 @@ export default function App() {
         const isTimeout = e?.name === 'AbortError';
         const msg = isTimeout ? 'serveur WooCommerce lent (délai dépassé) — réessai automatique' : (e?.message || 'erreur réseau');
         wooFailCountRef.current += 1;
+        backoff();
         if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + msg);
         logWcSync({ status: 'error', error: msg });
         logError('wc_poll', msg, { timeout: isTimeout });
