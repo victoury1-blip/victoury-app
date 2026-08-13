@@ -27,6 +27,19 @@ export async function saveOrdersOffline(orders) {
   await tx.done;
 }
 
+// Remplace INTÉGRALEMENT le cache local par la liste fournie.
+// `saveOrdersOffline` ne fait qu'ajouter/écraser : les commandes supprimées
+// restaient indéfiniment dans le cache et ressortaient au démarrage.
+export async function replaceOrdersOffline(orders) {
+  const db = await getDb();
+  const tx = db.transaction('orders', 'readwrite');
+  await tx.store.clear();
+  for (const order of orders) {
+    await tx.store.put(order);
+  }
+  await tx.done;
+}
+
 // Load orders from IndexedDB (for offline use)
 export async function loadOrdersOffline() {
   const db = await getDb();

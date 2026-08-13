@@ -31,6 +31,8 @@ const queueSync = async (...a) => (await _offlineStore()).queueSync(...a);
 const getPendingSync = async (...a) => (await _offlineStore()).getPendingSync(...a);
 const deleteSyncItem = async (...a) => (await _offlineStore()).deleteSyncItem(...a);
 const deleteOrderOffline = async (...a) => (await _offlineStore()).deleteOrderOffline(...a);
+const replaceOrdersOffline = async (...a) => (await _offlineStore()).replaceOrdersOffline(...a);
+import { fetchFingerprints, fetchAllOrders, fetchOrdersByIds, staleIds } from './lib/ordersSync';
 import { cloudGet, cloudSet } from './lib/cloudSettings';
 import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
 import { logAlert } from './lib/errorLog';
@@ -150,7 +152,6 @@ export default function App() {
   // Version « état » du drapeau : un ref ne déclenche pas de re-rendu, donc
   // l'effet de sondage ne repartirait jamais une fois le chargement terminé.
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const lastOrdersSigRef = useRef(null);
   // id -> timestamp du dernier changement LOCAL. Pendant une courte fenêtre, une
   // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
   // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
@@ -327,108 +328,173 @@ export default function App() {
     });
   }, [session]);
 
-  /* ── Load orders from Supabase ── */
+  /* ── Chargement des commandes : cache local d'abord, puis delta ──
+   *
+   * L'application relisait TOUTES les commandes (des milliers de lignes avec
+   * leurs objets `recipient` / `products`) à l'ouverture ET à chaque retour au
+   * premier plan. C'est ce qui épuisait le quota de bande passante de la base.
+   *
+   * Le même effet couvre maintenant le premier chargement ET le rattrapage au
+   * retour au premier plan : les deux passent par la comparaison d'empreintes,
+   * il n'y a donc plus qu'un seul chemin à maintenir. */
   useEffect(() => {
     if (!session) return;
-    async function load(attempt = 0) {
-      /* Load only non-deleted orders */
-      let data, error;
-      try {
-        // Supabase limite chaque requête à 1000 lignes : on pagine avec range() pour
-        // TOUT charger, sinon les commandes au-delà de 1000 « disparaissent ».
-        const PAGE = 1000;
-        let all = [];
-        let from = 0;
-        while (true) {
-          const res = await supabase
-            .from('orders')
-            // Colonnes de mapRow uniquement (voir plus bas) : `*` transférait des
-            // champs jamais lus, sur des milliers de lignes.
-            .select('id, recipient, product, products, price, status, note, date_added, date_updated, validated, echange, report_date, note_livraison, tracking_number, ozone_tracking, ozone_last_status, manually_modified, recu, created_at')
-            // `neq('is_deleted', true)` exclut les lignes où is_deleted IS NULL (NULL <> true = NULL) :
-            // on inclut explicitement NULL et false pour ne pas masquer des commandes valides.
-            .or('is_deleted.is.null,is_deleted.eq.false')
-            // Clé de tri UNIQUE (created_at + id) : sans départage, un lot importé
-            // avec le même created_at rend la pagination ambiguë aux frontières de
-            // page et duplique/saute des lignes.
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
-            .range(from, from + PAGE - 1);
-          if (res.error) { error = res.error; break; }
-          const batch = res.data || [];
-          all = all.concat(batch);
-          if (batch.length < PAGE) break;
-          from += PAGE;
-        }
-        // Dédoublonnage de sécurité par id (au cas où une insertion concurrente
-        // décale les pages pendant le chargement).
-        if (!error) {
-          const seen = new Set();
-          data = all.filter(o => (seen.has(o.id) ? false : seen.add(o.id)));
-        }
-      } catch (e) {
-        error = e;
+    let cancelled = false;
+    let syncing = false;
+    let lastSync = 0;
+
+    /* Les versions précédentes du cache omettaient certaines colonnes (`recu`,
+       `created_at`). On l'ignore tant qu'il n'a pas été réécrit au format
+       courant, sinon ces champs reviendraient vides. */
+    const CACHE_VERSION = '2';
+
+    /* Applique l'état du serveur en ne remplaçant que ce qui a bougé.
+       `fpRows` = empreintes de TOUTES les lignes ; `fetched` = lignes
+       complètes rapatriées ; `cachedById` = ce qu'on avait déjà. */
+    function apply(fpRows, fetched, cachedById) {
+      const fullById = new Map(fetched.map(r => [r.id, mapRow(r)]));
+      /* Liste noire : elle se déduit de la MÊME requête que les empreintes —
+         l'ancienne requête séparée sur les commandes supprimées disparaît.
+         Une ligne redevenue active fait foi : une commande restaurée via la
+         Corbeille sort de la liste noire, même si un autre appareil garde
+         encore son id en localStorage (sinon la restauration ne « tient » pas). */
+      const activeIds = new Set(fpRows.filter(r => !r.is_deleted).map(r => r.id));
+      let localBlacklist = [];
+      try { localBlacklist = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'); } catch { /* cache vide */ }
+      const deletedIds = [...new Set([
+        ...fpRows.filter(r => r.is_deleted).map(r => r.id),
+        ...localBlacklist,
+      ])].filter(id => !activeIds.has(id));
+      deletedIdsRef.current = new Set(deletedIds);
+      try { localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds)); } catch { /* quota */ }
+
+      const rows = fpRows
+        .filter(r => !r.is_deleted && !deletedIdsRef.current.has(r.id))
+        .map(r => fullById.get(r.id) || cachedById.get(r.id))
+        .filter(Boolean);
+
+      /* FUSION (et non remplacement) : on garde la version LOCALE des commandes
+         éditées il y a moins de 15 s — mutation encore en vol, pas confirmée en
+         base — sinon la synchro ferait « revenir » l'édition à l'ancienne valeur. */
+      const GRACE = 15000;
+      const nowTs = Date.now();
+      let committed = rows;
+      setOrders(prev => {
+        const prevMap = new Map(prev.map(o => [o.id, o]));
+        const fetchedIds = new Set(rows.map(o => o.id));
+        const merged = rows.map(o => {
+          const editedAt = recentEditsRef.current.get(o.id);
+          return editedAt && nowTs - editedAt < GRACE && prevMap.has(o.id) ? prevMap.get(o.id) : o;
+        });
+        // Conserver en tête les commandes locales récentes absentes du serveur
+        // (créées localement, pas encore en base) pour ne pas les perdre.
+        const localOnly = prev.filter(o => {
+          if (fetchedIds.has(o.id) || deletedIdsRef.current.has(o.id)) return false;
+          const editedAt = recentEditsRef.current.get(o.id);
+          return editedAt && nowTs - editedAt < GRACE;
+        });
+        const seen = new Set();
+        committed = [...localOnly, ...merged].filter(o => (seen.has(o.id) ? false : seen.add(o.id)));
+        return committed;
+      });
+      // Le cache est REMPLACÉ : sans cela les commandes supprimées y restaient
+      // et ressortaient au démarrage suivant.
+      replaceOrdersOffline(committed)
+        .then(() => { try { localStorage.setItem('orders_cache_version', CACHE_VERSION); } catch { /* quota */ } })
+        .catch(e => console.error('Failed to cache orders offline:', e));
+    }
+
+    /* Synchro par empreintes : 7 petites colonnes pour toutes les lignes, puis
+       rapatriement complet des SEULES commandes qui ont changé. Quand rien n'a
+       bougé — le cas courant — le transfert s'arrête à l'empreinte. */
+    async function delta(cachedById) {
+      const fp = await fetchFingerprints(supabase);
+      if (fp.error) return false;
+      const ids = staleIds(fp.rows.filter(r => !r.is_deleted), cachedById);
+      let fetched = [];
+      if (ids.length) {
+        const res = await fetchOrdersByIds(supabase, ids);
+        if (res.error) return false;
+        fetched = res.rows;
       }
-      if (error || !data) {
-        if (attempt < 3) {
+      if (cancelled) return true;
+      apply(fp.rows, fetched, cachedById);
+      return true;
+    }
+
+    /* Cache absent ou périmé : une seule lecture complète, puis on repasse en
+       mode delta pour toutes les ouvertures suivantes. */
+    async function full(attempt = 0) {
+      const res = await fetchAllOrders(supabase);
+      if (res.error) {
+        if (attempt < 3 && !cancelled) {
           await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
-          return load(attempt + 1);
+          return full(attempt + 1);
         }
-        setDbError('⚠️ Erreur Supabase: ' + (error?.message || 'impossible de charger les commandes'));
-        // Fallback to IndexedDB cached orders
-        try {
-          const cached = await loadOrdersOffline();
+        return false;
+      }
+      if (cancelled) return true;
+      apply(res.rows.map(r => ({ ...r, is_deleted: false })), res.rows, new Map());
+      return true;
+    }
+
+    async function sync(force = false) {
+      if (syncing || (!force && Date.now() - lastSync < 60000)) return;
+      syncing = true;
+      try {
+        const cached = localStorage.getItem('orders_cache_version') === CACHE_VERSION
+          ? await loadOrdersOffline().catch(() => [])
+          : [];
+        const ok = cached.length
+          ? await delta(new Map(cached.map(o => [o.id, o])))
+          : await full();
+        if (ok) {
+          lastSync = Date.now();
+          /* Le sondage WooCommerce N'EST autorisé qu'après une lecture réussie :
+             lancé sur une liste incomplète, il prend chaque commande pour une
+             nouvelle et lui réattribue un code de suivi. */
+          initialLoadDoneRef.current = true;
+          setInitialLoadDone(true);
+        } else if (!initialLoadDoneRef.current) {
+          setDbError('⚠️ Erreur Supabase : impossible de charger les commandes');
           if (cached.length) {
             setOrders(cached);
             setDbError(prev => prev + ' — données hors-ligne chargées');
           }
-        } catch (offlineErr) {
-          console.error('Failed to load offline orders:', offlineErr);
         }
+      } catch (e) {
+        console.error('[sync] échec de la synchronisation des commandes:', e);
+      } finally {
+        syncing = false;
         setIsLoading(false);
-        return;
       }
-      /* Build blacklist from soft-deleted rows — survives cache resets.
-         On FUSIONNE avec la liste noire locale : les commandes WooCommerce (WC-xxxx)
-         supprimées n'ont pas toujours de ligne Supabase ; sans fusion, le polling WC
-         les ré-ajouterait après un rechargement. */
-      let delRows = [];
-      { // pagination : Supabase limite à 1000 lignes par requête
-        let from = 0;
-        while (true) {
-          const r = await supabase.from('orders').select('id').eq('is_deleted', true).range(from, from + 999);
-          const b = r.data || [];
-          delRows = delRows.concat(b);
-          if (r.error || b.length < 1000) break;
-          from += 1000;
-        }
-      }
-      let localBlacklist = [];
-      try { localBlacklist = JSON.parse(localStorage.getItem('deleted_order_ids') || '[]'); } catch {}
-      // Une ligne ACTIVE dans Supabase (is_deleted=false) fait foi : une commande
-      // restaurée via la Corbeille est retirée de la liste noire, même si un autre
-      // appareil a encore son id dans son localStorage (sinon la restauration ne
-      // « tient » pas après une synchro).
-      const activeIds = new Set(data.map(o => o.id));
-      const deletedIds = [...new Set([...delRows.map(r => r.id), ...localBlacklist])]
-        .filter(id => !activeIds.has(id));
-      deletedIdsRef.current = new Set(deletedIds);
-      localStorage.setItem('deleted_order_ids', JSON.stringify(deletedIds));
-      setOrders(data.map(mapRow));
-      setIsLoading(false);
-      initialLoadDoneRef.current = true;
-      setInitialLoadDone(true);
-      // Cache orders to IndexedDB for offline use
-      saveOrdersOffline(data.map((o) => ({
-        id: o.id, recipient: o.recipient || {}, product: o.product || {}, products: o.products || null,
-        price: o.price, status: o.status, note: o.note, dateAdded: o.date_added,
-        dateUpdated: o.date_updated, validated: o.validated, echange: o.echange || false,
-        reportDate: o.report_date || null, noteLivraison: o.note_livraison || '',
-        trackingNumber: o.tracking_number || null, ozoneTracking: o.ozone_tracking || null,
-        ozoneLastStatus: o.ozone_last_status || null, manuallyModified: o.manually_modified || false,
-      }))).catch(e => console.error('Failed to cache orders offline:', e));
     }
-    load();
+
+    // Affichage IMMÉDIAT depuis le cache : l'application est utilisable avant
+    // même la première réponse du serveur.
+    (async () => {
+      try {
+        if (localStorage.getItem('orders_cache_version') !== CACHE_VERSION) return;
+        const cached = await loadOrdersOffline();
+        if (!cancelled && cached.length) { setOrders(cached); setIsLoading(false); }
+      } catch (e) {
+        console.error('Failed to load offline orders:', e);
+      } finally {
+        if (!cancelled) sync(true);
+      }
+    })();
+
+    /* Rattrapage au retour au premier plan : le Realtime ne fonctionne que tant
+       que l'onglet est actif ; en arrière-plan sur mobile la connexion se coupe
+       et les changements faits ailleurs sont MANQUÉS. */
+    const onVis = () => { if (document.visibilityState === 'visible') sync(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
+    };
   }, [session]);
 
   /* ── Realtime: sync order changes from other devices ── */
@@ -504,79 +570,6 @@ export default function App() {
                    codes en double. Le rattrapage se refera au prochain démarrage. */ }
     })();
   }, [session, orders.length]);
-
-  /* ── Catch-up sync: re-fetch orders when the app regains focus ──
-     Le Realtime ne fonctionne que tant que l'onglet est actif ; sur mobile, en
-     arrière-plan la connexion se coupe et les changements faits ailleurs (PC)
-     sont MANQUÉS. Au retour au premier plan, on re-synchronise pour rattraper
-     ce retard. Throttlé, et on ne re-rend QUE si quelque chose a changé. */
-  useEffect(() => {
-    if (!session) return;
-    let lastSync = 0;
-    let syncing = false;
-    const sig = (rows) => rows.map(o => `${o.id}|${o.status}|${o.date_updated}|${o.tracking_number}|${o.validated}|${o.recu}|${o.is_deleted}`).join('~');
-    async function reloadOrders() {
-      // Le Realtime propage déjà les changements en continu ; ce rattrapage n'est
-      // qu'un filet de sécurité pour ce qui aurait été manqué hors premier plan.
-      // À 8 s, chaque retour sur l'application relisait les milliers de commandes
-      // — c'est ce qui a épuisé le quota de bande passante de la base.
-      if (syncing || Date.now() - lastSync < 180000) return;
-      syncing = true;
-      try {
-        const PAGE = 1000; let all = []; let from = 0;
-        while (true) {
-          // Colonnes de mapRow uniquement : `*` renvoyait aussi les champs inutilisés
-          // et gonflait la bande passante à chaque rattrapage.
-          const res = await supabase.from('orders').select('id, recipient, product, products, price, status, note, date_added, date_updated, validated, echange, report_date, note_livraison, tracking_number, ozone_tracking, ozone_last_status, manually_modified, recu, created_at')
-            .or('is_deleted.is.null,is_deleted.eq.false')
-            .order('created_at', { ascending: false }).order('id', { ascending: false })
-            .range(from, from + PAGE - 1);
-          if (res.error) { syncing = false; return; }
-          const batch = res.data || [];
-          all = all.concat(batch);
-          if (batch.length < PAGE) break;
-          from += PAGE;
-        }
-        const seenIds = new Set();
-        const rows = all.filter(o => (seenIds.has(o.id) ? false : seenIds.add(o.id)))
-          .filter(o => !deletedIdsRef.current.has(o.id));
-        lastSync = Date.now();
-        const newSig = sig(rows);
-        if (newSig === lastOrdersSigRef.current) { syncing = false; return; } // rien de neuf
-        lastOrdersSigRef.current = newSig;
-        // FUSION (et non remplacement) : on garde la version LOCALE des commandes
-        // éditées il y a moins de 15 s (mutation encore en vol / pas confirmée en
-        // base) — sinon le refetch ferait « revenir » l'édition à l'ancienne valeur.
-        const GRACE = 15000;
-        const nowTs = Date.now();
-        setOrders(prev => {
-          const prevMap = new Map(prev.map(o => [o.id, o]));
-          const fetchedIds = new Set(rows.map(o => o.id));
-          const merged = rows.map(r => {
-            const editedAt = recentEditsRef.current.get(r.id);
-            if (editedAt && nowTs - editedAt < GRACE && prevMap.has(r.id)) return prevMap.get(r.id);
-            return mapRow(r);
-          });
-          // Conserver en tête les commandes locales récentes absentes du fetch
-          // (créées localement, pas encore en base) pour ne pas les perdre.
-          const localOnly = prev.filter(o => {
-            if (fetchedIds.has(o.id) || deletedIdsRef.current.has(o.id)) return false;
-            const editedAt = recentEditsRef.current.get(o.id);
-            return editedAt && nowTs - editedAt < GRACE;
-          });
-          // Dédoublonnage final par id (sécurité) : jamais deux copies d'une commande.
-          const out = [...localOnly, ...merged];
-          const seen = new Set();
-          return out.filter(o => (seen.has(o.id) ? false : seen.add(o.id)));
-        });
-      } catch {}
-      syncing = false;
-    }
-    const onVis = () => { if (document.visibilityState === 'visible') reloadOrders(); };
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('focus', onVis);
-    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); };
-  }, [session]);
 
   /* ── Reload settings from Supabase when app regains focus (cross-device sync) ── */
   useEffect(() => {
