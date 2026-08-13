@@ -307,7 +307,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     for (const e of errs) {
       if (!e) continue;
       if (e.name === 'AbortError' || /aborted/i.test(e.message || '')) {
-        return 'serveur WooCommerce trop lent (délai dépassé)';
+        return 'la boutique n’a pas répondu à temps — le site victoury-maroc.com est trop lent, à voir avec l’hébergeur';
       }
       if (/failed to fetch|networkerror|load failed/i.test(e.message || '')) {
         return 'connexion impossible — vérifiez le réseau, un bloqueur ou le pare-feu';

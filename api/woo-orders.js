@@ -11,6 +11,9 @@ export default async function handler(req, res) {
   if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
 
   const { siteUrl, consumerKey, consumerSecret, status = 'processing,pending', perPage = 50 } = req.body || {};
+  // Borné : une valeur fournie par le client ne doit pas pouvoir demander des
+  // centaines de commandes d'un coup à une boutique déjà lente.
+  const nb = Math.min(100, Math.max(1, parseInt(perPage, 10) || 50));
   if (!siteUrl || !consumerKey || !consumerSecret) {
     return res.status(400).json({ error: 'Config WooCommerce manquante (URL / clés)' });
   }
@@ -31,7 +34,11 @@ export default async function handler(req, res) {
   }
   const qs = new URLSearchParams({
     status,
-    per_page: String(perPage),
+    per_page: String(nb),
+    // Les plus récentes d'abord : avec un `per_page` réduit (repli quand la
+    // boutique est lente), ce sont les commandes qui comptent qu'on garde.
+    orderby: 'date',
+    order: 'desc',
     // _fields : ne demander que le nécessaire -> réponse bien plus légère et
     // rapide (évite le timeout, surtout sur Vercel Hobby limité à 10s).
     _fields: 'id,number,status,date_created,date_modified,total,billing,line_items,customer_note',
@@ -43,7 +50,8 @@ export default async function handler(req, res) {
   const ac = new AbortController();
   // < 10s : rester sous la limite Vercel Hobby pour renvoyer une erreur propre
   // plutôt que d'être tué par la plateforme.
-  const to = setTimeout(() => ac.abort(), 9000);
+  const TIMEOUT_MS = 9000;
+  const to = setTimeout(() => ac.abort(), TIMEOUT_MS);
   try {
     const r = await fetch(url, {
       signal: ac.signal,
@@ -66,7 +74,15 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, orders: data });
   } catch (e) {
     const isTimeout = e?.name === 'AbortError';
-    return res.status(504).json({ error: isTimeout ? 'Serveur WooCommerce trop lent (timeout 25s)' : `Connexion impossible: ${e?.message || 'erreur réseau'}` });
+    // Le délai annoncé est celui réellement appliqué : le message parlait de 25 s
+    // alors que l'abandon survient à 9 s, ce qui rendait le diagnostic impossible.
+    return res.status(504).json({
+      error: isTimeout
+        ? `La boutique n'a pas répondu en ${TIMEOUT_MS / 1000} s (${nb} commandes demandées)`
+        : `Connexion impossible: ${e?.message || 'erreur réseau'}`,
+      timeout: isTimeout,
+      perPage: nb,
+    });
   } finally {
     clearTimeout(to);
   }

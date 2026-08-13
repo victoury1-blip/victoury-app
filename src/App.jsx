@@ -646,8 +646,11 @@ export default function App() {
         // que le navigateur → rewrite → boutique (évite « Failed to fetch », CORS,
         // suppression d'en-têtes). Repli sur le rewrite direct si l'API échoue.
         const WC_TIMEOUT = 25000;
-        let data;
-        try {
+        /* Une lecture via notre fonction serveur, pour un nombre de commandes
+           donné. Séparée en fonction pour pouvoir RÉESSAYER plus petit : quand
+           la boutique met plus de 9 s à répondre, c'est le volume demandé qui
+           est en cause bien plus souvent que la panne. */
+        async function callWooApi(perPage) {
           const { data: { session } } = await supabase.auth.getSession();
           const controller = new AbortController();
           const to = setTimeout(() => controller.abort(), WC_TIMEOUT + 3000);
@@ -660,7 +663,7 @@ export default function App() {
                 'Content-Type': 'application/json',
                 ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
               },
-              body: JSON.stringify({ siteUrl: config.siteUrl || 'https://victoury-maroc.com', consumerKey: config.consumerKey, consumerSecret: config.consumerSecret }),
+              body: JSON.stringify({ siteUrl: config.siteUrl || 'https://victoury-maroc.com', consumerKey: config.consumerKey, consumerSecret: config.consumerSecret, perPage }),
             });
           } finally { clearTimeout(to); }
           const ct = apiRes.headers.get('content-type') || '';
@@ -672,25 +675,52 @@ export default function App() {
             throw new Error(`Requête bloquée avant le serveur (HTTP ${apiRes.status}) — vérifiez le pare-feu/la protection Vercel du projet`);
           }
           const j = await apiRes.json().catch(() => ({}));
-          if (!apiRes.ok) throw new Error(j.error || `API ${apiRes.status}`);
-          data = j.orders || [];
+          if (!apiRes.ok) {
+            const err = new Error(j.error || `API ${apiRes.status}`);
+            err.wooTimeout = !!j.timeout;
+            throw err;
+          }
+          return j.orders || [];
+        }
+        let data;
+        try {
+          try {
+            data = await callWooApi(50);
+          } catch (firstErr) {
+            // Repli sur un lot réduit : les commandes sont triées de la plus
+            // récente à la plus ancienne, donc les nouvelles restent couvertes.
+            if (!firstErr?.wooTimeout) throw firstErr;
+            data = await callWooApi(10);
+          }
         } catch (apiErr) {
           // Repli : appel direct via le rewrite Vercel (query-string + header).
           // Un AbortError renvoie le message brut du navigateur (« signal is
           // aborted without reason ») : on le reformule pour rester lisible.
-          const friendly = (err) => (err?.name === 'AbortError' ? 'serveur WooCommerce trop lent (délai dépassé)' : (err?.message || 'erreur réseau'));
+          /* Le message doit désigner la BOUTIQUE : les deux voies (fonction
+             serveur et appel direct) partent d'ici, donc un échec des deux vient
+             du site WordPress, pas de l'application ni des clés API. */
+          const friendly = (err) => {
+            if (err?.name === 'AbortError') return 'la boutique n’a pas répondu à temps';
+            return err?.message || 'erreur réseau';
+          };
           const wcHeaders = { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) };
           const wcAuthQs = `consumer_key=${encodeURIComponent(config.consumerKey)}&consumer_secret=${encodeURIComponent(config.consumerSecret)}`;
           const controller = new AbortController();
           const to = setTimeout(() => controller.abort(), WC_TIMEOUT);
           let res;
           try {
-            res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=50&_fields=id,number,status,date_created,date_modified,total,billing,line_items,customer_note&${wcAuthQs}`, { signal: controller.signal, headers: wcHeaders });
+            // Lot réduit : cette voie ne sert que lorsque la boutique répond mal,
+            // lui redemander 50 commandes garantissait un second échec.
+            res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=10&orderby=date&order=desc&_fields=id,number,status,date_created,date_modified,total,billing,line_items,customer_note&${wcAuthQs}`, { signal: controller.signal, headers: wcHeaders });
           } catch (directErr) {
             // Les deux voies ont échoué : afficher le message le plus utile
             // (celui de l'API serveur, qui explique la vraie cause).
             wooFailCountRef.current += 1;
-            if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || friendly(directErr) || 'connexion impossible'));
+            if (wooFailCountRef.current >= 2) {
+              const slow = apiErr?.wooTimeout || directErr?.name === 'AbortError';
+              setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || friendly(directErr) || 'connexion impossible')
+                + (slow ? ' — le site victoury-maroc.com est trop lent, à voir avec l’hébergeur' : ''));
+            }
             return;
           } finally { clearTimeout(to); }
           if (!res.ok) {
