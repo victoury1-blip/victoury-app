@@ -32,6 +32,38 @@ export default async function handler(req, res) {
   } catch {
     return res.status(400).json({ error: 'URL de boutique invalide' });
   }
+  const UA = 'Mozilla/5.0 (compatible; VictouryApp/1.0)';
+  const auth = 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+
+  /* ── Diagnostic ──
+     « La boutique n'a pas répondu » ne dit pas OÙ ça bloque : le site entier,
+     l'API de WordPress, ou seulement la lecture des commandes. Trois sondages
+     chronométrés répondent à la question, ce qui évite de chercher au hasard. */
+  if (req.body?.diagnose) {
+    async function probe(name, url, ms) {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), ms);
+      const t0 = Date.now();
+      try {
+        const r = await fetch(url, { signal: ac.signal, headers: { 'User-Agent': UA, Accept: '*/*', Authorization: auth } });
+        // Corps lu puis jeté : sans cela la mesure s'arrête aux en-têtes et
+        // masque une réponse dont le contenu, lui, met des secondes à arriver.
+        await r.text();
+        return { name, ok: r.ok, status: r.status, ms: Date.now() - t0 };
+      } catch (e) {
+        return { name, ok: false, ms: Date.now() - t0, error: e?.name === 'AbortError' ? `pas de réponse en ${ms / 1000} s` : 'injoignable' };
+      } finally {
+        clearTimeout(t);
+      }
+    }
+    // En série, budget serré : la fonction elle-même est coupée à 10 s.
+    const steps = [];
+    steps.push(await probe('Site web', base + '/', 3000));
+    steps.push(await probe('API WordPress', base + '/wp-json/', 3000));
+    steps.push(await probe('Lecture des commandes', `${base}/wp-json/wc/v3/orders?per_page=1&_fields=id`, 3000));
+    return res.status(200).json({ ok: true, steps });
+  }
+
   const qs = new URLSearchParams({
     status,
     per_page: String(nb),
@@ -58,9 +90,9 @@ export default async function handler(req, res) {
       headers: {
         // Certaines protections (Wordfence, hébergeur) bloquent les requêtes
         // sans User-Agent « navigateur » ; on en met un.
-        'User-Agent': 'Mozilla/5.0 (compatible; VictouryApp/1.0)',
+        'User-Agent': UA,
         Accept: 'application/json',
-        Authorization: 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64'),
+        Authorization: auth,
       },
     });
     const text = await r.text();

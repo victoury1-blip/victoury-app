@@ -377,9 +377,27 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      « signal is aborted » du navigateur. La route serveur, elle, tourne chez
      Vercel — elle n'est donc pas soumise au réseau local, au bloqueur ou au
      pare-feu de l'appareil, et elle rapporte l'erreur exacte de la boutique. */
+  /* « La boutique n'a pas répondu » ne dit pas OÙ ça bloque. Après un échec, on
+     sonde séparément le site, l'API de WordPress et la lecture des commandes :
+     le premier maillon rouge désigne le vrai coupable. */
+  async function diagnoseWoo() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch('/api/woo-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, diagnose: true }),
+      });
+      const j = await r.json().catch(() => ({}));
+      setWoo((p) => ({ ...p, testSteps: Array.isArray(j.steps) ? j.steps : [] }));
+    } catch {
+      setWoo((p) => ({ ...p, testSteps: [] }));
+    }
+  }
+
   async function testWoo() {
     if (!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret) return;
-    setWoo((p) => ({ ...p, testStatus: 'loading', testError: '' }));
+    setWoo((p) => ({ ...p, testStatus: 'loading', testError: '', testSteps: null }));
     const ac = new AbortController();
     const to = setTimeout(() => ac.abort(), 30000);
     try {
@@ -401,6 +419,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
         setWoo((p) => ({ ...p, testStatus: 'error', testError: `${j.error || 'erreur'} (HTTP ${r.status})` }));
+        diagnoseWoo();
         return;
       }
       setWoo((p) => ({ ...p, testStatus: 'success', testError: `${(j.orders || []).length} commande(s) lue(s)` }));
@@ -1068,6 +1087,27 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             {woo.testStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-600"><XCircle size={12} /> Échec{woo.testError ? ` — ${woo.testError}` : ''}</span>}
             {woo.syncStatus === 'success' && <span className="flex items-center gap-1 text-xs text-purple-600"><CheckCircle2 size={12} /> Importées</span>}
           </div>
+
+          {/* Diagnostic : le premier maillon en rouge indique ce qu'il faut réparer. */}
+          {Array.isArray(woo.testSteps) && woo.testSteps.length > 0 && (
+            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm text-xs">
+              {woo.testSteps.map((s, i) => (
+                <div key={s.name} className={`flex items-center justify-between gap-2 px-3 py-2 ${i % 2 ? 'bg-gray-50' : 'bg-white'}`}>
+                  <span className="flex items-center gap-1.5">
+                    {s.ok ? <CheckCircle2 size={12} className="text-green-600" /> : <XCircle size={12} className="text-red-600" />}
+                    {s.name}
+                  </span>
+                  <span className={s.ok ? 'text-gray-500' : 'text-red-600'}>
+                    {s.error || `HTTP ${s.status}`} · {s.ms} ms
+                  </span>
+                </div>
+              ))}
+              <div className="px-3 py-2 bg-amber-50 text-amber-700 border-t border-amber-200">
+                Le premier élément en rouge indique où ça bloque. Si le site lui-même est
+                rouge ou lent, c’est l’hébergement du site qu’il faut revoir.
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 
