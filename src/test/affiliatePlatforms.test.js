@@ -69,3 +69,28 @@ describe('domaines des plateformes', () => {
     }
   });
 });
+
+/* Laravel nomme le cookie de session d'après l'application : envoyer
+   `laravel_session` à un site qui attend le sien revient à ne pas être
+   connecté — un 401 sans autre indice. */
+describe('cookies de session', () => {
+  it('chaque plateforme annonce au moins un nom de cookie', () => {
+    for (const p of AFFILIATE_LIST) {
+      expect(Array.isArray(p.sessionCookies)).toBe(true);
+      expect(p.sessionCookies.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('les noms sont des noms de cookie valides', () => {
+    // Le proxy les rejette sinon : un séparateur permettrait d'injecter
+    // n'importe quoi dans l'en-tête Cookie.
+    for (const p of AFFILIATE_LIST) {
+      for (const n of p.sessionCookies) expect(n).toMatch(/^[A-Za-z0-9_.-]{1,64}$/);
+    }
+  });
+
+  it('Bouait porte son propre nom de session', () => {
+    expect(AFFILIATE_PLATFORMS.bouait.sessionCookies[0]).toBe('bouaitafaffiliate_session');
+    expect(AFFILIATE_PLATFORMS.chic.sessionCookies).toEqual(['laravel_session']);
+  });
+});

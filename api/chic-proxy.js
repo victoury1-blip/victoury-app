@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   // Authentification obligatoire : sans cela, l'endpoint est un relais ouvert
   // (n'importe qui peut faire transiter des requêtes par votre domaine).
   if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
-  const { path, xsrf, session, mode, host = DEFAULT_HOST } = req.query;
+  const { path, xsrf, session, mode, host = DEFAULT_HOST, names = 'laravel_session' } = req.query;
   if (!path || !session) {
     return res.status(400).json({ error: 'Missing path or session' });
   }
@@ -29,7 +29,18 @@ export default async function handler(req, res) {
   try {
     const sess = decodeURIComponent(session);
     const xsrfDecoded = xsrf ? decodeURIComponent(xsrf) : '';
-    const cookie = `laravel_session=${sess}${xsrfDecoded ? `; XSRF-TOKEN=${xsrfDecoded}` : ''}`;
+    /* Le cookie de session ne s'appelle pas partout `laravel_session` : Laravel
+       le nomme d'après l'application. On envoie la valeur sous chacun des noms
+       annoncés — un cookie inconnu est ignoré, un nom manquant fait échouer
+       toute la session. Les noms sont filtrés : un cookie ne peut pas contenir
+       de séparateur, sous peine d'injection dans l'en-tête. */
+    const cookieNames = String(names).split(',')
+      .map(n => n.trim()).filter(n => /^[A-Za-z0-9_.-]{1,64}$/.test(n));
+    if (!cookieNames.length) cookieNames.push('laravel_session');
+    const cookie = [
+      ...cookieNames.map(n => `${n}=${sess}`),
+      ...(xsrfDecoded ? [`XSRF-TOKEN=${xsrfDecoded}`] : []),
+    ].join('; ');
     const headers = {
       'Cookie': cookie,
       'Accept': mode === 'html' ? 'text/html' : 'application/json',

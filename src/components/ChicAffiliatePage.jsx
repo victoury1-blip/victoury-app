@@ -216,7 +216,7 @@ function ConfigPanel({ onTest }) {
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
           <p className="text-xs text-gray-500">
-            Ouvrez {P.host} &rarr; F12 &rarr; Application &rarr; Cookies &rarr; copiez XSRF-TOKEN et laravel_session
+            Ouvrez {P.host} &rarr; F12 &rarr; Application &rarr; Cookies &rarr; copiez XSRF-TOKEN et {P.sessionCookies[0]}
           </p>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">XSRF-TOKEN</label>
@@ -229,7 +229,7 @@ function ConfigPanel({ onTest }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Laravel Session</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Session ({P.sessionCookies[0]})</label>
             <input
               type="text"
               value={config.sessionCookie}
@@ -1888,7 +1888,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
             <p className="font-semibold text-red-700">Session {P.label} expirée</p>
             <p className="text-red-600 mt-0.5 text-xs leading-relaxed">
               Les cookies de connexion ont expiré. Ouvrez <b>{P.host}</b> (connecté) →
-              F12 → Application → Cookies → recopiez <b>XSRF-TOKEN</b> et <b>laravel_session</b>
+              F12 → Application → Cookies → recopiez <b>XSRF-TOKEN</b> et <b>{P.sessionCookies[0]}</b>
               dans « Configuration {P.label} » ci-dessous, puis « Tester la connexion ».
             </p>
           </div>

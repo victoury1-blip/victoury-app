@@ -22,6 +22,12 @@ export const AFFILIATE_PLATFORMS = {
     configKey: 'chic_config',
     /* Préfixe de la clé API du profil affilié (« CHIC_… », « BOUT_… »). */
     keyPrefix: 'CHIC_',
+    /* Nom du cookie de session. Laravel le nomme d'après l'application : Chic
+       garde le nom par défaut, Bouait porte le sien. Envoyer un nom qui n'est
+       pas le bon revient à ne pas être connecté (401), sans autre indice.
+       Plusieurs noms sont envoyés ensemble : un cookie inconnu est ignoré par
+       le serveur, alors qu'un nom manquant fait échouer toute la session. */
+    sessionCookies: ['laravel_session'],
     source: 'chic-affiliate',
     statusPrefix: 'chic',
     path: '/chic-affiliate',
@@ -34,6 +40,7 @@ export const AFFILIATE_PLATFORMS = {
     hosts: ['bouaitafaffiliate.com', 'www.bouaitafaffiliate.com', 'api.bouaitafaffiliate.com'],
     configKey: 'bouait_config',
     keyPrefix: 'BOUT_',
+    sessionCookies: ['bouaitafaffiliate_session', 'bouait_session', 'laravel_session'],
     source: 'bouait-affiliate',
     statusPrefix: 'bouait',
     path: '/bouait-affiliate',

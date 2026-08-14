@@ -75,6 +75,8 @@ function proxyUrl(path, mode, plat = 'chic') {
   const config = getChicConfig(plat);
   if (!config) throw new Error(`${P.label} non configuré`);
   const params = new URLSearchParams({ path, session: config.sessionCookie, host: P.host });
+  /* Nom du cookie de session, propre à chaque site (voir affiliatePlatforms). */
+  params.set('names', (P.sessionCookies || ['laravel_session']).join(','));
   if (config.xsrfToken) params.set('xsrf', config.xsrfToken);
   if (mode) params.set('mode', mode);
   return `/api/chic-proxy?${params}`;
