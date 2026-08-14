@@ -40,6 +40,26 @@ function isStaleBundleError(msg) {
   return /Loading chunk|dynamically imported module|module script failed|before initialization/i.test(String(msg || ''));
 }
 
+/* Sortie de secours utilisable depuis un téléphone : ouvrir l'application avec
+   « ?reset=1 » remet tout à zéro. Sans elle, sortir d'un état bloqué demandait
+   les outils de développement, indisponibles sur mobile. */
+if (new URLSearchParams(location.search).has('reset')) {
+  clearCachesAndReload();
+}
+
+/* Au chargement qui SUIT une réinitialisation profonde, le service worker
+   fraîchement réenregistré est désinstallé une dernière fois : sans cela il
+   reprend la main avec la version qui vient de casser. Le drapeau ne vaut que
+   pour ce chargement. */
+try {
+  if (sessionStorage.getItem('_sw_off') === '1') {
+    sessionStorage.removeItem('_sw_off');
+    navigator.serviceWorker?.getRegistrations?.()
+      .then(regs => Promise.all(regs.map(r => r.unregister())))
+      .catch(() => { /* pas de service worker */ });
+  }
+} catch { /* stockage indisponible */ }
+
 // On chunk load error (stale SW cache after a deploy), clear caches and reload.
 // Guard: at most one auto-reload per 15s to avoid a reload loop.
 function autoRecover() {
@@ -66,6 +86,14 @@ window.addEventListener('vite:preloadError', (e) => {
   // remonter jusqu'à RootErrorBoundary qui affiche le bouton Recharger
   if (autoRecover()) e.preventDefault?.();
 });
+
+/* Réinitialisation profonde : le service worker est désinstallé ET son
+   réenregistrement est bloqué pour ce chargement, sinon il se réinstalle
+   immédiatement et resert la version cassée. */
+async function hardReset() {
+  try { sessionStorage.setItem('_sw_off', '1'); } catch { /* mode privé */ }
+  await clearCachesAndReload();
+}
 
 // Never show a white page: catch render crashes and offer a reload
 class RootErrorBoundary extends React.Component {
@@ -97,6 +125,15 @@ class RootErrorBoundary extends React.Component {
             style={{ background: '#1E3A5F', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 32px', fontSize: 15, fontWeight: 700 }}
           >
             Recharger
+          </button>
+          {/* Si « Recharger » ne suffit pas — le service worker se réinstalle
+              aussitôt et resert la même version cassée — cette sortie le
+              désinstalle pour de bon avant de repartir de zéro. */}
+          <button
+            onClick={hardReset}
+            style={{ background: 'transparent', color: '#6b7280', border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 600 }}
+          >
+            Réinitialiser complètement
           </button>
         </div>
       );
