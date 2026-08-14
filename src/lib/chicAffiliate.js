@@ -99,6 +99,15 @@ function flagSession(res, payload, plat = 'chic') {
 /** Message d'expiration nommant la bonne plateforme. */
 const expired = (plat) => `Session ${platformOf(plat).label} expirée — reconnectez-vous`;
 
+/* Erreur d'une réponse du proxy. Le code seul (« Erreur 500 ») ne dit pas si le
+   site est injoignable, s'il a refusé la requête ou si le nom de domaine est
+   faux : on remonte le message du serveur, qui porte la vraie cause. */
+async function proxyError(res) {
+  let detail = '';
+  try { detail = (await res.clone().json())?.error || ''; } catch { /* réponse non-JSON */ }
+  return new Error(detail ? `${detail} (HTTP ${res.status})` : `Erreur ${res.status}`);
+}
+
 export async function fetchChicOrders(startDate, endDate, start = 0, length = 50, plat = 'chic') {
   const params = new URLSearchParams({
     draw: '1',
@@ -114,14 +123,14 @@ export async function fetchChicOrders(startDate, endDate, start = 0, length = 50
 
   const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`, null, plat));
   if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  if (!res.ok) throw await proxyError(res);
   return res.json();
 }
 
 export async function fetchChicProducts(plat = 'chic') {
   const res = await authFetch(proxyUrl('/affiliate/products', 'html', plat));
   if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  if (!res.ok) throw await proxyError(res);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const origin = platformOf(plat).origin;
@@ -262,7 +271,7 @@ function harvestProduct(root, origin = platformOf('chic').origin) {
 export async function diagnoseChicList(plat = 'chic') {
   const res = await authFetch(proxyUrl('/affiliate/products', 'html', plat));
   if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  if (!res.ok) throw await proxyError(res);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const anchors = [...doc.querySelectorAll('a')].map(a => a.getAttribute('href') || '').filter(h => /product/i.test(h));
@@ -284,7 +293,7 @@ export async function diagnoseChicList(plat = 'chic') {
 export async function diagnoseChicJs(plat = 'chic') {
   const res = await authFetch(proxyUrl('/js/dashboard.js?ver=0.3', 'html', plat));
   if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  if (!res.ok) throw await proxyError(res);
   const { html: js } = await res.json();
   const around = (kw, len = 320) => {
     const out = []; let i = -1; const low = js.toLowerCase();
@@ -324,7 +333,7 @@ export async function fetchChicCityFees(villeId, token, plat = 'chic') {
 export async function fetchChicProductDetails(chicProductId, plat = 'chic') {
   const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html', plat));
   if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  if (!res.ok) throw await proxyError(res);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
 
@@ -444,7 +453,7 @@ export async function fetchChicProductDetails(chicProductId, plat = 'chic') {
 export async function diagnoseChicProduct(chicProductId, plat = 'chic') {
   const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html', plat));
   if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  if (!res.ok) throw await proxyError(res);
   const { html } = await res.json();
   const inertia = extractInertiaData(html);
   const harvested = inertia ? harvestProduct(inertia, platformOf(plat).origin) : null;
@@ -534,6 +543,12 @@ export async function chicApi(path, { method = 'GET', body, host, auth, keyOverr
   return res.json();
 }
 
+/* Extrait lisible d'une réponse. `JSON.stringify(undefined)` vaut `undefined`,
+   et non une chaîne : appeler `.slice` dessus faisait échouer le sondage et
+   remplaçait TOUTES les réponses par « Cannot read properties of undefined »,
+   masquant la vraie cause de l'échec. */
+const sampleOf = (r) => String(JSON.stringify(r?.body) ?? r?.error ?? r?.status ?? '').slice(0, 180);
+
 /* Sonde les endpoints réels de l'API Chic (non documentée publiquement —
    utilisée par urlanding). Phase 1 : trouver la combinaison host + méthode
    d'authentification que /api/user accepte. Phase 2 : sonder les chemins
@@ -545,19 +560,22 @@ export async function discoverChicApi(onProgress, plat = 'chic') {
   const auths = ['bearer', 'xkey', 'plain', 'query'];
 
   /* Phase 1 — /api/user est la seule route confirmée (401 = existe).
-     urlanding stocke la clé SANS le préfixe « CHIC_ » : on teste les deux
-     formes de la clé pour chaque combinaison host × méthode d'auth. */
+     urlanding stocke la clé SANS son préfixe : on teste les deux formes pour
+     chaque combinaison host × méthode d'auth. Le préfixe dépend de la
+     plateforme (« CHIC_ », « BOUT_ »…). */
+  const prefix = P.keyPrefix || '';
   const rawKey = (getChicConfig(plat)?.apiKey || '').trim();
-  const keyForms = [...new Set([rawKey, rawKey.replace(/^CHIC_/i, ''), rawKey.startsWith('CHIC_') ? rawKey : `CHIC_${rawKey}`])].filter(Boolean);
+  const bare = prefix ? rawKey.replace(new RegExp(`^${prefix}`, 'i'), '') : rawKey;
+  const keyForms = [...new Set([rawKey, bare, prefix ? `${prefix}${bare}` : rawKey])].filter(Boolean);
   let best = null;
   for (const keyOverride of keyForms) {
-    const kLabel = keyOverride.startsWith('CHIC_') ? 'avec CHIC_' : 'sans CHIC_';
+    const kLabel = prefix && keyOverride.toUpperCase().startsWith(prefix) ? `avec ${prefix}` : `sans ${prefix}`;
     for (const host of hosts) {
       for (const auth of auths) {
         onProgress?.(`auth: ${host} / ${auth} / ${kLabel}`);
         try {
           const r = await chicApi('/api/user', { host, auth, keyOverride, plat });
-          results.push({ path: `[${host} · ${auth} · ${kLabel}] /api/user`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
+          results.push({ path: `[${host} · ${auth} · ${kLabel}] /api/user`, status: r.status, sample: sampleOf(r) });
           if (r.status >= 200 && r.status < 300 && !best) best = { host, auth, keyOverride };
         } catch (e) {
           results.push({ path: `[${host} · ${auth} · ${kLabel}] /api/user`, status: 0, sample: e.message });
@@ -582,7 +600,7 @@ export async function discoverChicApi(onProgress, plat = 'chic') {
     onProgress?.(path);
     try {
       const r = await chicApi(path, { ...combo, plat });
-      results.push({ path: `[${combo.host} · ${combo.auth}] ${path}`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
+      results.push({ path: `[${combo.host} · ${combo.auth}] ${path}`, status: r.status, sample: sampleOf(r) });
     } catch (e) {
       results.push({ path, status: 0, sample: e.message });
     }
@@ -667,7 +685,7 @@ export async function fetchChicCounts(plat = 'chic') {
     'order[0][dir]': 'desc',
   });
   const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`, null, plat));
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  if (!res.ok) throw await proxyError(res);
   const data = await res.json();
   return { total: data.recordsTotal || 0 };
 }

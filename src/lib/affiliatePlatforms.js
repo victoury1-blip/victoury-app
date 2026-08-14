@@ -20,6 +20,8 @@ export const AFFILIATE_PLATFORMS = {
        tantôt avec `www.`, tantôt sans). */
     hosts: ['www.chic-affiliate.com', 'chic-affiliate.com', 'api.chic-affiliate.com'],
     configKey: 'chic_config',
+    /* Préfixe de la clé API du profil affilié (« CHIC_… », « BOUT_… »). */
+    keyPrefix: 'CHIC_',
     source: 'chic-affiliate',
     statusPrefix: 'chic',
     path: '/chic-affiliate',
@@ -31,6 +33,7 @@ export const AFFILIATE_PLATFORMS = {
     origin: 'https://bouaitaffiliate.com',
     hosts: ['bouaitaffiliate.com', 'www.bouaitaffiliate.com', 'api.bouaitaffiliate.com'],
     configKey: 'bouait_config',
+    keyPrefix: 'BOUT_',
     source: 'bouait-affiliate',
     statusPrefix: 'bouait',
     path: '/bouait-affiliate',

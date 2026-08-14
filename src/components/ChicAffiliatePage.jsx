@@ -239,7 +239,7 @@ function ConfigPanel({ onTest }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Clé API (profil Chic → «&nbsp;Clé API&nbsp;», commence par CHIC_)</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Clé API (profil {P.label} → «&nbsp;Clé API&nbsp;», commence par {P.keyPrefix})</label>
             <input
               type="text"
               value={config.apiKey || ''}
@@ -279,7 +279,7 @@ function ConfigPanel({ onTest }) {
 
           {/* Diagnostic produit : voir ce que le parseur lit (tailles/couleurs) */}
           <div className="border-t border-gray-100 pt-3">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Diagnostic produit (ID Chic, ex : 203)</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Diagnostic produit (ID produit, ex : 203)</label>
             <div className="flex gap-2">
               <input
                 type="text"

@@ -72,6 +72,15 @@ export default async function handler(req, res) {
       res.status(response.status).json({ error: 'Réponse non-JSON', body: text.slice(0, 500) });
     }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    /* Un nom de domaine inexistant ou un site injoignable remontait en
+       « Erreur 500 » sans plus d'explication — impossible de savoir s'il
+       fallait corriger l'adresse ou attendre. */
+    const cause = e?.cause?.code || e?.code || '';
+    const unreachable = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ETIMEDOUT|ECONNRESET|UNABLE_TO_VERIFY/i.test(cause);
+    res.status(502).json({
+      error: unreachable
+        ? `${host} injoignable (${cause}) — vérifiez l'adresse du site`
+        : `Requête impossible : ${e?.message || 'erreur réseau'}`,
+    });
   }
 }
