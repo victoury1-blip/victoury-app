@@ -229,9 +229,17 @@ export default function ProfitPage({ orders = [] }) {
   // Match each colis to its order for product cost calculation
   const orderMap = useMemo(() => new Map(orders.map(o => [o.id, o])), [orders]);
 
+  /* Une commande marquée ÉCHANGE ne coûte rien de plus : la marchandise a déjà
+     été payée sur la commande d'origine. Lui compter le prix d'achat une
+     seconde fois affichait des marges négatives sur des échanges livrés
+     (30 encaissés, 100 de coût, −70 de « perte » qui n'existe pas).
+     La règle vit ici, et non dans le tableau : les totaux, l'export CSV et le
+     détail du coût d'achat en dépendent tous. */
+  const isEchange = (colis) => !!orderMap.get(colis.orderId)?.echange;
+
   function getProductCost(colis) {
     const order = orderMap.get(colis.orderId);
-    if (!order) return 0;
+    if (!order || order.echange) return 0;
     const prods = order.products?.length ? order.products : [order.product];
     let cost = 0;
     for (const p of prods) {
@@ -261,6 +269,13 @@ export default function ProfitPage({ orders = [] }) {
     const order = orderMap.get(colis.orderId);
     const prods = order?.products?.length ? order.products : [order?.product].filter(Boolean);
     const items = [];
+    // Même règle que getProductCost : un échange n'a pas de coût d'achat.
+    if (order?.echange) {
+      return (prods || []).filter(p => p?.name).map(p => ({
+        name: p.name, matched: 'Échange — déjà payé', manual: false,
+        unitCost: 0, qty: p.qty || 1, cost: 0, echange: true,
+      }));
+    }
     for (const p of (prods || [])) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
@@ -311,6 +326,8 @@ export default function ProfitPage({ orders = [] }) {
   });
   const chicCA = chicOrdersList.reduce((s, o) => s + (o.price || 0), 0);
   const chicCost = chicOrdersList.reduce((s, o) => {
+    // Échange : marchandise déjà payée sur la commande d'origine.
+    if (o.echange) return s;
     const prods = o.products?.length ? o.products : [o.product];
     let cost = 0;
     for (const p of prods) {
@@ -365,7 +382,8 @@ export default function ProfitPage({ orders = [] }) {
               const noCost = isR || isC;
               const pa = noCost ? 0 : getProductCost(c); const fl = c.fraisLivraison||0;
               const m = noCost ? -fl : (c.prix||0) - pa - fl;
-              rows.push([esc(c.factureRef), esc(c.orderId), esc(c.recipient||''), esc(c.city||''), isR?'Refusé':isC?'Échange':'Livré', noCost?0:c.prix||0, pa.toFixed(2), fl, m.toFixed(2)].join(','));
+              const statut = isR ? 'Refusé' : isC ? 'Échange' : isEchange(c) ? 'Livré (échange)' : 'Livré';
+              rows.push([esc(c.factureRef), esc(c.orderId), esc(c.recipient||''), esc(c.city||''), statut, noCost?0:c.prix||0, pa.toFixed(2), fl, m.toFixed(2)].join(','));
             });
             rows.push('');
             EXPENSE_CATS.forEach(cat => {
@@ -514,6 +532,9 @@ export default function ProfitPage({ orders = [] }) {
                   const isRefuse = c.status === 'refuse';
                   const isChange = c.status === 'change';
                   const noCost = isRefuse || isChange; // échange : pas de coût d'achat, pas de CA
+                  // Commande marquée échange mais livrée : l'encaissement est réel,
+                  // seul le coût d'achat disparaît (marchandise déjà payée).
+                  const echangeLivre = !noCost && isEchange(c);
                   const pv = c.prix || 0;
                   const pa = noCost ? 0 : getProductCost(c);
                   const fl = c.fraisLivraison || 0;
@@ -528,7 +549,7 @@ export default function ProfitPage({ orders = [] }) {
                       <td className="px-4 py-2.5 text-xs text-gray-500">{c.city || order?.recipient?.city || '—'}</td>
                       <td className="px-4 py-2.5">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isRefuse ? 'bg-red-100 text-red-600' : isChange ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                          {isRefuse ? 'Refusé' : isChange ? 'Échange' : 'Livré'}
+                          {isRefuse ? 'Refusé' : isChange ? 'Échange' : echangeLivre ? 'Livré (échange)' : 'Livré'}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[150px] truncate">
@@ -536,7 +557,7 @@ export default function ProfitPage({ orders = [] }) {
                         {order?.products?.length > 1 && <span className="text-[10px] text-gray-400 ml-1">(+{order.products.length - 1})</span>}
                       </td>
                       <td className="px-4 py-2.5 font-semibold text-gray-800">{noCost ? '—' : fmt(pv)}</td>
-                      <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{noCost ? '—' : fmt(pa)}</td>
+                      <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{noCost || echangeLivre ? '—' : fmt(pa)}</td>
                       <td className="px-4 py-2.5 text-orange-500 text-xs font-semibold">{fmt(fl)}</td>
                       <td className={`px-4 py-2.5 font-bold text-xs ${marge >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(marge)}</td>
                     </tr>
@@ -600,10 +621,10 @@ export default function ProfitPage({ orders = [] }) {
                 </thead>
                 <tbody>
                   {livresColis.flatMap((c) => getProductCostDetail(c).map((it, j) => (
-                    <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.unitCost === 0 ? 'bg-red-50/60' : it.manual ? 'bg-blue-50/40' : ''}`}>
+                    <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.echange ? 'bg-amber-50/50' : it.unitCost === 0 ? 'bg-red-50/60' : it.manual ? 'bg-blue-50/40' : ''}`}>
                       <td className="px-2 py-2 font-mono font-bold text-blue-600">{j === 0 ? c.orderId : ''}</td>
                       <td className="px-2 py-2 text-gray-700">{it.name}</td>
-                      <td className={`px-2 py-2 ${it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
+                      <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
                       <td className="px-2 py-2 text-right font-semibold text-gray-800">{j === 0 ? `${fmt(c.prix)}` : ''}</td>
                       <td className="px-2 py-2 text-right">
                         <input

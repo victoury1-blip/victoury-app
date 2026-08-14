@@ -390,6 +390,8 @@ export default function Dashboard({ orders = [], isLoading = false }) {
       .reduce((s, o) => s + (o.price || 0), 0);
 
     const todayCost = todayChic.filter(o => ['confirme', 'livre'].includes(o.status)).reduce((s, o) => {
+      // Échange : la marchandise a déjà été payée sur la commande d'origine.
+      if (o.echange) return s;
       const prods = o.products || [o.product];
       let cost = 0;
       (prods || []).forEach(p => {
