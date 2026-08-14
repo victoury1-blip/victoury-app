@@ -29,9 +29,9 @@ export const AFFILIATE_PLATFORMS = {
   bouait: {
     key: 'bouait',
     label: 'Bouait Affiliate',
-    host: 'bouaitaffiliate.com',
-    origin: 'https://bouaitaffiliate.com',
-    hosts: ['bouaitaffiliate.com', 'www.bouaitaffiliate.com', 'api.bouaitaffiliate.com'],
+    host: 'bouaitafaffiliate.com',
+    origin: 'https://bouaitafaffiliate.com',
+    hosts: ['bouaitafaffiliate.com', 'www.bouaitafaffiliate.com', 'api.bouaitafaffiliate.com'],
     configKey: 'bouait_config',
     keyPrefix: 'BOUT_',
     source: 'bouait-affiliate',

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  AFFILIATE_LIST, platformOf, st, isAffiliateStatus,
+  AFFILIATE_PLATFORMS, AFFILIATE_LIST, platformOf, st, isAffiliateStatus,
   isAffiliateSource, platformOfSource, platKey,
 } from '../lib/affiliatePlatforms';
 
@@ -50,5 +50,22 @@ describe('plateformes d’affiliation', () => {
     expect(platKey('chic', 'city_frais')).toBe('chic_city_frais');
     expect(platKey(undefined, 'hidden_ids')).toBe('chic_hidden_ids');
     expect(platKey('bouait', 'city_frais')).toBe('bouait_city_frais');
+  });
+});
+
+/* Le domaine avait été deviné (« bouaitaffiliate.com ») au lieu d'être lu :
+   il n'existait pas, et toutes les requêtes échouaient. */
+describe('domaines des plateformes', () => {
+  it('les hôtes sont ceux des sites réels', () => {
+    expect(AFFILIATE_PLATFORMS.chic.host).toBe('www.chic-affiliate.com');
+    expect(AFFILIATE_PLATFORMS.bouait.host).toBe('bouaitafaffiliate.com');
+  });
+
+  it('origine et hôtes concordent', () => {
+    for (const p of AFFILIATE_LIST) {
+      expect(p.origin).toBe(`https://${p.host}`);
+      expect(p.hosts).toContain(p.host);
+      expect(p.origin.startsWith('https://')).toBe(true);
+    }
   });
 });

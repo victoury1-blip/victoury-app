@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     }
     // Restreint le proxy aux plateformes d'affiliation, en HTTPS (évite un
     // SSRF vers un hôte arbitraire / des services internes).
-    if (!/^https:\/\/(www\.)?(chic-affiliate|bouaitaffiliate)\.com\//i.test(imageUrl)) {
+    if (!/^https:\/\/(www\.)?(chic-affiliate|bouaitafaffiliate)\.com\//i.test(imageUrl)) {
       return res.status(400).json({ error: 'Hôte non autorisé' });
     }
     // Le Referer doit correspondre à l'hôte demandé : certains sites refusent

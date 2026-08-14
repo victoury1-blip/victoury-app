@@ -3,7 +3,7 @@ import { isAuthenticated } from './_auth.js';
 /* Hôtes autorisés. Chic et Bouait tournent sur le même logiciel : le proxy est
    le même, seul l'hôte change. La liste est FERMÉE — sans elle, l'endpoint
    relaierait vers n'importe quelle adresse (SSRF / relais ouvert). */
-const ALLOWED_HOSTS = ['www.chic-affiliate.com', 'chic-affiliate.com', 'bouaitaffiliate.com', 'www.bouaitaffiliate.com'];
+const ALLOWED_HOSTS = ['www.chic-affiliate.com', 'chic-affiliate.com', 'bouaitafaffiliate.com', 'www.bouaitafaffiliate.com'];
 const DEFAULT_HOST = 'www.chic-affiliate.com';
 
 export default async function handler(req, res) {

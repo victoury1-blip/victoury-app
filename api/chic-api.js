@@ -9,7 +9,7 @@ import { isAuthenticated } from './_auth.js';
    - auth : bearer (défaut) | xkey (X-API-KEY) | plain (Authorization brut) | query (?api_key=) */
 const ALLOWED_HOSTS = [
   'www.chic-affiliate.com', 'api.chic-affiliate.com', 'chic-affiliate.com',
-  'bouaitaffiliate.com', 'www.bouaitaffiliate.com', 'api.bouaitaffiliate.com',
+  'bouaitafaffiliate.com', 'www.bouaitafaffiliate.com', 'api.bouaitafaffiliate.com',
 ];
 
 export default async function handler(req, res) {
