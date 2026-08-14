@@ -7,7 +7,10 @@ import { isAuthenticated } from './_auth.js';
    - path : chemin /api/... (obligatoire)
    - host : www.chic-affiliate.com (défaut) | api.chic-affiliate.com | chic-affiliate.com
    - auth : bearer (défaut) | xkey (X-API-KEY) | plain (Authorization brut) | query (?api_key=) */
-const ALLOWED_HOSTS = ['www.chic-affiliate.com', 'api.chic-affiliate.com', 'chic-affiliate.com'];
+const ALLOWED_HOSTS = [
+  'www.chic-affiliate.com', 'api.chic-affiliate.com', 'chic-affiliate.com',
+  'bouaitaffiliate.com', 'www.bouaitaffiliate.com', 'api.bouaitaffiliate.com',
+];
 
 export default async function handler(req, res) {
   // Authentification obligatoire : sans cela, l'endpoint est un relais ouvert

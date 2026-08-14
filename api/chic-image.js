@@ -10,14 +10,17 @@ export default async function handler(req, res) {
     if (imageUrl.includes('%2F') || imageUrl.includes('%3A')) {
       try { imageUrl = decodeURIComponent(imageUrl); } catch {}
     }
-    // Restreint le proxy d'images à chic-affiliate.com en HTTPS (évite un SSRF
-    // vers un hôte arbitraire / des services internes).
-    if (!/^https:\/\/(www\.)?chic-affiliate\.com\//i.test(imageUrl)) {
+    // Restreint le proxy aux plateformes d'affiliation, en HTTPS (évite un
+    // SSRF vers un hôte arbitraire / des services internes).
+    if (!/^https:\/\/(www\.)?(chic-affiliate|bouaitaffiliate)\.com\//i.test(imageUrl)) {
       return res.status(400).json({ error: 'Hôte non autorisé' });
     }
+    // Le Referer doit correspondre à l'hôte demandé : certains sites refusent
+    // une image dont le référent pointe vers un autre domaine.
+    const origin = new URL(imageUrl).origin;
     const response = await fetch(imageUrl, {
       headers: {
-        'Referer': 'https://www.chic-affiliate.com/',
+        'Referer': `${origin}/`,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     });

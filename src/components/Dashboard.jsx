@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { isAffiliateSource } from '../lib/affiliatePlatforms';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
@@ -370,7 +371,7 @@ export default function Dashboard({ orders = [], isLoading = false }) {
   ];
 
   /* ── Chic Affiliate stats ── */
-  const { products: chicProducts } = useProducts(p => p.source === 'chic-affiliate');
+  const { products: chicProducts } = useProducts(p => isAffiliateSource(p.source));
 
   const chicStats = useMemo(() => {
     const chicNames = new Set(chicProducts.map(p => p.name?.toLowerCase()).filter(Boolean));

@@ -35,6 +35,7 @@ const replaceOrdersOffline = async (...a) => (await _offlineStore()).replaceOrde
 import { fetchFingerprints, fetchAllOrders, fetchOrdersByIds, staleIds } from './lib/ordersSync';
 import { cloudGet, cloudSet } from './lib/cloudSettings';
 import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
+import { AFFILIATE_LIST, platformOf } from './lib/affiliatePlatforms';
 import { logAlert } from './lib/errorLog';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
@@ -763,20 +764,29 @@ export default function App() {
           }
           return '';
         };
-        /* Produits importés de Chic Affiliate : leurs commandes site ne passent pas
-           par « À Confirmer » mais par l'onglet Commandes Site de la page Chic. */
-        let chicNames = new Set();
+        /* Produits importés d'une plateforme d'affiliation : leurs commandes site
+           ne passent pas par « À Confirmer » mais par l'onglet Commandes Site de
+           la page correspondante. Chaque plateforme a ses propres noms — sans
+           cette séparation, une commande Bouait atterrirait chez Chic. */
+        const normName = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const namesByPlat = new Map();
         try {
           const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
-          const normName = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-          chicNames = new Set(prods.filter(p => p.source === 'chic-affiliate').map(p => normName(p.name)).filter(Boolean));
-        } catch {}
-        const isChicProduct = (name) => {
-          const n = (name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-          if (!n) return false;
-          if (chicNames.has(n)) return true;
-          for (const c of chicNames) { if (c && (n.includes(c) || c.includes(n))) return true; }
-          return false;
+          for (const plat of AFFILIATE_LIST) {
+            namesByPlat.set(plat.key, new Set(
+              prods.filter(p => p.source === plat.source).map(p => normName(p.name)).filter(Boolean)
+            ));
+          }
+        } catch { /* cache produits illisible : tout part en « À Confirmer » */ }
+        /* Plateforme d'un produit d'après son nom, ou null s'il n'en vient pas. */
+        const platOfName = (name) => {
+          const n = normName(name);
+          if (!n) return null;
+          for (const [key, names] of namesByPlat) {
+            if (names.has(n)) return key;
+            for (const c of names) { if (c && (n.includes(c) || c.includes(n))) return key; }
+          }
+          return null;
         };
         /* Map each WC order individually — bad order is skipped, not crashes the whole poll */
         const mapped = [];
@@ -807,7 +817,10 @@ export default function App() {
               },
               products: products.length > 0 ? products : null,
               price: parseFloat(o.total) || 0,
-              status: products.some(p => isChicProduct(p.name)) || isChicProduct(firstItem.name) ? 'chic_nouveau' : 'nouveau',
+              status: (() => {
+                const plat = products.map(p => platOfName(p.name)).find(Boolean) || platOfName(firstItem.name);
+                return plat ? `${platformOf(plat).statusPrefix}_nouveau` : 'nouveau';
+              })(),
               note: o.customer_note || '',
               dateAdded: fmtDate(o.date_created),
               dateUpdated: fmtDate(o.date_modified),
@@ -1002,28 +1015,30 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    async function syncChic() {
+    /* Une passe par plateforme configurée : chacune a sa session et ses statuts. */
+    async function syncPlatform(plat) {
       try {
-        if (!getChicConfig()?.sessionCookie) return;
-        if (!ordersRef.current.some(o => o.status === 'chic_envoye')) return;
-        const chicOrders = await fetchChicRecentOrders(100);
-        if (cancelled || !chicOrders.length) return;
+        if (!getChicConfig(plat.key)?.sessionCookie) return;
+        if (!ordersRef.current.some(o => o.status === `${plat.statusPrefix}_envoye`)) return;
+        const remote = await fetchChicRecentOrders(100, plat.key);
+        if (cancelled || !remote.length) return;
         setOrdersWithSync(prev => {
-          const updates = computeChicStatusUpdates(chicOrders, prev);
+          const updates = computeChicStatusUpdates(remote, prev, plat.key);
           if (!updates.length) return prev;
           const m = new Map(updates.map(u => [u.id, u.status]));
           const ts = now();
           return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: ts, manuallyModified: true } : o);
         });
       } catch (e) {
-        logAlert('Sync Chic', `Échec de la synchro automatique : ${e?.message || 'erreur'}`);
+        logAlert(`Sync ${plat.label}`, `Échec de la synchro automatique : ${e?.message || 'erreur'}`);
       }
     }
+    const syncChic = () => Promise.all(AFFILIATE_LIST.map(syncPlatform));
     syncChic();
     const interval = setInterval(syncChic, 5 * 60 * 1000);
     const onVis = () => { if (document.visibilityState === 'visible') syncChic(); };
     document.addEventListener('visibilitychange', onVis);
-    const onChicExpired = () => logAlert('Chic Affiliate', 'Session expirée — reconnectez-vous (Configuration).');
+    const onChicExpired = (e) => logAlert(platformOf(e?.detail?.plat).label, 'Session expirée — reconnectez-vous (Configuration).');
     window.addEventListener('chic-session-expired', onChicExpired);
     return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('chic-session-expired', onChicExpired); };
   }, [session]);
@@ -1246,7 +1261,9 @@ export default function App() {
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/fournisseur" element={<PermGate perm="stock"><FournisseurPage /></PermGate>} />
-          <Route path="/chic-affiliate" element={<ChicAffiliatePage orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
+          <Route path="/chic-affiliate" element={<ChicAffiliatePage platform="chic" orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
+          {/* Même page, autre plateforme : Bouait tourne sur le même logiciel que Chic. */}
+          <Route path="/bouait-affiliate" element={<ChicAffiliatePage platform="bouait" orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
           <Route path="/ramassage/scanner" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/ramassage/bons" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />

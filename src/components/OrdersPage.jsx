@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { isAffiliateSource, platformOfSource, platformOf } from '../lib/affiliatePlatforms';
 import useDebounce from '../hooks/useDebounce';
 import useSearchShortcut from '../hooks/useSearchShortcut';
 import Pagination, { paginate } from './Pagination';
@@ -404,16 +405,18 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   const [customerHistory, setCustomerHistory] = useState(null);
   const [chicSending, setChicSending] = useState(null);
 
+  /* Produits venant d'une plateforme d'affiliation, toutes plateformes
+     confondues : la plateforme visée se déduit ensuite de `source`. */
   const [chicProducts, setChicProducts] = useState(() => {
-    return loadProducts().filter(p => p.source === 'chic-affiliate');
+    return loadProducts().filter(p => isAffiliateSource(p.source));
   });
   useEffect(() => {
-    const local = loadProducts().filter(p => p.source === 'chic-affiliate');
+    const local = loadProducts().filter(p => isAffiliateSource(p.source));
     if (local.length > 0) setChicProducts(local);
     loadProductsRemote().then(remote => {
-      const chic = (remote || []).filter(p => p.source === 'chic-affiliate');
+      const chic = (remote || []).filter(p => isAffiliateSource(p.source));
       if (chic.length > chicProducts.length) setChicProducts(chic);
-    }).catch(() => {});
+    }).catch(() => { /* le local suffit */ });
   }, []);
 
   function isChicOrder(order) {
@@ -436,27 +439,32 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
   }
 
   async function forwardToChic(order) {
-    const config = getChicConfig();
-    if (!config) { toast.error('Chic Affiliate non configuré — allez dans la page Chic Affiliate'); return; }
     const match = getChicProductForOrder(order);
-    if (!match) { toast.error('Produit Chic non trouvé'); return; }
+    if (!match) { toast.error('Produit d’affiliation non trouvé'); return; }
+    /* La plateforme vient du produit lui-même : envoyer une commande Bouait
+       avec la session Chic échouerait, ou pire, créerait la commande au mauvais
+       endroit. */
+    const plat = platformOfSource(match.chicProd.source);
+    const P = platformOf(plat);
+    const config = getChicConfig(plat);
+    if (!config) { toast.error(`${P.label} non configuré — allez dans la page ${P.label}`); return; }
     setChicSending(order.id);
     try {
       let chicId = match.chicProd.chicId;
       if (!chicId) {
-        const chicList = await fetchChicProducts();
+        const chicList = await fetchChicProducts(plat);
         const normalize = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
         const prodName = normalize(match.chicProd.name);
         const found = (chicList.data || []).find(cp => normalize(cp.name) === prodName)
           || (chicList.data || []).find(cp => normalize(cp.name).includes(prodName) || prodName.includes(normalize(cp.name)));
-        if (!found?.chicId) { toast.error(`Produit "${match.chicProd.name}" non trouvé sur chic-affiliate.com`); setChicSending(null); return; }
+        if (!found?.chicId) { toast.error(`Produit "${match.chicProd.name}" non trouvé sur ${P.host}`); setChicSending(null); return; }
         chicId = found.chicId;
         const prods = loadProducts().map(p =>
           p.id === match.chicProd.id ? { ...p, chicId } : p
         );
         saveProducts(prods);
       }
-      const details = await fetchChicProductDetails(chicId);
+      const details = await fetchChicProductDetails(chicId, plat);
       const villeMatch = details.cities.find(c =>
         c.name.toLowerCase().includes((order.recipient?.city || '').toLowerCase())
       );
@@ -474,10 +482,10 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         fraisLivraison: '',
         address: order.recipient?.address || '',
         comment: `Commande ${order.id}`,
-      });
+      }, plat);
 
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, chicForwarded: true } : o));
-      toast.success(`Commande ${order.id} envoyée à Chic Affiliate !`);
+      toast.success(`Commande ${order.id} envoyée à ${P.label} !`);
     } catch (e) {
       toast.error('Erreur: ' + e.message);
     } finally {

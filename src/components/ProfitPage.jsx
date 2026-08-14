@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { isAffiliateSource, isAffiliateStatus } from '../lib/affiliatePlatforms';
 import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package, Store } from 'lucide-react';
 import useProducts from '../hooks/useProducts';
 import { loadFactures } from '../data/factures';
@@ -293,7 +294,7 @@ export default function ProfitPage({ orders = [] }) {
   const totalRefuse = allFactureColis.filter(c => c.status === 'refuse').length;
   const totalLivre = livresColis.length;
 
-  const chicProducts = stockProducts.filter(p => p.source === 'chic-affiliate');
+  const chicProducts = stockProducts.filter(p => isAffiliateSource(p.source));
   // Matching par nom de base (ignore les variantes « - L », « - Noir »…).
   const cNorm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
   const cBase = s => cNorm(s).split(/\s*[-–—/|]\s*/)[0].trim();
@@ -304,7 +305,7 @@ export default function ProfitPage({ orders = [] }) {
   };
   // Profit Chic = commandes livrées/facturées (ventes réalisées).
   const chicOrdersList = orders.filter(o => {
-    if (o.status !== 'chic_livre' && o.status !== 'chic_facture') return false;
+    if (!isAffiliateStatus(o.status, 'livre', 'facture')) return false;
     const prods = o.products?.length ? o.products : [o.product];
     return prods.some(p => chicMatch(p?.name));
   });

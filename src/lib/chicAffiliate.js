@@ -1,5 +1,6 @@
 import { cloudSet } from './cloudSettings';
 import { supabase } from './supabase';
+import { platformOf, st } from './affiliatePlatforms';
 
 /* Les routes serveur /api/chic-* exigent un utilisateur connecté : on joint le
    jeton Supabase à chaque appel. */
@@ -11,7 +12,10 @@ async function authFetch(url, opts = {}) {
   return fetch(url, { ...opts, headers });
 }
 
-const STORAGE_KEY = 'chic_config';
+/* Toutes les fonctions acceptent une plateforme en dernier argument et
+   retombent sur Chic sans elle : Chic et Bouait tournent sur le même logiciel,
+   seuls l'hôte, la configuration et les statuts changent. Ce défaut garde le
+   code appelant historique valable tel quel. */
 
 /* Nom français approché d'une couleur CSS (hex ou rgb) — les pastilles de
    couleur de chic-affiliate.com n'ont pas de libellé, seulement un fond. */
@@ -52,23 +56,25 @@ export function stripHtml(str) {
   return doc.body.textContent || '';
 }
 
-export function getChicConfig() {
+export function getChicConfig(plat = 'chic') {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    return JSON.parse(localStorage.getItem(platformOf(plat).configKey) || 'null');
   } catch {
     return null;
   }
 }
 
-export function saveChicConfig(config) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  cloudSet(STORAGE_KEY, config);
+export function saveChicConfig(config, plat = 'chic') {
+  const key = platformOf(plat).configKey;
+  localStorage.setItem(key, JSON.stringify(config));
+  cloudSet(key, config);
 }
 
-function proxyUrl(path, mode) {
-  const config = getChicConfig();
-  if (!config) throw new Error('Chic Affiliate non configuré');
-  const params = new URLSearchParams({ path, session: config.sessionCookie });
+function proxyUrl(path, mode, plat = 'chic') {
+  const P = platformOf(plat);
+  const config = getChicConfig(plat);
+  if (!config) throw new Error(`${P.label} non configuré`);
+  const params = new URLSearchParams({ path, session: config.sessionCookie, host: P.host });
   if (config.xsrfToken) params.set('xsrf', config.xsrfToken);
   if (mode) params.set('mode', mode);
   return `/api/chic-proxy?${params}`;
@@ -80,15 +86,20 @@ export function isSessionError(err) {
   const m = (err?.message || String(err || '')).toLowerCase();
   return m.includes('401') || m.includes('session') || m.includes('reconnect');
 }
-function flagSession(res, payload) {
+function flagSession(res, payload, plat = 'chic') {
   if (res.status === 401 || payload?.error?.toLowerCase?.().includes('session')) {
-    try { window.dispatchEvent(new CustomEvent('chic-session-expired')); } catch {}
+    // La plateforme voyage dans l'événement : sans elle, une session Bouait
+    // expirée afficherait « reconnectez-vous à Chic ».
+    try { window.dispatchEvent(new CustomEvent('chic-session-expired', { detail: { plat } })); } catch { /* hors navigateur */ }
     return true;
   }
   return false;
 }
 
-export async function fetchChicOrders(startDate, endDate, start = 0, length = 50) {
+/** Message d'expiration nommant la bonne plateforme. */
+const expired = (plat) => `Session ${platformOf(plat).label} expirée — reconnectez-vous`;
+
+export async function fetchChicOrders(startDate, endDate, start = 0, length = 50, plat = 'chic') {
   const params = new URLSearchParams({
     draw: '1',
     start: String(start),
@@ -101,18 +112,19 @@ export async function fetchChicOrders(startDate, endDate, start = 0, length = 50
   if (startDate) params.set('startDate', startDate);
   if (endDate) params.set('endDate', endDate);
 
-  const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+  const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`, null, plat));
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   return res.json();
 }
 
-export async function fetchChicProducts() {
-  const res = await authFetch(proxyUrl('/affiliate/products', 'html'));
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+export async function fetchChicProducts(plat = 'chic') {
+  const res = await authFetch(proxyUrl('/affiliate/products', 'html', plat));
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
+  const origin = platformOf(plat).origin;
   const products = [];
   const seen = new Set();
 
@@ -122,7 +134,7 @@ export async function fetchChicProducts() {
   const priceRe = /[\d.,]+\s*(?:MAD|DH|Dhs)/gi;
   const proxify = (src) => {
     if (!src) return '';
-    const raw = src.startsWith('//') ? `https:${src}` : src.startsWith('/') ? `https://www.chic-affiliate.com${src}` : src;
+    const raw = src.startsWith('//') ? `https:${src}` : src.startsWith('/') ? `${origin}${src}` : src;
     return `/api/chic-image?url=${encodeURIComponent(raw)}`;
   };
   const pickImg = (el) => {
@@ -184,7 +196,7 @@ function extractInertiaData(html) {
 
 /* Cherche récursivement dans l'objet Inertia le nœud produit et en tire
    tailles / couleurs / images. Robuste aux noms de clés variables. */
-function harvestProduct(root) {
+function harvestProduct(root, origin = platformOf('chic').origin) {
   const out = { sizes: [], colors: [], images: [], description: '', cities: [], token: '', productId: '' };
   if (!root || typeof root !== 'object') return out;
   const seen = new Set();
@@ -221,7 +233,7 @@ function harvestProduct(root) {
         arr.forEach(v => {
           let u = typeof v === 'object' ? (v.url || v.src || v.path || v.image || v.name) : v;
           if (typeof u === 'string' && u) {
-            if (!/^https?:\/\//.test(u)) u = `https://www.chic-affiliate.com/${u.replace(/^\//, '')}`;
+            if (!/^https?:\/\//.test(u)) u = `${origin}/${u.replace(/^\//, '')}`;
             if (!out.images.includes(u)) out.images.push(u);
           }
         });
@@ -247,9 +259,9 @@ function harvestProduct(root) {
 
 /* Diagnostic de la LISTE des produits : montre comment les produits sont liés
    (URL, data-attributs) pour extraire le chicId de façon fiable. */
-export async function diagnoseChicList() {
-  const res = await authFetch(proxyUrl('/affiliate/products', 'html'));
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+export async function diagnoseChicList(plat = 'chic') {
+  const res = await authFetch(proxyUrl('/affiliate/products', 'html', plat));
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -269,9 +281,9 @@ export async function diagnoseChicList() {
 
 /* Cherche dans dashboard.js comment le Tarif de livraison est récupéré à la
    sélection d'une ville (endpoint AJAX + paramètres) pour l'automatiser. */
-export async function diagnoseChicJs() {
-  const res = await authFetch(proxyUrl('/js/dashboard.js?ver=0.3', 'html'));
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+export async function diagnoseChicJs(plat = 'chic') {
+  const res = await authFetch(proxyUrl('/js/dashboard.js?ver=0.3', 'html', plat));
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html: js } = await res.json();
   const around = (kw, len = 320) => {
@@ -295,23 +307,23 @@ export async function diagnoseChicJs() {
 /* Récupère le frais de livraison réel d'une ville via l'endpoint officiel de
    Chic (découvert dans le JS de la page) : POST /affiliate/city/fees
    { id, _token } -> { fees }. */
-export async function fetchChicCityFees(villeId, token) {
+export async function fetchChicCityFees(villeId, token, plat = 'chic') {
   if (!villeId) return 0;
   const body = new URLSearchParams({ id: String(villeId), _token: token || '' });
-  const res = await authFetch(proxyUrl('/affiliate/city/fees'), {
+  const res = await authFetch(proxyUrl('/affiliate/city/fees', null, plat), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
   });
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   const data = await res.json().catch(() => ({}));
   const fees = data?.fees ?? data?.body?.fees ?? data?.tarif;
   return parseFloat(String(fees ?? '').replace(/[^\d.]/g, '')) || 0;
 }
 
-export async function fetchChicProductDetails(chicProductId) {
-  const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+export async function fetchChicProductDetails(chicProductId, plat = 'chic') {
+  const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html', plat));
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -322,7 +334,8 @@ export async function fetchChicProductDetails(chicProductId) {
 
   /* Source prioritaire : le JSON Inertia embarqué (données produit fiables). */
   const inertia = extractInertiaData(html);
-  const fromJson = inertia ? harvestProduct(inertia) : null;
+  const origin = platformOf(plat).origin;
+  const fromJson = inertia ? harvestProduct(inertia, origin) : null;
 
   /* Tailles : <input type="radio" name="size" value="L|Xl|2xl|3xl"> — on
      normalise en majuscules et on dédoublonne. */
@@ -402,7 +415,7 @@ export async function fetchChicProductDetails(chicProductId) {
   const images = fromJson?.images ? [...fromJson.images] : [];
   if (images.length === 0) doc.querySelectorAll('.product-gallery img, .swiper img, .carousel img, [class*="slider"] img, [class*="gallery"] img').forEach(img => {
     const src = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('src') || '';
-    const fullSrc = src.startsWith('//') ? `https:${src}` : src.startsWith('/') ? `https://www.chic-affiliate.com${src}` : src;
+    const fullSrc = src.startsWith('//') ? `https:${src}` : src.startsWith('/') ? `${origin}${src}` : src;
     if (fullSrc && fullSrc.includes('http') && !images.includes(fullSrc)) images.push(fullSrc);
   });
   if (images.length === 0) {
@@ -428,13 +441,13 @@ export async function fetchChicProductDetails(chicProductId) {
 /* Diagnostic : renvoie ce que le parseur voit réellement sur la page produit
    (JSON Inertia présent ? clés de haut niveau ? extrait HTML autour de taille
    et couleur) pour corriger le parsing si des variantes manquent encore. */
-export async function diagnoseChicProduct(chicProductId) {
-  const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html'));
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+export async function diagnoseChicProduct(chicProductId, plat = 'chic') {
+  const res = await authFetch(proxyUrl(`/affiliate/products/${chicProductId}`, 'html', plat));
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const { html } = await res.json();
   const inertia = extractInertiaData(html);
-  const harvested = inertia ? harvestProduct(inertia) : null;
+  const harvested = inertia ? harvestProduct(inertia, platformOf(plat).origin) : null;
   const topKeys = inertia?.props ? Object.keys(inertia.props) : (inertia ? Object.keys(inertia) : []);
   const around = (kw, len = 1400) => {
     const i = html.toLowerCase().indexOf(kw.toLowerCase());
@@ -468,7 +481,7 @@ export async function diagnoseChicProduct(chicProductId) {
   };
 }
 
-export async function createChicOrder(orderData) {
+export async function createChicOrder(orderData, plat = 'chic') {
   const {
     token, productId, size, color, quantity,
     recipientPrice, recipient, phone,
@@ -493,27 +506,27 @@ export async function createChicOrder(orderData) {
     frais_refus: '',
   });
 
-  const res = await authFetch(proxyUrl('/affiliate/orders/store'), {
+  const res = await authFetch(proxyUrl('/affiliate/orders/store', null, plat), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
   });
 
-  if (res.status === 401) { flagSession(res); throw new Error('Session Chic expirée — reconnectez-vous'); }
+  if (res.status === 401) { flagSession(res, null, plat); throw new Error(expired(plat)); }
   const data = await res.json();
   if (data.success) return data;
-  if (data.error) { if (isSessionError({ message: data.error })) flagSession({ status: 401 }); throw new Error(data.error); }
+  if (data.error) { if (isSessionError({ message: data.error })) flagSession({ status: 401 }, null, plat); throw new Error(data.error); }
   throw new Error('Erreur lors de la création de la commande');
 }
 
 /* ── API officielle (Clé CHIC_...) ──
    Appelle un chemin /api/... de chic-affiliate.com avec la clé API du profil. */
-export async function chicApi(path, { method = 'GET', body, host, auth, keyOverride } = {}) {
-  const config = getChicConfig();
+export async function chicApi(path, { method = 'GET', body, host, auth, keyOverride, plat = 'chic' } = {}) {
+  const config = getChicConfig(plat);
   const key = (keyOverride || config?.apiKey || '').trim();
   if (!key) throw new Error('Clé API non configurée');
   const params = new URLSearchParams({ path });
-  if (host) params.set('host', host);
+  params.set('host', host || platformOf(plat).host);
   if (auth) params.set('auth', auth);
   const opts = { method, headers: { 'x-chic-key': key } };
   if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
@@ -525,15 +538,16 @@ export async function chicApi(path, { method = 'GET', body, host, auth, keyOverr
    utilisée par urlanding). Phase 1 : trouver la combinaison host + méthode
    d'authentification que /api/user accepte. Phase 2 : sonder les chemins
    candidats avec la meilleure combinaison. */
-export async function discoverChicApi(onProgress) {
+export async function discoverChicApi(onProgress, plat = 'chic') {
   const results = [];
-  const hosts = ['www.chic-affiliate.com', 'api.chic-affiliate.com'];
+  const P = platformOf(plat);
+  const hosts = P.hosts;
   const auths = ['bearer', 'xkey', 'plain', 'query'];
 
   /* Phase 1 — /api/user est la seule route confirmée (401 = existe).
      urlanding stocke la clé SANS le préfixe « CHIC_ » : on teste les deux
      formes de la clé pour chaque combinaison host × méthode d'auth. */
-  const rawKey = (getChicConfig()?.apiKey || '').trim();
+  const rawKey = (getChicConfig(plat)?.apiKey || '').trim();
   const keyForms = [...new Set([rawKey, rawKey.replace(/^CHIC_/i, ''), rawKey.startsWith('CHIC_') ? rawKey : `CHIC_${rawKey}`])].filter(Boolean);
   let best = null;
   for (const keyOverride of keyForms) {
@@ -542,7 +556,7 @@ export async function discoverChicApi(onProgress) {
       for (const auth of auths) {
         onProgress?.(`auth: ${host} / ${auth} / ${kLabel}`);
         try {
-          const r = await chicApi('/api/user', { host, auth, keyOverride });
+          const r = await chicApi('/api/user', { host, auth, keyOverride, plat });
           results.push({ path: `[${host} · ${auth} · ${kLabel}] /api/user`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
           if (r.status >= 200 && r.status < 300 && !best) best = { host, auth, keyOverride };
         } catch (e) {
@@ -563,11 +577,11 @@ export async function discoverChicApi(onProgress) {
     '/api/affiliate/user', '/api/v2/products', '/api/store/order',
     '/api/orders/create', '/api/order', '/api/product/list', '/api/orders/list',
   ];
-  const combo = best || { host: 'www.chic-affiliate.com', auth: 'bearer' };
+  const combo = best || { host: P.host, auth: 'bearer' };
   for (const path of candidates) {
     onProgress?.(path);
     try {
-      const r = await chicApi(path, combo);
+      const r = await chicApi(path, { ...combo, plat });
       results.push({ path: `[${combo.host} · ${combo.auth}] ${path}`, status: r.status, sample: JSON.stringify(r.body).slice(0, 180) });
     } catch (e) {
       results.push({ path, status: 0, sample: e.message });
@@ -580,7 +594,7 @@ export async function discoverChicApi(onProgress) {
    Victoury « chic_envoye », si Chic la donne « Livré » (match téléphone +
    nom de produit), renvoie { id, status:'chic_livre' }. Réutilisable pour la
    synchro manuelle ET automatique. */
-export function computeChicStatusUpdates(chicOrders, victouryOrders) {
+export function computeChicStatusUpdates(chicOrders, victouryOrders, plat = 'chic') {
   const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
   const base = s => norm(s).split(/\s*[-–—/|]\s*/)[0].trim();
   const phoneKey = s => (s || '').replace(/\D/g, '').slice(-9);
@@ -593,7 +607,7 @@ export function computeChicStatusUpdates(chicOrders, victouryOrders) {
   }
   const updates = [];
   for (const o of (victouryOrders || [])) {
-    if (o.status !== 'chic_envoye') continue;
+    if (o.status !== st(plat, 'envoye')) continue;
     const cands = byPhone.get(phoneKey(o.recipient?.phone)) || [];
     const b = base(o.product?.name);
     // Exiger un vrai match produit : PAS de repli sur cands[0] — sinon une
@@ -606,7 +620,7 @@ export function computeChicStatusUpdates(chicOrders, victouryOrders) {
     // Le statut Chic doit VRAIMENT être livré (et non annulé/retour qui peut
     // contenir « livraison »). On confirme « livr » sans mot d'annulation.
     const isLivre = /livr[ée]/.test(st) && !/annul|retour|refus|non\s*livr/.test(st);
-    if (isLivre) updates.push({ id: o.id, status: 'chic_livre' });
+    if (isLivre) updates.push({ id: o.id, status: st(plat, 'livre') });
   }
   return updates;
 }
@@ -637,12 +651,12 @@ export function getChicStatusMap(chicOrders, victouryOrders) {
 }
 
 /* Récupère les commandes Chic récentes (sans filtre de date) pour l'auto-synchro. */
-export async function fetchChicRecentOrders(length = 100) {
-  const data = await fetchChicOrders('', '', 0, length);
+export async function fetchChicRecentOrders(length = 100, plat = 'chic') {
+  const data = await fetchChicOrders('', '', 0, length, plat);
   return data.data || [];
 }
 
-export async function fetchChicCounts() {
+export async function fetchChicCounts(plat = 'chic') {
   const params = new URLSearchParams({
     draw: '1',
     start: '0',
@@ -652,7 +666,7 @@ export async function fetchChicCounts() {
     'order[0][column]': '0',
     'order[0][dir]': 'desc',
   });
-  const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`));
+  const res = await authFetch(proxyUrl(`/affiliate/orders/dataTables?${params}`, null, plat));
   if (!res.ok) throw new Error(`Erreur ${res.status}`);
   const data = await res.json();
   return { total: data.recordsTotal || 0 };

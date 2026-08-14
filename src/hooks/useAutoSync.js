@@ -31,6 +31,9 @@ const SYNC_KEYS = [
   'chic_config',
   'chic_hidden_orders',
   'chic_hidden_ids',
+  'bouait_config',
+  'bouait_hidden_orders',
+  'bouait_hidden_ids',
 ];
 
 // Clés fusionnées par UNION (croissante). Attention : une union ne peut jamais
@@ -41,9 +44,12 @@ const SYNC_KEYS = [
 const MERGE_KEYS = new Set([
   'victoury_sent_livreur',
   'deleted_order_ids',
-  // Masquage des commandes/produits Chic : additif, doit tenir sur tous les appareils.
+  // Masquage des commandes/produits d'affiliation : additif, doit tenir sur
+  // tous les appareils.
   'chic_hidden_orders',
   'chic_hidden_ids',
+  'bouait_hidden_orders',
+  'bouait_hidden_ids',
 ]);
 
 /* Les réglages synchronisés contiennent des blobs volumineux (produits,

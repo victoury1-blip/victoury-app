@@ -11,6 +11,7 @@ import {
   Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet,
 } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
+import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
 
 const NAV_ITEMS = [
   { path: '/dashboard',   label: 'Tableau de bord', icon: LayoutDashboard },
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
   { path: '/fournisseur', label: 'Fournisseur',     icon: Truck, perm: 'stock' },
   { path: '/chic-affiliate', label: 'Chic Affiliate', icon: Store },
+  { path: '/bouait-affiliate', label: 'Bouait Affiliate', icon: Store },
   {
     path: '/ramassage',
     label: 'Ramassage',
@@ -369,8 +371,10 @@ export default function Sidebar({ orders = [], session }) {
           }
 
           const active = isActive(item.path);
-          const itemBadge = item.path === '/chic-affiliate'
-            ? orders.filter(o => o.status === 'chic_nouveau').length
+          /* Badge = nouvelles commandes de CETTE plateforme d'affiliation. */
+          const badgePlat = AFFILIATE_LIST.find(a => a.path === item.path);
+          const itemBadge = badgePlat
+            ? orders.filter(o => o.status === `${badgePlat.statusPrefix}_nouveau`).length
             : 0;
           return (
             <a

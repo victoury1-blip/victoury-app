@@ -1,6 +1,6 @@
 import { useToast } from './Toast';
 import { esc } from '../lib/htmlUtils';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import {
   Store, Settings, Search, ChevronDown, ChevronRight, RefreshCw,
   Download, Loader2, AlertCircle, CheckCircle2, Check, Package, ShoppingCart,
@@ -25,35 +25,45 @@ import {
 import { loadProducts, saveProducts } from '../data/products';
 import { cloudSet, cloudGet } from '../lib/cloudSettings';
 import { now, fmtDate } from '../lib/dateUtils';
+import { platformOf, st, platKey } from '../lib/affiliatePlatforms';
 
-/* Statuts propres aux commandes Chic (pipeline site -> livraison -> facture). */
-const CHIC_ORDER_STATUSES = [
-  { key: 'chic_nouveau', label: 'Nouvelle', cls: 'bg-purple-100 text-purple-700' },
-  { key: 'chic_envoye', label: 'Envoyée', cls: 'bg-blue-100 text-blue-700' },
-  { key: 'chic_livre', label: 'Livrée', cls: 'bg-green-100 text-green-700' },
-  { key: 'chic_facture', label: 'Facturée', cls: 'bg-gray-800 text-white' },
+/* Plateforme courante (Chic, Bouait…). Elle traverse toute la page par un
+   contexte plutôt que d'être passée de composant en composant : une trentaine
+   de sous-composants l'utilisent, et un oubli de transmission afficherait
+   silencieusement les commandes d'une plateforme sous une autre. */
+const PlatformCtx = createContext('chic');
+const usePlat = () => useContext(PlatformCtx);
+
+/* Statuts propres aux commandes d'affiliation (site -> livraison -> facture).
+   Chaque plateforme a les siens : `chic_livre`, `bouait_livre`… sinon leurs
+   commandes se retrouveraient mélangées dans les mêmes onglets. */
+const orderStatuses = (plat) => [
+  { key: st(plat, 'nouveau'), label: 'Nouvelle', cls: 'bg-purple-100 text-purple-700' },
+  { key: st(plat, 'envoye'), label: 'Envoyée', cls: 'bg-blue-100 text-blue-700' },
+  { key: st(plat, 'livre'), label: 'Livrée', cls: 'bg-green-100 text-green-700' },
+  { key: st(plat, 'facture'), label: 'Facturée', cls: 'bg-gray-800 text-white' },
 ];
-const chicStatusMeta = (k) => CHIC_ORDER_STATUSES.find(s => s.key === k) || CHIC_ORDER_STATUSES[0];
+const chicStatusMeta = (k, plat) => orderStatuses(plat).find(s => s.key === k) || orderStatuses(plat)[0];
 
 /* Mémoire locale des frais de livraison par ville : Chic charge le tarif via
    AJAX (absent du HTML), donc on retient ce que l'utilisateur saisit et on
    le repropose automatiquement pour la même ville les fois suivantes. */
-const CITY_FRAIS_KEY = 'chic_city_frais';
+const cityFraisKey = (plat) => platKey(plat, 'city_frais');
 const cityKey = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-function getCityFraisMap() { try { return JSON.parse(localStorage.getItem(CITY_FRAIS_KEY) || '{}'); } catch { return {}; } }
-function rememberCityFrais(cityName, frais) {
+function getCityFraisMap(plat) { try { return JSON.parse(localStorage.getItem(cityFraisKey(plat)) || '{}'); } catch { return {}; } }
+function rememberCityFrais(cityName, frais, plat) {
   const k = cityKey(cityName); const f = parseFloat(frais);
   if (!k || !f) return;
-  try { const m = getCityFraisMap(); m[k] = f; localStorage.setItem(CITY_FRAIS_KEY, JSON.stringify(m)); } catch {}
+  try { const m = getCityFraisMap(plat); m[k] = f; localStorage.setItem(cityFraisKey(plat), JSON.stringify(m)); } catch { /* quota */ }
 }
-function recallCityFrais(cityName) { const v = getCityFraisMap()[cityKey(cityName)]; return v != null ? String(v) : ''; }
-function setCityFraisValue(cityName, val) {
+function recallCityFrais(cityName, plat) { const v = getCityFraisMap(plat)[cityKey(cityName)]; return v != null ? String(v) : ''; }
+function setCityFraisValue(cityName, val, plat) {
   const k = cityKey(cityName); if (!k) return;
   try {
-    const m = getCityFraisMap(); const f = parseFloat(val);
+    const m = getCityFraisMap(plat); const f = parseFloat(val);
     if (val === '' || isNaN(f)) delete m[k]; else m[k] = f;
-    localStorage.setItem(CITY_FRAIS_KEY, JSON.stringify(m));
-  } catch {}
+    localStorage.setItem(cityFraisKey(plat), JSON.stringify(m));
+  } catch { /* quota */ }
 }
 
 /* ── Status badge ── */
@@ -104,8 +114,10 @@ function StatusBadge({ raw }) {
 
 /* ── Config Panel ── */
 function ConfigPanel({ onTest }) {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const [open, setOpen] = useState(false);
-  const [config, setConfig] = useState(() => getChicConfig() || { xsrfToken: '', sessionCookie: '', apiKey: '' });
+  const [config, setConfig] = useState(() => getChicConfig(plat) || { xsrfToken: '', sessionCookie: '', apiKey: '' });
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
   const [apiResults, setApiResults] = useState(null);
@@ -120,7 +132,7 @@ function ConfigPanel({ onTest }) {
     setDiagLoading(true);
     setDiagResult(null);
     try {
-      const d = await diagnoseChicProduct(diagId.trim());
+      const d = await diagnoseChicProduct(diagId.trim(), plat);
       setDiagResult(d);
     } catch (e) {
       setDiagResult({ error: e.message });
@@ -134,7 +146,7 @@ function ConfigPanel({ onTest }) {
     setDiagLoading(true);
     setDiagResult(null);
     try {
-      setDiagResult(await diagnoseChicList());
+      setDiagResult(await diagnoseChicList(plat));
     } catch (e) {
       setDiagResult({ error: e.message });
     } finally {
@@ -147,7 +159,7 @@ function ConfigPanel({ onTest }) {
     setDiagLoading(true);
     setDiagResult(null);
     try {
-      setDiagResult(await diagnoseChicJs());
+      setDiagResult(await diagnoseChicJs(plat));
     } catch (e) {
       setDiagResult({ error: e.message });
     } finally {
@@ -160,7 +172,7 @@ function ConfigPanel({ onTest }) {
     setApiTesting(true);
     setApiResults(null);
     try {
-      const results = await discoverChicApi();
+      const results = await discoverChicApi(undefined, plat);
       setApiResults(results);
     } catch (e) {
       setApiResults([{ path: '—', status: 0, sample: e.message }]);
@@ -171,7 +183,7 @@ function ConfigPanel({ onTest }) {
 
   function save(c) {
     setConfig(c);
-    saveChicConfig(c);
+    saveChicConfig(c, plat);
   }
 
   async function testConnection() {
@@ -179,7 +191,7 @@ function ConfigPanel({ onTest }) {
     setTestResult(null);
     try {
       save(config);
-      const data = await fetchChicCounts();
+      const data = await fetchChicCounts(plat);
       setTestResult({ ok: true, msg: `Connexion réussie — ${JSON.stringify(data)}` });
       onTest?.(true);
     } catch (e) {
@@ -197,14 +209,14 @@ function ConfigPanel({ onTest }) {
         className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition rounded-xl"
       >
         <Settings size={16} className="text-gray-400" />
-        <span>Configuration Chic Affiliate</span>
+        <span>Configuration {P.label}</span>
         {open ? <ChevronDown size={14} className="ml-auto" /> : <ChevronRight size={14} className="ml-auto" />}
       </button>
 
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
           <p className="text-xs text-gray-500">
-            Ouvrez chic-affiliate.com &rarr; F12 &rarr; Application &rarr; Cookies &rarr; copiez XSRF-TOKEN et laravel_session
+            Ouvrez {P.host} &rarr; F12 &rarr; Application &rarr; Cookies &rarr; copiez XSRF-TOKEN et laravel_session
           </p>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">XSRF-TOKEN</label>
@@ -321,6 +333,8 @@ function ConfigPanel({ onTest }) {
 
 /* ── Products Tab ── */
 function ProductsTab() {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -331,22 +345,22 @@ function ProductsTab() {
   const [importedIds, setImportedIds] = useState(() => {
     try {
       const prods = loadProducts();
-      return new Set(prods.filter(p => p.source === 'chic-affiliate').map(p => p.chicId || p.name?.toLowerCase()));
+      return new Set(prods.filter(p => p.source === P.source).map(p => p.chicId || p.name?.toLowerCase()));
     } catch { return new Set(); }
   });
   const [importedNames, setImportedNames] = useState(() => {
     try {
       const prods = loadProducts();
-      return new Set(prods.filter(p => p.source === 'chic-affiliate').map(p => p.name?.toLowerCase()).filter(Boolean));
+      return new Set(prods.filter(p => p.source === P.source).map(p => p.name?.toLowerCase()).filter(Boolean));
     } catch { return new Set(); }
   });
   /* Produits Chic masqués localement (pour ne garder que ceux utilisés). */
   const [hiddenIds, setHiddenIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('chic_hidden_ids') || '[]')); } catch { return new Set(); }
+    try { return new Set(JSON.parse(localStorage.getItem(platKey(plat, 'hidden_ids')) || '[]')); } catch { return new Set(); }
   });
   const [showHidden, setShowHidden] = useState(false);
   function persistHidden(next) {
-    localStorage.setItem('chic_hidden_ids', JSON.stringify([...next]));
+    localStorage.setItem(platKey(plat, 'hidden_ids'), JSON.stringify([...next]));
     setHiddenIds(new Set(next));
   }
   function hideProduct(p) {
@@ -366,7 +380,7 @@ function ProductsTab() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchChicProducts();
+      const data = await fetchChicProducts(plat);
       if (my !== reqIdRef.current) return; // réponse périmée
       const chicList = data.data || [];
       setProducts(chicList);
@@ -378,7 +392,7 @@ function ProductsTab() {
         const stored = loadProducts();
         let changed = false;
         const updated = stored.map(p => {
-          if (p.source === 'chic-affiliate' && !p.chicId && p.name) {
+          if (p.source === P.source && !p.chicId && p.name) {
             const norm = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
             const match = chicList.find(c => norm(c.name) === norm(p.name))
               || chicList.find(c => norm(c.name).includes(norm(p.name)) || norm(p.name).includes(norm(c.name)));
@@ -407,7 +421,7 @@ function ProductsTab() {
       const existing = loadProducts();
       const already = existing.find(x =>
         (p.chicId && x.chicId === p.chicId) ||
-        (p.name && x.source === 'chic-affiliate' && x.name?.toLowerCase() === p.name.toLowerCase())
+        (p.name && x.source === P.source && x.name?.toLowerCase() === p.name.toLowerCase())
       );
       if (already) {
         if (!importingAllRef.current) alert('Produit déjà importé');
@@ -418,7 +432,7 @@ function ProductsTab() {
       let details = { sizes: [], colors: [], images: [], description: '' };
       if (p.chicId) {
         try {
-          details = await fetchChicProductDetails(p.chicId);
+          details = await fetchChicProductDetails(p.chicId, plat);
         } catch {}
       }
 
@@ -440,12 +454,12 @@ function ProductsTab() {
         colors: details.colors,
         description: details.description,
         statut: 'Active',
-        boutique: 'Chic Affiliate',
+        boutique: P.label,
         shopifyId: '',
         prix: sale,
         compareAt: sale,
         etiquette: '',
-        source: 'chic-affiliate',
+        source: P.source,
         purchasePrice: purchase,
         stock_quantity: 10,
         variations,
@@ -662,6 +676,8 @@ function ProductsTab() {
 
 /* ── Orders Tab ── */
 function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -678,7 +694,7 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
   function syncStatuses() {
     let count = 0;
     setVictouryOrders?.(prev => {
-      const updates = computeChicStatusUpdates(orders, prev);
+      const updates = computeChicStatusUpdates(orders, prev, plat);
       count = updates.length;
       if (!updates.length) return prev;
       const m = new Map(updates.map(u => [u.id, u.status]));
@@ -693,7 +709,7 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchChicOrders(startDate, endDate, start, PAGE_SIZE);
+      const data = await fetchChicOrders(startDate, endDate, start, PAGE_SIZE, plat);
       if (my !== reqIdRef.current) return; // réponse périmée (date/page changée)
       setOrders(data.data || []);
       setTotal(data.recordsTotal || 0);
@@ -708,31 +724,31 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
 
   /* Masquage local des commandes Chic (nettoyage de la liste, réversible). */
   const [hiddenOrders, setHiddenOrders] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('chic_hidden_orders') || '[]')); } catch { return new Set(); }
+    try { return new Set(JSON.parse(localStorage.getItem(platKey(plat, 'hidden_orders')) || '[]')); } catch { return new Set(); }
   });
   const [showHiddenOrders, setShowHiddenOrders] = useState(false);
   // Récupère la liste masquée du cloud au montage (masquage cross-appareils).
   useEffect(() => {
-    cloudGet('chic_hidden_orders').then(cloud => {
+    cloudGet(platKey(plat, 'hidden_orders')).then(cloud => {
       if (!Array.isArray(cloud) || !cloud.length) return;
       setHiddenOrders(prev => {
         const merged = new Set([...prev, ...cloud.map(String)]);
-        localStorage.setItem('chic_hidden_orders', JSON.stringify([...merged]));
+        localStorage.setItem(platKey(plat, 'hidden_orders'), JSON.stringify([...merged]));
         return merged;
       });
     }).catch(() => {});
   }, []);
   function hideOrder(id) {
     const next = new Set(hiddenOrders); next.add(String(id));
-    localStorage.setItem('chic_hidden_orders', JSON.stringify([...next]));
+    localStorage.setItem(platKey(plat, 'hidden_orders'), JSON.stringify([...next]));
     setHiddenOrders(next);
-    cloudSet('chic_hidden_orders', [...next]); // propage à tous les appareils
+    cloudSet(platKey(plat, 'hidden_orders'), [...next]); // propage à tous les appareils
   }
   function unhideOrder(id) {
     const next = new Set(hiddenOrders); next.delete(String(id));
-    localStorage.setItem('chic_hidden_orders', JSON.stringify([...next]));
+    localStorage.setItem(platKey(plat, 'hidden_orders'), JSON.stringify([...next]));
     setHiddenOrders(next);
-    cloudSet('chic_hidden_orders', [...next]);
+    cloudSet(platKey(plat, 'hidden_orders'), [...next]);
   }
   const visibleOrders = orders.filter(o => showHiddenOrders || !hiddenOrders.has(String(o.id)));
   const hiddenCount = orders.filter(o => hiddenOrders.has(String(o.id))).length;
@@ -763,7 +779,7 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
         dateAdded: fmtDate(o.created_at),
         dateUpdated: now(),
         validated: false,
-        source: 'chic-affiliate',
+        source: P.source,
       };
       // Dispatch to parent app via custom event
       window.dispatchEvent(new CustomEvent('chic-import-order', { detail: newOrder }));
@@ -911,6 +927,8 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
    par App.jsx) et s'envoient à Chic Affiliate en un clic : produit, taille,
    couleur et ville sont résolus automatiquement. */
 function SiteOrderEditModal({ order, onClose, onSave }) {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const r = order.recipient || {};
   const [form, setForm] = useState({
     name: r.name || '', phone: r.phone || '', city: r.city || '', address: r.address || '',
@@ -955,6 +973,8 @@ function SiteOrderEditModal({ order, onClose, onSave }) {
    boutons de taille, pastilles de couleur, ville (liste Chic) — pré-rempli
    depuis la commande du site. L'utilisateur confirme puis envoie. */
 function SendToChicModal({ order, chicProduct, onClose, onSent }) {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -969,14 +989,14 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
      (/affiliate/city/fees) qui renvoie le tarif réel de la ville. */
   const setVille = async (villeId) => {
     const c = (details?.cities || []).find(x => String(x.id) === String(villeId));
-    const known = (c?.frais ? String(c.frais) : '') || recallCityFrais(c?.name);
+    const known = (c?.frais ? String(c.frais) : '') || recallCityFrais(c?.name, plat);
     // Effacer si inconnu (ne pas garder le frais de la ville précédente) ;
     // l'appel asynchrone ci-dessous le remplira depuis Chic.
     setForm(f => ({ ...f, villeId, fraisLivraison: known }));
     if (!known && villeId && details?.token) {
       try {
-        const fee = await fetchChicCityFees(villeId, details.token);
-        if (fee) { setForm(f => ({ ...f, fraisLivraison: String(fee) })); rememberCityFrais(c?.name, fee); }
+        const fee = await fetchChicCityFees(villeId, details.token, plat);
+        if (fee) { setForm(f => ({ ...f, fraisLivraison: String(fee) })); rememberCityFrais(c?.name, fee, plat); }
       } catch {}
     }
   };
@@ -987,7 +1007,7 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
     let alive = true;
     (async () => {
       try {
-        const d = await fetchChicProductDetails(chicProduct.chicId);
+        const d = await fetchChicProductDetails(chicProduct.chicId, plat);
         if (!alive) return;
         setDetails(d);
         const wantSize = (order.product?.size || '').toUpperCase().trim();
@@ -995,13 +1015,13 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
         const cityN = norm(order.recipient?.city);
         const city = (d.cities || []).find(c => norm(c.name) === cityN)
           || (d.cities || []).find(c => norm(c.name).includes(cityN) || cityN.includes(norm(c.name)));
-        const frais0 = (city?.frais ? String(city.frais) : '') || recallCityFrais(city?.name) || '';
+        const frais0 = (city?.frais ? String(city.frais) : '') || recallCityFrais(city?.name, plat) || '';
         setForm(f => ({ ...f, size, color: d.colors?.[0]?.id || '', villeId: city?.id || '', fraisLivraison: frais0 }));
         // Frais inconnu -> récupérer le tarif réel depuis Chic
         if (!frais0 && city?.id && d.token) {
           try {
-            const fee = await fetchChicCityFees(city.id, d.token);
-            if (fee) { setForm(f => ({ ...f, fraisLivraison: String(fee) })); rememberCityFrais(city.name, fee); }
+            const fee = await fetchChicCityFees(city.id, d.token, plat);
+            if (fee) { setForm(f => ({ ...f, fraisLivraison: String(fee) })); rememberCityFrais(city.name, fee, plat); }
           } catch {}
         }
       } catch (e) {
@@ -1023,10 +1043,10 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
         size: form.size, color: form.color, quantity: form.quantity,
         recipientPrice: form.price, recipient: form.recipient, phone: form.phone,
         villeId: form.villeId, fraisLivraison: form.fraisLivraison || '', address: form.address, comment: form.comment,
-      });
+      }, plat);
       /* Retenir le frais saisi pour cette ville (auto-remplissage futur). */
       const cityName = (details.cities || []).find(c => String(c.id) === String(form.villeId))?.name;
-      rememberCityFrais(cityName, form.fraisLivraison);
+      rememberCityFrais(cityName, form.fraisLivraison, plat);
       onSent(order.id, { fraisLivraison: parseFloat(form.fraisLivraison) || 0, price: parseFloat(form.price) || order.price });
     } catch (e) {
       setError(e.message);
@@ -1041,7 +1061,7 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
       <div className="bg-white rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
           <div>
-            <h2 className="font-bold text-gray-900">Envoyer à Chic Affiliate</h2>
+            <h2 className="font-bold text-gray-900">Envoyer à {P.label}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{chicProduct.name} · {order.id}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
@@ -1113,7 +1133,7 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Annuler</button>
           <button onClick={submit} disabled={sending || loading}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50">
-            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Envoyer à Chic
+            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Envoyer à {P.label}
           </button>
         </div>
       </div>
@@ -1122,6 +1142,8 @@ function SendToChicModal({ order, chicProduct, onClose, onSent }) {
 }
 
 function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau' }) {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const [result, setResult] = useState(null);   /* { id, ok, msg } */
   const [editOrder, setEditOrder] = useState(null);
   const [historyOrder, setHistoryOrder] = useState(null);
@@ -1140,9 +1162,9 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
     <select
       value={o.status}
       onChange={e => setStatus(o.id, e.target.value)}
-      className={`text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer ${chicStatusMeta(o.status).cls}`}
+      className={`text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer ${chicStatusMeta(o.status, plat).cls}`}
     >
-      {CHIC_ORDER_STATUSES.map(s => <option key={s.key} value={s.key} className="bg-white text-gray-800">{s.label}</option>)}
+      {orderStatuses(plat).map(s => <option key={s.key} value={s.key} className="bg-white text-gray-800">{s.label}</option>)}
     </select>
   );
   function saveEdit(updated) {
@@ -1170,12 +1192,12 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
              className="p-1.5 rounded bg-sky-100 text-sky-600 hover:bg-sky-200 transition"><Phone size={13} /></a>
         </>
       )}
-      {o.status === 'chic_nouveau' && (
+      {o.status === st(plat, 'nouveau') && (
         <button
           onClick={() => openSend(o)}
           className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition"
         >
-          <Send size={12} /> Envoyer à Chic
+          <Send size={12} /> Envoyer à {P.label}
         </button>
       )}
       <button onClick={() => setEditOrder(o)} title="Modifier" className="p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition"><Pencil size={13} /></button>
@@ -1188,9 +1210,9 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
      mode 'envoye' = Liste Colis Chic : toutes les commandes envoyées à Chic
      et leur suite (envoyée → livrée → facturée). Une commande facturée RESTE
      dans cette liste (badge « Facturée ») en plus d'apparaître dans Factures. */
-  const SENT_STATUSES = ['chic_envoye', 'chic_livre', 'chic_facture'];
+  const SENT_STATUSES = [st(plat, 'envoye'), st(plat, 'livre'), st(plat, 'facture')];
   const siteOrders = orders.filter(o =>
-    mode === 'envoye' ? SENT_STATUSES.includes(o.status) : o.status === 'chic_nouveau');
+    mode === 'envoye' ? SENT_STATUSES.includes(o.status) : o.status === st(plat, 'nouveau'));
   const norm = s => (s || '').toString().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ').trim();
@@ -1210,7 +1232,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
      détecter un produit importé SANS identifiant (ancien import) pour donner
      un message précis (« réimportez-le »). */
   function findChicProduct(order, requireChicId = true) {
-    const prods = loadProducts().filter(p => p.source === 'chic-affiliate' && (!requireChicId || p.chicId));
+    const prods = loadProducts().filter(p => p.source === P.source && (!requireChicId || p.chicId));
     const names = [order.product?.name, ...(order.products || []).map(p => p.name)].filter(Boolean);
     for (const name of names) {
       const full = norm(name);
@@ -1244,10 +1266,10 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
 
   function onSent(orderId, extra = {}) {
     setOrders?.(prev => prev.map(o => o.id === orderId
-      ? { ...o, status: 'chic_envoye', chicFrais: extra.fraisLivraison ?? o.chicFrais, price: extra.price ?? o.price, dateUpdated: now(), manuallyModified: true }
+      ? { ...o, status: st(plat, 'envoye'), chicFrais: extra.fraisLivraison ?? o.chicFrais, price: extra.price ?? o.price, dateUpdated: now(), manuallyModified: true }
       : o));
     setSendModal(null);
-    setResult({ id: orderId, ok: true, msg: `Commande ${orderId} envoyée à Chic Affiliate ✅` });
+    setResult({ id: orderId, ok: true, msg: `Commande ${orderId} envoyée à ${P.label} ✅` });
   }
 
   /* Statut RÉEL côté Chic Affiliate pour chaque colis (mode Liste Colis Chic). */
@@ -1258,7 +1280,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
     setLoadingStatuses(true);
     setResult(null);
     try {
-      const chicOrders = await fetchChicRecentOrders(200);
+      const chicOrders = await fetchChicRecentOrders(200, plat);
       const map = getChicStatusMap(chicOrders, siteOrders);
       setChicStatuses(map);
       const found = Object.keys(map).length;
@@ -1271,7 +1293,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
   }
   // Auto-chargement des statuts à l'ouverture de la Liste Colis Chic.
   useEffect(() => {
-    if (mode === 'envoye' && siteOrders.length && getChicConfig()?.sessionCookie) refreshChicStatuses();
+    if (mode === 'envoye' && siteOrders.length && getChicConfig(plat)?.sessionCookie) refreshChicStatuses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -1279,7 +1301,7 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
     <div className="space-y-4">
       {mode === 'envoye' && (
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs text-gray-500">Colis envoyés à Chic — statut récupéré directement de chic-affiliate.com</p>
+          <p className="text-xs text-gray-500">Colis envoyés à Chic — statut récupéré directement de {P.host}</p>
           <button onClick={refreshChicStatuses} disabled={loadingStatuses}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 disabled:opacity-60">
             {loadingStatuses ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
@@ -1378,6 +1400,8 @@ function SiteOrdersTab({ orders = [], setOrders, onDeleteOrder, mode = 'nouveau'
 
 /* ── Send Order to Chic ── */
 function SendOrderTab() {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const [chicProducts, setChicProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [details, setDetails] = useState(null);
@@ -1392,14 +1416,14 @@ function SendOrderTab() {
 
   useEffect(() => {
     const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
-    setChicProducts(prods.filter(p => p.source === 'chic-affiliate' && p.chicId));
+    setChicProducts(prods.filter(p => p.source === P.source && p.chicId));
   }, []);
 
   async function loadProductDetails(chicId) {
     if (!chicId) { setDetails(null); return; }
     setLoadingDetails(true);
     try {
-      const d = await fetchChicProductDetails(chicId);
+      const d = await fetchChicProductDetails(chicId, plat);
       setDetails(d);
       setForm(f => ({ ...f, size: d.sizes?.[0] || '', color: d.colors?.[0]?.id || '' }));
     } catch (e) {
@@ -1423,8 +1447,8 @@ function SendOrderTab() {
         token: details.token,
         productId: details.productId,
         ...form,
-      });
-      setResult({ ok: true, msg: 'Commande envoyée avec succès à Chic Affiliate!' });
+      }, plat);
+      setResult({ ok: true, msg: `Commande envoyée avec succès à ${P.label} !` });
       setForm(f => ({ ...f, recipient: '', phone: '', address: '', comment: '' }));
     } catch (err) {
       setResult({ ok: false, msg: err.message });
@@ -1436,7 +1460,7 @@ function SendOrderTab() {
   return (
     <div className="space-y-4 max-w-2xl">
       <div>
-        <label className="block text-xs font-semibold text-gray-600 mb-1">Produit Chic *</label>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Produit {P.label} *</label>
         <select
           value={selectedProduct}
           onChange={e => { setSelectedProduct(e.target.value); loadProductDetails(e.target.value); }}
@@ -1448,7 +1472,7 @@ function SendOrderTab() {
           ))}
         </select>
         {chicProducts.length === 0 && (
-          <p className="text-xs text-orange-600 mt-1">Aucun produit Chic importé. Importez d'abord depuis l'onglet Produits.</p>
+          <p className="text-xs text-orange-600 mt-1">Aucun produit importé. Importez d'abord depuis l'onglet Produits.</p>
         )}
       </div>
 
@@ -1543,7 +1567,7 @@ function SendOrderTab() {
           <button type="submit" disabled={sending}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50">
             {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            Envoyer à Chic Affiliate
+            Envoyer à {P.label}
           </button>
 
           {result && (
@@ -1562,12 +1586,14 @@ function SendOrderTab() {
    Regroupe les commandes Livrées/Facturées, calcule ventes/revendeur/bénéfice,
    permet de marquer « Facturée » et d'imprimer — comme les Factures Victoury. */
 function ChicFacturesTab({ orders = [], setOrders }) {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const toast = useToast();
-  const list = orders.filter(o => o.status === 'chic_livre' || o.status === 'chic_facture');
+  const list = orders.filter(o => o.status === st(plat, 'livre') || o.status === st(plat, 'facture'));
   const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 
   const rows = React.useMemo(() => {
-    const prods = loadProducts().filter(p => p.source === 'chic-affiliate');
+    const prods = loadProducts().filter(p => p.source === P.source);
     const base = (name) => norm(name).split(/\s*[-–—/|]\s*/)[0].trim();
     return list.map(o => {
       const b = base(o.product?.name);
@@ -1582,7 +1608,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
       const vente = o.price || 0;
       const revendeur = (prod?.purchasePrice || 0) * qty;
       /* frais enregistré sur la commande, sinon fallback sur le tableau Villes & Frais */
-      const frais = o.chicFrais || parseFloat(recallCityFrais(o.recipient?.city)) || 0;
+      const frais = o.chicFrais || parseFloat(recallCityFrais(o.recipient?.city, plat)) || 0;
       return { o, qty, vente, revendeur, frais, benefice: vente - revendeur - frais, prodName: prod?.name || o.product?.name || '—' };
     });
   }, [list]);
@@ -1592,15 +1618,15 @@ function ChicFacturesTab({ orders = [], setOrders }) {
   }), { ventes: 0, revendeur: 0, frais: 0, benefice: 0 });
 
   function facturer(id) {
-    setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status: 'chic_facture', manuallyModified: true } : o));
+    setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status: st(plat, 'facture'), manuallyModified: true } : o));
   }
   function setStatus(id, status) {
     setOrders?.(prev => prev.map(o => o.id === id ? { ...o, status, dateUpdated: now(), manuallyModified: true } : o));
   }
   function facturerTout() {
-    const ids = new Set(rows.filter(r => r.o.status === 'chic_livre').map(r => r.o.id));
+    const ids = new Set(rows.filter(r => r.o.status === st(plat, 'livre')).map(r => r.o.id));
     if (!ids.size) return;
-    setOrders?.(prev => prev.map(o => ids.has(o.id) ? { ...o, status: 'chic_facture', manuallyModified: true } : o));
+    setOrders?.(prev => prev.map(o => ids.has(o.id) ? { ...o, status: st(plat, 'facture'), manuallyModified: true } : o));
   }
   function imprimer() {
     const w = window.open('', '_blank');
@@ -1647,7 +1673,7 @@ function ChicFacturesTab({ orders = [], setOrders }) {
       </div>
 
       <div className="flex gap-2 justify-end">
-        {rows.some(r => r.o.status === 'chic_livre') && (
+        {rows.some(r => r.o.status === st(plat, 'livre')) && (
           <button onClick={facturerTout} className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-900">
             <Check size={14} /> Tout facturer
           </button>
@@ -1684,17 +1710,17 @@ function ChicFacturesTab({ orders = [], setOrders }) {
                   <select
                     value={r.o.status}
                     onChange={e => setStatus(r.o.id, e.target.value)}
-                    className={`text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer ${chicStatusMeta(r.o.status).cls}`}
+                    className={`text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer ${chicStatusMeta(r.o.status, plat).cls}`}
                   >
-                    {CHIC_ORDER_STATUSES.map(s => <option key={s.key} value={s.key} className="bg-white text-gray-800">{s.label}</option>)}
+                    {orderStatuses(plat).map(s => <option key={s.key} value={s.key} className="bg-white text-gray-800">{s.label}</option>)}
                   </select>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
-                    {r.o.status === 'chic_livre' && (
+                    {r.o.status === st(plat, 'livre') && (
                       <button onClick={() => facturer(r.o.id)} title="Facturer" className="flex items-center gap-1 px-2 py-1 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-900"><Check size={12} /> Facturer</button>
                     )}
-                    <button onClick={() => setStatus(r.o.id, 'chic_envoye')} title="Renvoyer vers Commandes Site" className="p-1.5 rounded bg-purple-100 text-purple-600 hover:bg-purple-200 transition"><RefreshCw size={13} /></button>
+                    <button onClick={() => setStatus(r.o.id, st(plat, 'envoye'))} title="Renvoyer vers Commandes Site" className="p-1.5 rounded bg-purple-100 text-purple-600 hover:bg-purple-200 transition"><RefreshCw size={13} /></button>
                   </div>
                 </td>
               </tr>
@@ -1713,9 +1739,11 @@ function ChicFacturesTab({ orders = [], setOrders }) {
    Charge la liste des villes depuis une fiche produit Chic et permet de saisir
    le frais de livraison par ville (mémorisé, réutilisé partout à l'envoi). */
 function ChicCitiesTab() {
+  const plat = usePlat();
+  const P = platformOf(plat);
   const [cities, setCities] = useState([]);
   const [token, setToken] = useState('');
-  const [map, setMap] = useState(getCityFraisMap());
+  const [map, setMap] = useState(() => getCityFraisMap(plat));
   const [loading, setLoading] = useState(false);
   const [fetchingAll, setFetchingAll] = useState(false);
   const [progress, setProgress] = useState('');
@@ -1725,9 +1753,9 @@ function ChicCitiesTab() {
   async function loadCities() {
     setLoading(true); setError(null);
     try {
-      const prod = loadProducts().find(p => p.source === 'chic-affiliate' && p.chicId);
+      const prod = loadProducts().find(p => p.source === P.source && p.chicId);
       if (!prod) throw new Error('Importez d\'abord un produit Chic (les villes proviennent d\'une fiche produit).');
-      const d = await fetchChicProductDetails(prod.chicId);
+      const d = await fetchChicProductDetails(prod.chicId, plat);
       setCities(d.cities || []);
       setToken(d.token || '');
       if (!d.cities?.length) setError('Aucune ville trouvée sur la fiche produit.');
@@ -1736,8 +1764,8 @@ function ChicCitiesTab() {
   useEffect(() => { loadCities(); }, []);
 
   function onFrais(name, val) {
-    setCityFraisValue(name, val);
-    setMap(getCityFraisMap());
+    setCityFraisValue(name, val, plat);
+    setMap(getCityFraisMap(plat));
   }
 
   /* Récupère automatiquement le tarif de CHAQUE ville via /affiliate/city/fees. */
@@ -1749,10 +1777,10 @@ function ChicCitiesTab() {
       done++;
       setProgress(`${done}/${cities.length} — ${c.name}`);
       try {
-        const fee = await fetchChicCityFees(c.id, token);
-        if (fee) { setCityFraisValue(c.name, fee); ok++; }
+        const fee = await fetchChicCityFees(c.id, token, plat);
+        if (fee) { setCityFraisValue(c.name, fee, plat); ok++; }
       } catch {}
-      setMap(getCityFraisMap());
+      setMap(getCityFraisMap(plat));
     }
     setFetchingAll(false); setProgress('');
     setError(null);
@@ -1820,21 +1848,26 @@ function ChicCitiesTab() {
 }
 
 /* ── Main Page ── */
-export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrder }) {
+export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrder, platform = 'chic' }) {
+  const plat = platform;
+  const P = platformOf(plat);
   const [tab, setTab] = useState('products');
   const [sessionExpired, setSessionExpired] = useState(false);
-  const siteCount = orders.filter(o => o.status === 'chic_nouveau').length;
+  const siteCount = orders.filter(o => o.status === st(plat, 'nouveau')).length;
   // Badge = colis en cours (envoyés + livrés non encore facturés).
-  const sentCount = orders.filter(o => o.status === 'chic_envoye' || o.status === 'chic_livre').length;
-  const factureCount = orders.filter(o => o.status === 'chic_livre').length;
+  const sentCount = orders.filter(o => o.status === st(plat, 'envoye') || o.status === st(plat, 'livre')).length;
+  const factureCount = orders.filter(o => o.status === st(plat, 'livre')).length;
 
   useEffect(() => {
-    const onExpired = () => setSessionExpired(true);
+    // L'événement porte la plateforme concernée : sans ce filtre, une session
+    // Chic expirée afficherait aussi la bannière sur la page Bouait.
+    const onExpired = (e) => { if ((e?.detail?.plat || 'chic') === plat) setSessionExpired(true); };
     window.addEventListener('chic-session-expired', onExpired);
     return () => window.removeEventListener('chic-session-expired', onExpired);
-  }, []);
+  }, [plat]);
 
   return (
+    <PlatformCtx.Provider value={plat}>
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
@@ -1842,8 +1875,8 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           <Store size={20} className="text-purple-600" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Chic Affiliate</h1>
-          <p className="text-xs text-gray-500">Gestion des produits et commandes chic-affiliate.com</p>
+          <h1 className="text-xl font-bold text-gray-900">{P.label}</h1>
+          <p className="text-xs text-gray-500">Gestion des produits et commandes {P.host}</p>
         </div>
       </div>
 
@@ -1852,11 +1885,11 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
         <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
           <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
           <div className="flex-1 text-sm">
-            <p className="font-semibold text-red-700">Session Chic Affiliate expirée</p>
+            <p className="font-semibold text-red-700">Session {P.label} expirée</p>
             <p className="text-red-600 mt-0.5 text-xs leading-relaxed">
-              Les cookies de connexion ont expiré. Ouvrez <b>chic-affiliate.com</b> (connecté) →
+              Les cookies de connexion ont expiré. Ouvrez <b>{P.host}</b> (connecté) →
               F12 → Application → Cookies → recopiez <b>XSRF-TOKEN</b> et <b>laravel_session</b>
-              dans « Configuration Chic Affiliate » ci-dessous, puis « Tester la connexion ».
+              dans « Configuration {P.label} » ci-dessous, puis « Tester la connexion ».
             </p>
           </div>
           <button onClick={() => setSessionExpired(false)} className="text-red-400 hover:text-red-600 text-xs font-medium shrink-0">Masquer</button>
@@ -1887,7 +1920,7 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           onClick={() => setTab('sent')}
           className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition ${tab === 'sent' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
-          <Send size={14} /> Liste Colis Chic
+          <Send size={14} /> Liste Colis
           {sentCount > 0 && (
             <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{sentCount}</span>
           )}
@@ -1919,5 +1952,6 @@ export default function ChicAffiliatePage({ orders = [], setOrders, onDeleteOrde
           : <SiteOrdersTab orders={orders} setOrders={setOrders} onDeleteOrder={onDeleteOrder} mode="nouveau" />}
       </div>
     </div>
+    </PlatformCtx.Provider>
   );
 }

@@ -1,10 +1,16 @@
 import { isAuthenticated } from './_auth.js';
 
+/* Hôtes autorisés. Chic et Bouait tournent sur le même logiciel : le proxy est
+   le même, seul l'hôte change. La liste est FERMÉE — sans elle, l'endpoint
+   relaierait vers n'importe quelle adresse (SSRF / relais ouvert). */
+const ALLOWED_HOSTS = ['www.chic-affiliate.com', 'chic-affiliate.com', 'bouaitaffiliate.com', 'www.bouaitaffiliate.com'];
+const DEFAULT_HOST = 'www.chic-affiliate.com';
+
 export default async function handler(req, res) {
   // Authentification obligatoire : sans cela, l'endpoint est un relais ouvert
   // (n'importe qui peut faire transiter des requêtes par votre domaine).
   if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'Non autorisé' });
-  const { path, xsrf, session, mode } = req.query;
+  const { path, xsrf, session, mode, host = DEFAULT_HOST } = req.query;
   if (!path || !session) {
     return res.status(400).json({ error: 'Missing path or session' });
   }
@@ -16,7 +22,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Chemin invalide' });
   }
 
-  const url = `https://www.chic-affiliate.com${path}`;
+  if (!ALLOWED_HOSTS.includes(host)) return res.status(400).json({ error: 'Hôte non autorisé' });
+  const origin = `https://${host}`;
+  const url = `${origin}${path}`;
 
   try {
     const sess = decodeURIComponent(session);
@@ -26,7 +34,7 @@ export default async function handler(req, res) {
       'Cookie': cookie,
       'Accept': mode === 'html' ? 'text/html' : 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
-      'Referer': 'https://www.chic-affiliate.com/affiliate/products',
+      'Referer': `${origin}/affiliate/products`,
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     };
     if (xsrfDecoded) headers['X-XSRF-TOKEN'] = xsrfDecoded;
@@ -37,7 +45,7 @@ export default async function handler(req, res) {
       fetchOpts.method = 'POST';
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
       headers['Accept'] = 'text/html,application/json';
-      headers['Origin'] = 'https://www.chic-affiliate.com';
+      headers['Origin'] = origin;
       const body = typeof req.body === 'string' ? req.body : new URLSearchParams(req.body).toString();
       fetchOpts.body = body;
     }
@@ -47,7 +55,7 @@ export default async function handler(req, res) {
     if (response.status === 302 || response.status === 301) {
       const location = response.headers.get('location') || '';
       if (location.includes('/login')) {
-        return res.status(401).json({ error: 'Session expirée — reconnectez-vous sur chic-affiliate.com' });
+        return res.status(401).json({ error: `Session expirée — reconnectez-vous sur ${host}` });
       }
       return res.status(200).json({ success: true, redirect: location });
     }
