@@ -87,23 +87,23 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        /* Les modules de DONNÉES partagés (aucune dépendance, seulement des
-         * constantes) reçoivent leur propre fichier.
-         *
-         * Sinon Rollup les fond dans le fichier principal, et une page chargée
-         * à la demande — qui en dépend — se retrouve à importer le fichier
-         * principal, lequel importe déjà la page : les deux fichiers
+        /* Découpage explicite. Laissé à lui-même, Rollup fond les modules
+         * partagés dans le fichier principal ; une page chargée à la demande en
+         * dépend alors PAR ce fichier, lequel importe déjà la page. Les deux
          * s'attendent l'un l'autre et une constante est lue avant d'exister
-         * (« Cannot access 'm' before initialization »), au hasard des pages.
+         * (« Cannot access 'x' before initialization »), sur une page au hasard
+         * et en production seulement.
          *
-         * N'inscrire ici QUE des modules sans import : eux ne peuvent, par
-         * construction, refermer aucune boucle. */
-        manualChunks: {
-          'data-constants': [
-            './src/lib/affiliatePlatforms.js',
-            './src/lib/cityMatch.js',
-            './src/data/colisPipeline.js',
-          ],
+         * `lib`, `data` et `hooks` n'importent AUCUN composant (un test le
+         * vérifie) : les regrouper à part ne peut donc refermer aucune boucle,
+         * puisque rien n'y renvoie vers le fichier principal. */
+        manualChunks(id) {
+          const path = id.replace(/\\/g, '/');
+          /* Les dépendances externes restent réparties par Rollup : les
+             regrouper de force recréait une boucle avec ce fichier. */
+          if (path.includes('/node_modules/')) return undefined;
+          if (/\/src\/(lib|data|hooks)\//.test(path)) return 'app-shared';
+          return undefined;
         },
       },
     },
