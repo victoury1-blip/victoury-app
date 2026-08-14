@@ -81,17 +81,33 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
           fraisCache[l.id] = [];
         }
       }));
+      /* Le colis est une COPIE de la commande au moment de la facture. Corriger
+         une ville, un statut ou cocher « échange » ensuite ne changeait donc
+         rien : le recalcul relisait la copie périmée. La commande fait foi
+         quand elle existe encore, et la copie est remise à jour avec elle. */
       const updatedColis = facture.colis.map(c => {
-        /* Les factures émises avant que l'échange soit retenu sur le colis n'ont
-           pas le drapeau : on le relit sur la commande, sinon « Recalculer les
-           frais » les laisserait à 0 pour toujours. */
-        const isEchange = c.echange ?? !!orders?.find(o => o.id === c.orderId)?.echange;
-        const auto = getLivreurFrais(facture.livreur, c.city, c.status, fraisCache, livreursList, isEchange);
-        return { ...c, echange: isEchange, fraisLivraison: auto !== null ? auto : c.fraisLivraison };
+        const order = orders?.find(o => o.id === c.orderId);
+        const city = order?.recipient?.city || c.city;
+        const status = order?.status || c.status;
+        const isEchange = order ? !!order.echange : !!c.echange;
+        const auto = getLivreurFrais(facture.livreur, city, status, fraisCache, livreursList, isEchange);
+        return {
+          ...c, city, status, echange: isEchange,
+          prix: order ? (order.price ?? c.prix) : c.prix,
+          recipient: order?.recipient?.name || c.recipient,
+          phone: order?.recipient?.phone || c.phone,
+          fraisLivraison: auto !== null ? auto : c.fraisLivraison,
+        };
       });
       const totalLivre = updatedColis.filter(c => c.status === 'livre').reduce((s, c) => s + (c.prix || 0), 0);
       const totalFrais = updatedColis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
       onUpdate({ ...facture, colis: updatedColis, totalLivre, totalFrais, totalNet: totalLivre - totalFrais });
+      /* Compte rendu : sans lui, un recalcul sans effet — ville toujours absente
+         du tarif — ne se distingue pas d'un recalcul réussi. */
+      const changed = updatedColis.filter((c, i) => c.fraisLivraison !== facture.colis[i]?.fraisLivraison).length;
+      const unknown = updatedColis.filter(c => !c.fraisLivraison).map(c => c.city).filter(Boolean);
+      toast.success(changed ? `${changed} frais mis à jour` : 'Aucun frais modifié');
+      if (unknown.length) toast.error(`Sans tarif : ${[...new Set(unknown)].join(', ')}`);
     } catch (e) { console.error('Recalcul failed:', e); }
     setRecalculating(false);
   }
@@ -194,7 +210,7 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
             <div className="flex gap-2 mt-5">
               <button onClick={recalculerFrais} disabled={recalculating}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg bg-blue-500 text-white text-xs font-semibold hover:bg-blue-600 disabled:opacity-50">
-                <RefreshCw size={12} className={recalculating ? 'animate-spin' : ''} /> {recalculating ? '...' : 'Recalculer frais'}
+                <RefreshCw size={12} className={recalculating ? 'animate-spin' : ''} /> {recalculating ? '...' : 'Recalculer (villes + frais)'}
               </button>
               <button onClick={toggleCloture} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${facture.locked ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-amber-500 text-white hover:bg-amber-600'}`}>
                 {facture.locked ? 'Rouvrir' : 'Clôturer la facture'}
