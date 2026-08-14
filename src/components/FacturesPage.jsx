@@ -49,7 +49,7 @@ const STATUT_STYLE = {
 const STATUT_LABEL = { en_attente: 'Ouvert', paye: 'Versé', cloture: 'Clôturé' };
 
 /* ─── Facture Detail View ─── */
-function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
+function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
   const toast = useToast();
   const [recalculating, setRecalculating] = useState(false);
 
@@ -81,8 +81,12 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete }) {
         }
       }));
       const updatedColis = facture.colis.map(c => {
-        const auto = getLivreurFrais(facture.livreur, c.city, c.status, fraisCache, livreursList);
-        return { ...c, fraisLivraison: auto !== null ? auto : c.fraisLivraison };
+        /* Les factures émises avant que l'échange soit retenu sur le colis n'ont
+           pas le drapeau : on le relit sur la commande, sinon « Recalculer les
+           frais » les laisserait à 0 pour toujours. */
+        const isEchange = c.echange ?? !!orders?.find(o => o.id === c.orderId)?.echange;
+        const auto = getLivreurFrais(facture.livreur, c.city, c.status, fraisCache, livreursList, isEchange);
+        return { ...c, echange: isEchange, fraisLivraison: auto !== null ? auto : c.fraisLivraison };
       });
       const totalLivre = updatedColis.filter(c => c.status === 'livre').reduce((s, c) => s + (c.prix || 0), 0);
       const totalFrais = updatedColis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
@@ -376,7 +380,7 @@ function normalizeCity(name) {
     .replace(/gu/g, 'g');
 }
 
-function getLivreurFraisFromList(fraisList, city, status) {
+function getLivreurFraisFromList(fraisList, city, status, isEchange) {
   if (!fraisList?.length || !city) return null;
   const cn = city.toLowerCase().trim();
   const cnN = normalizeCity(city);
@@ -395,6 +399,10 @@ function getLivreurFraisFromList(fraisList, city, status) {
     return vlN && (vlN.includes(cnN) || cnN.includes(vlN));
   });
   if (!row) return null;
+  /* Un échange se facture au tarif « change » du livreur, même livré : c'est un
+     aller-retour, pas une livraison ordinaire. Sans cela, la ligne se retrouvait
+     à 0 et le frais n'était jamais déduit du total de la commande. */
+  if (isEchange) return row.change ?? row.livre ?? null;
   if (status === 'livre')  return row.livre  ?? null;
   if (status === 'refuse') return row.refuse ?? null;
   if (status === 'annule') return row.annule ?? null;
@@ -404,14 +412,14 @@ function getLivreurFraisFromList(fraisList, city, status) {
 
 const normName = (s) => String(s || '').toLowerCase().trim();
 
-function getLivreurFrais(livreurName, city, status, fraisCache, livreursList) {
+function getLivreurFrais(livreurName, city, status, fraisCache, livreursList, isEchange) {
   try {
     const list = livreursList || JSON.parse(localStorage.getItem('livreurs') || '[]');
     const target = normName(livreurName);
     const liv = list.find(l => normName(l.nom) === target);
     if (!liv) return null;
     const fraisList = fraisCache?.[liv.id] || JSON.parse(localStorage.getItem(`frais_${liv.id}`) || '[]');
-    return getLivreurFraisFromList(fraisList, city, status);
+    return getLivreurFraisFromList(fraisList, city, status, isEchange);
   } catch { return null; }
 }
 
@@ -494,7 +502,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   }, [orders]);
 
   function getFraisForOrder(o) {
-    const auto = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache, livreursList);
+    const auto = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache, livreursList, o.echange);
     return auto !== null ? auto : fraisDefault;
   }
 
@@ -540,6 +548,9 @@ function NewFactureModal({ orders, onClose, onCreated }) {
       colis: selOrders.map(o => ({
         orderId: o.id,
         status: o.status,
+        // Retenu sur le colis : le recalcul des frais et le rapport de profit
+        // n'ont pas toujours la commande d'origine sous la main.
+        echange: !!o.echange,
         prix: o.price || 0,
         fraisLivraison: selected[o.id] || 0,
         recipient: o.recipient?.name,
@@ -615,7 +626,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
                     }`}>{statusLabel(o.status)}</span>
                     <div className="font-bold text-gray-800 text-sm w-20 text-right">{fmt(o.price)} DH</div>
                     {selected[o.id] !== undefined && (() => {
-                      const autoFrais = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache, livreursList);
+                      const autoFrais = getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache, livreursList, o.echange);
                       return (
                         <div className="flex items-center gap-1 w-32">
                           <span className="text-xs text-gray-400">Frais:</span>
@@ -764,6 +775,7 @@ export default function FacturesPage({ orders }) {
         onBack={() => setDetail(null)}
         onUpdate={updateFacture}
         onDelete={(id) => { del(id); setDetail(null); }}
+        orders={orders}
       />
     );
   }

@@ -235,11 +235,11 @@ export default function ProfitPage({ orders = [] }) {
      (30 encaissés, 100 de coût, −70 de « perte » qui n'existe pas).
      La règle vit ici, et non dans le tableau : les totaux, l'export CSV et le
      détail du coût d'achat en dépendent tous. */
-  const isEchange = (colis) => !!orderMap.get(colis.orderId)?.echange;
+  const isEchange = (colis) => colis.echange ?? !!orderMap.get(colis.orderId)?.echange;
 
   function getProductCost(colis) {
     const order = orderMap.get(colis.orderId);
-    if (!order || order.echange) return 0;
+    if (!order || order.echange || colis.echange) return 0;
     const prods = order.products?.length ? order.products : [order.product];
     let cost = 0;
     for (const p of prods) {
