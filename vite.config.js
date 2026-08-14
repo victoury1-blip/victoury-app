@@ -85,6 +85,28 @@ export default defineConfig({
   ],
   build: {
     chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        /* Les modules de DONNÉES partagés (aucune dépendance, seulement des
+         * constantes) reçoivent leur propre fichier.
+         *
+         * Sinon Rollup les fond dans le fichier principal, et une page chargée
+         * à la demande — qui en dépend — se retrouve à importer le fichier
+         * principal, lequel importe déjà la page : les deux fichiers
+         * s'attendent l'un l'autre et une constante est lue avant d'exister
+         * (« Cannot access 'm' before initialization »), au hasard des pages.
+         *
+         * N'inscrire ici QUE des modules sans import : eux ne peuvent, par
+         * construction, refermer aucune boucle. */
+        manualChunks: {
+          'data-constants': [
+            './src/lib/affiliatePlatforms.js',
+            './src/lib/cityMatch.js',
+            './src/data/colisPipeline.js',
+          ],
+        },
+      },
+    },
   },
   server: {
     proxy: {
