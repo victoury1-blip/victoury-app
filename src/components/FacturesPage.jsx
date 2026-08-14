@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { findCityRow, feeFromRow } from '../lib/cityMatch';
 import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel, dedupeFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
@@ -371,43 +372,11 @@ function printFacture(f, toast) {
   w.document.close();
 }
 
-/* ─── helpers: get delivery fee from fraisList (supports partial city match) ─── */
-function normalizeCity(name) {
-  return (name || '').toLowerCase().trim()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[-_\s']/g, '')
-    .replace(/ou/g, 'u')
-    .replace(/gu/g, 'g');
-}
-
+/* ─── helpers: get delivery fee from fraisList ─── */
+/* Le rapprochement des noms de villes vit dans `cityMatch` : il est testé, et
+   le rapport de profit en a besoin autant que les factures. */
 function getLivreurFraisFromList(fraisList, city, status, isEchange) {
-  if (!fraisList?.length || !city) return null;
-  const cn = city.toLowerCase().trim();
-  const cnN = normalizeCity(city);
-  /* 1. Exact match */
-  let row = fraisList.find(c => (c.ville || '').toLowerCase().trim() === cn);
-  /* 2. Normalized match */
-  if (!row) row = fraisList.find(c => normalizeCity(c.ville) === cnN);
-  /* 3. Partial match */
-  if (!row) row = fraisList.find(c => {
-    const vl = (c.ville || '').toLowerCase().trim();
-    return vl && (vl.includes(cn) || cn.includes(vl));
-  });
-  /* 4. Normalized partial match */
-  if (!row) row = fraisList.find(c => {
-    const vlN = normalizeCity(c.ville);
-    return vlN && (vlN.includes(cnN) || cnN.includes(vlN));
-  });
-  if (!row) return null;
-  /* Un échange se facture au tarif « change » du livreur, même livré : c'est un
-     aller-retour, pas une livraison ordinaire. Sans cela, la ligne se retrouvait
-     à 0 et le frais n'était jamais déduit du total de la commande. */
-  if (isEchange) return row.change ?? row.livre ?? null;
-  if (status === 'livre')  return row.livre  ?? null;
-  if (status === 'refuse') return row.refuse ?? null;
-  if (status === 'annule') return row.annule ?? null;
-  if (status === 'change') return row.change ?? null;
-  return row.livre ?? null;
+  return feeFromRow(findCityRow(fraisList, city), status, isEchange);
 }
 
 const normName = (s) => String(s || '').toLowerCase().trim();
@@ -633,7 +602,12 @@ function NewFactureModal({ orders, onClose, onCreated }) {
                           <input type="number" value={selected[o.id]}
                             onChange={e => setSelected(prev => ({ ...prev, [o.id]: Number(e.target.value) }))}
                             className="border border-gray-200 rounded px-2 py-0.5 text-xs w-16 text-center" />
-                          {autoFrais !== null && <span className="text-xs text-green-500" title="Frais auto-détecté">✓</span>}
+                          {autoFrais !== null
+                            ? <span className="text-xs text-green-500" title={o.echange ? 'Tarif échange auto-détecté' : 'Frais auto-détecté'}>{o.echange ? '⇄' : '✓'}</span>
+                            /* Ville absente du tarif du livreur : sans ce
+                               signal, le frais restait à 0 sans que rien ne
+                               l'indique, et la marge du colis était fausse. */
+                            : <span className="text-xs text-amber-500" title={`Ville « ${o.recipient?.city || '—'} » absente du tarif de ce livreur — saisissez le frais à la main`}>⚠</span>}
                         </div>
                       );
                     })()}
