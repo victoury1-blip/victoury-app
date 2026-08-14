@@ -11,7 +11,6 @@
   },
   "headers": [
     {
-      "comment": "Le shell HTML et le service worker ne doivent JAMAIS être servis depuis un cache : un index.html périmé réclame des fichiers supprimés par le déploiement suivant, et l'application reste bloquée sur une erreur de chargement que vider le cache du service worker ne répare pas — le cache HTTP du navigateur, lui, garde l'ancienne page.",
       "source": "/",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
