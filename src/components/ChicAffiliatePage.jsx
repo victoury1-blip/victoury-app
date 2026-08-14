@@ -182,8 +182,9 @@ function ConfigPanel({ onTest }) {
   }
 
   function save(c) {
-    setConfig(c);
-    saveChicConfig(c, plat);
+    // On réaffiche la version nettoyée : sinon le champ garde les espaces
+    // recopiés alors que ce n'est pas ce qui est envoyé.
+    setConfig(saveChicConfig(c, plat));
   }
 
   async function testConnection() {

@@ -66,8 +66,19 @@ export function getChicConfig(plat = 'chic') {
 
 export function saveChicConfig(config, plat = 'chic') {
   const key = platformOf(plat).configKey;
-  localStorage.setItem(key, JSON.stringify(config));
-  cloudSet(key, config);
+  /* Un cookie recopié depuis les outils du navigateur arrive souvent avec des
+     espaces, un retour à la ligne ou des guillemets autour : envoyés tels quels,
+     ils invalident la session et l'erreur est indiscernable d'un cookie périmé. */
+  const clean = (v) => String(v ?? '').trim().replace(/^["']|["']$/g, '').replace(/\s+/g, '');
+  const cleaned = {
+    ...config,
+    xsrfToken: clean(config?.xsrfToken),
+    sessionCookie: clean(config?.sessionCookie),
+    apiKey: String(config?.apiKey ?? '').trim(),
+  };
+  localStorage.setItem(key, JSON.stringify(cleaned));
+  cloudSet(key, cleaned);
+  return cleaned;
 }
 
 function proxyUrl(path, mode, plat = 'chic') {
