@@ -28,6 +28,12 @@ export const AFFILIATE_PLATFORMS = {
        Plusieurs noms sont envoyés ensemble : un cookie inconnu est ignoré par
        le serveur, alors qu'un nom manquant fait échouer toute la session. */
     sessionCookies: ['laravel_session'],
+    /* Préfixe de la référence produit. Les identifiants sont numérotés
+       séparément par chaque site : le produit 489 de Bouait et le 489 de Chic
+       partageaient la même référence « CHIC-489 », donc le même produit dans le
+       Stock. Chic garde son préfixe historique, sans quoi tous ses produits
+       déjà importés changeraient de référence. */
+    refPrefix: 'CHIC',
     source: 'chic-affiliate',
     statusPrefix: 'chic',
     path: '/chic-affiliate',
@@ -41,6 +47,7 @@ export const AFFILIATE_PLATFORMS = {
     configKey: 'bouait_config',
     keyPrefix: 'BOUT_',
     sessionCookies: ['bouaitafaffiliate_session', 'bouait_session', 'laravel_session'],
+    refPrefix: 'BOUT',
     source: 'bouait-affiliate',
     statusPrefix: 'bouait',
     path: '/bouait-affiliate',

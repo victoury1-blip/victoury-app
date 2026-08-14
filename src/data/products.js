@@ -1,5 +1,16 @@
 import { cloudSet, cloudGet } from '../lib/cloudSettings';
-import { isAffiliateSource } from '../lib/affiliatePlatforms';
+import { isAffiliateSource, platformOf, platformOfSource } from '../lib/affiliatePlatforms';
+
+/* Référence attendue d'un produit d'affiliation.
+ * Les identifiants sont numérotés séparément par chaque site : le produit 489 de
+ * Bouait portait la référence « CHIC-489 », celle du 489 de Chic — donc le même
+ * produit dans le Stock, avec le prix et le stock de l'autre. Les produits déjà
+ * importés sous l'ancien préfixe sont corrigés à la lecture. */
+function fixAffiliateRef(p) {
+  if (!isAffiliateSource(p?.source) || !p?.chicId) return p;
+  const want = `${platformOf(platformOfSource(p.source)).refPrefix}-${p.chicId}`;
+  return p.ref === want && p.id === want ? p : { ...p, ref: want, id: want };
+}
 
 const STORAGE_KEY = 'victoury_products';
 
@@ -49,7 +60,7 @@ export function loadProducts() {
           p.variations = p.variations.map(v => ({ ...v, stock: 10 }));
           p.stockSeeded = true;
         }
-        return p;
+        return fixAffiliateRef(p);
       });
     }
   } catch {}
@@ -81,7 +92,7 @@ export async function loadProductsRemote() {
         p.variations = p.variations.map(v => ({ ...v, stock: 10 }));
         p.stockSeeded = true;
       }
-      return p;
+      return fixAffiliateRef(p);
     });
   }
   return null;

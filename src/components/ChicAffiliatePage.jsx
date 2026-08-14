@@ -399,7 +399,7 @@ function ProductsTab() {
               || chicList.find(c => norm(c.name).includes(norm(p.name)) || norm(p.name).includes(norm(c.name)));
             if (match?.chicId) {
               changed = true;
-              return { ...p, chicId: match.chicId, ref: `CHIC-${match.chicId}` };
+              return { ...p, chicId: match.chicId, ref: `${P.refPrefix}-${match.chicId}` };
             }
           }
           return p;
@@ -446,8 +446,10 @@ function ProductsTab() {
       const allImages = details.images.length > 0 ? details.images : (p.image ? [p.image] : []);
 
       const newProd = {
-        id: p.chicId ? `CHIC-${p.chicId}` : `CHIC-${Date.now()}`,
-        ref: p.chicId ? `CHIC-${p.chicId}` : `CHIC-${Date.now()}`,
+        // Préfixe propre à la plateforme : sans lui, deux produits portant le
+        // même numéro sur deux sites deviennent un seul produit du Stock.
+        id: `${P.refPrefix}-${p.chicId || Date.now()}`,
+        ref: `${P.refPrefix}-${p.chicId || Date.now()}`,
         chicId: p.chicId,
         name: p.name || '',
         image: allImages[0] || p.image || null,
@@ -759,7 +761,7 @@ function OrdersTab({ victouryOrders = [], setVictouryOrders }) {
       const existing = JSON.parse(localStorage.getItem('victoury_products') || '[]');
       const productName = o.product?.name || 'Produit Chic';
       const newOrder = {
-        id: `CHIC-${o.id}`,
+        id: `${P.refPrefix}-${o.id}`,
         recipient: {
           name: o.Recipient || '',
           phone: o.Recipient_phone || '',

@@ -94,3 +94,25 @@ describe('cookies de session', () => {
     expect(AFFILIATE_PLATFORMS.chic.sessionCookies).toEqual(['laravel_session']);
   });
 });
+
+/* Les sites numérotent leurs produits chacun de son côté : le 489 de Bouait
+   portait « CHIC-489 », la référence du 489 de Chic — donc le même produit dans
+   le Stock, avec le prix et le stock de l'autre. */
+describe('références produit', () => {
+  it('chaque plateforme a son propre préfixe', () => {
+    const prefixes = AFFILIATE_LIST.map(p => p.refPrefix);
+    expect(new Set(prefixes).size).toBe(prefixes.length);
+    expect(prefixes.every(Boolean)).toBe(true);
+  });
+
+  it('Chic garde son préfixe historique', () => {
+    // Le changer renommerait tous les produits Chic déjà importés.
+    expect(AFFILIATE_PLATFORMS.chic.refPrefix).toBe('CHIC');
+    expect(AFFILIATE_PLATFORMS.bouait.refPrefix).toBe('BOUT');
+  });
+
+  it('un même numéro donne deux références distinctes', () => {
+    const ref = (p) => `${AFFILIATE_PLATFORMS[p].refPrefix}-489`;
+    expect(ref('chic')).not.toBe(ref('bouait'));
+  });
+});
