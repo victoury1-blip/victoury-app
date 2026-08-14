@@ -32,7 +32,15 @@ export default defineConfig({
     react(),
     versionFilePlugin,
     VitePWA({
-      registerType: 'autoUpdate',
+      /* « prompt » et NON « autoUpdate » : avec la mise à jour automatique, le
+         nouveau service worker prenait le contrôle de la page DÉJÀ OUVERTE. Le
+         code en cours d'exécution venait alors de l'ancienne version tandis que
+         les fichiers chargés ensuite venaient de la nouvelle — deux versions
+         mélangées, d'où « Cannot access 'x' before initialization » sur une page
+         au hasard après chaque déploiement.
+         La bannière de mise à jour (PWAUpdateBanner) propose le rechargement :
+         la bascule se fait alors d'un bloc, jamais en cours de route. */
+      registerType: 'prompt',
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'apple-touch-icon-512.png'],
       manifest: {
         name: 'VICTOURY - Gestion des Commandes',
@@ -66,8 +74,11 @@ export default defineConfig({
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        skipWaiting: true,
-        clientsClaim: true,
+        /* Le nouveau service worker ATTEND : prendre le contrôle immédiatement
+           (skipWaiting/clientsClaim) est ce qui mélangeait les deux versions. */
+        skipWaiting: false,
+        clientsClaim: false,
+        cleanupOutdatedCaches: true,
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/wc-api/, /^\/chic-api/, /^\/api\//, /^\/ozone-/],
         runtimeCaching: [

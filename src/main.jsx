@@ -29,6 +29,17 @@ async function clearCachesAndReload() {
   }
 }
 
+/* Signes d'un bundle incohérent — deux versions de l'application mélangées
+   après un déploiement. « Cannot access 'x' before initialization » en fait
+   partie : un fichier attend une constante d'un autre fichier resté à
+   l'ancienne version. Absent de cette liste, il s'affichait en écran rouge au
+   lieu de déclencher le rechargement qui le répare. */
+function isStaleBundleError(msg) {
+  // Volontairement étroit : élargir à « is not a function » ferait recharger
+  // l'application sur de VRAIS bugs, qui disparaîtraient alors sans être vus.
+  return /Loading chunk|dynamically imported module|module script failed|before initialization/i.test(String(msg || ''));
+}
+
 // On chunk load error (stale SW cache after a deploy), clear caches and reload.
 // Guard: at most one auto-reload per 15s to avoid a reload loop.
 function autoRecover() {
@@ -40,6 +51,15 @@ function autoRecover() {
   }
   return false;
 }
+
+/* Une erreur d'évaluation de module survient HORS du rendu React : aucune
+   frontière d'erreur ne la voit, et la page reste blanche. */
+window.addEventListener('error', (e) => {
+  if (isStaleBundleError(e?.message || e?.error?.message)) autoRecover();
+});
+window.addEventListener('unhandledrejection', (e) => {
+  if (isStaleBundleError(e?.reason?.message || e?.reason)) autoRecover();
+});
 
 window.addEventListener('vite:preloadError', (e) => {
   // ne supprimer l'erreur que si on recharge vraiment — sinon la laisser
@@ -58,14 +78,12 @@ class RootErrorBoundary extends React.Component {
   }
   componentDidCatch(error) {
     const msg = String(error?.message || '');
-    if (/Loading chunk|dynamically imported module|module script failed/i.test(msg)) {
-      autoRecover();
-    }
+    if (isStaleBundleError(msg)) autoRecover();
   }
   render() {
     if (this.state.error) {
       const msg = String(this.state.error?.message || this.state.error || '');
-      const isChunk = /Loading chunk|dynamically imported module|module script failed|Failed to fetch/i.test(msg);
+      const isChunk = isStaleBundleError(msg) || /Failed to fetch/i.test(msg);
       return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: 'sans-serif', padding: 24, textAlign: 'center' }}>
           <p style={{ fontSize: 40 }}>🔄</p>
