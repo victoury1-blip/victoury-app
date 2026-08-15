@@ -5,13 +5,14 @@ import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
   ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
-  Search, ArrowDownCircle, Tag, Upload, Bell, Phone, MessageCircle, FileText,
+  Search, ArrowDownCircle, Tag, Upload, Bell, Phone, MessageCircle, FileText, TrendingUp,
 } from 'lucide-react';
 import { requestPermission } from '../hooks/useNotifications';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
 import { readNextNumber, setNextNumber, peekNextVictId, formatVictId } from '../lib/victId';
 import { A_CONFIRMER_STATUSES } from '../data/colisPipeline';
+import { getMetaConfig, saveMetaConfig, buildEvent, sendEvents } from '../lib/metaCapi';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -806,6 +807,32 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
      `ozone_tracking` : on le remet comme code de suivi.
      Aucune commande dont `ozone_tracking` est vide n'est touchée. */
 
+  /* ── Meta / Conversions API ── */
+  const [meta, setMeta] = useState(() => ({ enabled: false, pixelId: '', token: '', testCode: '', sourceUrl: '', ...getMetaConfig() }));
+  const [metaTest, setMetaTest] = useState(null);
+  function updateMeta(patch) {
+    setMeta(prev => ({ ...prev, ...saveMetaConfig({ ...prev, ...patch }) }));
+    setMetaTest(null);
+  }
+  async function testMeta() {
+    setMetaTest({ busy: true });
+    try {
+      /* Envoi d'une commande RÉELLE déjà livrée plutôt qu'un évènement inventé :
+         un test factice passe même quand les vraies données ne conviennent pas
+         (numéro absent, montant nul). */
+      const sample = (orders || []).find(o => o.status === 'livre' && o.recipient?.phone);
+      if (!sample) { setMetaTest({ ok: false, msg: 'Aucune commande livrée avec téléphone pour tester' }); return; }
+      const ev = await buildEvent(sample, meta);
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await sendEvents([ev], meta, session?.access_token);
+      setMetaTest(r.ok
+        ? { ok: true, msg: `Évènement accepté par Meta (commande ${sample.id})` }
+        : { ok: false, msg: r.error });
+    } catch (e) {
+      setMetaTest({ ok: false, msg: e?.message || 'Échec' });
+    }
+  }
+
   /* ── Settings cards config ── */
   const CARDS = [
     {
@@ -819,6 +846,20 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       cardBg: 'from-amber-50',
       saved: true,
       badge: { label: peekNextVictId(orders), color: 'text-amber-700 bg-amber-50 border-amber-200' },
+    },
+    {
+      /* La publicité n'apprend, depuis le site, que la commande PASSÉE. En
+         paiement à la livraison, une bonne part n'aboutit jamais. */
+      id: 'meta',
+      title: 'Meta / Facebook',
+      desc: 'Renvoie à Meta les commandes réellement livrées, pour que la publicité optimise sur les ventes encaissées.',
+      icon: <TrendingUp size={22} className="text-blue-600" />,
+      iconBg: 'bg-blue-100',
+      cardBg: 'from-blue-50',
+      saved: !!(meta.enabled && meta.pixelId && meta.token),
+      badge: meta.enabled && meta.pixelId && meta.token
+        ? { label: 'Actif', color: 'text-green-700 bg-green-50 border-green-200' }
+        : { label: 'Inactif', color: 'text-gray-500 bg-gray-50 border-gray-200' },
     },
     {
       id: 'woocommerce',
@@ -1295,6 +1336,74 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
       {/* ── Ozon Express Modal ── */}
       {/* ── Codes de suivi ── */}
+      {/* ── Meta / Conversions API ── */}
+      <Modal open={openModal === 'meta'} onClose={() => setOpenModal(null)}
+        title="Meta / Facebook" icon={<TrendingUp size={18} className="text-blue-600" />}>
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-800 leading-relaxed">
+            Meta n’apprend, depuis le site, que la commande <b>passée</b>. Ici, le système lui
+            renvoie l’issue <b>réelle</b> : livrée, annulée, refusée — pour que la publicité
+            cherche des clients qui paient, et non des formulaires remplis.
+          </div>
+
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input type="checkbox" checked={!!meta.enabled} onChange={e => updateMeta({ enabled: e.target.checked })} />
+            Activer l’envoi automatique
+          </label>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Pixel ID</label>
+            <input type="text" value={meta.pixelId || ''} onChange={e => updateMeta({ pixelId: e.target.value })}
+              placeholder="1080161523515714"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Jeton d’accès (Gestionnaire d’évènements → Paramètres → API de conversions)
+            </label>
+            <input type="password" value={meta.token || ''} onChange={e => updateMeta({ token: e.target.value })}
+              placeholder="EAAG..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Code de test (facultatif — pour voir les évènements arriver en direct)
+            </label>
+            <input type="text" value={meta.testCode || ''} onChange={e => updateMeta({ testCode: e.target.value })}
+              placeholder="TEST12345"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Adresse de la boutique (facultatif)</label>
+            <input type="text" value={meta.sourceUrl || ''} onChange={e => updateMeta({ sourceUrl: e.target.value })}
+              placeholder="https://victoury-maroc.com"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={testMeta} disabled={!meta.pixelId || !meta.token || metaTest?.busy}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-300 text-blue-600 text-xs font-medium hover:bg-blue-50 disabled:opacity-40 transition">
+              {metaTest?.busy ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+              Tester l’envoi
+            </button>
+            {metaTest && !metaTest.busy && (
+              <span className={`flex items-center gap-1 text-xs ${metaTest.ok ? 'text-green-600' : 'text-red-600'}`}>
+                {metaTest.ok ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {metaTest.msg}
+              </span>
+            )}
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[11px] text-amber-800 leading-relaxed">
+            Le téléphone et le nom sont <b>hachés dans le navigateur</b> : ni ce serveur ni Meta ne
+            voient une donnée en clair. Comptez une à deux semaines avant que l’effet se voie —
+            Meta a besoin d’un volume d’évènements pour réapprendre.
+          </div>
+        </div>
+      </Modal>
+
       <Modal open={openModal === 'tracking'} onClose={() => setOpenModal(null)}
         title="Codes de suivi" icon={<FileText size={18} className="text-amber-600" />}>
         <div className="space-y-4">

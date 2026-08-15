@@ -1,0 +1,98 @@
+/* Envoi automatique des conversions à Meta.
+ *
+ * Une commande ne change d'issue qu'une fois : chaque évènement ne doit partir
+ * qu'une seule fois, sinon la même vente est comptée plusieurs fois et fausse
+ * autant l'apprentissage que le retour sur dépense affiché.
+ *
+ * Ce qui est déjà parti est donc mémorisé, localement ET dans le cloud : sans
+ * cela, ouvrir l'application sur un second appareil renverrait tout l'historique.
+ */
+import { useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
+import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import { getMetaConfig, buildEvent, eventForStatus, eventId } from '../lib/metaCapi';
+import { sendEvents } from '../lib/metaCapi';
+import { logAlert } from '../lib/errorLog';
+
+const SENT_KEY = 'meta_capi_sent';
+/* Meta refuse un évènement de plus de sept jours : réémettre un vieux statut au
+   premier démarrage n'apprendrait rien et serait rejeté. */
+const MAX_AGE_MS = 6 * 24 * 60 * 60 * 1000;
+
+function readSent() {
+  try { return new Set(JSON.parse(localStorage.getItem(SENT_KEY) || '[]')); } catch { return new Set(); }
+}
+function writeSent(set) {
+  // Borné : la liste ne doit pas grossir sans fin dans le stockage local.
+  const arr = [...set].slice(-5000);
+  try { localStorage.setItem(SENT_KEY, JSON.stringify(arr)); } catch { /* quota */ }
+  cloudSet(SENT_KEY, arr);
+}
+
+/** Horodatage d'une commande, pour écarter les statuts trop anciens. */
+function tsOf(order) {
+  const raw = order?.dateUpdated || order?.dateAdded || '';
+  const m = String(raw).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0)).getTime();
+  const d = order?.createdAt ? new Date(order.createdAt).getTime() : NaN;
+  return Number.isFinite(d) ? d : NaN;
+}
+
+export default function useMetaCapi(orders) {
+  const sentRef = useRef(null);
+  const busyRef = useRef(false);
+
+  // La mémoire du cloud fait foi au démarrage : elle porte ce qu'ont déjà
+  // envoyé les autres appareils.
+  useEffect(() => {
+    sentRef.current = readSent();
+    cloudGet(SENT_KEY).then(remote => {
+      if (!Array.isArray(remote)) return;
+      const merged = new Set([...(sentRef.current || []), ...remote]);
+      sentRef.current = merged;
+      try { localStorage.setItem(SENT_KEY, JSON.stringify([...merged].slice(-5000))); } catch { /* quota */ }
+    }).catch(() => { /* le local suffit */ });
+  }, []);
+
+  useEffect(() => {
+    const cfg = getMetaConfig();
+    if (!cfg.enabled || !cfg.pixelId || !cfg.token) return;
+    if (!sentRef.current || busyRef.current || !orders?.length) return;
+
+    const now = Date.now();
+    const pending = orders.filter(o => {
+      const spec = eventForStatus(o?.status);
+      if (!spec) return false;
+      if (sentRef.current.has(eventId(o, spec.name))) return false;
+      const t = tsOf(o);
+      return Number.isFinite(t) && now - t <= MAX_AGE_MS;
+    });
+    if (!pending.length) return;
+
+    busyRef.current = true;
+    (async () => {
+      try {
+        // Par paquets : un envoi géant échouerait en entier au moindre refus.
+        const batch = pending.slice(0, 50);
+        const events = (await Promise.all(batch.map(o => buildEvent(o, cfg)))).filter(Boolean);
+        if (!events.length) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        const r = await sendEvents(events, cfg, session?.access_token);
+        if (!r.ok) { logAlert('Meta CAPI', r.error || 'Envoi refusé'); return; }
+        // Marqué APRÈS confirmation seulement : marquer avant perdrait
+        // définitivement les conversions d'un envoi qui a échoué.
+        const next = new Set(sentRef.current);
+        for (const o of batch) {
+          const spec = eventForStatus(o.status);
+          if (spec) next.add(eventId(o, spec.name));
+        }
+        sentRef.current = next;
+        writeSent(next);
+      } catch (e) {
+        logAlert('Meta CAPI', e?.message || 'Envoi impossible');
+      } finally {
+        busyRef.current = false;
+      }
+    })();
+  }, [orders]);
+}

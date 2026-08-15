@@ -39,6 +39,7 @@ import { AFFILIATE_LIST, platformOf } from './lib/affiliatePlatforms';
 import { tabFromParam, tabPath } from './data/orderTabs';
 import { logAlert } from './lib/errorLog';
 import useAutoSync from './hooks/useAutoSync';
+import useMetaCapi from './hooks/useMetaCapi';
 import useNotifications from './hooks/useNotifications';
 import useOrderNotifications from './hooks/useOrderNotifications';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -168,6 +169,10 @@ export default function App() {
   const location = useLocation();
 
   useAutoSync(session);
+  /* Renvoie à Meta l'issue RÉELLE des commandes (livrée, annulée) : depuis le
+     site, la publicité n'apprend que la commande passée, alors qu'en paiement à
+     la livraison une bonne part n'aboutit jamais. */
+  useMetaCapi(orders);
   const { notifyNewOrder } = useOrderNotifications();
 
   const [notifPerm, setNotifPerm] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
