@@ -91,15 +91,41 @@ export const eventForStatus = (status) => EVENT_BY_STATUS[status] || null;
  *  conversion si le pixel du site l'a déjà signalée. */
 export const eventId = (order, eventName) => `${order.id}:${eventName}`;
 
+/* Fenêtre acceptée par Meta : au-delà de sept jours, l'évènement est rejeté.
+   On reste à six pour garder une marge. */
+export const MAX_AGE_MS = 6 * 24 * 60 * 60 * 1000;
+
+/** Date du dernier changement de statut, en millisecondes. */
+export function orderTimestamp(order) {
+  const raw = order?.dateUpdated || order?.dateAdded || '';
+  const m = String(raw).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0)).getTime();
+  const d = order?.createdAt ? new Date(order.createdAt).getTime() : NaN;
+  return Number.isFinite(d) ? d : NaN;
+}
+
+/* Instant de l'évènement : celui de la LIVRAISON, pas celui de l'envoi.
+ *
+ * Horodater à l'envoi reportait sur aujourd'hui toutes les livraisons des jours
+ * précédents : vingt et un achats affichés le jour où deux commandes seulement
+ * étaient arrivées. Le chiffre est juste, la date ne l'est pas — et c'est la
+ * date qui sert à rapprocher une vente de la dépense publicitaire du jour.
+ *
+ * Borné des deux côtés : Meta refuse un horodatage en avance, et tout ce qui
+ * dépasse sa fenêtre. */
+export function eventTime(order, now = Date.now()) {
+  const t = orderTimestamp(order);
+  if (!Number.isFinite(t)) return Math.floor(now / 1000);
+  return Math.floor(Math.min(Math.max(t, now - MAX_AGE_MS), now) / 1000);
+}
+
 /** Construit l'évènement Meta d'une commande, ou null si son statut n'en a pas. */
 export async function buildEvent(order, cfg = {}) {
   const spec = eventForStatus(order?.status);
   if (!spec) return null;
   const ev = {
     event_name: spec.name,
-    // En secondes, et jamais dans le futur : Meta rejette un horodatage en
-    // avance, et refuse au-delà de sept jours dans le passé.
-    event_time: Math.floor(Date.now() / 1000),
+    event_time: eventTime(order),
     event_id: eventId(order, spec.name),
     action_source: 'website',
     user_data: await hashUserData(order),

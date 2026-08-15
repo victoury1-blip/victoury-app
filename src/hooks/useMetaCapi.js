@@ -10,14 +10,10 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
-import { getMetaConfig, buildEvent, eventForStatus, eventId } from '../lib/metaCapi';
-import { sendEvents } from '../lib/metaCapi';
+import { getMetaConfig, buildEvent, eventForStatus, eventId, sendEvents, orderTimestamp, MAX_AGE_MS } from '../lib/metaCapi';
 import { logAlert } from '../lib/errorLog';
 
 const SENT_KEY = 'meta_capi_sent';
-/* Meta refuse un évènement de plus de sept jours : réémettre un vieux statut au
-   premier démarrage n'apprendrait rien et serait rejeté. */
-const MAX_AGE_MS = 6 * 24 * 60 * 60 * 1000;
 
 function readSent() {
   try { return new Set(JSON.parse(localStorage.getItem(SENT_KEY) || '[]')); } catch { return new Set(); }
@@ -27,15 +23,6 @@ function writeSent(set) {
   const arr = [...set].slice(-5000);
   try { localStorage.setItem(SENT_KEY, JSON.stringify(arr)); } catch { /* quota */ }
   cloudSet(SENT_KEY, arr);
-}
-
-/** Horodatage d'une commande, pour écarter les statuts trop anciens. */
-function tsOf(order) {
-  const raw = order?.dateUpdated || order?.dateAdded || '';
-  const m = String(raw).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0)).getTime();
-  const d = order?.createdAt ? new Date(order.createdAt).getTime() : NaN;
-  return Number.isFinite(d) ? d : NaN;
 }
 
 export default function useMetaCapi(orders) {
@@ -64,7 +51,7 @@ export default function useMetaCapi(orders) {
       const spec = eventForStatus(o?.status);
       if (!spec) return false;
       if (sentRef.current.has(eventId(o, spec.name))) return false;
-      const t = tsOf(o);
+      const t = orderTimestamp(o);
       return Number.isFinite(t) && now - t <= MAX_AGE_MS;
     });
     if (!pending.length) return;

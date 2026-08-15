@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { webcrypto } from 'node:crypto';
-import { phoneForMeta, eventForStatus, eventId, buildEvent, EVENT_BY_STATUS } from '../lib/metaCapi';
+import { phoneForMeta, eventForStatus, eventId, buildEvent, EVENT_BY_STATUS, eventTime, MAX_AGE_MS } from '../lib/metaCapi';
 
 beforeAll(() => {
   if (!globalThis.crypto?.subtle) globalThis.crypto = webcrypto;
@@ -84,5 +84,38 @@ describe('évènement construit', () => {
     // Meta rejette un évènement daté en avance.
     const ev = await buildEvent(order, {});
     expect(ev.event_time).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
+  });
+});
+
+/* Horodater à l'ENVOI reportait sur aujourd'hui toutes les livraisons des jours
+   précédents : vingt et un achats affichés le jour où deux commandes seulement
+   étaient arrivées. Le chiffre était juste, la date non — et c'est la date qui
+   rattache une vente à la dépense publicitaire du jour. */
+describe('date de l’évènement', () => {
+  const jour = (d, m, y, h = 12) => `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} ${h}:00:00`;
+
+  it('reprend la date de livraison, pas celle de l’envoi', () => {
+    const now = new Date(2026, 7, 15, 15, 0, 0).getTime();
+    const order = { id: 'A', status: 'livre', dateUpdated: jour(13, 8, 2026, 10) };
+    const attendu = Math.floor(new Date(2026, 7, 13, 10, 0, 0).getTime() / 1000);
+    expect(eventTime(order, now)).toBe(attendu);
+  });
+
+  it('ne date jamais dans le futur', () => {
+    const now = new Date(2026, 7, 15, 15, 0, 0).getTime();
+    const order = { id: 'A', dateUpdated: jour(20, 8, 2026) };
+    expect(eventTime(order, now)).toBe(Math.floor(now / 1000));
+  });
+
+  it('ramène une date trop ancienne dans la fenêtre acceptée', () => {
+    // Au-delà de sept jours, Meta rejette l'évènement : mieux vaut le border.
+    const now = new Date(2026, 7, 15, 15, 0, 0).getTime();
+    const order = { id: 'A', dateUpdated: jour(1, 7, 2026) };
+    expect(eventTime(order, now)).toBe(Math.floor((now - MAX_AGE_MS) / 1000));
+  });
+
+  it('retombe sur l’instant présent si la date est illisible', () => {
+    const now = new Date(2026, 7, 15, 15, 0, 0).getTime();
+    expect(eventTime({ id: 'A' }, now)).toBe(Math.floor(now / 1000));
   });
 });
