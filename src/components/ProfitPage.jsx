@@ -303,7 +303,14 @@ export default function ProfitPage({ orders = [] }) {
   const inPeriod = (d) => (!applied.dateFrom || d >= applied.dateFrom) && (!applied.dateTo || d <= applied.dateTo);
   // La publicité doit couvrir la MÊME période que le chiffre d'affaires, sinon le
   // profit du mois est amputé de toutes les dépenses des mois précédents.
-  const totalPub = adTransfers.filter(t => inPeriod(String(t.date || ''))).reduce((s, t) => s + (t.amount || 0), 0);
+  /* Dépenses de la PÉRIODE. Le détail par catégorie s'en déduit : calculé sur
+     la totalité des dépenses, il annonçait des montants supérieurs au total
+     affiché juste au-dessus — 2 645 + 200 pour un total de 2 245. */
+  const pubDeLaPeriode = adTransfers.filter(t => inPeriod(String(t.date || '')));
+  const totalPub = pubDeLaPeriode.reduce((s, t) => s + (t.amount || 0), 0);
+  const pubParCategorie = (cat) => pubDeLaPeriode
+    .filter(x => (x.category || 'facebook') === cat)
+    .reduce((s, x) => s + (x.amount || 0), 0);
   const profitNet = sousTotal - totalPub;
 
   /* ── Indicateurs publicitaires ──
@@ -415,7 +422,7 @@ export default function ProfitPage({ orders = [] }) {
             });
             rows.push('');
             EXPENSE_CATS.forEach(cat => {
-              const t = adTransfers.filter(x => (x.category || 'facebook') === cat.value).reduce((s, x) => s + (x.amount || 0), 0);
+              const t = pubParCategorie(cat.value);
               if (t) rows.push(`${cat.label},${t.toFixed(2)}`);
             });
             rows.push(`Total Dépenses,${totalPub.toFixed(2)}`); rows.push(`Profit Net,${profitNet.toFixed(2)}`);
@@ -560,7 +567,7 @@ export default function ProfitPage({ orders = [] }) {
               <div className="text-lg font-black text-purple-600">{fmt(totalPub)}</div>
               <div className="flex flex-wrap justify-center gap-1 mt-2">
                 {EXPENSE_CATS.map(cat => {
-                  const t = adTransfers.filter(x => (x.category || 'facebook') === cat.value).reduce((s, x) => s + (x.amount || 0), 0);
+                  const t = pubParCategorie(cat.value);
                   if (!t) return null;
                   return <span key={cat.value} className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${cat.bg} ${cat.color}`}>{cat.label}: {fmt(t)}</span>;
                 })}
