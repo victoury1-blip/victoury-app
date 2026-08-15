@@ -116,3 +116,31 @@ describe('références produit', () => {
     expect(ref('chic')).not.toBe(ref('bouait'));
   });
 });
+
+
+/* Ajouter une plateforme ne doit rien demander d'autre qu'une entrée : les
+   routes, le menu et les hôtes autorisés en découlent. */
+describe('ajout d’une plateforme', () => {
+  it('AlphaCod est déclarée comme les autres', () => {
+    const p = AFFILIATE_PLATFORMS.alphacod;
+    expect(p.host).toBe('alphacod.ma');
+    expect(p.path).toBe('/alphacod-affiliate');
+    expect(p.refPrefix).toBe('ALPH');
+  });
+
+  it('chaque plateforme est complètement décrite', () => {
+    for (const p of AFFILIATE_LIST) {
+      for (const champ of ['key', 'label', 'host', 'origin', 'configKey', 'keyPrefix', 'refPrefix', 'source', 'statusPrefix', 'path']) {
+        expect(typeof p[champ]).toBe('string');
+        expect(p[champ].length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('rien n’est partagé entre deux plateformes', () => {
+    for (const champ of ['key', 'host', 'configKey', 'refPrefix', 'statusPrefix', 'path', 'source']) {
+      const vals = AFFILIATE_LIST.map(p => p[champ]);
+      expect(new Set(vals).size).toBe(vals.length);
+    }
+  });
+});

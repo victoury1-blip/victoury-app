@@ -31,8 +31,19 @@ const NAV_ITEMS = [
   { path: '/import-sheets', label: 'Google Sheets', icon: FileSpreadsheet, perm: 'liste_colis' },
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
   { path: '/fournisseur', label: 'Fournisseur',     icon: Truck, perm: 'stock' },
-  { path: '/chic-affiliate', label: 'Chic Affiliate', icon: Store },
-  { path: '/bouait-affiliate', label: 'Bouait Affiliate', icon: Store },
+  /* Une seule entrée pour toutes les plateformes d'affiliation : une ligne par
+     plateforme allongeait le menu à chaque ajout, alors qu'elles font le même
+     travail. Les sous-entrées se déduisent de la liste des plateformes. */
+  {
+    path: '/affiliations',
+    label: 'Affiliations',
+    icon: Store,
+    children: AFFILIATE_LIST.map(p => ({
+      path: p.path,
+      label: p.label.replace(/ Affiliate$/, ''),
+      statuses: [`${p.statusPrefix}_nouveau`],
+    })),
+  },
   {
     path: '/ramassage',
     label: 'Ramassage',
@@ -371,11 +382,7 @@ export default function Sidebar({ orders = [], session }) {
           }
 
           const active = isActive(item.path);
-          /* Badge = nouvelles commandes de CETTE plateforme d'affiliation. */
-          const badgePlat = AFFILIATE_LIST.find(a => a.path === item.path);
-          const itemBadge = badgePlat
-            ? orders.filter(o => o.status === `${badgePlat.statusPrefix}_nouveau`).length
-            : 0;
+          const itemBadge = 0;
           return (
             <a
               key={item.path}

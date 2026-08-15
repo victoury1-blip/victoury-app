@@ -74,6 +74,7 @@ export function saveChicConfig(config, plat = 'chic') {
     ...config,
     xsrfToken: clean(config?.xsrfToken),
     sessionCookie: clean(config?.sessionCookie),
+    sessionName: clean(config?.sessionName),
     apiKey: String(config?.apiKey ?? '').trim(),
   };
   localStorage.setItem(key, JSON.stringify(cleaned));
@@ -86,8 +87,13 @@ function proxyUrl(path, mode, plat = 'chic') {
   const config = getChicConfig(plat);
   if (!config) throw new Error(`${P.label} non configuré`);
   const params = new URLSearchParams({ path, session: config.sessionCookie, host: P.host });
-  /* Nom du cookie de session, propre à chaque site (voir affiliatePlatforms). */
-  params.set('names', (P.sessionCookies || ['laravel_session']).join(','));
+  /* Nom du cookie de session. Celui saisi dans Réglages passe en TÊTE : les
+     noms connus d'avance sont des suppositions, et une plateforme qui en change
+     ne doit pas exiger une nouvelle mise en ligne pour se reconnecter. */
+  const names = [config.sessionName, ...(P.sessionCookies || ['laravel_session'])]
+    .map(n => String(n || '').trim())
+    .filter((n, i, a) => n && a.indexOf(n) === i);
+  params.set('names', names.join(','));
   if (config.xsrfToken) params.set('xsrf', config.xsrfToken);
   if (mode) params.set('mode', mode);
   return `/api/chic-proxy?${params}`;

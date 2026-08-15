@@ -10,6 +10,7 @@ import { isAuthenticated } from './_auth.js';
 const ALLOWED_HOSTS = [
   'www.chic-affiliate.com', 'api.chic-affiliate.com', 'chic-affiliate.com',
   'bouaitafaffiliate.com', 'www.bouaitafaffiliate.com', 'api.bouaitafaffiliate.com',
+  'alphacod.ma', 'www.alphacod.ma', 'api.alphacod.ma',
 ];
 
 export default async function handler(req, res) {

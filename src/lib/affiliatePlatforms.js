@@ -52,6 +52,20 @@ export const AFFILIATE_PLATFORMS = {
     statusPrefix: 'bouait',
     path: '/bouait-affiliate',
   },
+  alphacod: {
+    key: 'alphacod',
+    label: 'AlphaCod Affiliate',
+    host: 'alphacod.ma',
+    origin: 'https://alphacod.ma',
+    hosts: ['alphacod.ma', 'www.alphacod.ma', 'api.alphacod.ma'],
+    configKey: 'alphacod_config',
+    keyPrefix: 'ALPH_',
+    sessionCookies: ['alphacod_session', 'azom_session', 'laravel_session'],
+    refPrefix: 'ALPH',
+    source: 'alphacod-affiliate',
+    statusPrefix: 'alphacod',
+    path: '/alphacod-affiliate',
+  },
 };
 
 export const AFFILIATE_LIST = Object.values(AFFILIATE_PLATFORMS);

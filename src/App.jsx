@@ -1255,9 +1255,16 @@ export default function App() {
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/fournisseur" element={<PermGate perm="stock"><FournisseurPage /></PermGate>} />
-          <Route path="/chic-affiliate" element={<ChicAffiliatePage platform="chic" orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
-          {/* Même page, autre plateforme : Bouait tourne sur le même logiciel que Chic. */}
-          <Route path="/bouait-affiliate" element={<ChicAffiliatePage platform="bouait" orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
+          {/* Une route par plateforme d'affiliation : la page est la même, seule
+              la plateforme change. Les déclarer à la main revenait à en oublier
+              une à chaque ajout. */}
+          {AFFILIATE_LIST.map(p => (
+            <Route
+              key={p.key}
+              path={p.path}
+              element={<ChicAffiliatePage platform={p.key} orders={orders} setOrders={setOrdersWithSync} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />}
+            />
+          ))}
           <Route path="/ramassage" element={<Navigate to="/ramassage/scanner" replace />} />
           <Route path="/ramassage/scanner" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/ramassage/bons" element={<PermGate perm="ramassage"><RamassagePage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />

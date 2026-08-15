@@ -117,7 +117,7 @@ function ConfigPanel({ onTest }) {
   const plat = usePlat();
   const P = platformOf(plat);
   const [open, setOpen] = useState(false);
-  const [config, setConfig] = useState(() => getChicConfig(plat) || { xsrfToken: '', sessionCookie: '', apiKey: '' });
+  const [config, setConfig] = useState(() => getChicConfig(plat) || { xsrfToken: '', sessionCookie: '', apiKey: '', sessionName: '' });
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
   const [apiResults, setApiResults] = useState(null);
@@ -230,7 +230,7 @@ function ConfigPanel({ onTest }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Session ({P.sessionCookies[0]})</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Session ({config.sessionName || P.sessionCookies[0]})</label>
             <input
               type="text"
               value={config.sessionCookie}
@@ -240,12 +240,26 @@ function ConfigPanel({ onTest }) {
             />
           </div>
           <div>
+            {/* Le nom du cookie varie d'un site à l'autre et peut changer : il se
+                règle ici, sans quoi une reconnexion exigerait une mise en ligne. */}
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Nom du cookie de session (optionnel — laisser vide si {P.sessionCookies[0]})
+            </label>
+            <input
+              type="text"
+              value={config.sessionName || ''}
+              onChange={e => save({ ...config, sessionName: e.target.value })}
+              placeholder={P.sessionCookies[0]}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Clé API (profil {P.label} → «&nbsp;Clé API&nbsp;», commence par {P.keyPrefix})</label>
             <input
               type="text"
               value={config.apiKey || ''}
               onChange={e => save({ ...config, apiKey: e.target.value.trim() })}
-              placeholder="CHIC_xxxxxxxxxxxxxxxx"
+              placeholder={`${P.keyPrefix}xxxxxxxxxxxxxxxx`}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-300"
             />
           </div>
