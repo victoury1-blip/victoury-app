@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { normalizePhone } from '../lib/phoneUtils';
 import ContactModal from './ContactModal';
 
 const PHONE_COLOR_DEFAULTS = { livreBg: '#047857', livreText: '#ffffff', knownBg: '#fbbf24', knownText: '#111827' };
@@ -7,13 +8,9 @@ export function getPhoneColors() {
   try { return { ...PHONE_COLOR_DEFAULTS, ...JSON.parse(localStorage.getItem('phone_colors') || '{}') }; } catch { return PHONE_COLOR_DEFAULTS; }
 }
 
-export function normalizePhone(p) {
-  let s = (p || '').replace(/[\s\-\.\+]/g, '').replace(/^(00212|212)/, '0');
-  // Google Sheets stocke le téléphone comme un nombre et supprime le 0 initial
-  // (ex: 0709015213 → 709015213). On le rétablit pour les numéros marocains.
-  if (/^[5-7]\d{8}$/.test(s)) s = '0' + s;
-  return s;
-}
+/* La normalisation vit dans `lib/phoneUtils` : le rapprochement des numéros
+   sert bien au-delà de ce composant. Réexportée ici pour les appels existants. */
+export { normalizePhone };
 
 export default function PhoneChip({ phone, allOrders }) {
   const [open, setOpen] = useState(false);

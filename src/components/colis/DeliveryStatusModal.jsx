@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { normalizePhone, samePhone } from '../../lib/phoneUtils';
 import { X, Check, Phone, Truck } from 'lucide-react';
 import { cloudGet, cloudSet } from '../../lib/cloudSettings';
 
@@ -118,12 +119,16 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
           // correspond pas, le code d'envoi appartient à une autre commande — on
           // n'enregistre surtout pas son livreur (sinon le client reçoit les
           // coordonnées du livreur de quelqu'un d'autre).
-          const dig = (v) => String(v || '').replace(/\D/g, '').replace(/^212/, '0');
-          const ozPhone = dig(parcelInfos['PHONE'] || parcelInfos['RECIPIENT-PHONE']);
-          const ourPhone = dig(order.recipient?.phone);
-          const samePhone = !ozPhone || !ourPhone || ozPhone === ourPhone;
-          setPhoneMismatch(samePhone ? null : { ozPhone, tn });
-          if (samePhone && (deliveryPerson || deliveryPhone)) {
+          /* Comparaison sur des numéros NORMALISÉS : « 0723276261 » et
+             « 723276261 » sont le même abonné, un tableur ayant mangé le zéro
+             initial. Comparés bruts, ils déclenchaient une alerte « ce code
+             appartient à une autre commande » sur des colis parfaitement
+             corrects. */
+          const ozPhone = normalizePhone(parcelInfos['PHONE'] || parcelInfos['RECIPIENT-PHONE']);
+          const ourPhone = normalizePhone(order.recipient?.phone);
+          const isSame = samePhone(ozPhone, ourPhone);
+          setPhoneMismatch(isSame ? null : { ozPhone, tn });
+          if (isSame && (deliveryPerson || deliveryPhone)) {
             // On garde le code interrogé ET celui renvoyé par Ozon : les deux
             // désignent ce colis, donc les deux valident l'info livreur.
             const payload = ozonDpPayload(order, deliveryPerson, deliveryPhone, [tn, realTn]);
