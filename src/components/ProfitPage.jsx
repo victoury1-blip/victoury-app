@@ -306,6 +306,34 @@ export default function ProfitPage({ orders = [] }) {
   const totalPub = adTransfers.filter(t => inPeriod(String(t.date || ''))).reduce((s, t) => s + (t.amount || 0), 0);
   const profitNet = sousTotal - totalPub;
 
+  /* ── Indicateurs publicitaires ──
+     Ce que la publicité doit être jugée dessus : non pas les commandes reçues,
+     mais celles réellement encaissées. Ces chiffres étaient à reconstituer à la
+     main entre plusieurs pages, donc jamais regardés. */
+  const adKpis = useMemo(() => {
+    /* Date de CRÉATION, et non de mise à jour : une commande se rattache à la
+       dépense publicitaire du jour où elle est arrivée. */
+    const dayOf = (o) => {
+      if (o.createdAt) { const t = new Date(o.createdAt); if (!isNaN(t)) return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
+      const m = String(o.dateAdded || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+    };
+    const inRange = (d) => d && (!applied.dateFrom || d >= applied.dateFrom) && (!applied.dateTo || d <= applied.dateTo);
+    const list = (orders || []).filter(o => inRange(dayOf(o)));
+    const total = list.length;
+    const livre = list.filter(o => o.status === 'livre' || o.status === 'echange_recu').length;
+    /* Toutes les issues sans encaissement, y compris celles qui n'arrivent jamais
+       jusqu'au colis (annulée, injoignable) : les ignorer flatterait le taux. */
+    const perdu = list.filter(o => ['annule', 'injoignable', 'refuse', 'pas_reponse', 'black_liste'].includes(o.status)).length;
+    const enCours = total - livre - perdu;
+    return { total, livre, perdu, enCours };
+  }, [orders, applied]);
+
+  /* Coût par commande LIVRÉE, et retour sur dépense calculé sur l'argent
+     réellement encaissé — pas sur les commandes passées. */
+  const cpaReel = adKpis.livre ? totalPub / adKpis.livre : 0;
+  const roasReel = totalPub ? ca / totalPub : 0;
+
   const totalRefuse = allFactureColis.filter(c => c.status === 'refuse').length;
   const totalLivre = livresColis.length;
 
@@ -415,6 +443,50 @@ export default function ProfitPage({ orders = [] }) {
           <KpiCard label="Profit Net" value={profitNet} icon={DollarSign}
             subtitle={`${pct(profitNet, ca)}% du CA (après pub)`} progress={Math.max(0, parseFloat(pct(profitNet, ca)))}
             color={{ border: 'border-teal-500', icon: 'text-teal-500', text: profitNet >= 0 ? 'text-teal-700' : 'text-red-600', bar: 'bg-teal-500' }} />
+        </div>
+
+        {/* Indicateurs publicitaires — à comparer d'une période à l'autre. */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={14} className="text-blue-600" />
+            <h3 className="font-bold text-gray-800 text-sm">Indicateurs publicitaires</h3>
+            <span className="text-[11px] text-gray-400">— {applied.dateFrom} → {applied.dateTo}</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">Commandes reçues</div>
+              <div className="text-lg font-black text-gray-800">{adKpis.total}</div>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">Livrées</div>
+              <div className="text-lg font-black text-green-700">
+                {adKpis.livre} <span className="text-xs font-semibold">({pct(adKpis.livre, adKpis.total)}%)</span>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">Perdues</div>
+              <div className="text-lg font-black text-red-600">
+                {adKpis.perdu} <span className="text-xs font-semibold">({pct(adKpis.perdu, adKpis.total)}%)</span>
+              </div>
+              <div className="text-[10px] text-gray-500 mt-0.5">annulé · injoignable · refusé</div>
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût par livraison</div>
+              <div className="text-lg font-black text-orange-600">{fmt(cpaReel)} <span className="text-xs font-semibold">DH</span></div>
+              <div className="text-[10px] text-gray-500 mt-0.5">pub ÷ livrées</div>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">ROAS réel</div>
+              <div className={`text-lg font-black ${roasReel >= 2 ? 'text-blue-700' : 'text-red-600'}`}>{roasReel.toFixed(2)}×</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">CA encaissé ÷ pub</div>
+            </div>
+          </div>
+          {adKpis.enCours > 0 && (
+            <p className="text-[11px] text-gray-500 mt-2">
+              {adKpis.enCours} commande(s) encore en cours sur cette période : les taux se
+              stabiliseront une fois leur sort connu.
+            </p>
+          )}
         </div>
 
         {/* Chic Affiliate Summary */}
