@@ -41,12 +41,17 @@ function todayFr() {
 }
 
 function PaiementModal({ facture, reste, onClose, onSave }) {
+  /* Montant VIDE au départ. Pré-rempli avec le reste dû, le champ donnait à
+     croire qu'un versement était déjà là — et valider sans y toucher soldait
+     la facture d'un coup, alors qu'on venait souvent n'ajouter qu'un acompte.
+     Le bouton « Solder le reste » remplit le champ quand c'est bien l'intention. */
   const [form, setForm] = useState({
-    montant: reste > 0 ? String(reste) : '',
+    montant: '',
     date: todayFr(),
     methode: 'especes',
     note: '',
   });
+  const dejaVerses = facture?.paiements || [];
   const montant = parseFloat(form.montant) || 0;
   const invalide = montant <= 0;
 
@@ -67,10 +72,34 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
             <input type="number" min="0" step="0.01" value={form.montant} autoFocus
               onChange={(e) => setForm(p => ({ ...p, montant: e.target.value }))}
               className={fieldCls + ' w-full font-bold'} placeholder="0" />
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-[11px] text-gray-500">Reste dû : <b>{reste.toLocaleString('fr-FR')} DH</b></span>
+              {reste > 0 && (
+                <button type="button" onClick={() => setForm(p => ({ ...p, montant: String(reste) }))}
+                  className="text-[11px] font-semibold text-blue-600 hover:underline">Solder le reste</button>
+              )}
+            </div>
             {montant > reste && reste >= 0 && (
               <p className="text-[11px] text-amber-600 mt-1">Ce versement dépasse le reste dû ({reste.toLocaleString('fr-FR')} DH).</p>
             )}
           </div>
+
+          {/* Versements déjà enregistrés : sans eux, on ne sait pas, au moment
+              d'en ajouter un, ce qui a déjà été réglé ni quand. */}
+          {dejaVerses.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1.5">Déjà versé ({dejaVerses.length})</p>
+              <div className="space-y-1">
+                {dejaVerses.map(p => (
+                  <div key={p.id} className="flex items-center gap-2 text-xs bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1.5">
+                    <span className="font-bold text-gray-700">{(parseFloat(p.montant) || 0).toLocaleString('fr-FR')} DH</span>
+                    <span className="text-gray-400">{methodOf(p.methode).label}</span>
+                    <span className="text-gray-400 ml-auto">{p.date}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Date</label>
