@@ -29,8 +29,14 @@ export const isInColisPipeline = (status) => COLIS_PIPELINE_SET.has(status);
  * commandes que celles affichées dans ces onglets. */
 export const A_CONFIRMER_STATUSES = ['nouveau'];
 
+/* « Annulé » N'EST PAS un statut de suivi : la commande est close, il n'y a plus
+ * rien à relancer. Compté dans « En Suivi », il gonflait le nombre de commandes
+ * à traiter avec des dossiers terminés. Il a son propre onglet — le retirer sans
+ * lui en donner un aurait rendu ces commandes introuvables. */
 export const EN_SUIVI_STATUSES = [
   'en_attente', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste',
   'injoignable', 'pas_reponse', 'pas_rep_1', 'pas_rep_2', 'pas_rep_3',
-  'pas_rep_4', 'pas_rep_5', 'manque_stock', 'dem_suivi', 'annule',
+  'pas_rep_4', 'pas_rep_5', 'manque_stock', 'dem_suivi',
 ];
+
+export const ANNULE_STATUSES = ['annule'];

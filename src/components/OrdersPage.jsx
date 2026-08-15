@@ -44,7 +44,7 @@ import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { now } from '../lib/dateUtils';
 import { generateVictId, isVictCode } from '../lib/victId';
-import { COLIS_PIPELINE_SET, A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES } from '../data/colisPipeline';
+import { COLIS_PIPELINE_SET, A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES, ANNULE_STATUSES } from '../data/colisPipeline';
 import { recordHistory } from '../lib/orderHistory';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
@@ -59,6 +59,7 @@ const tabs = [
   { id: 'en_suivi', label: 'En Suivi', status: EN_SUIVI_STATUSES },
   { id: 'reporter', label: 'Reporté', status: 'reporter' },
   { id: 'confirme', label: 'Confirmé', status: 'confirme' },
+  { id: 'annule', label: 'Annulé', status: ANNULE_STATUSES },
 ];
 
 // Seul « confirmé » — la PORTE D'ENTRÉE du circuit colis — peut déclencher

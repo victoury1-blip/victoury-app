@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
 import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
+import { A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES, ANNULE_STATUSES } from '../data/colisPipeline';
 
 const NAV_ITEMS = [
   { path: '/dashboard',   label: 'Tableau de bord', icon: LayoutDashboard },
@@ -21,10 +22,14 @@ const NAV_ITEMS = [
     label: 'Commandes',
     icon: ShoppingCart,
     children: [
-      { path: '/commandes/a-confirmer', label: 'À Confirmer', statuses: ['nouveau'] },
-      { path: '/commandes/en-suivi',    label: 'En Suivi',    statuses: ['en_attente', 'a_voir', 'interesse', 'photo_whatsapp', 'black_liste', 'injoignable', 'pas_reponse', 'pas_rep_1', 'pas_rep_2', 'pas_rep_3', 'pas_rep_4', 'pas_rep_5', 'manque_stock', 'dem_suivi', 'annule'] },
+      /* Listes IMPORTÉES et non recopiées : la copie d'ici divergeait de celle
+         des onglets, si bien que le compteur du menu et la page ne montraient
+         pas les mêmes commandes. */
+      { path: '/commandes/a-confirmer', label: 'À Confirmer', statuses: A_CONFIRMER_STATUSES },
+      { path: '/commandes/en-suivi',    label: 'En Suivi',    statuses: EN_SUIVI_STATUSES },
       { path: '/commandes/reporter',    label: 'Reporté',     statuses: ['reporter'] },
       { path: '/commandes/confirme',    label: 'Confirmé',    statuses: ['confirme'] },
+      { path: '/commandes/annule',      label: 'Annulé',      statuses: ANNULE_STATUSES },
     ],
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
