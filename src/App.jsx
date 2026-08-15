@@ -36,6 +36,7 @@ import { fetchFingerprints, fetchAllOrders, fetchOrdersByIds, staleIds } from '.
 import { cloudGet, cloudSet } from './lib/cloudSettings';
 import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
 import { AFFILIATE_LIST, platformOf } from './lib/affiliatePlatforms';
+import { tabFromParam, tabPath } from './data/orderTabs';
 import { logAlert } from './lib/errorLog';
 import useAutoSync from './hooks/useAutoSync';
 import useNotifications from './hooks/useNotifications';
@@ -69,21 +70,14 @@ function assignVictTracking(freshOrders, allOrders) {
   return freshOrders;
 }
 
-const TAB_FROM_PARAM = {
-  'a-confirmer': 'a_confirmer',
-  'en-suivi':    'en_suivi',
-  'reporter':    'reporter',
-  'confirme':    'confirme',
-};
-
 function OrdersRoute({ orders, setOrdersWithSync, isLoading, onDeleteOrder, currentUser }) {
   const { tab } = useParams();
-  const activeTab = TAB_FROM_PARAM[tab] || 'a_confirmer';
+  const activeTab = tabFromParam(tab);
   const navigate = useNavigate();
   return (
     <OrdersPage
       activeTab={activeTab}
-      setActiveTab={(t) => navigate(`/commandes/${t.replace(/_/g, '-')}`)}
+      setActiveTab={(t) => navigate(tabPath(t))}
       externalOrders={orders}
       setExternalOrders={setOrdersWithSync}
       isLoading={isLoading}

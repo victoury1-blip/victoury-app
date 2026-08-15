@@ -44,7 +44,8 @@ import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { buildWhatsappMessage } from '../lib/whatsappTemplates';
 import { now } from '../lib/dateUtils';
 import { generateVictId, isVictCode } from '../lib/victId';
-import { COLIS_PIPELINE_SET, A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES, ANNULE_STATUSES } from '../data/colisPipeline';
+import { COLIS_PIPELINE_SET } from '../data/colisPipeline';
+import { ORDER_TABS } from '../data/orderTabs';
 import { recordHistory } from '../lib/orderHistory';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
@@ -54,13 +55,8 @@ import NewOrderModal from './orders/NewOrderModal';
 
 
 
-const tabs = [
-  { id: 'a_confirmer', label: 'À Confirmer', status: A_CONFIRMER_STATUSES },
-  { id: 'en_suivi', label: 'En Suivi', status: EN_SUIVI_STATUSES },
-  { id: 'reporter', label: 'Reporté', status: 'reporter' },
-  { id: 'confirme', label: 'Confirmé', status: 'confirme' },
-  { id: 'annule', label: 'Annulé', status: ANNULE_STATUSES },
-];
+/* `status` conserve le nom historique attendu par le reste du fichier. */
+const tabs = ORDER_TABS.map(t => ({ id: t.id, label: t.label, status: t.statuses }));
 
 // Seul « confirmé » — la PORTE D'ENTRÉE du circuit colis — peut déclencher
 // l'attribution d'un code de suivi. Les statuts suivants (att_ramassage,

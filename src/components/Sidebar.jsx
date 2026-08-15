@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
 import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
-import { A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES, ANNULE_STATUSES } from '../data/colisPipeline';
+import { ORDER_TABS, tabPath } from '../data/orderTabs';
 
 const NAV_ITEMS = [
   { path: '/dashboard',   label: 'Tableau de bord', icon: LayoutDashboard },
@@ -22,14 +22,9 @@ const NAV_ITEMS = [
     label: 'Commandes',
     icon: ShoppingCart,
     children: [
-      /* Listes IMPORTÉES et non recopiées : la copie d'ici divergeait de celle
-         des onglets, si bien que le compteur du menu et la page ne montraient
-         pas les mêmes commandes. */
-      { path: '/commandes/a-confirmer', label: 'À Confirmer', statuses: A_CONFIRMER_STATUSES },
-      { path: '/commandes/en-suivi',    label: 'En Suivi',    statuses: EN_SUIVI_STATUSES },
-      { path: '/commandes/reporter',    label: 'Reporté',     statuses: ['reporter'] },
-      { path: '/commandes/confirme',    label: 'Confirmé',    statuses: ['confirme'] },
-      { path: '/commandes/annule',      label: 'Annulé',      statuses: ANNULE_STATUSES },
+      /* Déduits des onglets : la liste recopiée ici divergeait de la page, et le
+         compteur du menu ne montrait alors pas les mêmes commandes. */
+      ...ORDER_TABS.map(t => ({ path: tabPath(t.id), label: t.label, statuses: t.statuses })),
     ],
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
