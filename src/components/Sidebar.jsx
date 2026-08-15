@@ -29,7 +29,7 @@ const NAV_ITEMS = [
     children: [
       /* Déduits des onglets : la liste recopiée ici divergeait de la page, et le
          compteur du menu ne montrait alors pas les mêmes commandes. */
-      ...ORDER_TABS.map(t => ({ path: tabPath(t.id), label: t.label, statuses: t.statuses })),
+      ...ORDER_TABS.map(t => ({ path: tabPath(t.id), label: t.label, statuses: t.noBadge ? null : t.statuses })),
     ],
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },

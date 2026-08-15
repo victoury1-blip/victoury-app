@@ -15,7 +15,9 @@ export const ORDER_TABS = [
   { id: 'en_suivi', label: 'En Suivi', statuses: EN_SUIVI_STATUSES },
   { id: 'reporter', label: 'Reporté', statuses: ['reporter'] },
   { id: 'confirme', label: 'Confirmé', statuses: ['confirme'] },
-  { id: 'annule', label: 'Annulé', statuses: ANNULE_STATUSES },
+  /* Sans compteur : une commande annulée est close, il n'y a rien à traiter.
+     Un badge rouge la ferait passer pour du travail en attente. */
+  { id: 'annule', label: 'Annulé', statuses: ANNULE_STATUSES, noBadge: true },
 ];
 
 /* L'adresse utilise des tirets là où l'identifiant utilise des soulignés
