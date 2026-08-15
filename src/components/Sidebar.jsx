@@ -14,9 +14,14 @@ import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
 import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
 import { ORDER_TABS, tabPath } from '../data/orderTabs';
 
+/* Ordre = fréquence d'usage sur une journée de travail. Les pages ouvertes en
+ * permanence (commandes, colis, factures, profit, ramassage, retour) viennent
+ * d'abord ; celles que l'on consulte de temps en temps (statistiques, réglages,
+ * imports) suivent. Le menu se lit du plus courant au plus rare, sans faire
+ * défiler pour atteindre ce qu'on ouvre vingt fois par jour.
+ */
 const NAV_ITEMS = [
   { path: '/dashboard',   label: 'Tableau de bord', icon: LayoutDashboard },
-  { path: '/analytics',   label: 'Statistiques',    icon: Activity },
   {
     path: '/commandes',
     label: 'Commandes',
@@ -28,22 +33,9 @@ const NAV_ITEMS = [
     ],
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
-  { path: '/import-sheets', label: 'Google Sheets', icon: FileSpreadsheet, perm: 'liste_colis' },
-  { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
+  { path: '/factures',    label: 'Factures',        icon: FileText, perm: 'factures' },
+  { path: '/profit',      label: 'Profit',          icon: TrendingUp, perm: 'profit' },
   { path: '/fournisseur', label: 'Fournisseur',     icon: Truck, perm: 'stock' },
-  /* Une seule entrée pour toutes les plateformes d'affiliation : une ligne par
-     plateforme allongeait le menu à chaque ajout, alors qu'elles font le même
-     travail. Les sous-entrées se déduisent de la liste des plateformes. */
-  {
-    path: '/affiliations',
-    label: 'Affiliations',
-    icon: Store,
-    children: AFFILIATE_LIST.map(p => ({
-      path: p.path,
-      label: p.label.replace(/ Affiliate$/, ''),
-      statuses: [`${p.statusPrefix}_nouveau`],
-    })),
-  },
   {
     path: '/ramassage',
     label: 'Ramassage',
@@ -64,9 +56,25 @@ const NAV_ITEMS = [
       { path: '/retour/bons',    label: 'Liste des Bons' },
     ],
   },
-  { path: '/factures',    label: 'Factures',        icon: FileText, perm: 'factures' },
-  { path: '/profit',      label: 'Profit',          icon: TrendingUp, perm: 'profit' },
+
+  /* ── Consultées ponctuellement ── */
+  { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
+  /* Une seule entrée pour toutes les plateformes d'affiliation : une ligne par
+     plateforme allongeait le menu à chaque ajout, alors qu'elles font le même
+     travail. Les sous-entrées se déduisent de la liste des plateformes. */
+  {
+    path: '/affiliations',
+    label: 'Affiliations',
+    icon: Store,
+    children: AFFILIATE_LIST.map(p => ({
+      path: p.path,
+      label: p.label.replace(/ Affiliate$/, ''),
+      statuses: [`${p.statusPrefix}_nouveau`],
+    })),
+  },
+  { path: '/analytics',   label: 'Statistiques',    icon: Activity },
   { path: '/etats',       label: 'États',           icon: BarChart2, perm: 'etats' },
+  { path: '/import-sheets', label: 'Google Sheets', icon: FileSpreadsheet, perm: 'liste_colis' },
   { path: '/livraison',   label: 'Livraison',       icon: MapPin, perm: 'livraison' },
   { path: '/moderateurs', label: 'Modérateurs',     icon: Shield, adminOnly: true },
   { path: '/reglage',     label: 'Paramètres',      icon: Settings, perm: 'reglages' },
