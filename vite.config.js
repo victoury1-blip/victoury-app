@@ -32,15 +32,25 @@ export default defineConfig({
     react(),
     versionFilePlugin,
     VitePWA({
-      /* « prompt » et NON « autoUpdate » : avec la mise à jour automatique, le
-         nouveau service worker prenait le contrôle de la page DÉJÀ OUVERTE. Le
-         code en cours d'exécution venait alors de l'ancienne version tandis que
-         les fichiers chargés ensuite venaient de la nouvelle — deux versions
-         mélangées, d'où « Cannot access 'x' before initialization » sur une page
-         au hasard après chaque déploiement.
-         La bannière de mise à jour (PWAUpdateBanner) propose le rechargement :
-         la bascule se fait alors d'un bloc, jamais en cours de route. */
-      registerType: 'prompt',
+      /* Le service worker se DÉSINSTALLE de lui-même.
+       *
+       * Il servait certains fichiers depuis son cache et laissait les autres
+       * partir sur le réseau : deux versions de l'application se retrouvaient
+       * mélangées après chaque déploiement, d'où « Cannot access 'x' before
+       * initialization » sur une page au hasard. Réglages, attentes, bannières :
+       * rien n'a supprimé la classe de panne, seulement des cas particuliers.
+       *
+       * `selfDestroying` publie un service worker qui vide les caches et se
+       * retire — y compris chez les appareils portant encore l'ancien, sans
+       * manipulation de leur part. L'application se charge désormais toujours
+       * depuis le réseau, d'un seul bloc.
+       *
+       * Contrepartie assumée : plus de démarrage hors ligne. Les commandes
+       * restent lisibles hors ligne (cache IndexedDB) une fois l'application
+       * ouverte, et les modifications faites sans réseau sont toujours mises en
+       * file d'attente. */
+      selfDestroying: true,
+      registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'apple-touch-icon-512.png'],
       manifest: {
         name: 'VICTOURY - Gestion des Commandes',
