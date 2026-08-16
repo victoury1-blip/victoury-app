@@ -965,14 +965,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
             📦 {showArchived ? 'Retour aux colis actifs' : `Archives (${archivedCount})`}
           </button>
         )}
+        {/* Recherche en pleine largeur sur mobile : partagée avec les six boutons
+            d'action, elle se réduisait à trois caractères — impossible d'y relire
+            un numéro de téléphone qu'on vient de saisir. */}
         {tab === 'colis' && (
-          <div className="relative flex items-center flex-1 max-w-xs">
+          <div className="relative flex items-center basis-full sm:basis-auto sm:flex-1 sm:max-w-xs">
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher une commande..."
-              className="w-full pl-3 pr-10 py-1.5 border border-gray-300 rounded-l-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full min-w-0 pl-3 pr-3 py-2 border border-gray-300 rounded-l-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
-            <button className="px-3 py-[7px] bg-blue-600 text-white rounded-r-md hover:bg-blue-700 transition">
+            <button className="px-3 py-2 shrink-0 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 transition">
               <Search size={16} />
             </button>
           </div>
