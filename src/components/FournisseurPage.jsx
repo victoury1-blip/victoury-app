@@ -377,7 +377,15 @@ export default function FournisseurPage() {
       qte += itemQty(it);
     }
     const paye = factures.reduce((n, f) => n + paidOf(f), 0);
-    return { cout, qte, paye, du: cout - paye };
+    const du = cout - paye;
+    /* Prix moyen réellement payé la pièce, déduit des factures — et non un
+       montant fixé en dur : le jour où le fournisseur change son tarif, le
+       compte suit tout seul. */
+    const prixPiece = qte > 0 ? cout / qte : 0;
+    /* Pièces que la somme encore due représente : c'est en pièces qu'on
+       raisonne face au fournisseur, pas en dirhams. */
+    const piecesDues = prixPiece > 0 ? Math.round(du / prixPiece) : 0;
+    return { cout, qte, paye, du, prixPiece, piecesDues };
   }, [factures]);
 
   const visibleFactures = useMemo(() => {
@@ -408,6 +416,9 @@ export default function FournisseurPage() {
         <SummaryCard label="Payé" value={`${totals.paye.toLocaleString('fr-FR')} DH`} color="text-emerald-600" />
         <SummaryCard label="Reste à payer" value={`${totals.du.toLocaleString('fr-FR')} DH`}
           color={totals.du > 0 ? 'text-red-600' : 'text-emerald-700'} />
+        <SummaryCard label="Pièces non payées" value={totals.piecesDues}
+          color={totals.piecesDues > 0 ? 'text-amber-600' : 'text-emerald-700'}
+          hint={totals.prixPiece > 0 ? `à ${Math.round(totals.prixPiece).toLocaleString('fr-FR')} DH la pièce` : undefined} />
       </div>
 
       <div className="relative mb-4 max-w-xs">
@@ -629,11 +640,12 @@ export default function FournisseurPage() {
   );
 }
 
-function SummaryCard({ label, value, color }) {
+function SummaryCard({ label, value, color, hint }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
       <p className="text-[11px] text-gray-400 uppercase font-semibold mb-1">{label}</p>
       <p className={`text-lg font-bold ${color}`}>{value}</p>
+      {hint && <p className="text-[10px] text-gray-400 mt-0.5">{hint}</p>}
     </div>
   );
 }
