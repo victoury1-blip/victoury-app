@@ -12,7 +12,7 @@ import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from
 import { fmtDate } from '../lib/dateUtils';
 import { readNextNumber, setNextNumber, peekNextVictId, formatVictId } from '../lib/victId';
 import { A_CONFIRMER_STATUSES } from '../data/colisPipeline';
-import { getMetaConfig, saveMetaConfig, buildEvent, sendEvents } from '../lib/metaCapi';
+import { getMetaConfig, saveMetaConfig, loadMetaConfigRemote, buildEvent, sendEvents } from '../lib/metaCapi';
 
 const TIMEZONES = [
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
@@ -810,6 +810,13 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   /* ── Meta / Conversions API ── */
   const [meta, setMeta] = useState(() => ({ enabled: false, pixelId: '', token: '', testCode: '', sourceUrl: '', ...getMetaConfig() }));
   const [metaTest, setMetaTest] = useState(null);
+  /* Le réglage est attaché au compte : sur un appareil où il n'a jamais été
+     saisi, les champs restaient vides et l'envoi ne partait pas. */
+  useEffect(() => {
+    let vivant = true;
+    loadMetaConfigRemote().then(remote => { if (vivant && remote) setMeta(prev => ({ ...prev, ...remote })); }).catch(() => {});
+    return () => { vivant = false; };
+  }, []);
   function updateMeta(patch) {
     setMeta(prev => ({ ...prev, ...saveMetaConfig({ ...prev, ...patch }) }));
     setMetaTest(null);

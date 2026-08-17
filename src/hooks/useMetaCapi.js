@@ -7,10 +7,10 @@
  * Ce qui est déjà parti est donc mémorisé, localement ET dans le cloud : sans
  * cela, ouvrir l'application sur un second appareil renverrait tout l'historique.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
-import { getMetaConfig, buildEvent, eventForStatus, eventId, sendEvents, orderTimestamp, MAX_AGE_MS } from '../lib/metaCapi';
+import { getMetaConfig, loadMetaConfigRemote, buildEvent, eventForStatus, eventId, sendEvents, orderTimestamp, MAX_AGE_MS } from '../lib/metaCapi';
 import { logAlert } from '../lib/errorLog';
 
 const SENT_KEY = 'meta_capi_sent';
@@ -28,6 +28,13 @@ function writeSent(set) {
 export default function useMetaCapi(orders) {
   const sentRef = useRef(null);
   const busyRef = useRef(false);
+  const [cfgReady, setCfgReady] = useState(false);
+
+  /* Le réglage vient du compte, pas de l'appareil : sur un téléphone où rien
+     n'a jamais été saisi, il n'existe qu'après cette lecture. */
+  useEffect(() => {
+    loadMetaConfigRemote().catch(() => { /* le local suffit */ }).finally(() => setCfgReady(true));
+  }, []);
 
   // La mémoire du cloud fait foi au démarrage : elle porte ce qu'ont déjà
   // envoyé les autres appareils.
@@ -42,6 +49,7 @@ export default function useMetaCapi(orders) {
   }, []);
 
   useEffect(() => {
+    if (!cfgReady) return;
     const cfg = getMetaConfig();
     if (!cfg.enabled || !cfg.pixelId || !cfg.token) return;
     if (!sentRef.current || busyRef.current || !orders?.length) return;
@@ -81,5 +89,5 @@ export default function useMetaCapi(orders) {
         busyRef.current = false;
       }
     })();
-  }, [orders]);
+  }, [orders, cfgReady]);
 }

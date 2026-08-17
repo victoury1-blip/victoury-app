@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { webcrypto } from 'node:crypto';
-import { phoneForMeta, eventForStatus, eventId, buildEvent, EVENT_BY_STATUS, eventTime, MAX_AGE_MS } from '../lib/metaCapi';
+import { phoneForMeta, eventForStatus, eventId, buildEvent, EVENT_BY_STATUS, eventTime, MAX_AGE_MS, normalizeMetaConfig } from '../lib/metaCapi';
 
 beforeAll(() => {
   if (!globalThis.crypto?.subtle) globalThis.crypto = webcrypto;
@@ -20,6 +20,20 @@ describe('numéro envoyé à Meta', () => {
   it('ne fabrique rien à partir de rien', () => {
     expect(phoneForMeta('')).toBe('');
     expect(phoneForMeta(null)).toBe('');
+  });
+});
+
+/* Le réglage n'était écrit qu'en stockage local : configuré sur l'ordinateur,
+   il n'existait pas sur le téléphone, et l'envoi automatique n'y partait jamais
+   — sans message ni case décochée. Il suit désormais le compte. */
+describe('réglage Meta partagé entre appareils', () => {
+  it('ne retient que les cinq champs attendus', () => {
+    const c = normalizeMetaConfig({ enabled: 1, pixelId: ' 108 016-152 ', token: '  EAAG…  ', testCode: '', sourceUrl: ' https://x.ma/ ', intrus: 'x' });
+    expect(c).toEqual({ enabled: true, pixelId: '108016152', token: 'EAAG…', testCode: '', sourceUrl: 'https://x.ma/' });
+  });
+
+  it('supporte l’absence totale de réglage', () => {
+    expect(normalizeMetaConfig(null)).toEqual({ enabled: false, pixelId: '', token: '', testCode: '', sourceUrl: '' });
   });
 });
 

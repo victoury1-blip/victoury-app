@@ -14,6 +14,10 @@ import { normalizePhone } from './phoneUtils';
 
 const KEY = 'meta_capi_config';
 
+/* Chargé à la demande : ce module reste par ailleurs sans dépendance réseau,
+   ce qui permet de l'éprouver isolément et de le charger avec le reste. */
+const cloud = () => import('./cloudSettings');
+
 export function getMetaConfig() {
   try {
     return JSON.parse(localStorage.getItem(KEY) || 'null') || {};
@@ -22,15 +26,39 @@ export function getMetaConfig() {
   }
 }
 
-export function saveMetaConfig(cfg) {
-  const clean = {
-    enabled: !!cfg.enabled,
-    pixelId: String(cfg.pixelId || '').replace(/\D/g, ''),
-    token: String(cfg.token || '').trim(),
-    testCode: String(cfg.testCode || '').trim(),
-    sourceUrl: String(cfg.sourceUrl || '').trim(),
+/** Forme retenue en stockage — jamais autre chose que ces cinq champs. */
+export function normalizeMetaConfig(cfg) {
+  return {
+    enabled: !!cfg?.enabled,
+    pixelId: String(cfg?.pixelId || '').replace(/\D/g, ''),
+    token: String(cfg?.token || '').trim(),
+    testCode: String(cfg?.testCode || '').trim(),
+    sourceUrl: String(cfg?.sourceUrl || '').trim(),
   };
-  localStorage.setItem(KEY, JSON.stringify(clean));
+}
+
+/* Le réglage suit le COMPTE, pas l'appareil.
+ *
+ * Il n'était écrit qu'en stockage local : configuré sur l'ordinateur, il
+ * n'existait pas sur le téléphone — et l'envoi automatique n'y partait donc
+ * jamais, sans le moindre signe. Le jeton d'accès n'a rien de propre à une
+ * machine ; il est désormais sauvegardé avec les autres réglages. */
+export function saveMetaConfig(cfg) {
+  const clean = normalizeMetaConfig(cfg);
+  try { localStorage.setItem(KEY, JSON.stringify(clean)); } catch { /* quota */ }
+  cloud().then(m => m.cloudSet(KEY, clean)).catch(() => { /* le local suffit */ });
+  return clean;
+}
+
+/** Réglage du cloud, recopié en local. Renvoie null si le cloud n'a rien. */
+export async function loadMetaConfigRemote() {
+  const remote = await cloud().then(m => m.cloudGet(KEY)).catch(() => null);
+  if (!remote || typeof remote !== 'object') return null;
+  const clean = normalizeMetaConfig(remote);
+  /* Un enregistrement vide côté cloud ne doit pas écraser un réglage local
+     valable : sans jeton, il n'y a rien à reprendre. */
+  if (!clean.pixelId || !clean.token) return null;
+  try { localStorage.setItem(KEY, JSON.stringify(clean)); } catch { /* quota */ }
   return clean;
 }
 
