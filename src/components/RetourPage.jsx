@@ -4,9 +4,9 @@ import { QrCode, CheckCircle, Package, List, Trash2, X, ArrowLeft, Eye, Lock, Ro
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { printBon } from '../lib/printBon';
-import { findOrderByCode, checkRetourScan } from '../lib/scanUtils';
+import { findOrderByCode, checkRetourScan, retourTargetStatus } from '../lib/scanUtils';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
-import { fmtDate } from '../lib/dateUtils';
+import { fmtDate, now } from '../lib/dateUtils';
 
 
 function ScannerRetourPage({ orders, setOrders }) {
@@ -81,9 +81,14 @@ function ScannerRetourPage({ orders, setOrders }) {
     scannedIdsRef.current.add(order.id);
     playBeep();
 
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, recu: true } : o));
-    // source de vérité : colonne recu de la table orders (synchro realtime entre appareils)
-    supabase.from('orders').update({ recu: true }).eq('id', order.id).then(({ error }) => {
+    /* Le colis est PHYSIQUEMENT rentré : son statut le dit, et pas seulement la
+       case « Reçu ». Sans ce changement, la Liste des Colis continuait de
+       l'afficher « Prêt retour » ou « Refusé », et rien ne distinguait ce qui
+       était rentré de ce qui était encore dehors. */
+    const nouveauStatut = retourTargetStatus(order.status);
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, recu: true, status: nouveauStatut, dateUpdated: now() } : o));
+    // source de vérité : colonnes recu + status (synchro realtime entre appareils)
+    supabase.from('orders').update({ recu: true, status: nouveauStatut, date_updated: now() }).eq('id', order.id).then(({ error }) => {
       if (error && !/column|recu/i.test(error.message)) {
         showMessage(`⚠️ ${order.id}: non synchronisé (${error.message})`, 'error');
       }
@@ -118,7 +123,7 @@ function ScannerRetourPage({ orders, setOrders }) {
       }];
     });
 
-    showMessage(`${order.recipient?.name || code} — reçu ✓ (${order.status})`);
+    showMessage(`${order.recipient?.name || code} — rentré ✓ (${nouveauStatut === 'echange_recu' ? 'Échange reçu' : 'Retour reçu'})`);
   }, [orders, setOrders]);
 
   async function handleTraiter() {
@@ -518,15 +523,19 @@ function BonRetourDetailPage({ orders }) {
 function BonsRetourListPage() {
   const [bons, setBons] = useState([]);
   const [loading, setLoading] = useState(true);
+  /* L'erreur de lecture était ignorée : une base injoignable affichait « Aucun
+     bon de retour », exactement comme une liste réellement vide. */
+  const [loadError, setLoadError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('bons_retour')
         .select('*')
         .order('created_at', { ascending: false });
-      if (data) setBons(data);
+      if (error) setLoadError(error.message);
+      else setBons(data || []);
       setLoading(false);
     }
     load();
@@ -557,6 +566,11 @@ function BonsRetourListPage() {
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : loadError ? (
+        <div className="bg-red-50 rounded-xl border border-red-200 p-6 text-center">
+          <p className="text-sm font-semibold text-red-700">Impossible de lire les bons de retour</p>
+          <p className="text-xs text-red-600 mt-1">{loadError}</p>
         </div>
       ) : bons.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">

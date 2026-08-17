@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findOrderByCode, checkRamassageScan, checkRetourScan, RETOUR_ACCEPTED } from '../lib/scanUtils';
+import { findOrderByCode, checkRamassageScan, checkRetourScan, RETOUR_ACCEPTED, retourTargetStatus } from '../lib/scanUtils';
 
 const orders = [
   { id: 'VICT0001', trackingNumber: 'BMD-123', ozoneTracking: 'OZ-999', status: 'att_ramassage' },
@@ -61,5 +61,26 @@ describe('checkRetourScan', () => {
   });
   it('rejette une commande absente', () => {
     expect(checkRetourScan(undefined)).toEqual({ ok: false, reason: 'not_found' });
+  });
+});
+
+/* Le scan retour se contentait de cocher « Reçu » sans toucher au statut : la
+   marchandise était rentrée, mais la Liste des Colis l'affichait toujours
+   « Prêt retour » ou « Refusé ». */
+describe('retourTargetStatus', () => {
+  it('un colis rentré passe « retour reçu »', () => {
+    expect(retourTargetStatus('pret_retour')).toBe('retour_recu');
+    expect(retourTargetStatus('refuse')).toBe('retour_recu');
+    expect(retourTargetStatus('annule')).toBe('retour_recu');
+  });
+
+  it('un échange revient sous son propre statut', () => {
+    // La pièce repart chez le client : ce n'est pas un retour définitif.
+    expect(retourTargetStatus('change')).toBe('echange_recu');
+    expect(retourTargetStatus('echange_recu')).toBe('echange_recu');
+  });
+
+  it('rescanner un colis déjà rentré ne change rien', () => {
+    expect(retourTargetStatus('retour_recu')).toBe('retour_recu');
   });
 });

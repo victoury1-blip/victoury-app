@@ -25,8 +25,24 @@ export type ScanCheck =
   | { ok: true }
   | { ok: false; reason: 'not_found' | 'deja_expedier' | 'statut_invalide' };
 
-/** Statuts acceptés au scan retour : le statut est conservé, le colis passe "Reçu". */
+/** Statuts acceptés au scan retour. */
 export const RETOUR_ACCEPTED: ReadonlySet<string> = new Set(['pret_retour', 'retour_recu', 'annule', 'change', 'refuse']);
+
+/**
+ * Statut d'un colis une fois rentré au dépôt.
+ *
+ * Le scan se contentait auparavant de cocher « Reçu » sans toucher au statut :
+ * la marchandise était physiquement revenue, mais la Liste des Colis continuait
+ * de l'afficher « Prêt retour » ou « Refusé », et rien ne distinguait ce qui
+ * était rentré de ce qui était encore dehors.
+ *
+ * Un échange revient sous son propre statut : la pièce repart chez le client,
+ * ce n'est pas le même travail qu'un retour définitif.
+ */
+export function retourTargetStatus(status: string): string {
+  if (status === 'change' || status === 'echange_recu') return 'echange_recu';
+  return 'retour_recu';
+}
 
 /** Seul statut ramassable : passe à "expedier" au scan. */
 export const RAMASSAGE_ACCEPTED = 'att_ramassage';
