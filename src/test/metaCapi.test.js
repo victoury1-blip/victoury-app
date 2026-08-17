@@ -119,3 +119,34 @@ describe('date de l’évènement', () => {
     expect(eventTime({ id: 'A' }, now)).toBe(Math.floor(now / 1000));
   });
 });
+
+/* Meta note la qualité du rapprochement : le téléphone seul plafonne bas.
+   L'adresse e-mail est le signal le plus fort, et l'identifiant stable relie
+   entre eux les évènements d'un même client. */
+describe('signaux d’identification', () => {
+  const base = { id: 'A', status: 'livre', price: 200, recipient: { name: 'Fatima Zahra', phone: '0612345678', city: 'Casablanca' } };
+
+  it('ajoute l’e-mail quand la commande en porte un', async () => {
+    const ev = await buildEvent({ ...base, recipient: { ...base.recipient, email: ' Client@Mail.COM ' } }, {});
+    expect(ev.user_data.em).toHaveLength(1);
+    expect(ev.user_data.em[0]).toMatch(/^[a-f0-9]{64}$/);
+    // L'adresse en clair ne doit jamais figurer dans l'évènement.
+    expect(JSON.stringify(ev)).not.toContain('client@mail.com');
+  });
+
+  it('n’invente pas d’e-mail quand il n’y en a pas', async () => {
+    const ev = await buildEvent(base, {});
+    expect(ev.user_data.em).toBeUndefined();
+  });
+
+  it('ignore une adresse qui n’en est pas une', async () => {
+    const ev = await buildEvent({ ...base, recipient: { ...base.recipient, email: 'pas-une-adresse' } }, {});
+    expect(ev.user_data.em).toBeUndefined();
+  });
+
+  it('donne le même identifiant stable au même client', async () => {
+    const a = await buildEvent(base, {});
+    const b = await buildEvent({ ...base, id: 'B', status: 'annule' }, {});
+    expect(a.user_data.external_id[0]).toBe(b.user_data.external_id[0]);
+  });
+});

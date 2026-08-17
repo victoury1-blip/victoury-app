@@ -53,12 +53,24 @@ export function phoneForMeta(phone) {
   return n.startsWith('0') ? '212' + n.slice(1) : n.replace(/\D/g, '');
 }
 
+/* Meta note la qualité du rapprochement : plus il y a de signaux concordants,
+ * mieux une conversion est attribuée à une personne réelle — et mieux la
+ * publicité apprend. Le téléphone seul plafonne bas ; l'adresse e-mail est le
+ * signal le plus fort, et l'identifiant stable permet de relier entre eux les
+ * évènements d'un même client. */
 /** Données d'identification du client, entièrement hachées. */
 export async function hashUserData(order) {
   const r = order?.recipient || {};
   const out = {};
   const ph = phoneForMeta(r.phone);
-  if (ph) out.ph = [await sha256(ph)];
+  if (ph) {
+    out.ph = [await sha256(ph)];
+    /* Identifiant stable, dérivé du téléphone : il relie les évènements d'un
+       même client (achat, annulation) sans rien révéler de plus. */
+    out.external_id = [await sha256(`victoury:${ph}`)];
+  }
+  const email = String(r.email || '').trim().toLowerCase();
+  if (email.includes('@')) out.em = [await sha256(email)];
   // Le nom complet est découpé : Meta compare prénom et nom séparément.
   const parts = String(r.name || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length) {

@@ -805,6 +805,12 @@ export default function App() {
                 address: o.billing.address_1 || '',
                 city: o.billing.city || '',
                 phone: o.billing.phone || '',
+                /* L'adresse e-mail est le signal d'identification le plus fort
+                   dont dispose Meta : sans elle, une conversion renvoyée depuis
+                   le serveur se rapproche mal d'une personne, et la publicité
+                   apprend d'autant moins. Elle tient dans `recipient`, déjà
+                   stocké en JSON — aucune colonne à ajouter. */
+                email: o.billing.email || '',
                 delivery: null,
               },
               product: {
