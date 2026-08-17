@@ -169,7 +169,13 @@ function ScannerRetourPage({ orders, setOrders }) {
 
     const { error } = await supabase.from('bons_retour').insert(bon);
     if (error) {
-      showMessage('Erreur: ' + error.message, 'error');
+      /* Une colonne absente de la table est un défaut de STRUCTURE, pas une
+         mauvaise manipulation : le message brut de la base ne dit pas quoi
+         faire, et le bon échoue silencieusement à chaque tentative. */
+      const colonne = /Could not find the '([^']+)' column/i.exec(error.message)?.[1];
+      showMessage(colonne
+        ? `La table « bons_retour » n'a pas de colonne « ${colonne} ». Ajoutez-la dans Supabase (SQL) : alter table bons_retour add column if not exists ${colonne} text;`
+        : 'Erreur: ' + error.message, 'error');
       return;
     }
 
