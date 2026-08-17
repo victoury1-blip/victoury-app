@@ -576,7 +576,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     });
   }, []);
   const { statuses } = useStatuses();
-  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '', status: '' };
+  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '', status: '', recu: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
   const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
   const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
@@ -826,6 +826,13 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
         (qDigits && normalizePhone(o.recipient?.phone).includes(qDigits));
       if (!matchSearch) return false;
       if (af.status && o.status !== af.status) return false;
+      /* « Reçu » se lit sur la commande OU sur la liste locale héritée : filtrer
+         sur la seule colonne laisserait de côté les colis cochés avant qu'elle
+         existe. */
+      if (af.recu) {
+        const estRecu = !!o.recu || recuIds.has(o.id);
+        if (af.recu === 'oui' ? !estRecu : estRecu) return false;
+      }
       if (af.livreur && !(o.recipient?.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
       if (af.ville && !(o.recipient?.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
       if (af.produit) {
@@ -864,7 +871,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       return String(b.id).localeCompare(String(a.id));
     };
     return filtered.sort(cmp);
-  }, [orders, debouncedSearch, appliedFilter, showArchived]);
+  }, [orders, debouncedSearch, appliedFilter, showArchived, recuIds]);
 
   const archivedCount = useMemo(() => orders.reduce((n, o) => {
     const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
@@ -1035,6 +1042,20 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   >
                     <option value="">Tous les états</option>
                     {statuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+                {/* Reçu — pour séparer ce qui est rentré au dépôt de ce qui est
+                    encore dehors, la seule question qui compte au retour. */}
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Reçu</label>
+                  <select
+                    value={filterForm.recu || ''}
+                    onChange={e => setFilterForm(p => ({ ...p, recu: e.target.value }))}
+                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+                  >
+                    <option value="">Tous</option>
+                    <option value="oui">Reçu</option>
+                    <option value="non">Non reçu</option>
                   </select>
                 </div>
                 {/* Livreurs — autocomplete */}
