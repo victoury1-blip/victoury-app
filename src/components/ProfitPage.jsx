@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { isAffiliateSource, isAffiliateStatus } from '../lib/affiliatePlatforms';
+import { isAffiliateSource, isAffiliateStatus, platformOfSource } from '../lib/affiliatePlatforms';
+import { fraisAffilie } from '../lib/affiliateFrais';
 import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package, Store } from 'lucide-react';
 import useProducts from '../hooks/useProducts';
 import { loadFactures } from '../data/factures';
@@ -421,8 +422,15 @@ export default function ProfitPage({ orders = [] }) {
     }
     return s + cost;
   }, 0);
-  // Frais de livraison Chic (mémorisés par commande à l'envoi).
-  const chicFrais = chicOrdersList.reduce((s, o) => s + (o.chicFrais || 0), 0);
+  /* Frais de livraison Chic. Le montant figé sur la commande à l'envoi ne suffit
+     pas : une commande passée autrement, ou envoyée sans que le tarif soit
+     renseigné, n'en porte aucun. À défaut, on reprend celui retenu pour sa ville
+     — c'est déjà ce que fait la page Affiliations. Ce qui reste introuvable est
+     compté comme INCONNU, jamais comme gratuit : un zéro silencieux gonflerait
+     le bénéfice affiché. */
+  const chicFraisParCommande = chicOrdersList.map(o => fraisAffilie(o, platformOfSource(o.source)?.key));
+  const chicFrais = chicFraisParCommande.reduce((s, f) => s + (f || 0), 0);
+  const chicFraisInconnus = chicFraisParCommande.filter(f => f == null).length;
   const chicProfit = chicCA - chicCost - chicFrais;
 
   const selCls = 'border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300';
@@ -614,9 +622,16 @@ export default function ProfitPage({ orders = [] }) {
                 <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût Revendeur</div>
                 <div className="text-lg font-black text-red-600">{fmt(chicCost)}</div>
               </div>
-              <div className="bg-orange-50 rounded-xl p-3">
+              {/* Un frais introuvable n'est pas un frais nul : le signaler, sinon
+                  le bénéfice affiché est trop haut sans que rien ne le dise. */}
+              <div className={`rounded-xl p-3 ${chicFraisInconnus ? 'bg-amber-100' : 'bg-orange-50'}`}>
                 <div className="text-[10px] font-semibold text-gray-500 uppercase">Frais Livraison</div>
-                <div className="text-lg font-black text-orange-600">{fmt(chicFrais)}</div>
+                <div className={`text-lg font-black ${chicFraisInconnus ? 'text-amber-700' : 'text-orange-600'}`}>{fmt(chicFrais)}</div>
+                {chicFraisInconnus > 0 && (
+                  <div className="text-[10px] text-amber-800 mt-0.5">
+                    ⚠ {chicFraisInconnus} commande{chicFraisInconnus > 1 ? 's' : ''} sans tarif connu
+                  </div>
+                )}
               </div>
               <div className="bg-green-50 rounded-xl p-3">
                 <div className="text-[10px] font-semibold text-gray-500 uppercase">Bénéfice net</div>

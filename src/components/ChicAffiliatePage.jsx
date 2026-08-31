@@ -26,6 +26,7 @@ import { loadProducts, saveProducts } from '../data/products';
 import { cloudSet, cloudGet } from '../lib/cloudSettings';
 import { now, fmtDate } from '../lib/dateUtils';
 import { platformOf, st, platKey } from '../lib/affiliatePlatforms';
+import { getCityFraisMap, rememberCityFrais, recallCityFrais, setCityFraisValue, cityKey } from '../lib/affiliateFrais';
 
 /* Plateforme courante (Chic, Bouait…). Elle traverse toute la page par un
    contexte plutôt que d'être passée de composant en composant : une trentaine
@@ -45,26 +46,8 @@ const orderStatuses = (plat) => [
 ];
 const chicStatusMeta = (k, plat) => orderStatuses(plat).find(s => s.key === k) || orderStatuses(plat)[0];
 
-/* Mémoire locale des frais de livraison par ville : Chic charge le tarif via
-   AJAX (absent du HTML), donc on retient ce que l'utilisateur saisit et on
-   le repropose automatiquement pour la même ville les fois suivantes. */
-const cityFraisKey = (plat) => platKey(plat, 'city_frais');
-const cityKey = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-function getCityFraisMap(plat) { try { return JSON.parse(localStorage.getItem(cityFraisKey(plat)) || '{}'); } catch { return {}; } }
-function rememberCityFrais(cityName, frais, plat) {
-  const k = cityKey(cityName); const f = parseFloat(frais);
-  if (!k || !f) return;
-  try { const m = getCityFraisMap(plat); m[k] = f; localStorage.setItem(cityFraisKey(plat), JSON.stringify(m)); } catch { /* quota */ }
-}
-function recallCityFrais(cityName, plat) { const v = getCityFraisMap(plat)[cityKey(cityName)]; return v != null ? String(v) : ''; }
-function setCityFraisValue(cityName, val, plat) {
-  const k = cityKey(cityName); if (!k) return;
-  try {
-    const m = getCityFraisMap(plat); const f = parseFloat(val);
-    if (val === '' || isNaN(f)) delete m[k]; else m[k] = f;
-    localStorage.setItem(cityFraisKey(plat), JSON.stringify(m));
-  } catch { /* quota */ }
-}
+/* Mémoire des frais par ville : partagée avec le rapport de profit
+   (src/lib/affiliateFrais.js). */
 
 /* ── Status badge ── */
 /* Couleur d'un sous-statut Chic (raison / dernière action). */
