@@ -96,3 +96,15 @@ export const platformOfSource = (source) =>
  *  les frais de ville et les commandes masquées déjà enregistrés. */
 export const platKey = (plat, base) =>
   plat === 'chic' || !plat ? `chic_${base}` : `${platformOf(plat).statusPrefix}_${base}`;
+
+/* Catalogue propre, sans les articles rapatriés des plateformes d'affiliation.
+ *
+ * Le Stock les héberge tous ensemble — c'est ce qu'il faut pour le réassort —
+ * mais la liste de choix d'une commande, elle, mélangeait les deux : une
+ * quinzaine d'articles qu'on ne vend pas soi-même s'intercalaient entre les
+ * siens, à chaque saisie. Ceux-là arrivent déjà remplis par leur plateforme.
+ *
+ * Un article d'affiliation DÉJÀ posé sur une commande reste affiché : la liste
+ * sert à choisir, pas à effacer ce qui a été vendu. */
+export const isOwnProduct = (p) => !isAffiliateSource(p?.source);
+export const ownProducts = (list) => (list || []).filter(isOwnProduct);

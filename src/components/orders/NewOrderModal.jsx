@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Plus, Check, Trash2 } from 'lucide-react';
 import { useStatuses } from '../../contexts/StatusContext';
 import { loadProducts, loadProductsRemote, SIZE_OPTIONS, NUMERIC_SIZES } from '../../data/products';
+import { ownProducts } from '../../lib/affiliatePlatforms';
 import { now } from '../../lib/dateUtils';
 import { generateVictId } from '../../lib/victId';
 
@@ -71,12 +72,15 @@ function CityAutocomplete({ value, onChange, livreur }) {
 }
 
 export default function NewOrderModal({ onClose, onSave, orders = [] }) {
-  const [stockProducts, setStockProducts] = useState(loadProducts());
+  // Seulement les siens : les articles d'affiliation sont remplis par leur
+  // plateforme, jamais choisis à la main ici.
+  const [stockProducts, setStockProducts] = useState(() => ownProducts(loadProducts()));
   useEffect(() => {
     loadProductsRemote().then(remote => {
       if (remote && remote.length > 0) {
+        // Le Stock, lui, garde tout le catalogue : c'est ce qu'il faut au réassort.
         localStorage.setItem('victoury_products', JSON.stringify(remote));
-        setStockProducts(remote);
+        setStockProducts(ownProducts(remote));
       }
     });
   }, []);
@@ -186,6 +190,12 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
                     <select value={prod.name} onChange={(e) => updateProduct(idx, 'name', e.target.value)}
                       className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white">
                       <option value="">-- Choisir un produit --</option>
+                      {/* Un article absent de la liste — d'affiliation, ou retiré
+                          du catalogue — reste affiché : la liste sert à choisir,
+                          pas à effacer ce qui est déjà sur la commande. */}
+                      {prod.name && !stockProducts.some(p => p.name === prod.name) && (
+                        <option value={prod.name}>{prod.name}</option>
+                      )}
                       {stockProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                     </select>
                     <select value={prod.size || ''} onChange={(e) => updateProduct(idx, 'size', e.target.value)}
