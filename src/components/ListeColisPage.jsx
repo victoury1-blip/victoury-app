@@ -926,6 +926,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     ));
   }
 
+  /* L'interrupteur ne savait que désactiver : le rallumer ne faisait rien, sans
+   * message ni retour visuel. Une commande dévalidée — ou saisie à la main après
+   * coup — restait donc hors de toute facture, définitivement.
+   *
+   * Le statut n'est pas touché : il est le résultat constaté, pas une étape à
+   * refaire. Une commande livrée redevient simplement facturable. */
+  function activateOrder(orderId) {
+    const ts = now();
+    setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, dateUpdated: ts, validated: true } : o)));
+  }
+
   if (isLoading) return (
     <div className="flex flex-col h-full p-4 gap-3 animate-pulse">
       <div className="h-9 w-48 bg-gray-200 rounded-lg" />
@@ -1426,7 +1437,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     <Toggle
                       checked={o.validated !== false}
                       loading={false}
-                      onChange={(next) => { if (!next) deactivateOrder(o.id); }}
+                      onChange={(next) => (next ? activateOrder(o.id) : deactivateOrder(o.id))}
                     />
                   </td>
 
