@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { StatusProvider } from './contexts/StatusContext'
 import './index.css'
+import { RECOVERY_KEY, nextRecoveryStep, isStaleBundleError } from './lib/bundleRecovery'
 
 async function clearCachesAndReload() {
   /* `reset` est retiré AVANT de recharger : laissé dans l'adresse, il relance
@@ -38,16 +39,6 @@ async function clearCachesAndReload() {
   }
 }
 
-/* Signes d'un bundle incohérent — deux versions de l'application mélangées
-   après un déploiement. « Cannot access 'x' before initialization » en fait
-   partie : un fichier attend une constante d'un autre fichier resté à
-   l'ancienne version. Absent de cette liste, il s'affichait en écran rouge au
-   lieu de déclencher le rechargement qui le répare. */
-function isStaleBundleError(msg) {
-  // Volontairement étroit : élargir à « is not a function » ferait recharger
-  // l'application sur de VRAIS bugs, qui disparaîtraient alors sans être vus.
-  return /Loading chunk|dynamically imported module|module script failed|before initialization/i.test(String(msg || ''));
-}
 
 /* Sortie de secours utilisable depuis un téléphone : ouvrir l'application avec
    « ?reset=1 » remet tout à zéro. Sans elle, sortir d'un état bloqué demandait
@@ -69,16 +60,31 @@ try {
   }
 } catch { /* stockage indisponible */ }
 
-// On chunk load error (stale SW cache after a deploy), clear caches and reload.
-// Guard: at most one auto-reload per 15s to avoid a reload loop.
+/* Réparation automatique, par paliers.
+ *
+ * Vider les caches et recharger ne suffit pas toujours : le service worker se
+ * réinstalle dans la foulée et ressert la version cassée. La réparation
+ * s'arrêtait pourtant là, et laissait l'écran « Une mise à jour est
+ * disponible » — dont le bouton refait exactement la tentative qui vient
+ * d'échouer. D'où la boucle : reproposer sans fin le remède inopérant.
+ *
+ * On monte donc d'un cran à chaque échec — d'abord les caches, puis le service
+ * worker désinstallé et maintenu à l'écart — et on ne rend la main à
+ * l'utilisateur qu'une fois les deux épuisés. */
 function autoRecover() {
-  const last = Number(sessionStorage.getItem('_reload_ts') || 0);
-  if (Date.now() - last > 15000) {
+  let attempts = 0, last = 0;
+  try {
+    attempts = Number(sessionStorage.getItem(RECOVERY_KEY) || 0);
+    last = Number(sessionStorage.getItem('_reload_ts') || 0);
+  } catch { /* stockage indisponible */ }
+  const step = nextRecoveryStep(attempts, Date.now() - last);
+  if (!step) return false;
+  try {
+    sessionStorage.setItem(RECOVERY_KEY, String(attempts + 1));
     sessionStorage.setItem('_reload_ts', String(Date.now()));
-    clearCachesAndReload();
-    return true;
-  }
-  return false;
+  } catch { /* stockage indisponible */ }
+  if (step === 'hard') { hardReset(); } else { clearCachesAndReload(); }
+  return true;
 }
 
 /* Une erreur d'évaluation de module survient HORS du rendu React : aucune
@@ -138,20 +144,16 @@ class RootErrorBoundary extends React.Component {
               mise à jour rendait tout diagnostic impossible depuis un téléphone,
               où les outils de développement n'existent pas. */}
           <pre style={{ fontSize: 11, color: isChunk ? '#6b7280' : '#b91c1c', background: isChunk ? '#f3f4f6' : '#fef2f2', padding: 12, borderRadius: 8, maxWidth: 600, whiteSpace: 'pre-wrap', wordBreak: 'break-word', textAlign: 'left' }}>{msg.slice(0, 500)}</pre>
-          <button
-            onClick={clearCachesAndReload}
-            style={{ background: '#1E3A5F', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 32px', fontSize: 15, fontWeight: 700 }}
-          >
-            Recharger
-          </button>
-          {/* Si « Recharger » ne suffit pas — le service worker se réinstalle
-              aussitôt et resert la même version cassée — cette sortie le
-              désinstalle pour de bon avant de repartir de zéro. */}
+          {/* Un seul bouton, et c'est le plus complet. Le précédent se contentait
+              de vider les caches : le service worker se réinstallait aussitôt et
+              resservait la version cassée, si bien qu'appuyer redonnait le même
+              écran. Proposer d'abord le remède inopérant, c'était installer la
+              boucle dans laquelle l'utilisateur tournait. */}
           <button
             onClick={hardReset}
-            style={{ background: 'transparent', color: '#6b7280', border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 600 }}
+            style={{ background: '#1E3A5F', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 32px', fontSize: 15, fontWeight: 700 }}
           >
-            Réinitialiser complètement
+            Réinitialiser et recharger
           </button>
         </div>
       );
@@ -159,6 +161,12 @@ class RootErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
+/* Un démarrage qui tient rend son plein crédit à la réparation : sans cela, un
+   incident réglé consommerait les tentatives du suivant, des semaines plus tard. */
+setTimeout(() => {
+  try { sessionStorage.removeItem(RECOVERY_KEY); } catch { /* stockage indisponible */ }
+}, 8000);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

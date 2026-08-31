@@ -13,44 +13,121 @@
     {
       "source": "/",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/index.html",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/version.txt",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(self), microphone=(), geolocation=()" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(self), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        }
       ]
     }
   ],
   "rewrites": [
-    { "source": "/ozone-client/:path*", "destination": "https://client.ozoneexpress.ma/:path*" },
-    { "source": "/ozone-api/:path*", "destination": "https://api.ozonexpress.ma/:path*" },
-    { "source": "/wc-api/:path*", "destination": "https://victoury-maroc.com/:path*" },
-    { "source": "/chic-api/:path*", "destination": "https://www.chic-affiliate.com/:path*" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/ozone-client/:path*",
+      "destination": "https://client.ozoneexpress.ma/:path*"
+    },
+    {
+      "source": "/ozone-api/:path*",
+      "destination": "https://api.ozonexpress.ma/:path*"
+    },
+    {
+      "source": "/wc-api/:path*",
+      "destination": "https://victoury-maroc.com/:path*"
+    },
+    {
+      "source": "/chic-api/:path*",
+      "destination": "https://www.chic-affiliate.com/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
