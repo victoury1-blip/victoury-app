@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { isAffiliateSource, isAffiliateStatus } from '../lib/affiliatePlatforms';
 import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Download, Plus, Trash2, Receipt, Package, Store } from 'lucide-react';
 import useProducts from '../hooks/useProducts';
@@ -170,6 +170,22 @@ export default function ProfitPage({ orders = [] }) {
 
   const { products: stockProducts } = useProducts();
 
+  /* La commande tombe-t-elle dans la période choisie ? Partagée par toute la
+     page : définie au fond d'un calcul, elle n'était pas appliquée au bloc des
+     ventes d'affiliation, qui affichait alors un total de toujours. */
+  const inPeriodOrder = useCallback((o) => {
+    let d = null;
+    if (o.createdAt) { const t = new Date(o.createdAt); if (!isNaN(t)) d = t; }
+    if (!d) {
+      const m = String(o.dateAdded || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) d = new Date(+m[3], +m[2] - 1, +m[1]);
+      else { const m2 = String(o.dateAdded || '').match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if (m2) d = new Date(+m2[1], +m2[2] - 1, +m2[3]); }
+    }
+    if (!d) return false;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return key >= applied.dateFrom && key <= applied.dateTo;
+  }, [applied.dateFrom, applied.dateTo]);
+
   // Get all colis from factures, within the period
   const allFactureColis = useMemo(() => {
     const colis = [];
@@ -191,18 +207,7 @@ export default function ProfitPage({ orders = [] }) {
     // livraison inconnus hors facture → 0, la facture reste la référence.
     const invoicedIds = new Set();
     for (const f of factures) for (const c of (f.colis || [])) invoicedIds.add(c.orderId);
-    const inPeriod = (o) => {
-      let d = null;
-      if (o.createdAt) { const t = new Date(o.createdAt); if (!isNaN(t)) d = t; }
-      if (!d) {
-        const m = String(o.dateAdded || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-        if (m) d = new Date(+m[3], +m[2] - 1, +m[1]);
-        else { const m2 = String(o.dateAdded || '').match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if (m2) d = new Date(+m2[1], +m2[2] - 1, +m2[3]); }
-      }
-      if (!d) return false;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      return key >= applied.dateFrom && key <= applied.dateTo;
-    };
+    const inPeriod = inPeriodOrder;
     for (const o of orders) {
       if (!['livre', 'refuse', 'change'].includes(o.status)) continue;
       if (invoicedIds.has(o.id)) continue;
@@ -228,7 +233,7 @@ export default function ProfitPage({ orders = [] }) {
       seen.add(k);
       return true;
     });
-  }, [factures, orders, applied]);
+  }, [factures, orders, applied, inPeriodOrder]);
 
   const livresColis = allFactureColis.filter(c => c.status === 'livre');
   const refuseColis = allFactureColis.filter(c => c.status === 'refuse');
@@ -392,9 +397,15 @@ export default function ProfitPage({ orders = [] }) {
     return chicProducts.find(cp => cBase(cp.name) === b)
       || (b.length > 2 ? chicProducts.find(cp => cBase(cp.name).includes(b) || b.includes(cBase(cp.name))) : null);
   };
-  // Profit Chic = commandes livrées/facturées (ventes réalisées).
+  /* Profit Chic = commandes livrées/facturées (ventes réalisées).
+   *
+   * Bornées à la période choisie, comme tout le reste de la page : elles ne
+   * l'étaient pas, et le bloc annonçait le total de TOUTES les ventes Chic sous
+   * un titre affichant le mois en cours. Un chiffre qui ne bougeait jamais quand
+   * on changeait de période. */
   const chicOrdersList = orders.filter(o => {
     if (!isAffiliateStatus(o.status, 'livre', 'facture')) return false;
+    if (!inPeriodOrder(o)) return false;
     const prods = o.products?.length ? o.products : [o.product];
     return prods.some(p => chicMatch(p?.name));
   });
@@ -580,9 +591,16 @@ export default function ProfitPage({ orders = [] }) {
         {/* Chic Affiliate Summary */}
         {chicOrdersList.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-bold text-gray-700 mb-3 text-sm flex items-center gap-2">
+            <h2 className="font-bold text-gray-700 mb-1 text-sm flex items-center gap-2">
               <Store size={14} className="text-indigo-600" /> Profit Chic Affiliate
+              <span className="text-[11px] font-normal text-gray-400">— {applied.dateFrom} → {applied.dateTo}</span>
             </h2>
+            {/* Ces ventes suivent leur propre circuit et n'entrent dans aucune
+                facture : elles sont donc absentes du profit net. Le dire, plutôt
+                que de laisser deux bénéfices côte à côte sans lien apparent. */}
+            <p className="text-[11px] text-gray-500 mb-3">
+              Compté à part : ces ventes ne passent pas par les factures, elles ne sont pas incluses dans le <b>Profit Net</b> ci-dessus.
+            </p>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
               <div className="bg-indigo-50 rounded-xl p-3">
                 <div className="text-[10px] font-semibold text-gray-500 uppercase">Commandes</div>
