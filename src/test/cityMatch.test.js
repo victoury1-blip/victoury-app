@@ -76,6 +76,15 @@ describe('feeFromRow', () => {
     expect(feeFromRow({ ville: 'Rabat', livre: 0 }, 'livre')).not.toBeNull();
   });
 
+  /* Un colis revenu à l'entrepôt garde l'issue constatée à la facture. Sans
+     cela, un colis facturé « refusé » à 10 DH puis scanné au retour se voyait
+     appliquer, au premier recalcul, le prix d'une livraison. */
+  it('un retour ne se facture pas au prix d’une livraison', () => {
+    expect(feeFromRow(row, 'retour_recu')).toBeNull();
+    expect(feeFromRow(row, 'retour_recu')).not.toBe(row.livre);
+    expect(feeFromRow(row, 'att_ramassage')).toBeNull();
+  });
+
   it('un échange sans aucun tarif ne se facture pas à zéro en silence', () => {
     // L'échange doit être facturé : à défaut de tarif, c'est « inconnu », pas « gratuit ».
     expect(feeFromRow(null, 'change', true)).toBeNull();

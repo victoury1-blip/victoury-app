@@ -44,7 +44,15 @@ export function findCityRow(fraisList, city) {
   return row || null;
 }
 
-/** Tarif applicable : un échange se facture au tarif « change », même livré. */
+/* Tarif applicable : un échange se facture au tarif « change », même livré.
+ *
+ * Le tarif ne couvre que les quatre issues commerciales. Tout autre statut est
+ * INCONNU, et non « livré » : un colis passé à « retour reçu » après avoir été
+ * facturé refusé se serait vu appliquer le prix d'une livraison au premier
+ * recalcul — 35 DH pour un colis qui est revenu. Rendre null laisse le montant
+ * déjà facturé en place, ce qui est le comportement juste : l'issue commerciale
+ * a été constatée au moment de la facture, le retour physique ne la change pas.
+ */
 export function feeFromRow(row, status, isEchange) {
   if (!row) return null;
   if (isEchange) return row.change ?? row.livre ?? null;
@@ -52,5 +60,5 @@ export function feeFromRow(row, status, isEchange) {
   if (status === 'refuse') return row.refuse ?? null;
   if (status === 'annule') return row.annule ?? null;
   if (status === 'change') return row.change ?? null;
-  return row.livre ?? null;
+  return null;
 }
