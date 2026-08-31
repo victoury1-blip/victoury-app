@@ -1285,7 +1285,7 @@ export default function App() {
           <Route path="/retour/bons" element={<PermGate perm="retour"><RetourPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/retour/bon/:bonId" element={<PermGate perm="retour"><RetourPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/factures" element={<PermGate perm="factures"><FacturesPage orders={orders} /></PermGate>} />
-          <Route path="/profit" element={<PermGate perm="profit"><ProfitPage orders={orders} /></PermGate>} />
+          <Route path="/profit" element={<PermGate perm="profit"><ProfitPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/etats" element={<PermGate perm="etats"><EtatsPage /></PermGate>} />
           <Route path="/livraison" element={<PermGate perm="livraison"><LivraisonPage /></PermGate>} />
           <Route path="/moderateurs" element={<ModeratorsPage />} />

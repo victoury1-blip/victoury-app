@@ -35,7 +35,7 @@ function KpiCard({ label, value, unit = 'MAD', subtitle, color, icon: Icon, prog
   );
 }
 
-export default function ProfitPage({ orders = [] }) {
+export default function ProfitPage({ orders = [], setOrders }) {
   const today = new Date();
   // Format LOCAL aaaa-mm-jj : toISOString() décale d'un jour en UTC+1 (minuit
   // local du 1er sérialisé « 30 du mois précédent »), ce qui excluait le
@@ -71,6 +71,35 @@ export default function ProfitPage({ orders = [] }) {
       }
     });
   }, []);
+  /* Corriger la quantité d'une ligne, depuis le détail du coût.
+   *
+   * Le coût d'achat vaut prix unitaire × quantité. Quand une commande de deux
+   * articles n'en déclarait qu'un, la tentation était de doubler le PRIX
+   * unitaire pour retomber sur le bon total — mais ce prix est celui du produit,
+   * partagé par toutes ses commandes : la correction en faussait aussitôt
+   * quatre autres. C'est la quantité qu'il fallait atteindre, et elle n'était
+   * modifiable que commande par commande, ailleurs.
+   *
+   * Le prix unitaire reste donc ce qu'il est — ce que coûte une pièce — et la
+   * quantité se corrige ici, là où l'écart se voit. */
+  function setProductQty(orderId, index, value) {
+    const qty = Math.max(1, Math.min(parseInt(value, 10) || 1, 999));
+    if (!setOrders) return;
+    setOrders(prev => prev.map(o => {
+      if (o.id !== orderId) return o;
+      // Une commande sans tableau `products` n'en porte qu'un, dans `product` :
+      // on normalise avant d'écrire, sinon la correction se perdrait.
+      const prods = o.products?.length ? o.products : (o.product ? [o.product] : []);
+      if (!prods[index]) return o;
+      const products = prods.map((p, i) => (i === index ? { ...p, qty } : p));
+      return {
+        ...o,
+        products,
+        product: index === 0 ? { ...(o.product || {}), ...products[0] } : o.product,
+      };
+    }));
+  }
+
   function setProductCost(name, value) {
     const key = (name || '').trim().toLowerCase();
     if (!key) return;
@@ -293,7 +322,7 @@ export default function ProfitPage({ orders = [] }) {
         unitCost: 0, qty: p.qty || 1, cost: 0, echange: true,
       }));
     }
-    for (const p of (prods || [])) {
+    for (const [idx, p] of (prods || []).entries()) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
       const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
@@ -307,7 +336,8 @@ export default function ProfitPage({ orders = [] }) {
       const isManual = manualCost[pn] != null;
       const unitCost = isManual ? manualCost[pn] : (sp ? (parseFloat(sp.prixAchat || sp.purchasePrice || 0) || 0) : 0);
       const qty = p.qty || 1;
-      items.push({ name: p.name, matched: isManual ? 'Prix manuel' : (sp?.name || null), manual: isManual, unitCost, qty, cost: unitCost * qty });
+      // `index` : la ligne exacte de la commande, pour pouvoir corriger sa quantité.
+      items.push({ index: idx, name: p.name, matched: isManual ? 'Prix manuel' : (sp?.name || null), manual: isManual, unitCost, qty, cost: unitCost * qty });
     }
     return items;
   }
@@ -804,7 +834,12 @@ export default function ProfitPage({ orders = [] }) {
               <p className="text-xs text-gray-500 px-2 pb-2">
                 Le coût d'achat vient du <b>Prix d'achat</b> (Stock) × quantité, pour les commandes livrées.
                 Les lignes <span className="text-red-600 font-semibold">rouges</span> n'ont aucun prix trouvé.
-                👉 <b>Saisis le prix directement dans la case</b> « Prix achat U. » (Entrée pour valider) : il s'applique à tous les colis du même produit et se sauvegarde.
+                {/* Les deux cases ne jouent pas le même rôle, et les confondre coûte
+                    cher : doubler un prix unitaire pour rattraper UNE commande
+                    fausse aussitôt toutes les autres du même produit. */}
+                <br />👉 <b>« Prix achat U. »</b> = ce que coûte <b>une pièce</b>. Il vaut pour <b>tous</b> les colis du même produit — ne le change que si le prix d'achat a vraiment changé.
+                <br />👉 <b>« Qté »</b> = le nombre de pièces <b>de cette commande</b>. C'est elle qu'il faut corriger quand un total ne tombe pas juste (400 DH pour 2 ensembles → Qté 2, prix unitaire inchangé).
+                <br />Entrée pour valider ; tout est enregistré aussitôt.
               </p>
               <table className="w-full text-xs border-collapse">
                 <thead>
@@ -835,7 +870,21 @@ export default function ProfitPage({ orders = [] }) {
                           className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
                         />
                       </td>
-                      <td className="px-2 py-2 text-center">{it.qty}</td>
+                      {/* Modifiable : c'est la quantité, et non le prix unitaire,
+                          qu'il faut corriger quand le coût d'une commande ne
+                          tombe pas juste. */}
+                      <td className="px-2 py-2 text-center">
+                        {setOrders && !it.echange ? (
+                          <input
+                            type="number" min="1" step="1"
+                            defaultValue={it.qty}
+                            onBlur={(e) => setProductQty(c.orderId, it.index, e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            title="Nombre de pièces sur cette commande"
+                            className="w-14 border border-gray-200 rounded px-1.5 py-1 text-center text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          />
+                        ) : it.qty}
+                      </td>
                       <td className="px-2 py-2 text-right font-semibold text-red-600">{fmt(it.cost)}</td>
                     </tr>
                   )))}
