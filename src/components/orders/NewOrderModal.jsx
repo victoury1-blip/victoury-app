@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Plus, Check, Trash2 } from 'lucide-react';
 import { useStatuses } from '../../contexts/StatusContext';
 import { loadProducts, loadProductsRemote, SIZE_OPTIONS, NUMERIC_SIZES } from '../../data/products';
-import { ownProducts } from '../../lib/affiliatePlatforms';
+import { orderableProducts } from '../../lib/orderProducts';
 import { now } from '../../lib/dateUtils';
 import { generateVictId } from '../../lib/victId';
 
@@ -74,13 +74,13 @@ function CityAutocomplete({ value, onChange, livreur }) {
 export default function NewOrderModal({ onClose, onSave, orders = [] }) {
   // Seulement les siens : les articles d'affiliation sont remplis par leur
   // plateforme, jamais choisis à la main ici.
-  const [stockProducts, setStockProducts] = useState(() => ownProducts(loadProducts()));
+  const [stockProducts, setStockProducts] = useState(() => orderableProducts(loadProducts()));
   useEffect(() => {
     loadProductsRemote().then(remote => {
       if (remote && remote.length > 0) {
         // Le Stock, lui, garde tout le catalogue : c'est ce qu'il faut au réassort.
         localStorage.setItem('victoury_products', JSON.stringify(remote));
-        setStockProducts(ownProducts(remote));
+        setStockProducts(orderableProducts(remote));
       }
     });
   }, []);

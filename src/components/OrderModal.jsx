@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, Check, Plus, Trash2 } from 'lucide-react';
 import { useStatuses } from '../contexts/StatusContext';
 import { loadProducts, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
-import { ownProducts } from '../lib/affiliatePlatforms';
+import { orderableProducts } from '../lib/orderProducts';
 import { useToast } from './Toast';
 
 function getCitiesForLivreur(livreurName) {
@@ -281,7 +281,7 @@ export default function OrderModal({ order, onClose, onSave }) {
               {form.products.map((prod, idx) => {
                 // Seulement les siens : les articles d'affiliation sont remplis
                 // par leur plateforme, jamais choisis à la main ici.
-                const stockProducts = ownProducts(loadProducts());
+                const stockProducts = orderableProducts(loadProducts());
                 const selProd = stockProducts.find(p => p.name === prod.name);
                 // Par défaut : tailles vêtements (S…5XL). On ne montre les tailles
                 // numériques (36-47) que si la taille déjà saisie est un nombre.
