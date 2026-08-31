@@ -334,7 +334,10 @@ export default function ProfitPage({ orders = [] }) {
     const tries = [...payes].sort((a, b) => a - b);
     const median = tries.length ? tries[Math.floor(tries.length / 2)] : 0;
     const villes = [...new Set(sansFrais.map(c => c.city).filter(Boolean))];
-    return { count: sansFrais.length, median, ecart: median * sansFrais.length, villes };
+    /* Nommer les colis, pas seulement les villes : c'est le colis qu'il faut
+       retrouver dans sa facture pour corriger le montant à la main. */
+    const colis = sansFrais.map(c => ({ id: c.orderId, city: c.city || '—', facture: c.factureRef || '' }));
+    return { count: sansFrais.length, median, ecart: median * sansFrais.length, villes, colis };
   }, [allFactureColis]);
   const inPeriod = (d) => (!applied.dateFrom || d >= applied.dateFrom) && (!applied.dateTo || d <= applied.dateTo);
   // La publicité doit couvrir la MÊME période que le chiffre d'affaires, sinon le
@@ -492,8 +495,22 @@ export default function ProfitPage({ orders = [] }) {
                     {fraisManquants.villes.length > 12 && ` … (+${fraisManquants.villes.length - 12})`}
                   </div>
                 )}
-                <div className="mt-1 text-xs text-amber-700">
-                  👉 Ajoute ces villes aux tarifs du livreur, puis « Recalculer les frais » sur les factures concernées.
+                {/* Le colis à ouvrir, nommément : sans son code, il faut le
+                    chercher facture par facture. */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {fraisManquants.colis.slice(0, 40).map((c, i) => (
+                    <span key={`${c.id}-${i}`} className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white/70 px-2 py-0.5 text-[11px]">
+                      <b className="font-mono text-amber-900">{c.id}</b>
+                      <span className="text-amber-700">{c.city}</span>
+                      {c.facture && <span className="text-amber-500">· {c.facture}</span>}
+                    </span>
+                  ))}
+                  {fraisManquants.colis.length > 40 && (
+                    <span className="text-[11px] text-amber-700">… (+{fraisManquants.colis.length - 40})</span>
+                  )}
+                </div>
+                <div className="mt-1.5 text-xs text-amber-700">
+                  👉 Ouvre la facture indiquée, « Rouvrir » si elle est clôturée, et saisis les frais dans la colonne <b>Frais</b>.
                 </div>
               </div>
             </div>
