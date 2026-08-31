@@ -52,10 +52,21 @@ export default function ProfitPage({ orders = [] }) {
   const [manualCost, setManualCost] = useState(() => {
     try { return JSON.parse(localStorage.getItem('victoury_product_cost') || '{}'); } catch { return {}; }
   });
+  /* Le prix saisi est partagé, pas propre à l'appareil.
+   *
+   * La fusion donnait le dernier mot au stockage local : un prix corrigé sur le
+   * téléphone restait masqué sur l'ordinateur par l'ancienne valeur, et les deux
+   * appareils affichaient durablement deux coûts d'achat — donc deux profits.
+   * Toute saisie partant aussitôt dans le cloud, celui-ci fait foi ; seules les
+   * clés qu'il ne connaît pas encore sont conservées. */
   useEffect(() => {
     cloudGet('victoury_product_cost').then(r => {
       if (r && typeof r === 'object') {
-        setManualCost(prev => ({ ...r, ...prev }));
+        setManualCost(prev => {
+          const merged = { ...prev, ...r };
+          try { localStorage.setItem('victoury_product_cost', JSON.stringify(merged)); } catch { /* quota */ }
+          return merged;
+        });
       }
     });
   }, []);

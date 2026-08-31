@@ -112,6 +112,22 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
     setRecalculating(false);
   }
 
+  /* Un zéro n'est anormal que sur un colis réellement porté au client : une
+     commande annulée peut légitimement ne rien coûter. */
+  const fraisAbsent = (c) => !(c.fraisLivraison > 0) && (c.status === 'livre' || c.status === 'change');
+
+  /* Correction à la main, pour les villes qu'aucun tarif ne couvre. Les totaux
+     de la facture suivent immédiatement : les laisser en arrière rendrait le
+     montant versé au livreur faux. */
+  function setFraisColis(index, value) {
+    const v = parseFloat(value);
+    const frais = Number.isFinite(v) && v >= 0 ? v : 0;
+    const colis = facture.colis.map((c, i) => (i === index ? { ...c, fraisLivraison: frais } : c));
+    const totalLivre = colis.filter(c => c.status === 'livre').reduce((s, c) => s + (c.prix || 0), 0);
+    const totalFrais = colis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
+    onUpdate({ ...facture, colis, totalLivre, totalFrais, totalNet: totalLivre - totalFrais });
+  }
+
   function toggleCloture() {
     const updated = { ...facture, locked: !facture.locked, statut: !facture.locked ? 'cloture' : 'en_attente' };
     onUpdate(updated);
@@ -253,7 +269,24 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
                       }`}>{statusLabel(c.status)}</span>
                     </td>
                     <td className="px-4 py-2.5 font-semibold text-gray-800">{fmt(c.prix)} DH</td>
-                    <td className="px-4 py-2.5 text-red-500 text-xs">{fmt(c.fraisLivraison)} DH</td>
+                    {/* Saisissable : le recalcul automatique ne peut rien pour une
+                        ville absente des tarifs, et un zéro laissé là fausse le
+                        profit. La facture close reste en lecture seule. */}
+                    <td className={`px-4 py-2.5 text-xs ${fraisAbsent(c) ? 'bg-amber-100/70' : ''}`}>
+                      {facture.locked ? (
+                        <span className="text-red-500">{fmt(c.fraisLivraison)} DH</span>
+                      ) : (
+                        <input
+                          type="number" min="0" step="0.01"
+                          defaultValue={c.fraisLivraison ?? ''}
+                          onBlur={(e) => setFraisColis(i, e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          placeholder="0.00"
+                          title={fraisAbsent(c) ? 'Aucun tarif pour cette ville — saisis le montant réel' : 'Frais de livraison'}
+                          className={`w-20 border rounded px-1.5 py-1 text-right text-xs text-red-600 focus:outline-none focus:ring-2 focus:ring-blue-300 ${fraisAbsent(c) ? 'border-amber-400' : 'border-gray-200'}`}
+                        />
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-xs text-gray-400">{c.date || '—'}</td>
                   </tr>
                 ))}
