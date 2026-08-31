@@ -300,6 +300,31 @@ export default function ProfitPage({ orders = [] }) {
   const coutAchat = livresColis.reduce((s, c) => s + getProductCost(c), 0);
   const fraisLiv = allFactureColis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
   const sousTotal = ca - coutAchat - fraisLiv;
+
+  /* ── Colis livrés facturés à 0 DH de livraison ──
+   *
+   * Aucune livraison n'est gratuite. Quand la ville d'une commande n'a pas de
+   * tarif chez le livreur, le calcul retombait silencieusement sur 0 : la
+   * facture était créée, le colis passait, et le profit affiché était plus haut
+   * que le vrai — sans le moindre signe. Autant de fois que de villes non
+   * tarifées.
+   *
+   * On les compte ici, et on chiffre l'écart au tarif habituel : un chiffre
+   * faux qui s'annonce vaut mieux qu'un chiffre faux qui se tait. */
+  const fraisManquants = useMemo(() => {
+    /* Seuls les colis réellement portés jusqu'au client : une commande annulée
+       ou refusée peut légitimement ne rien coûter, une livraison jamais. */
+    const porte = (c) => c.status === 'livre' || c.status === 'change';
+    const sansFrais = allFactureColis.filter(c => porte(c) && !(c.fraisLivraison > 0));
+    if (!sansFrais.length) return null;
+    const payes = allFactureColis.filter(porte).map(c => c.fraisLivraison || 0).filter(v => v > 0);
+    // Tarif de référence : la médiane des frais réellement facturés, insensible
+    // aux quelques villes très chères ou très proches.
+    const tries = [...payes].sort((a, b) => a - b);
+    const median = tries.length ? tries[Math.floor(tries.length / 2)] : 0;
+    const villes = [...new Set(sansFrais.map(c => c.city).filter(Boolean))];
+    return { count: sansFrais.length, median, ecart: median * sansFrais.length, villes };
+  }, [allFactureColis]);
   const inPeriod = (d) => (!applied.dateFrom || d >= applied.dateFrom) && (!applied.dateTo || d <= applied.dateTo);
   // La publicité doit couvrir la MÊME période que le chiffre d'affaires, sinon le
   // profit du mois est amputé de toutes les dépenses des mois précédents.
@@ -436,6 +461,34 @@ export default function ProfitPage({ orders = [] }) {
       </div>
 
       <div className="flex-1 p-4 sm:p-6 space-y-6">
+        {/* Le profit affiché est faux tant que des colis sont facturés 0 DH de
+            livraison : autant le dire en haut de page, chiffré. */}
+        {fraisManquants && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <div className="flex items-start gap-2">
+              <span className="text-lg leading-none">⚠️</span>
+              <div className="text-sm text-amber-900">
+                <b>{fraisManquants.count} colis facturés sans frais de livraison.</b>{' '}
+                Aucune livraison n’est gratuite : leur ville n’a pas de tarif chez le livreur,
+                et le calcul est retombé sur 0.
+                {fraisManquants.median > 0 && (
+                  <> Au tarif habituel ({fmt(fraisManquants.median)} DH), le profit affiché est
+                    surestimé d’environ <b>{fmt(fraisManquants.ecart)} DH</b>.</>
+                )}
+                {fraisManquants.villes.length > 0 && (
+                  <div className="mt-1 text-xs text-amber-800">
+                    Villes concernées : {fraisManquants.villes.slice(0, 12).join(', ')}
+                    {fraisManquants.villes.length > 12 && ` … (+${fraisManquants.villes.length - 12})`}
+                  </div>
+                )}
+                <div className="mt-1 text-xs text-amber-700">
+                  👉 Ajoute ces villes aux tarifs du livreur, puis « Recalculer les frais » sur les factures concernées.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Chiffre d'Affaires" value={ca} icon={ShoppingBag}
@@ -620,8 +673,10 @@ export default function ProfitPage({ orders = [] }) {
                   const marge = noCost ? -(fl) : pv - pa - fl;
                   const order = orderMap.get(c.orderId);
                   const prodName = c.product || order?.product?.name || '—';
+                  // Un 0 n'est anormal que sur un colis réellement livré ou échangé.
+                  const fraisAbsent = fl <= 0 && (c.status === 'livre' || isChange);
                   return (
-                    <tr key={`${c.orderId}-${i}`} className={`hover:bg-gray-50 ${isRefuse ? 'bg-red-50/50' : isChange ? 'bg-amber-50/50' : ''}`}>
+                    <tr key={`${c.orderId}-${i}`} className={`hover:bg-gray-50 ${isRefuse ? 'bg-red-50/50' : isChange ? 'bg-amber-50/50' : ''}`} title={fraisAbsent ? 'Aucun tarif pour cette ville — frais comptés à 0, le profit de cette ligne est surestimé' : undefined}>
                       <td className="px-4 py-2.5 text-xs text-gray-500">{c.factureRef}</td>
                       <td className="px-4 py-2.5 font-mono text-xs font-bold text-blue-600">{c.orderId}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-700">{c.recipient || '—'}</td>
@@ -637,7 +692,11 @@ export default function ProfitPage({ orders = [] }) {
                       </td>
                       <td className="px-4 py-2.5 font-semibold text-gray-800">{noCost ? '—' : fmt(pv)}</td>
                       <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{noCost || echangeLivre ? '—' : fmt(pa)}</td>
-                      <td className="px-4 py-2.5 text-orange-500 text-xs font-semibold">{fmt(fl)}</td>
+                      {/* Un 0 de frais est une donnée manquante, pas une livraison
+                          gratuite : il doit se voir dans la colonne. */}
+                      <td className={`px-4 py-2.5 text-xs font-semibold ${fraisAbsent ? 'text-amber-700 bg-amber-100/70' : 'text-orange-500'}`}>
+                        {fraisAbsent ? '⚠ 0,00' : fmt(fl)}
+                      </td>
                       <td className={`px-4 py-2.5 font-bold text-xs ${marge >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(marge)}</td>
                     </tr>
                   );

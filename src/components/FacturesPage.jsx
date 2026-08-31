@@ -513,6 +513,15 @@ function NewFactureModal({ orders, onClose, onCreated }) {
   }
 
   const selOrders = eligible.filter(o => selected[o.id] !== undefined);
+  /* Villes sans tarif chez le livreur : leurs frais retombent sur la valeur par
+     défaut — 0 tant qu'elle n'est pas saisie. La facture partait alors avec une
+     livraison gratuite, et le profit s'en trouvait gonflé sans que rien ne le
+     dise. On les nomme AVANT la création. */
+  const villesSansTarif = [...new Set(
+    selOrders
+      .filter(o => getLivreurFrais(o.recipient?.delivery || livreur, o.recipient?.city, o.status, fraisCache, livreursList, o.echange) === null)
+      .map(o => o.recipient?.city || '—')
+  )];
   const totalLivre = selOrders.filter(o => o.status === 'livre').reduce((s, o) => s + (o.price || 0), 0);
   const totalFrais = selOrders.reduce((s, o) => s + (selected[o.id] || 0), 0);
   const totalNet = totalLivre - totalFrais;
@@ -581,6 +590,19 @@ function NewFactureModal({ orders, onClose, onCreated }) {
               <input type="number" value={fraisDefault} onChange={e => setFraisDefault(Number(e.target.value))} className={ic} />
             </div>
           </div>
+
+          {villesSansTarif.length > 0 && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              ⚠️ <b>{villesSansTarif.length} ville{villesSansTarif.length > 1 ? 's' : ''} sans tarif</b> chez ce livreur :{' '}
+              {villesSansTarif.slice(0, 10).join(', ')}
+              {villesSansTarif.length > 10 && ` … (+${villesSansTarif.length - 10})`}.
+              <div className="mt-1 text-amber-800">
+                {fraisDefault > 0
+                  ? <>Ces colis seront facturés au défaut ({fraisDefault} DH).</>
+                  : <>Ces colis partiraient à <b>0 DH de livraison</b> et gonfleraient le profit. Saisis un montant par défaut, ou ajoute ces villes aux tarifs du livreur.</>}
+              </div>
+            </div>
+          )}
 
           {/* Order list */}
           <div className="border border-gray-200 rounded-xl overflow-hidden">

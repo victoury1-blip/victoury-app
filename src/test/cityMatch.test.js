@@ -63,4 +63,22 @@ describe('feeFromRow', () => {
     expect(feeFromRow(row, 'change')).toBe(25);
     expect(feeFromRow(null, 'livre')).toBeNull();
   });
+
+  /* « Pas de tarif » et « tarif de zéro » sont deux choses différentes, et les
+     confondre coûte de l'argent : une ville absente des tarifs retombait sur 0,
+     la facture partait avec une livraison gratuite, et le profit affiché était
+     plus haut que le vrai — sans que rien ne le signale. */
+  it('distingue un tarif absent d’un tarif nul', () => {
+    // Ville inconnue : rien à facturer AUTOMATIQUEMENT, il faut le dire.
+    expect(feeFromRow(findCityRow(list, 'Ville inconnue'), 'livre')).toBeNull();
+    // Tarif réellement saisi à zéro : c'est une décision, elle se respecte.
+    expect(feeFromRow({ ville: 'Rabat', livre: 0 }, 'livre')).toBe(0);
+    expect(feeFromRow({ ville: 'Rabat', livre: 0 }, 'livre')).not.toBeNull();
+  });
+
+  it('un échange sans aucun tarif ne se facture pas à zéro en silence', () => {
+    // L'échange doit être facturé : à défaut de tarif, c'est « inconnu », pas « gratuit ».
+    expect(feeFromRow(null, 'change', true)).toBeNull();
+    expect(feeFromRow({ ville: 'Fès' }, 'change', true)).toBeNull();
+  });
 });
