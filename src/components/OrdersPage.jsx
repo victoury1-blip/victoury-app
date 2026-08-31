@@ -674,6 +674,40 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     setOzoneOpen(true);
   }
 
+  /* Une commande dont le sort est déjà connu n'a plus de trajet à faire : elle
+     a été livrée, refusée, annulée ou échangée, souvent saisie après coup. */
+  const SORT_CONNU = new Set(['livre', 'refuse', 'annule', 'change', 'echange_recu', 'retour_recu']);
+
+  /* Valider, c'est deux choses distinctes selon le moment.
+   *
+   * Pour une commande qui part : créer le colis chez le transporteur et la
+   * pousser vers le ramassage. Pour une commande déjà terminée : simplement la
+   * reconnaître comme facturable.
+   *
+   * Le bouton ne connaissait que le premier cas. Une commande livrée chez Ozon
+   * ouvrait donc la fenêtre de création d'un colis — pour une livraison déjà
+   * faite — et le bouton restait sans effet ; celle d'un autre livreur serait
+   * repartie en « attente de ramassage ». Dans les deux cas elle ne pouvait
+   * jamais entrer dans une facture. */
+  function validerCommande(order) {
+    if (order.validated) return;
+    const livreur = (order.recipient?.delivery || '').trim();
+    // Bloquer le passage vers la Liste des Colis sans livreur.
+    if (!livreur) {
+      addToast('error', 'Aucun livreur', `Impossible de valider ${order.id} : assignez un livreur d'abord`);
+      return;
+    }
+    if (SORT_CONNU.has(order.status)) {
+      // Le statut est conservé tel quel : il est le résultat, pas une étape.
+      setOrders(prev => prev.map(o => (o.id === order.id ? { ...o, validated: true, dateUpdated: now() } : o)));
+      addToast('success', `Commande ${order.id} validée`, 'Elle peut maintenant être facturée');
+      return;
+    }
+    if (livreur.toLowerCase().includes('ozon')) { openOzone(order); return; }
+    setOrders(prev => prev.map(o => (o.id === order.id ? { ...o, validated: true, status: 'att_ramassage', dateUpdated: now() } : o)));
+    addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
+  }
+
   function handleOzoneSuccess(orderId, ozoneTracking) {
     setOrders((prev) =>
       prev.map((o) =>
@@ -1127,21 +1161,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <Toggle
                     checked={!!order.validated}
                     loading={false}
-                    onChange={() => {
-                      if (order.validated) return;
-                      const livreur = (order.recipient?.delivery || '').trim();
-                      // Bloquer le passage vers la Liste des Colis sans livreur.
-                      if (!livreur) {
-                        addToast('error', 'Aucun livreur', `Impossible de valider ${order.id} : assignez un livreur d'abord`);
-                        return;
-                      }
-                      if (livreur.toLowerCase().includes('ozon')) {
-                        openOzone(order);
-                      } else {
-                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage', dateUpdated: now() } : o));
-                        addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
-                      }
-                    }}
+                    onChange={() => validerCommande(order)}
                   />
                   {order.trackingNumber && (
                     <span className="text-xs text-blue-600 font-mono block mt-1 max-w-[70px] truncate" title={order.trackingNumber}>
@@ -1249,20 +1269,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                   <Toggle
                     checked={!!order.validated}
                     loading={false}
-                    onChange={() => {
-                      if (order.validated) return;
-                      const livreur = (order.recipient?.delivery || '').trim();
-                      // Bloquer le passage vers la Liste des Colis sans livreur.
-                      if (!livreur) {
-                        addToast('error', 'Aucun livreur', `Impossible de valider ${order.id} : assignez un livreur d'abord`);
-                        return;
-                      }
-                      if (livreur.toLowerCase().includes('ozon')) { openOzone(order); }
-                      else {
-                        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, validated: true, status: 'att_ramassage', dateUpdated: now() } : o));
-                        addToast('success', `Commande ${order.id} validée`, 'Déplacée vers Liste des Colis');
-                      }
-                    }}
+                    onChange={() => validerCommande(order)}
                   />
                   Validé
                 </label>
