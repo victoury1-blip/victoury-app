@@ -11,6 +11,47 @@ export default function PWAUpdateBanner() {
   const [needRefresh, setNeedRefresh] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  /* Repérer une nouvelle version SANS service worker.
+   *
+   * Cette bannière n'écoutait que lui. Depuis qu'il a été retiré — c'est lui qui
+   * resservait des versions mélangées — plus rien ne l'affichait : la première
+   * nouvelle de la mise à jour arrivait sous la forme d'un écran d'erreur en
+   * plein travail. Le numéro de version publié suffit à la donner à temps, et
+   * doucement : on compare, on propose, on attend d'être cliqué. */
+  useEffect(() => {
+    let stop = false;
+    const running = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : null;
+    if (!running) return undefined;
+
+    const check = async () => {
+      try {
+        // `cache: no-store` : sans lui, la réponse gardée en cache répondrait
+        // indéfiniment l'ancien numéro, et la bannière ne viendrait jamais.
+        const r = await fetch('/version.txt', { cache: 'no-store' });
+        if (!r.ok) return;
+        const latest = (await r.text()).trim();
+        if (!stop && latest && latest !== running) setNeedRefresh(true);
+      } catch { /* hors ligne : on retentera */ }
+    };
+    check();
+    const interval = setInterval(check, 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVis);
+
+    /* Un chargement de module échoué dit la même chose, plus brutalement : la
+       version en ligne a changé sous nos pieds. On l'annonce ici plutôt que de
+       recharger d'autorité. */
+    const onSignal = () => setNeedRefresh(true);
+    window.addEventListener('app:update-available', onSignal);
+
+    return () => {
+      stop = true;
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('app:update-available', onSignal);
+    };
+  }, []);
+
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 

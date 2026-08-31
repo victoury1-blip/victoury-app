@@ -71,7 +71,23 @@ try {
  * On monte donc d'un cran à chaque échec — d'abord les caches, puis le service
  * worker désinstallé et maintenu à l'écart — et on ne rend la main à
  * l'utilisateur qu'une fois les deux épuisés. */
+/* L'application a-t-elle déjà démarré ?
+ *
+ * Recharger d'autorité n'a de sens qu'AVANT que l'utilisateur ait quelque chose
+ * à perdre. Une fois l'application en service, une saisie est en cours : la
+ * recharger sans prévenir efface le travail du moment, et c'est précisément ce
+ * qui arrivait — un déploiement en pleine journée, un fichier de l'ancienne
+ * version réclamé au détour d'une page, et tout repartait à zéro sans un mot.
+ *
+ * Passé le démarrage, on se contente donc de proposer la mise à jour. */
+let appDemarree = false;
+
 function autoRecover() {
+  if (appDemarree) {
+    // La bannière prend le relais : elle attend d'être cliquée.
+    try { window.dispatchEvent(new CustomEvent('app:update-available')); } catch { /* ignore */ }
+    return false;
+  }
   let attempts = 0, last = 0;
   try {
     attempts = Number(sessionStorage.getItem(RECOVERY_KEY) || 0);
@@ -165,6 +181,7 @@ class RootErrorBoundary extends React.Component {
 /* Un démarrage qui tient rend son plein crédit à la réparation : sans cela, un
    incident réglé consommerait les tentatives du suivant, des semaines plus tard. */
 setTimeout(() => {
+  appDemarree = true;
   try { sessionStorage.removeItem(RECOVERY_KEY); } catch { /* stockage indisponible */ }
 }, 8000);
 
