@@ -95,11 +95,17 @@ export default function Produit({ onAjouter }) {
                 <button key={s.size} type="button" disabled={epuisee}
                   onClick={() => setTaille(s.size)}
                   title={epuisee ? 'Épuisé' : undefined}
-                  className={`min-w-[3rem] px-3 py-2.5 text-sm border transition-colors relative
+                  className={`min-w-[3rem] px-3 py-2.5 text-sm border transition-colors relative overflow-hidden
                     ${epuisee
-                      ? 'border-gray-100 text-gray-300 cursor-not-allowed line-through'
+                      ? 'border-red-200 text-red-300 cursor-not-allowed'
                       : taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
                   {s.size}
+                  {/* Une diagonale sur tout le bouton, pas un texte barré : elle
+                      se voit avant même d'avoir lu le chiffre. */}
+                  {epuisee && (
+                    <span aria-hidden className="pointer-events-none absolute inset-0"
+                      style={{ background: 'linear-gradient(to top right, transparent calc(50% - 1px), #f87171 calc(50% - 1px), #f87171 calc(50% + 1px), transparent calc(50% + 1px))' }} />
+                  )}
                 </button>
               );
             })}
