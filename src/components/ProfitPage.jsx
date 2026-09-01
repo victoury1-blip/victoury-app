@@ -345,6 +345,15 @@ export default function ProfitPage({ orders = [], setOrders }) {
   // Calculations
   const ca = livresColis.reduce((s, c) => s + (c.prix || 0), 0);
   const coutAchat = livresColis.reduce((s, c) => s + getProductCost(c), 0);
+  /* Nombre de pièces réellement livrées. Un même article commandé deux fois
+     s'écrit en DEUX lignes de commande, pas en quantité 2 : c'est la somme des
+     lignes qui fait foi, et ce compte permet de vérifier qu'elles sont bien
+     toutes vues. */
+  const piecesLivrees = livresColis.reduce((s, c) => {
+    const o = orderMap.get(c.orderId);
+    const prods = o?.products?.length ? o.products : (o?.product ? [o.product] : []);
+    return s + prods.filter(p => p?.name).reduce((n, p) => n + (p.qty || 1), 0);
+  }, 0);
   const fraisLiv = allFactureColis.reduce((s, c) => s + (c.fraisLivraison || 0), 0);
   const sousTotal = ca - coutAchat - fraisLiv;
 
@@ -827,6 +836,13 @@ export default function ProfitPage({ orders = [], setOrders }) {
                 <Package size={18} className="text-red-500" />
                 <h2 className="font-bold text-gray-900">Détail du Coût d'Achat</h2>
                 <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold">{fmt(coutAchat)} MAD</span>
+                {/* Un même article commandé deux fois s'écrit en DEUX lignes, et non
+                    en quantité 2. Ce compte le dit d'un coup d'œil : si le nombre de
+                    pièces n'excède pas celui des colis, aucune commande multiple n'a
+                    été reconnue, et le coût est trop bas. */}
+                <span className="text-xs text-gray-500">
+                  {piecesLivrees} pièce{piecesLivrees > 1 ? 's' : ''} pour {livresColis.length} colis
+                </span>
               </div>
               <button onClick={() => setShowCost(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">✕</button>
             </div>

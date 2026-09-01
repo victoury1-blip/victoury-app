@@ -64,3 +64,34 @@ describe('correction de la quantité', () => {
     }
   });
 });
+
+/* Un même article commandé deux fois s'écrit en DEUX lignes de commande, et non
+   en quantité 2 : c'est ainsi que les commandes sont saisies. Le coût doit donc
+   se lire sur la somme des lignes, sans quoi une commande de 440 DH n'en
+   coûterait que 100. */
+const coutCommande = (order, prixUnitaire) => {
+  const prods = order.products?.length ? order.products : (order.product ? [order.product] : []);
+  return prods.filter(p => p?.name).reduce((s, p) => s + prixUnitaire * (p.qty || 1), 0);
+};
+
+describe('commande à plusieurs lignes', () => {
+  it('additionne deux lignes du même article', () => {
+    const o = { products: [{ name: 'Ensemble Sporte Noir', qty: 1 }, { name: 'Ensemble Sporte Noir', qty: 1 }] };
+    expect(coutCommande(o, 100)).toBe(200);
+  });
+
+  it('additionne deux articles différents', () => {
+    const o = { products: [{ name: 'Ensemble Sporte Gris claire', qty: 1 }, { name: 'Ensemble Sporte Noir', qty: 1 }] };
+    expect(coutCommande(o, 100)).toBe(200);
+  });
+
+  it('compte aussi les quantités, quand une ligne en porte une', () => {
+    // Les deux écritures doivent donner le même total.
+    expect(coutCommande({ products: [{ name: 'A', qty: 2 }] }, 100)).toBe(200);
+  });
+
+  it('ignore les lignes vides laissées dans une commande', () => {
+    const o = { products: [{ name: 'A', qty: 1 }, { name: '', qty: 1 }] };
+    expect(coutCommande(o, 100)).toBe(100);
+  });
+});
