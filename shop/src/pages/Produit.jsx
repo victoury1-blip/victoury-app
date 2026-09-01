@@ -91,7 +91,7 @@ export default function Produit({ onAjouter, theme }) {
           {/* Le client marocain lit son marché en arabe : l'étiquette de la
               taille — champ décisif, mal choisi il fait retourner le colis —
               est celle qui a le plus à gagner à être dans sa langue. */}
-          <p dir="rtl" lang="ar" className="text-[13px] tracking-normal text-gray-500">اختر القياس</p>
+          <p dir="rtl" lang="ar" className="text-[13px] tracking-normal text-ink font-medium">اختر القياس</p>
           {/* Réglable depuis /store/theme : la grille convient à un choix
               court (S…XL), la liste à un choix long comme des pointures. */}
           <div className={theme?.produitAffichageTailles === 'liste' ? 'flex flex-col gap-2 mt-3 max-w-xs' : 'flex flex-wrap gap-2 mt-3'}>

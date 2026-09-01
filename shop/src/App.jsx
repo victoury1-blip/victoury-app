@@ -54,6 +54,13 @@ function Vitrine() {
     if (reglages.clarity?.enabled && reglages.clarity?.projectId) chargerClarity(reglages.clarity.projectId);
   }, [reglages.clarity?.enabled, reglages.clarity?.projectId]);
 
+  // La couleur principale (texte, boutons, bordures actives) est une variable
+  // CSS : la changer ici touche tout le site d'un coup, sans recompiler.
+  useEffect(() => {
+    const c = reglages.theme?.couleurTexte;
+    if (c) document.documentElement.style.setProperty('--ink', c);
+  }, [reglages.theme?.couleurTexte]);
+
   // Le favicon déposé dans l'administration remplace celui de la première
   // installation : sans cette mise à jour, l'onglet du navigateur garderait
   // pour toujours l'icône par défaut, quoi qu'on dépose dans /store/theme.

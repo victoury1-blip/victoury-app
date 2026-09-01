@@ -9,7 +9,9 @@ export default {
         display: ['Jost', 'Futura', 'Century Gothic', 'system-ui', 'sans-serif'],
         sans: ['Jost', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
-      colors: { ink: '#111111', sand: '#F7F5F2' },
+      // `ink` suit une variable CSS plutôt qu'une teinte figée : c'est ce qui
+      // permet de la régler depuis /store/theme sans recompiler le site.
+      colors: { ink: 'var(--ink)', sand: '#F7F5F2' },
     },
   },
   plugins: [],

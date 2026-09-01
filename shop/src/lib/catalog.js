@@ -107,6 +107,10 @@ export const THEME_DEFAUT = {
   // 'gauche' | 'centre' | 'droite' — position du logo (et, avec lui, de la
   // navigation) dans l'en-tête.
   logoPosition: 'gauche',
+  // Couleur principale du site — texte, boutons, bordures actives. Une seule
+  // valeur plutôt qu'un réglage par élément : c'est la teinte de la marque,
+  // pas un détail à régler ailleurs pour chaque bouton séparément.
+  couleurTexte: '#111111',
   annonceActive: true,
   annonces: ['Livraison partout au Maroc · Paiement à la livraison'],
   tailleAnnonce: 11,

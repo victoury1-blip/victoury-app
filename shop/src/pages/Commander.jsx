@@ -97,11 +97,11 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
               c'est un livreur perdu ou un colis qui revient. */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">الاسم الكامل *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-center">الاسم الكامل *</label>
               <input value={form.nom} onChange={e => u('nom', e.target.value)} className={`${champ} ${enErreur('nom')}`} />
             </div>
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">الهاتف *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-center">الهاتف *</label>
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
                 inputMode="tel" placeholder="06 12 34 56 78" className={`${champ} ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
@@ -111,11 +111,11 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">المدينة *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-center">المدينة *</label>
               <input value={form.ville} onChange={e => u('ville', e.target.value)} className={`${champ} ${enErreur('ville')}`} />
             </div>
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">العنوان *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-center">العنوان *</label>
               <input value={form.adresse} onChange={e => u('adresse', e.target.value)} className={`${champ} ${enErreur('adresse')}`} />
             </div>
           </div>

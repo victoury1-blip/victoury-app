@@ -185,7 +185,7 @@ export default function EditTheme() {
                 pas seulement une étiquette : c'est ce qu'on verra sur le site. */}
             <div className={`flex items-center px-4 py-3 ${
               t.logoPosition === 'centre' ? 'justify-center' : t.logoPosition === 'droite' ? 'flex-row-reverse' : ''}`}>
-              {t.logoUrl ? <img src={t.logoUrl} alt="" className="h-7 object-contain" /> : <span className="wordmark text-sm">Victoury</span>}
+              {t.logoUrl ? <img src={t.logoUrl} alt="" className="h-7 object-contain" /> : <span className="wordmark text-sm" style={{ color: t.couleurTexte }}>Victoury</span>}
               {t.logoPosition !== 'centre' && <span className={`text-[10px] text-gray-300 ${t.logoPosition === 'droite' ? 'mr-auto' : 'ml-auto'}`}>search · panier</span>}
             </div>
           </section>
@@ -205,6 +205,18 @@ export default function EditTheme() {
               </div>
             </div>
           </section>
+
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <h2 className="text-sm font-medium">Couleur du site</h2>
+            {/* Une seule teinte, appliquée partout — texte, boutons, bordures
+                actives, étiquettes en arabe : la couleur de la marque, pas un
+                réglage à répéter élément par élément. */}
+            <p className="text-xs text-gray-400 mt-0.5">Texte, boutons et bordures actives, sur tout le site.</p>
+            <div className="mt-3 max-w-xs">
+              <ChampCouleur valeur={t.couleurTexte} onChange={v => u('couleurTexte', v)} />
+            </div>
+          </section>
+
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <DeposeImage titre="Favicon" aide="Icône affichée dans l'onglet du navigateur. Carré, 32×32 ou 64×64 conseillé."
               url={t.faviconUrl} onChange={v => u('faviconUrl', v)} className="w-14 h-14" />

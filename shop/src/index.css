@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Couleur principale du site — texte, boutons, bordures actives.
+     Réglable depuis /store/theme, sans recompiler le site : la page y écrit
+     cette variable au chargement, avant que la couleur par défaut soit vue. */
+  --ink: #111111;
+}
+
 @layer base {
   body { @apply bg-white text-ink antialiased; }
   /* Le nom de la marque : capitales très espacées, comme sur le logo. */
