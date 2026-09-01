@@ -44,12 +44,9 @@ export default function Reglages() {
     <div className="max-w-2xl">
       <h1 className="text-lg font-medium">Réglages</h1>
 
+      {/* Le logo, le favicon et le bandeau d'annonce ont leur propre page,
+          avec un aperçu en temps réel : /store/theme. */}
       <div className="mt-5 space-y-6">
-        <section className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Bandeau d'annonce</h2>
-          <input value={r.annonce} onChange={e => u('annonce', e.target.value)} className={champ} />
-        </section>
-
         <section className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-1">Remises par quantité</h2>
           {/* La 2ᵉ paire à −20%, la 3ᵉ à −30% : le rang est la position dans le

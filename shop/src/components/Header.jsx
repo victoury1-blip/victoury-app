@@ -3,7 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { Search, ShoppingBag, Menu, X } from 'lucide-react';
 import Wordmark from './Wordmark';
 
-export default function Header({ collections = [], nbArticles = 0, onOuvrirPanier }) {
+export default function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
   const lien = ({ isActive }) =>
     `text-[13px] tracking-widest uppercase transition-colors ${isActive ? 'text-ink' : 'text-gray-500 hover:text-ink'}`;
@@ -17,7 +17,9 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
           </button>
 
           <Link to="/" className="shrink-0">
-            <Wordmark className="text-xl sm:text-2xl" />
+            {/* Un logo déposé remplace le texte ; sans lui, le nom en capitales
+                reste net à toute taille — jamais de logo cassé ou flou. */}
+            {logoUrl ? <img src={logoUrl} alt="Victoury" className="h-8 sm:h-9 w-auto object-contain" /> : <Wordmark className="text-xl sm:text-2xl" />}
           </Link>
 
           <nav className="hidden lg:flex items-center gap-7 ml-8">

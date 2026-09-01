@@ -19,8 +19,9 @@ import CollectionsListe from './store/CollectionsListe';
 import PagesListe from './store/PagesListe';
 import CodesPromo from './store/CodesPromo';
 import MetaPixel from './store/MetaPixel';
+import EditTheme from './store/EditTheme';
 import Reglages from './store/Reglages';
-import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT } from './lib/catalog';
+import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT } from './lib/catalog';
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel } from './lib/pixel';
@@ -31,7 +32,7 @@ import { chargerPixel, trackPixel } from './lib/pixel';
    des deux applications elle sert. */
 function Vitrine() {
   const [collections, setCollections] = useState([]);
-  const [reglages, setReglages] = useState({ ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT });
+  const [reglages, setReglages] = useState({ ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT });
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
 
@@ -45,6 +46,18 @@ function Vitrine() {
   useEffect(() => {
     if (reglages.pixel?.enabled && reglages.pixel?.pixelId) chargerPixel(reglages.pixel.pixelId);
   }, [reglages.pixel?.enabled, reglages.pixel?.pixelId]);
+
+  // Le favicon déposé dans l'administration remplace celui de la première
+  // installation : sans cette mise à jour, l'onglet du navigateur garderait
+  // pour toujours l'icône par défaut, quoi qu'on dépose dans /store/theme.
+  useEffect(() => {
+    const url = reglages.theme?.faviconUrl;
+    if (!url) return;
+    const lien = document.querySelector("link[rel='icon']") || document.createElement('link');
+    lien.rel = 'icon';
+    lien.href = url;
+    document.head.appendChild(lien);
+  }, [reglages.theme?.faviconUrl]);
 
   /* Le panier est partagé entre les onglets ouverts : commander depuis l'un
      après avoir ajouté depuis l'autre doit donner le même panier. */
@@ -73,8 +86,8 @@ function Vitrine() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <AnnonceBar texte={reglages.annonce} />
-      <Header collections={collections} nbArticles={nbArticles(lignes)} onOuvrirPanier={() => setPanierOuvert(true)} />
+      <AnnonceBar theme={reglages.theme} />
+      <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl} onOuvrirPanier={() => setPanierOuvert(true)} />
 
       <main className="flex-1">
         <Routes>
@@ -116,6 +129,7 @@ function Administration() {
           <Route path="pages" element={<PagesListe />} />
           <Route path="codes-promo" element={<CodesPromo />} />
           <Route path="meta-pixel" element={<MetaPixel />} />
+          <Route path="theme" element={<EditTheme />} />
           <Route path="reglages" element={<Reglages />} />
         </Route>
       </Routes>
