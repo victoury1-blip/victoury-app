@@ -77,22 +77,29 @@ export async function chargerPage(slug) {
   return data || null;
 }
 
-/* Réglages de la boutique — bandeau, remises, livraison, pixel. Un défaut est
+/* Réglages de la boutique — bandeau, remises, livraison. Un défaut est
    toujours rendu : une boutique sans réglage doit rester vendable. */
 export const REGLAGES_DEFAUT = {
   annonce: 'Livraison partout au Maroc · Paiement à la livraison',
   paliers: [],
   livraison: 0,
   seuilGratuit: null,
-  pixelId: '',
   telephone: '',
 };
 
+// Le Meta Pixel vit dans sa propre clé : ni son activation ni son identifiant
+// ne se mélangent aux réglages généraux, qui ont chacun leur propre page
+// d'administration.
+export const PIXEL_DEFAUT = { enabled: false, pixelId: '', testCode: '' };
+
 export async function chargerReglages() {
   const { data, error } = await supabase.from('shop_settings').select('key, value');
-  if (error) return { ...REGLAGES_DEFAUT };
+  if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT } };
   const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
-  return { ...REGLAGES_DEFAUT, ...(map.boutique || {}) };
+  return {
+    ...REGLAGES_DEFAUT, ...(map.boutique || {}),
+    pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
+  };
 }
 
 /** Vérifie un code promo sans jamais exposer la liste des codes. */

@@ -92,11 +92,9 @@ export default function Reglages() {
           </div>
         </section>
 
-        <section className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Meta Pixel</h2>
-          <input value={r.pixelId} onChange={e => u('pixelId', e.target.value)} placeholder="ID du pixel" className={champ} />
-        </section>
       </div>
+      {/* Le Meta Pixel a sa propre page : /store/meta-pixel — il y a plus qu'un
+          identifiant à régler, et le jeton d'accès n'a rien à faire ici. */}
 
       <div className="mt-5 flex items-center gap-3">
         <button onClick={enregistrer} disabled={enregistrement} className="bg-ink text-white px-6 py-3 text-xs tracking-widest uppercase disabled:opacity-60">

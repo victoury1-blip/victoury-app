@@ -18,10 +18,12 @@ import ProduitForm from './store/ProduitForm';
 import CollectionsListe from './store/CollectionsListe';
 import PagesListe from './store/PagesListe';
 import CodesPromo from './store/CodesPromo';
+import MetaPixel from './store/MetaPixel';
 import Reglages from './store/Reglages';
-import { chargerCollections, chargerReglages, REGLAGES_DEFAUT } from './lib/catalog';
+import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT } from './lib/catalog';
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
+import { chargerPixel, trackPixel } from './lib/pixel';
 
 /* L'habillage de la vitrine — bandeau, en-tête, panier, pied de page — ne
    doit jamais apparaître sur l'administration : elle a sa propre mise en
@@ -29,7 +31,7 @@ import { nbArticles } from './lib/pricing';
    des deux applications elle sert. */
 function Vitrine() {
   const [collections, setCollections] = useState([]);
-  const [reglages, setReglages] = useState(REGLAGES_DEFAUT);
+  const [reglages, setReglages] = useState({ ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT });
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
 
@@ -37,6 +39,12 @@ function Vitrine() {
     chargerCollections().then(setCollections).catch(() => {});
     chargerReglages().then(setReglages).catch(() => {});
   }, []);
+
+  // Le pixel se charge une fois, dès que son réglage arrive — jamais avant,
+  // pour ne jamais l'activer avec un identifiant vide ou périmé.
+  useEffect(() => {
+    if (reglages.pixel?.enabled && reglages.pixel?.pixelId) chargerPixel(reglages.pixel.pixelId);
+  }, [reglages.pixel?.enabled, reglages.pixel?.pixelId]);
 
   /* Le panier est partagé entre les onglets ouverts : commander depuis l'un
      après avoir ajouté depuis l'autre doit donner le même panier. */
@@ -53,6 +61,10 @@ function Vitrine() {
   const onAjouter = useCallback((ligne) => {
     setLignes(prev => { const s = ajouter(prev, ligne); ecrirePanier(s); return s; });
     setPanierOuvert(true);
+    trackPixel('AddToCart', {
+      content_name: ligne.name, content_ids: [ligne.slug], content_type: 'product',
+      value: ligne.price, currency: 'MAD',
+    });
   }, []);
 
   const onQuantite = useCallback((cle, qty) => setLignes(prev => { const s = changerQuantite(prev, cle, qty); ecrirePanier(s); return s; }), []);
@@ -103,6 +115,7 @@ function Administration() {
           <Route path="collections" element={<CollectionsListe />} />
           <Route path="pages" element={<PagesListe />} />
           <Route path="codes-promo" element={<CodesPromo />} />
+          <Route path="meta-pixel" element={<MetaPixel />} />
           <Route path="reglages" element={<Reglages />} />
         </Route>
       </Routes>

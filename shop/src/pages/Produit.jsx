@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ChevronDown, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs } from '../lib/catalog';
+import { trackPixel } from '../lib/pixel';
 
 function Accordeon({ titre, children }) {
   const [ouvert, setOuvert] = useState(false);
@@ -32,6 +33,10 @@ export default function Produit({ onAjouter }) {
       .then(async p => {
         setProduit(p);
         setCouleurs(p?.group_id ? await chargerCouleurs(p.group_id) : []);
+        if (p) trackPixel('ViewContent', {
+          content_name: p.name, content_ids: [p.slug], content_type: 'product',
+          value: p.price, currency: 'MAD',
+        });
       })
       .catch(() => setProduit(null))
       .finally(() => setChargement(false));

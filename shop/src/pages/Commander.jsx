@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { fmtPrix, totalPanier } from '../lib/pricing';
@@ -6,6 +6,7 @@ import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { verifierPromo } from '../lib/catalog';
+import { trackPixel, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from '../lib/pixel';
 
 const champ = 'w-full border border-gray-200 px-3 py-3 text-sm focus:outline-none focus:border-ink transition-colors';
 
@@ -24,6 +25,16 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   });
   const u = (k, v) => { setForm(f => ({ ...f, [k]: v })); setManque(m => m.filter(x => x !== k)); };
 
+  // Une seule fois à l'arrivée sur la page : la publicité doit voir un panier
+  // qui entre en commande, pas chaque changement de quantité qui le précède.
+  useEffect(() => {
+    trackPixel('InitiateCheckout', {
+      value: t.total, currency: 'MAD', num_items: t.articles,
+      content_ids: lignes.map(l => l.slug), content_type: 'product',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function appliquerCode() {
     setCodeErreur('');
     if (!code.trim()) return;
@@ -40,6 +51,21 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
     const r = await envoyerCommande(form, lignes, t.total);
     setEnvoi(false);
     if (!r.ok) { setErreur(r.error || 'Envoi impossible. Réessayez.'); return; }
+    /* Un même identifiant des deux côtés : le pixel du navigateur (rapide, mais
+       bloqué par les bloqueurs de pub) et le relais serveur (toujours reçu)
+       envoient le MÊME achat, et Meta déduplique au lieu de le compter deux fois. */
+    const eventID = idEvenement(r.id);
+    trackPixel('Purchase', { value: t.total, currency: 'MAD', content_ids: lignes.map(l => l.slug), content_type: 'product' }, eventID);
+    if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
+      const tel = telephonePourMeta(form.telephone);
+      Promise.all([sha256(tel), form.email ? sha256(form.email.trim().toLowerCase()) : null])
+        .then(([ph, em]) => envoyerCAPI(reglages.pixel.pixelId, [{
+          event_name: 'Purchase', event_time: Math.floor(Date.now() / 1000),
+          event_id: eventID, action_source: 'website',
+          user_data: { ph: [ph], ...(em ? { em: [em] } : {}) },
+          custom_data: { value: t.total, currency: 'MAD', order_id: r.id },
+        }], reglages.pixel.testCode)).catch(() => {});
+    }
     onVider();
     navigate(`/merci/${r.id}`);
   }
