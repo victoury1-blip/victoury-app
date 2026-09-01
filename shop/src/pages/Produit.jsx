@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs } from '../lib/catalog';
 
@@ -95,16 +95,16 @@ export default function Produit({ onAjouter }) {
                 <button key={s.size} type="button" disabled={epuisee}
                   onClick={() => setTaille(s.size)}
                   title={epuisee ? 'Épuisé' : undefined}
-                  className={`min-w-[3rem] px-3 py-2.5 text-sm border transition-colors relative overflow-hidden
+                  className={`min-w-[3rem] px-3 py-2.5 text-sm border transition-colors relative
                     ${epuisee
-                      ? 'border-red-200 text-red-300 cursor-not-allowed'
+                      ? 'border-gray-200 text-ink cursor-not-allowed'
                       : taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
                   {s.size}
-                  {/* Une diagonale sur tout le bouton, pas un texte barré : elle
-                      se voit avant même d'avoir lu le chiffre. */}
+                  {/* Une croix au-dessus du chiffre : le chiffre reste lisible,
+                      la croix rouge dit à elle seule qu'il n'est pas disponible. */}
                   {epuisee && (
-                    <span aria-hidden className="pointer-events-none absolute inset-0"
-                      style={{ background: 'linear-gradient(to top right, transparent calc(50% - 1px), #f87171 calc(50% - 1px), #f87171 calc(50% + 1px), transparent calc(50% + 1px))' }} />
+                    <X aria-hidden size={28} strokeWidth={1.5}
+                      className="pointer-events-none absolute inset-0 m-auto text-red-500" />
                   )}
                 </button>
               );
