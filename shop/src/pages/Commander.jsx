@@ -12,7 +12,7 @@ const champ = 'w-full border border-gray-200 px-3 py-3 text-sm focus:outline-non
 
 export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ nom: '', telephone: '', ville: '', adresse: '', email: '' });
+  const [form, setForm] = useState({ nom: '', telephone: '', ville: '', adresse: '' });
   const [promo, setPromo] = useState(null);
   const [code, setCode] = useState('');
   const [codeErreur, setCodeErreur] = useState('');
@@ -57,12 +57,13 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
     const eventID = idEvenement(r.id);
     trackPixel('Purchase', { value: t.total, currency: 'MAD', content_ids: lignes.map(l => l.slug), content_type: 'product' }, eventID);
     if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
-      const tel = telephonePourMeta(form.telephone);
-      Promise.all([sha256(tel), form.email ? sha256(form.email.trim().toLowerCase()) : null])
-        .then(([ph, em]) => envoyerCAPI(reglages.pixel.pixelId, [{
+      // Sans e-mail collecté, le téléphone (haché) reste le seul signal
+      // d'identification envoyé à l'API de Conversions.
+      sha256(telephonePourMeta(form.telephone))
+        .then(ph => envoyerCAPI(reglages.pixel.pixelId, [{
           event_name: 'Purchase', event_time: Math.floor(Date.now() / 1000),
           event_id: eventID, action_source: 'website',
-          user_data: { ph: [ph], ...(em ? { em: [em] } : {}) },
+          user_data: { ph: [ph] },
           custom_data: { value: t.total, currency: 'MAD', order_id: r.id },
         }], reglages.pixel.testCode)).catch(() => {});
     }
@@ -91,13 +92,16 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
 
       <div className="mt-10 grid lg:grid-cols-2 gap-10">
         <div className="space-y-4">
+          {/* Le client marocain lit son marché en arabe : ces quatre champs sont
+              ceux qui décident si le colis arrive au bon endroit — mal compris,
+              c'est un livreur perdu ou un colis qui revient. */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-gray-500 mb-1.5">Nom complet *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">الاسم الكامل *</label>
               <input value={form.nom} onChange={e => u('nom', e.target.value)} className={`${champ} ${enErreur('nom')}`} />
             </div>
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-gray-500 mb-1.5">Téléphone *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">الهاتف *</label>
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
                 inputMode="tel" placeholder="06 12 34 56 78" className={`${champ} ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
@@ -107,19 +111,13 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-gray-500 mb-1.5">Ville *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">المدينة *</label>
               <input value={form.ville} onChange={e => u('ville', e.target.value)} className={`${champ} ${enErreur('ville')}`} />
             </div>
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-gray-500 mb-1.5">Adresse *</label>
+              <label dir="rtl" lang="ar" className="block text-sm text-gray-500 mb-1.5 text-center">العنوان *</label>
               <input value={form.adresse} onChange={e => u('adresse', e.target.value)} className={`${champ} ${enErreur('adresse')}`} />
             </div>
-          </div>
-          <div>
-            <label className="block text-[11px] tracking-widest uppercase text-gray-500 mb-1.5">
-              E-mail <span className="normal-case tracking-normal text-gray-400">(facultatif)</span>
-            </label>
-            <input value={form.email} onChange={e => u('email', e.target.value)} type="email" className={champ} />
           </div>
 
           <div className="border border-ink px-4 py-3 flex items-center gap-3">
