@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AnnonceBar from './components/AnnonceBar';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -10,11 +10,24 @@ import Produit from './pages/Produit';
 import Commander from './pages/Commander';
 import Merci from './pages/Merci';
 import PageStatique from './pages/PageStatique';
+import AdminAuth from './store/AdminAuth';
+import AdminLayout from './store/AdminLayout';
+import Dashboard from './store/Dashboard';
+import ProduitsListe from './store/ProduitsListe';
+import ProduitForm from './store/ProduitForm';
+import CollectionsListe from './store/CollectionsListe';
+import PagesListe from './store/PagesListe';
+import CodesPromo from './store/CodesPromo';
+import Reglages from './store/Reglages';
 import { chargerCollections, chargerReglages, REGLAGES_DEFAUT } from './lib/catalog';
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
 
-export default function App() {
+/* L'habillage de la vitrine — bandeau, en-tête, panier, pied de page — ne
+   doit jamais apparaître sur l'administration : elle a sa propre mise en
+   page, et un visiteur n'y passe jamais. La route décide seule laquelle
+   des deux applications elle sert. */
+function Vitrine() {
   const [collections, setCollections] = useState([]);
   const [reglages, setReglages] = useState(REGLAGES_DEFAUT);
   const [lignes, setLignes] = useState(lirePanier);
@@ -36,8 +49,6 @@ export default function App() {
       window.removeEventListener('panier:maj', relire);
     };
   }, []);
-
-  const maj = useCallback((suivant) => { setLignes(suivant); ecrirePanier(suivant); }, []);
 
   const onAjouter = useCallback((ligne) => {
     setLignes(prev => { const s = ajouter(prev, ligne); ecrirePanier(s); return s; });
@@ -78,4 +89,34 @@ export default function App() {
       />
     </div>
   );
+}
+
+function Administration() {
+  return (
+    <AdminAuth>
+      <Routes>
+        <Route element={<AdminLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="produits" element={<ProduitsListe />} />
+          <Route path="produits/:id" element={<ProduitForm />} />
+          <Route path="collections" element={<CollectionsListe />} />
+          <Route path="pages" element={<PagesListe />} />
+          <Route path="codes-promo" element={<CodesPromo />} />
+          <Route path="reglages" element={<Reglages />} />
+        </Route>
+      </Routes>
+    </AdminAuth>
+  );
+}
+
+export default function App() {
+  const { pathname } = useLocation();
+  if (pathname === '/store' || pathname.startsWith('/store/')) {
+    return (
+      <Routes>
+        <Route path="/store/*" element={<Administration />} />
+      </Routes>
+    );
+  }
+  return <Vitrine />;
 }
