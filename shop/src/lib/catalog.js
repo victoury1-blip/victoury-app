@@ -96,6 +96,9 @@ export const PIXEL_DEFAUT = { enabled: false, pixelId: '', testCode: '' };
    pas des règles de vente comme les remises ou la livraison. */
 export const THEME_DEFAUT = {
   logoUrl: '', faviconUrl: '',
+  // 'gauche' | 'centre' | 'droite' — position du logo (et, avec lui, de la
+  // navigation) dans l'en-tête.
+  logoPosition: 'gauche',
   annonceActive: true,
   annonces: ['Livraison partout au Maroc · Paiement à la livraison'],
   tailleAnnonce: 11,

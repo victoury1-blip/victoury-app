@@ -181,15 +181,29 @@ export default function EditTheme() {
                 {decouperGras(t.annonces.find(Boolean)).map((m, j) => (m.gras ? <b key={j}>{m.texte}</b> : <span key={j}>{m.texte}</span>))}
               </div>
             )}
-            <div className="flex items-center gap-4 px-4 py-3">
+            {/* La position choisie change ici même l'agencement de l'aperçu,
+                pas seulement une étiquette : c'est ce qu'on verra sur le site. */}
+            <div className={`flex items-center px-4 py-3 ${
+              t.logoPosition === 'centre' ? 'justify-center' : t.logoPosition === 'droite' ? 'flex-row-reverse' : ''}`}>
               {t.logoUrl ? <img src={t.logoUrl} alt="" className="h-7 object-contain" /> : <span className="wordmark text-sm">Victoury</span>}
-              <span className="ml-auto text-[10px] text-gray-300">search · panier</span>
+              {t.logoPosition !== 'centre' && <span className={`text-[10px] text-gray-300 ${t.logoPosition === 'droite' ? 'mr-auto' : 'ml-auto'}`}>search · panier</span>}
             </div>
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-5">
-            <DeposeImage titre="Logo" aide='Affiché à gauche du header. Laissez vide pour afficher le texte "Victoury".'
+            <DeposeImage titre="Logo" aide='Laissez vide pour afficher le texte "Victoury".'
               url={t.logoUrl} onChange={v => u('logoUrl', v)} className="w-32 h-16" />
+            <div className="mt-5">
+              <p className="text-sm mb-2">Position du logo</p>
+              <div className="grid grid-cols-3 gap-3 max-w-sm">
+                {[['gauche', 'Gauche'], ['centre', 'Centre'], ['droite', 'Droite']].map(([val, txt]) => (
+                  <button key={val} type="button" onClick={() => u('logoPosition', val)}
+                    className={`px-3 py-2.5 border text-sm ${t.logoPosition === val ? 'border-ink bg-sand font-medium' : 'border-gray-200 text-gray-500'}`}>
+                    {txt}
+                  </button>
+                ))}
+              </div>
+            </div>
           </section>
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <DeposeImage titre="Favicon" aide="Icône affichée dans l'onglet du navigateur. Carré, 32×32 ou 64×64 conseillé."

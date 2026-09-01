@@ -87,7 +87,8 @@ function Vitrine() {
   return (
     <div className="min-h-screen flex flex-col">
       <AnnonceBar theme={reglages.theme} />
-      <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl} onOuvrirPanier={() => setPanierOuvert(true)} />
+      <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
+        logoPosition={reglages.theme?.logoPosition} onOuvrirPanier={() => setPanierOuvert(true)} />
 
       <main className="flex-1">
         <Routes>
