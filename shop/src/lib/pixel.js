@@ -68,3 +68,19 @@ export async function envoyerCAPI(pixelId, evenements, testCode) {
     });
   } catch { /* la publicité continue d'apprendre par le seul pixel navigateur */ }
 }
+
+/* Microsoft Clarity — chargé une seule fois, avec le boilerplate officiel.
+   Contrairement à Meta, aucun jeton n'est jamais impliqué côté navigateur :
+   l'identifiant de projet n'a rien d'un secret. */
+let clarityCharge = false;
+export function chargerClarity(projectId) {
+  if (clarityCharge || !projectId || typeof window === 'undefined') return;
+  clarityCharge = true;
+  /* eslint-disable */
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", projectId);
+  /* eslint-enable */
+}

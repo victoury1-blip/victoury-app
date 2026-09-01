@@ -46,8 +46,13 @@ export function champsManquants(form, lignes) {
   return manque;
 }
 
+/* La commande n'a pas de colonne à elle pour la source de la visite : plutôt
+   que modifier le schéma de la table de l'application (partagée avec tout le
+   reste du système), l'information se glisse dans `recipient`, un champ déjà
+   libre — sans toucher à rien de ce que l'application attend par ailleurs. */
+
 /** La commande telle qu'elle sera écrite en base. */
-export function construireCommande(form, lignes, total, now = new Date(), id = nouvelId()) {
+export function construireCommande(form, lignes, total, now = new Date(), id = nouvelId(), meta = {}) {
   const ts = horodatage(now);
   const produits = lignes.map(l => ({ name: l.name, size: l.size || '', qty: l.qty || 1 }));
   return {
@@ -59,6 +64,7 @@ export function construireCommande(form, lignes, total, now = new Date(), id = n
       address: String(form.adresse || '').trim(),
       email: String(form.email || '').trim() || undefined,
       delivery: null,
+      source: meta.source || undefined,
     },
     // `product` reste la première ligne : toute l'application le lit ainsi.
     product: produits[0] || null,

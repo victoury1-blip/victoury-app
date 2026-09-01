@@ -20,11 +20,13 @@ import PagesListe from './store/PagesListe';
 import CodesPromo from './store/CodesPromo';
 import MetaPixel from './store/MetaPixel';
 import EditTheme from './store/EditTheme';
+import CommandesListe from './store/CommandesListe';
+import MicrosoftClarity from './store/MicrosoftClarity';
 import Reglages from './store/Reglages';
-import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT } from './lib/catalog';
+import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT } from './lib/catalog';
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
-import { chargerPixel, trackPixel } from './lib/pixel';
+import { chargerPixel, trackPixel, chargerClarity } from './lib/pixel';
 
 /* L'habillage de la vitrine — bandeau, en-tête, panier, pied de page — ne
    doit jamais apparaître sur l'administration : elle a sa propre mise en
@@ -32,7 +34,7 @@ import { chargerPixel, trackPixel } from './lib/pixel';
    des deux applications elle sert. */
 function Vitrine() {
   const [collections, setCollections] = useState([]);
-  const [reglages, setReglages] = useState({ ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT });
+  const [reglages, setReglages] = useState({ ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT, clarity: CLARITY_DEFAUT });
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
 
@@ -46,6 +48,10 @@ function Vitrine() {
   useEffect(() => {
     if (reglages.pixel?.enabled && reglages.pixel?.pixelId) chargerPixel(reglages.pixel.pixelId);
   }, [reglages.pixel?.enabled, reglages.pixel?.pixelId]);
+
+  useEffect(() => {
+    if (reglages.clarity?.enabled && reglages.clarity?.projectId) chargerClarity(reglages.clarity.projectId);
+  }, [reglages.clarity?.enabled, reglages.clarity?.projectId]);
 
   // Le favicon déposé dans l'administration remplace celui de la première
   // installation : sans cette mise à jour, l'onglet du navigateur garderait
@@ -131,6 +137,8 @@ function Administration() {
           <Route path="codes-promo" element={<CodesPromo />} />
           <Route path="meta-pixel" element={<MetaPixel />} />
           <Route path="theme" element={<EditTheme />} />
+          <Route path="commandes" element={<CommandesListe />} />
+          <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
           <Route path="reglages" element={<Reglages />} />
         </Route>
       </Routes>

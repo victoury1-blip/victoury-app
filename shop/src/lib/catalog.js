@@ -91,6 +91,13 @@ export const REGLAGES_DEFAUT = {
 // d'administration.
 export const PIXEL_DEFAUT = { enabled: false, pixelId: '', testCode: '' };
 
+/* Microsoft Clarity : enregistrements de session et cartes de chaleur.
+ * L'identifiant de projet n'a rien d'un secret — c'est la même valeur que
+ * n'importe qui verrait déjà dans le code source de chaque page — et peut
+ * donc, contrairement au jeton d'accès de Meta, vivre sans risque dans les
+ * réglages publics de la boutique. */
+export const CLARITY_DEFAUT = { enabled: false, projectId: '' };
+
 /* L'apparence de la boutique — logo, favicon, bandeau d'annonce — vit elle
    aussi à part : ce sont des réglages visuels, réglés depuis /store/theme,
    pas des règles de vente comme les remises ou la livraison. */
@@ -135,12 +142,13 @@ export const THEME_DEFAUT = {
 
 export async function chargerReglages() {
   const { data, error } = await supabase.from('shop_settings').select('key, value');
-  if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT } };
+  if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT } };
   const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
   const themeSauve = map.theme || {};
   return {
     ...REGLAGES_DEFAUT, ...(map.boutique || {}),
     pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
+    clarity: { ...CLARITY_DEFAUT, ...(map.microsoft_clarity || {}) },
     theme: {
       ...THEME_DEFAUT, ...themeSauve,
       hero: { ...THEME_DEFAUT.hero, ...(themeSauve.hero || {}) },

@@ -67,6 +67,17 @@ describe('commande écrite en base', () => {
     expect(c.product).toEqual(c.products[0]);
   });
 
+  it('range la source de la visite dans recipient, sans nouvelle colonne', () => {
+    // La table est partagée avec le reste de l'application : lui ajouter une
+    // colonne pour cette seule information romprait tout ce qui la lit ailleurs.
+    const avecSource = construireCommande(client, panier, 405, new Date(), 'VS-X', { source: 'Instagram' });
+    expect(avecSource.recipient.source).toBe('Instagram');
+  });
+
+  it('n’invente pas de source quand aucune n’est fournie', () => {
+    expect(c.recipient.source).toBeUndefined();
+  });
+
   it('normalise le téléphone du destinataire', () => {
     expect(construireCommande({ ...client, telephone: '+212612345678' }, panier, 405).recipient.phone)
       .toBe('0612345678');
