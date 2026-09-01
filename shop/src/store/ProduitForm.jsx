@@ -10,6 +10,22 @@ import {
 
 const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
 const label = 'block text-xs font-medium text-gray-500 mb-1.5';
+
+/* Palette prête à l'emploi, comme les pastilles de Volcano : les teintes les
+   plus courantes en habillement, pour ne pas ressaisir un code hexadécimal à
+   chaque produit. */
+const COULEURS_COURANTES = [
+  { nom: 'Noir', hex: '#111111' }, { nom: 'Blanc', hex: '#f5f5f5' },
+  { nom: 'Gris', hex: '#9ca3af' }, { nom: 'Gris foncé', hex: '#4b5563' },
+  { nom: 'Bleu marine', hex: '#1e3a5f' }, { nom: 'Bleu', hex: '#2563eb' },
+  { nom: 'Bleu ciel', hex: '#7dd3fc' }, { nom: 'Vert', hex: '#16a34a' },
+  { nom: 'Kaki', hex: '#6b7c3f' }, { nom: 'Rouge', hex: '#dc2626' },
+  { nom: 'Bordeaux', hex: '#7f1d1d' }, { nom: 'Rose', hex: '#f472b6' },
+  { nom: 'Jaune', hex: '#facc15' }, { nom: 'Orange', hex: '#ea580c' },
+  { nom: 'Marron', hex: '#78350f' }, { nom: 'Camel', hex: '#c19a6b' },
+  { nom: 'Beige', hex: '#e8dcc8' },
+];
+
 const VIDE = {
   name: '', slug: '', description: '', details: '', price: '', compare_at: '',
   gender: 'Unisexe', status: 'Actif', collection_id: '', group_id: '',
@@ -169,9 +185,32 @@ export default function ProduitForm() {
             vendu séparément. */}
         <div className="border-t border-gray-100 pt-5">
           <label className={label}>Couleur & modèle lié</label>
-          <div className="grid sm:grid-cols-2 gap-4">
+
+          {/* Pastilles prêtes à l'emploi, comme sur Volcano : un clic pose le nom
+              ET la teinte — plus rapide qu'une saisie manuelle, et le nom reste
+              modifiable ensuite pour une teinte qui n'y figure pas. */}
+          <div className="flex flex-wrap gap-2">
+            {COULEURS_COURANTES.map(c => (
+              <button key={c.hex} type="button" title={c.nom}
+                onClick={() => { u('color_name', c.nom); u('color_hex', c.hex); }}
+                className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                  form.color_hex === c.hex ? 'border-ink' : 'border-gray-200'}`}
+                style={{ background: c.hex }} />
+            ))}
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 mt-3">
             <input value={form.color_name} onChange={e => u('color_name', e.target.value)} placeholder="Nom de la couleur (ex. Noir)" className={champ} />
-            <input value={form.color_hex} onChange={e => u('color_hex', e.target.value)} type="color" className={`${champ} h-11 p-1`} />
+            {/* La couleur native (input type=color) n'affiche qu'un carré, sans
+                aucun texte : impossible de relire le code choisi. Celle-ci
+                garde le carré ET écrit le code hexadécimal en toutes lettres. */}
+            <div className={`${champ} flex items-center gap-2 relative`}>
+              <span className="w-6 h-6 rounded border border-gray-200 shrink-0" style={{ background: form.color_hex || '#000000' }} />
+              <input value={form.color_hex} onChange={e => u('color_hex', e.target.value)} placeholder="#000000"
+                className="flex-1 min-w-0 outline-none uppercase font-mono text-xs tracking-wide" />
+              <input value={form.color_hex} onChange={e => u('color_hex', e.target.value)} type="color"
+                className="absolute right-1 w-7 h-7 opacity-0 cursor-pointer" title="Choisir sur la palette" />
+            </div>
           </div>
           <div className="mt-3 flex gap-2">
             <select value={form.group_id} onChange={e => u('group_id', e.target.value)} className={`${champ} flex-1`}>
