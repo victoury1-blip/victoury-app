@@ -22,6 +22,7 @@ import MetaPixel from './store/MetaPixel';
 import EditTheme from './store/EditTheme';
 import CommandesListe from './store/CommandesListe';
 import MicrosoftClarity from './store/MicrosoftClarity';
+import RemisesListe from './store/RemisesListe';
 import Reglages from './store/Reglages';
 import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT } from './lib/catalog';
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
@@ -137,6 +138,7 @@ function Administration() {
           <Route path="codes-promo" element={<CodesPromo />} />
           <Route path="meta-pixel" element={<MetaPixel />} />
           <Route path="theme" element={<EditTheme />} />
+          <Route path="remises" element={<RemisesListe />} />
           <Route path="commandes" element={<CommandesListe />} />
           <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
           <Route path="reglages" element={<Reglages />} />

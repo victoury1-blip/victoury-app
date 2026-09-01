@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, LogOut } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Wordmark from '../components/Wordmark';
 
@@ -11,6 +11,7 @@ const LIENS = [
   { to: '/store/commandes', label: 'Commandes', icon: ShoppingCart },
   { to: '/store/pages', label: 'Pages', icon: FileText },
   { to: '/store/theme', label: 'Edit Theme', icon: Palette },
+  { to: '/store/remises', label: 'Remises', icon: Percent },
   { to: '/store/codes-promo', label: 'Codes promo', icon: Ticket },
   { to: '/store/meta-pixel', label: 'Meta Pixel', icon: Radio },
   { to: '/store/microsoft-clarity', label: 'Microsoft Clarity', icon: Activity },

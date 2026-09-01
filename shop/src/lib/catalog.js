@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { paliersEffectifs } from './remises';
 
 /* Lecture du catalogue.
  *
@@ -145,8 +146,12 @@ export async function chargerReglages() {
   if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT } };
   const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
   const themeSauve = map.theme || {};
+  const remises = Array.isArray(map.remises) ? map.remises : [];
   return {
     ...REGLAGES_DEFAUT, ...(map.boutique || {}),
+    // Plusieurs remises nommées peuvent exister (/store/remises) ; seules
+    // celles activées comptent, et c'est leur fusion qui s'applique au panier.
+    paliers: remises.length ? paliersEffectifs(remises) : (map.boutique?.paliers || []),
     pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
     clarity: { ...CLARITY_DEFAUT, ...(map.microsoft_clarity || {}) },
     theme: {

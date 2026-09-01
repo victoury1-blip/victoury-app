@@ -18,19 +18,13 @@ export default function Reglages() {
 
   const u = (k, v) => setR(x => ({ ...x, [k]: v }));
 
-  const majPalier = (i, k, v) => setR(x => {
-    const paliers = [...(x.paliers || [])];
-    paliers[i] = { ...paliers[i], [k]: v };
-    return { ...x, paliers };
-  });
-  const ajouterPalier = () => setR(x => ({ ...x, paliers: [...(x.paliers || []), { rang: (x.paliers?.length || 0) + 2, pourcent: 0 }] }));
-  const retirerPalier = (i) => setR(x => ({ ...x, paliers: x.paliers.filter((_, j) => j !== i) }));
-
   async function enregistrer() {
     setEnregistrement(true);
+    // `paliers` n'est plus réglé ici : il se déduit désormais des remises
+    // actives de /store/remises, et ne doit pas être réécrit depuis cette page.
+    const { paliers, ...sansPaliers } = r;
     const propre = {
-      ...r,
-      paliers: (r.paliers || []).map(p => ({ rang: parseInt(p.rang, 10) || 2, pourcent: parseFloat(p.pourcent) || 0 })),
+      ...sansPaliers,
       livraison: parseFloat(r.livraison) || 0,
       seuilGratuit: r.seuilGratuit ? parseFloat(r.seuilGratuit) : null,
     };
@@ -44,29 +38,10 @@ export default function Reglages() {
     <div className="max-w-2xl">
       <h1 className="text-lg font-medium">Réglages</h1>
 
-      {/* Le logo, le favicon et le bandeau d'annonce ont leur propre page,
-          avec un aperçu en temps réel : /store/theme. */}
+      {/* Le logo, le favicon et le bandeau d'annonce ont leur propre page
+          (/store/theme), les remises par quantité aussi (/store/remises) —
+          avec, pour les deux, un aperçu en temps réel. */}
       <div className="mt-5 space-y-6">
-        <section className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-1">Remises par quantité</h2>
-          {/* La 2ᵉ paire à −20%, la 3ᵉ à −30% : le rang est la position dans le
-              panier, du moins cher. */}
-          <p className="text-xs text-gray-400 mb-3">Ex. : 2ᵉ article à −20 %, 3ᵉ à −30 %.</p>
-          <div className="space-y-2">
-            {(r.paliers || []).map((p, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400">Article n°</span>
-                <input value={p.rang} onChange={e => majPalier(i, 'rang', e.target.value)} type="number" min="2" className={`${champ} w-20`} />
-                <span className="text-gray-400">→ −</span>
-                <input value={p.pourcent} onChange={e => majPalier(i, 'pourcent', e.target.value)} type="number" min="0" max="100" className={`${champ} w-20`} />
-                <span className="text-gray-400">%</span>
-                <button onClick={() => retirerPalier(i)} className="ml-auto text-xs text-gray-400 hover:text-red-500">Retirer</button>
-              </div>
-            ))}
-          </div>
-          <button onClick={ajouterPalier} className="mt-2 text-xs text-gray-500">+ Ajouter un palier</button>
-        </section>
-
         <section className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Livraison & contact</h2>
           <div className="grid grid-cols-2 gap-3">
