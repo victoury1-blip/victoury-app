@@ -83,6 +83,7 @@ export const REGLAGES_DEFAUT = {
   annonce: 'Livraison partout au Maroc · Paiement à la livraison',
   paliers: [],
   livraison: 0,
+  seuilGratuit: null,
   pixelId: '',
   telephone: '',
 };

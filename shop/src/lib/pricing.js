@@ -42,18 +42,33 @@ export function remisePromo(montant, promo) {
    panier et la facture suffit à faire douter le client. */
 export const arrondi = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+/* Livraison gratuite au-delà d'un seuil.
+ *
+ * Le seuil se compare au montant APRÈS remises : sinon un panier ramené sous
+ * le seuil par une remise garderait une livraison gratuite qu'il n'a plus
+ * gagnée, ou l'inverse — un panier qui l'atteignait avant remise la perdrait
+ * à tort. Un code promo peut donc faire repasser sous le seuil et faire
+ * réapparaître les frais : c'est le montant réellement payé qui compte. */
+export function fraisLivraison(montantApresRemises, { livraison = 0, seuilGratuit = null } = {}) {
+  if (seuilGratuit != null && seuilGratuit > 0 && montantApresRemises >= seuilGratuit) return 0;
+  return arrondi(livraison);
+}
+
 /** Détail complet du panier — c'est ce qui s'affiche ET ce qui est facturé. */
-export function totalPanier(lignes, { paliers = [], promo = null, livraison = 0 } = {}) {
+export function totalPanier(lignes, { paliers = [], promo = null, livraison = 0, seuilGratuit = null } = {}) {
   const st = arrondi(sousTotal(lignes));
   const rq = remiseQuantite(lignes, paliers);
   const apresQuantite = arrondi(st - rq);
   const rp = remisePromo(apresQuantite, promo);
-  const total = arrondi(apresQuantite - rp + (livraison || 0));
+  const apresRemises = arrondi(apresQuantite - rp);
+  const fl = fraisLivraison(apresRemises, { livraison, seuilGratuit });
+  const total = arrondi(apresRemises + fl);
   return {
     sousTotal: st,
     remiseQuantite: rq,
     remisePromo: rp,
-    livraison: arrondi(livraison),
+    livraison: fl,
+    livraisonGratuite: fl === 0 && (livraison || 0) > 0,
     total: Math.max(0, total),
     articles: nbArticles(lignes),
   };

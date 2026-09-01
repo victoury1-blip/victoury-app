@@ -4,9 +4,14 @@ import { X, Minus, Plus } from 'lucide-react';
 import { fmtPrix, totalPanier } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 
-export default function TiroirPanier({ ouvert, lignes, paliers, onFermer, onQuantite, onRetirer }) {
+export default function TiroirPanier({ ouvert, lignes, paliers, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
   if (!ouvert) return null;
-  const t = totalPanier(lignes, { paliers });
+  const t = totalPanier(lignes, { paliers, livraison, seuilGratuit });
+  // Ce qu'il manque pour atteindre la livraison gratuite : un rappel concret
+  // pousse à ajouter un article, là où « livraison offerte » seul ne dit rien
+  // de ce qu'il reste à faire.
+  const apresRemises = t.sousTotal - t.remiseQuantite;
+  const manqueLivraison = seuilGratuit > 0 && apresRemises < seuilGratuit ? seuilGratuit - apresRemises : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
@@ -54,6 +59,13 @@ export default function TiroirPanier({ ouvert, lignes, paliers, onFermer, onQuan
 
         {lignes.length > 0 && (
           <div className="border-t border-gray-100 p-5 space-y-2">
+            {seuilGratuit > 0 && (
+              <p className="text-xs text-gray-500 mb-1">
+                {manqueLivraison > 0
+                  ? <>Plus que <b className="text-ink">{fmtPrix(manqueLivraison)}</b> pour la livraison gratuite</>
+                  : <span className="text-green-700">✓ Livraison gratuite</span>}
+              </p>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Sous-total</span><span>{fmtPrix(t.sousTotal)}</span>
             </div>

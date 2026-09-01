@@ -32,6 +32,7 @@ export default function Reglages() {
       ...r,
       paliers: (r.paliers || []).map(p => ({ rang: parseInt(p.rang, 10) || 2, pourcent: parseFloat(p.pourcent) || 0 })),
       livraison: parseFloat(r.livraison) || 0,
+      seuilGratuit: r.seuilGratuit ? parseFloat(r.seuilGratuit) : null,
     };
     await enregistrerReglages(propre);
     setEnregistrement(false);
@@ -75,7 +76,14 @@ export default function Reglages() {
             <div>
               <label className={label}>Frais de livraison (DH)</label>
               <input value={r.livraison} onChange={e => u('livraison', e.target.value)} type="number" min="0" className={champ} />
-              <p className="mt-1 text-[11px] text-gray-400">0 = gratuite</p>
+              <p className="mt-1 text-[11px] text-gray-400">0 = toujours gratuite</p>
+            </div>
+            <div>
+              {/* Le seuil se compare au montant après remises, pas au sous-total
+                  affiché : un code promo peut donc faire réapparaître des frais. */}
+              <label className={label}>Livraison gratuite dès (DH)</label>
+              <input value={r.seuilGratuit ?? ''} onChange={e => u('seuilGratuit', e.target.value)} type="number" min="0"
+                placeholder="Laisser vide = jamais offerte" className={champ} />
             </div>
             <div>
               <label className={label}>Téléphone</label>

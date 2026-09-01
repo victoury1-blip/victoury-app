@@ -85,6 +85,7 @@ function Vitrine() {
 
       <TiroirPanier
         ouvert={panierOuvert} lignes={lignes} paliers={reglages.paliers}
+        livraison={reglages.livraison} seuilGratuit={reglages.seuilGratuit}
         onFermer={() => setPanierOuvert(false)} onQuantite={onQuantite} onRetirer={onRetirer}
       />
     </div>

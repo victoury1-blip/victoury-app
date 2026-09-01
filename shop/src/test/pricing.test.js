@@ -80,3 +80,43 @@ describe('total', () => {
     expect(t.total).toBe(0);
   });
 });
+
+/* Livraison gratuite au-delà d'un seuil : Volcano l'annonce, « livraison
+   offerte dans tout le Royaume » au-dessus d'un montant. Le seuil se compare
+   au montant APRÈS remises — pas au sous-total affiché sur la fiche — sinon un
+   code promo pourrait faire garder une livraison gratuite déjà perdue. */
+describe('seuil de livraison gratuite', () => {
+  it('facture la livraison sous le seuil', () => {
+    const t = totalPanier([ligne(150)], { livraison: 35, seuilGratuit: 200 });
+    expect(t.livraison).toBe(35);
+    expect(t.livraisonGratuite).toBe(false);
+  });
+
+  it('offre la livraison au-delà du seuil', () => {
+    const t = totalPanier([ligne(250)], { livraison: 35, seuilGratuit: 200 });
+    expect(t.livraison).toBe(0);
+    expect(t.livraisonGratuite).toBe(true);
+  });
+
+  it('compare le seuil au montant après remises, pas au sous-total', () => {
+    // 300 DH de sous-total, mais 210 après un code de 30% : reste au-dessus du
+    // seuil de 200, la livraison reste gratuite.
+    const t = totalPanier([ligne(300)], {
+      livraison: 35, seuilGratuit: 200, promo: { kind: 'percent', value: 30 },
+    });
+    expect(t.livraison).toBe(0);
+  });
+
+  it('un code promo peut faire repasser sous le seuil', () => {
+    // 250 DH de sous-total (au-dessus du seuil), mais 175 après 30% de remise :
+    // la livraison redevient due, car c'est le montant payé qui compte.
+    const t = totalPanier([ligne(250)], {
+      livraison: 35, seuilGratuit: 200, promo: { kind: 'percent', value: 30 },
+    });
+    expect(t.livraison).toBe(35);
+  });
+
+  it('sans seuil configuré, la livraison reste toujours due', () => {
+    expect(totalPanier([ligne(1000)], { livraison: 35 }).livraison).toBe(35);
+  });
+});

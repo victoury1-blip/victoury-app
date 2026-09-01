@@ -19,7 +19,9 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   const [erreur, setErreur] = useState('');
   const [manque, setManque] = useState([]);
 
-  const t = totalPanier(lignes, { paliers: reglages?.paliers, promo, livraison: reglages?.livraison });
+  const t = totalPanier(lignes, {
+    paliers: reglages?.paliers, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
+  });
   const u = (k, v) => { setForm(f => ({ ...f, [k]: v })); setManque(m => m.filter(x => x !== k)); };
 
   async function appliquerCode() {
