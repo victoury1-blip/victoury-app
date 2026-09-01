@@ -80,7 +80,10 @@ export default function Produit({ onAjouter }) {
         )}
 
         <div className="mt-6">
-          <p className="text-[11px] tracking-widest uppercase text-gray-500">Taille</p>
+          {/* Le client marocain lit son marché en arabe : l'étiquette de la
+              taille — champ décisif, mal choisi il fait retourner le colis —
+              est celle qui a le plus à gagner à être dans sa langue. */}
+          <p dir="rtl" lang="ar" className="text-[13px] tracking-normal text-gray-500">اختر القياس</p>
           {/* Seules les tailles en stock sont proposées : montrer une pointure
               épuisée pour la refuser ensuite fait perdre le client deux fois. */}
           <div className="flex flex-wrap gap-2 mt-3">
