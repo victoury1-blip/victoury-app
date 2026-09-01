@@ -41,9 +41,12 @@ export default function Produit({ onAjouter }) {
   if (chargement) return <div className="max-w-7xl mx-auto px-6 py-24 animate-pulse"><div className="h-96 bg-gray-100" /></div>;
   if (!produit) return <p className="max-w-7xl mx-auto px-6 py-24 text-center text-sm text-gray-400">Ce produit n'existe plus.</p>;
 
-  const dispo = (produit.sizes || []).filter(s => s.stock > 0);
+  // Toutes les tailles sont montrées : une pointure absente laisse croire
+  // qu'elle n'a jamais existé, quand elle est seulement épuisée pour l'instant.
+  // Le client la voit, comprend qu'elle reviendra, et choisit parmi les autres.
+  const tailles = produit.sizes || [];
   const promo = produit.compare_at > produit.price;
-  const stockTaille = dispo.find(s => s.size === taille)?.stock;
+  const stockTaille = tailles.find(s => s.size === taille)?.stock;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-2 gap-10">
@@ -84,17 +87,22 @@ export default function Produit({ onAjouter }) {
               taille — champ décisif, mal choisi il fait retourner le colis —
               est celle qui a le plus à gagner à être dans sa langue. */}
           <p dir="rtl" lang="ar" className="text-[13px] tracking-normal text-gray-500">اختر القياس</p>
-          {/* Seules les tailles en stock sont proposées : montrer une pointure
-              épuisée pour la refuser ensuite fait perdre le client deux fois. */}
           <div className="flex flex-wrap gap-2 mt-3">
-            {dispo.length === 0 && <p className="text-sm text-gray-400">Momentanément épuisé</p>}
-            {dispo.map(s => (
-              <button key={s.size} onClick={() => setTaille(s.size)}
-                className={`min-w-[3rem] px-3 py-2.5 text-sm border transition-colors
-                  ${taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
-                {s.size}
-              </button>
-            ))}
+            {tailles.length === 0 && <p className="text-sm text-gray-400">Momentanément épuisé</p>}
+            {tailles.map(s => {
+              const epuisee = !(s.stock > 0);
+              return (
+                <button key={s.size} type="button" disabled={epuisee}
+                  onClick={() => setTaille(s.size)}
+                  title={epuisee ? 'Épuisé' : undefined}
+                  className={`min-w-[3rem] px-3 py-2.5 text-sm border transition-colors relative
+                    ${epuisee
+                      ? 'border-gray-100 text-gray-300 cursor-not-allowed line-through'
+                      : taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
+                  {s.size}
+                </button>
+              );
+            })}
           </div>
         </div>
 
