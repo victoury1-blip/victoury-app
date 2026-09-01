@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply bg-white text-ink antialiased; }
+  /* Le nom de la marque : capitales très espacées, comme sur le logo. */
+  .wordmark { @apply font-display font-normal tracking-[0.22em] uppercase; }
+}
