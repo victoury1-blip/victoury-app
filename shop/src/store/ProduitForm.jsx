@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Trash2, Upload, Plus } from 'lucide-react';
+import { Trash2, Upload, Plus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { slugifier } from '../lib/slug';
 import {
@@ -196,13 +196,26 @@ export default function ProduitForm() {
         <div className="border-t border-gray-100 pt-5">
           <label className={label}>Tailles & stock</label>
           <div className="space-y-2">
-            {tailles.map((t, i) => (
-              <div key={i} className="flex gap-2">
-                <input value={t.size} onChange={e => majTaille(i, 'size', e.target.value)} placeholder="Taille (ex. 40)" className={`${champ} w-28`} />
-                <input value={t.stock} onChange={e => majTaille(i, 'stock', e.target.value)} type="number" min="0" placeholder="Stock" className={`${champ} w-28`} />
-                <button type="button" onClick={() => retirerTaille(i)} className="px-2 text-gray-300 hover:text-red-500"><Trash2 size={16} /></button>
-              </div>
-            ))}
+            {tailles.map((t, i) => {
+              // Un stock à zéro ne doit jamais se confondre avec une ligne
+              // ordinaire : c'est une taille qu'on ne peut PAS vendre, pas un
+              // détail à repérer en plissant les yeux.
+              const rupture = t.stock !== '' && Number(t.stock) === 0;
+              return (
+                <div key={i} className={`flex items-center gap-2 ${rupture ? 'bg-red-50 border border-red-200 rounded-lg px-2 py-1.5' : ''}`}>
+                  <input value={t.size} onChange={e => majTaille(i, 'size', e.target.value)} placeholder="Taille (ex. 40)"
+                    className={`${champ} w-28 ${rupture ? 'border-red-300' : ''}`} />
+                  <input value={t.stock} onChange={e => majTaille(i, 'stock', e.target.value)} type="number" min="0" placeholder="Stock"
+                    className={`${champ} w-28 ${rupture ? 'border-red-300 text-red-700 font-medium' : ''}`} />
+                  {rupture && (
+                    <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
+                      <X size={14} strokeWidth={3} /> Rupture de stock
+                    </span>
+                  )}
+                  <button type="button" onClick={() => retirerTaille(i)} className="ml-auto px-2 text-gray-300 hover:text-red-500"><Trash2 size={16} /></button>
+                </div>
+              );
+            })}
           </div>
           <button type="button" onClick={ajouterTaille} className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
             <Plus size={13} /> Ajouter une taille
