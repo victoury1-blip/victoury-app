@@ -20,7 +20,7 @@ function Accordeon({ titre, children }) {
   );
 }
 
-export default function Produit({ onAjouter }) {
+export default function Produit({ onAjouter, theme }) {
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
@@ -92,22 +92,26 @@ export default function Produit({ onAjouter }) {
               taille — champ décisif, mal choisi il fait retourner le colis —
               est celle qui a le plus à gagner à être dans sa langue. */}
           <p dir="rtl" lang="ar" className="text-[13px] tracking-normal text-gray-500">اختر القياس</p>
-          <div className="flex flex-wrap gap-2 mt-3">
+          {/* Réglable depuis /store/theme : la grille convient à un choix
+              court (S…XL), la liste à un choix long comme des pointures. */}
+          <div className={theme?.produitAffichageTailles === 'liste' ? 'flex flex-col gap-2 mt-3 max-w-xs' : 'flex flex-wrap gap-2 mt-3'}>
             {tailles.length === 0 && <p className="text-sm text-gray-400">Momentanément épuisé</p>}
             {tailles.map(s => {
               const epuisee = !(s.stock > 0);
+              const liste = theme?.produitAffichageTailles === 'liste';
               return (
                 <button key={s.size} type="button" disabled={epuisee}
                   onClick={() => setTaille(s.size)}
                   title={epuisee ? 'Épuisé' : undefined}
-                  className={`min-w-[3rem] px-3 py-2.5 text-sm border transition-colors relative
+                  className={`${liste ? 'w-full flex items-center justify-between' : 'min-w-[3rem]'} px-3 py-2.5 text-sm border transition-colors relative
                     ${epuisee
                       ? 'border-gray-200 text-ink cursor-not-allowed'
                       : taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
                   {s.size}
+                  {liste && epuisee && <span className="text-xs text-red-500">Épuisé</span>}
                   {/* Une croix au-dessus du chiffre : le chiffre reste lisible,
                       la croix rouge dit à elle seule qu'il n'est pas disponible. */}
-                  {epuisee && (
+                  {!liste && epuisee && (
                     <X aria-hidden size={28} strokeWidth={1.5}
                       className="pointer-events-none absolute inset-0 m-auto text-red-500" />
                   )}

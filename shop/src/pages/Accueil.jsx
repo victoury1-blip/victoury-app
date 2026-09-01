@@ -6,15 +6,22 @@ import { chargerNouveautes } from '../lib/catalog';
 export default function Accueil({ collections, reglages }) {
   const [produits, setProduits] = useState([]);
   useEffect(() => { chargerNouveautes(8).then(setProduits).catch(() => {}); }, []);
-  const hero = reglages?.hero || {};
+  const hero = reglages?.theme?.hero || {};
+  const sh = reglages?.theme?.texteSousHero || {};
 
   return (
     <>
       <section className="relative bg-sand">
         <div className="aspect-[16/10] sm:aspect-[16/7] overflow-hidden">
-          {hero.image
-            ? <img src={hero.image} alt="" className="w-full h-full object-cover" />
-            : <div className="w-full h-full bg-gradient-to-br from-sand to-gray-200" />}
+          {(hero.imageDesktop || hero.imageMobile) ? (
+            // Image mobile dédiée si réglée, sinon la même que le bureau.
+            <picture>
+              {hero.imageMobile && <source media="(max-width: 640px)" srcSet={hero.imageMobile} />}
+              <img src={hero.imageDesktop || hero.imageMobile} alt="" className="w-full h-full object-cover" />
+            </picture>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-sand to-gray-200" />
+          )}
         </div>
         <div className="absolute inset-0 grid place-items-center text-center px-6">
           <div>
@@ -22,14 +29,20 @@ export default function Accueil({ collections, reglages }) {
               {hero.titre || 'Bienvenue chez Victoury'}
             </h1>
             <p className="mt-3 text-sm text-gray-600">{hero.sousTitre || 'Le confort au quotidien'}</p>
-            <Link to={hero.lien || (collections[0] ? `/product-category/${collections[0].slug}/` : '/')}
+            <Link to={hero.boutonLien || (collections[0] ? `/product-category/${collections[0].slug}/` : '/')}
               className="inline-block mt-7 border border-ink px-8 py-3 text-[11px] tracking-widest uppercase
                          hover:bg-ink hover:text-white transition-colors">
-              Voir la collection →
+              {hero.boutonTexte || 'Voir la collection'} →
             </Link>
           </div>
         </div>
       </section>
+
+      {sh.texte && (
+        <p className="text-center px-6 py-6" style={{ fontSize: `${sh.taille || 14}px`, color: sh.couleurTexte, background: sh.couleurFond }}>
+          {sh.texte}
+        </p>
+      )}
 
       {produits.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">

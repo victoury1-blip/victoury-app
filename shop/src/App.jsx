@@ -94,10 +94,10 @@ function Vitrine() {
           <Route path="/" element={<Accueil collections={collections} reglages={reglages} />} />
           {/* Les adresses reprennent EXACTEMENT celles de l'ancienne boutique :
               une annonce en cours pointe dessus, et la changer l'arrêterait. */}
-          <Route path="/product-category/:slug" element={<Collection />} />
-          <Route path="/product-category/:slug/" element={<Collection />} />
-          <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} />} />
-          <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} />} />
+          <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} />} />
+          <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} />} />
+          <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} />} />
+          <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} />} />
           <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onRetirer={onRetirer} onVider={onVider} />} />
           <Route path="/merci/:id" element={<Merci />} />
           <Route path="/:slug/" element={<PageStatique />} />
@@ -106,7 +106,7 @@ function Vitrine() {
         </Routes>
       </main>
 
-      <Footer telephone={reglages.telephone} />
+      <Footer telephone={reglages.telephone} theme={reglages.theme} />
 
       <TiroirPanier
         ouvert={panierOuvert} lignes={lignes} paliers={reglages.paliers}

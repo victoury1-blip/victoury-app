@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import CarteProduit from '../components/CarteProduit';
 import { chargerProduitsDeCollection } from '../lib/catalog';
 
-export default function Collection() {
+export default function Collection({ theme }) {
   const { slug } = useParams();
   const [etat, setEtat] = useState({ chargement: true, collection: null, produits: [] });
   const [taille, setTaille] = useState('');
@@ -15,7 +15,12 @@ export default function Collection() {
       .catch(() => setEtat({ chargement: false, collection: null, produits: [] }));
   }, [slug]);
 
-  const tailles = [...new Set(etat.produits.flatMap(p => (p.sizes || []).filter(s => s.stock > 0).map(s => s.size)))];
+  // Réglable depuis /store/theme : superflu quand la collection ne mélange
+  // pas de tailles disparates.
+  const filtreActif = theme?.collectionFiltreTaille !== false;
+  const tailles = filtreActif
+    ? [...new Set(etat.produits.flatMap(p => (p.sizes || []).filter(s => s.stock > 0).map(s => s.size)))]
+    : [];
   const visibles = taille
     ? etat.produits.filter(p => (p.sizes || []).some(s => s.size === taille && s.stock > 0))
     : etat.produits;

@@ -101,16 +101,49 @@ export const THEME_DEFAUT = {
   tailleAnnonce: 11,
   couleurAnnonceFond: '#111111',
   couleurAnnonceTexte: '#ffffff',
+
+  hero: {
+    imageDesktop: '', imageMobile: '',
+    titre: 'Bienvenue chez Victoury', sousTitre: 'Le confort au quotidien',
+    boutonTexte: 'Voir la collection', boutonLien: '',
+  },
+  texteSousHero: { texte: '', taille: 14, couleurTexte: '#000000', couleurFond: '#f9f6f0' },
+
+  footer: {
+    description: 'Ensembles sport, burkinis et robes. Livraison partout au Maroc.',
+    couleurFond: '#f7f5f2', couleurTexte: '#111111',
+    collections: [], reseaux: [], mentions: [
+      { label: 'Conditions générales de vente', url: '/conditions-generales-de-vente' },
+      { label: 'Politique de livraison', url: '/politique-de-livraison' },
+      { label: "Politique d'échange", url: '/politique-dechange' },
+      { label: 'Politique de confidentialité', url: '/politique-de-confidentialite' },
+    ],
+  },
+
+  // Filtre par taille sur les pages de collection : pertinent quand une même
+  // collection mélange des tailles vêtement (S…XL) et des tailles pointure —
+  // sinon superflu, d'où l'option plutôt qu'un affichage forcé.
+  collectionFiltreTaille: true,
+  // Affichage des tailles sur la fiche produit : « grille » (celui déjà en
+  // place) convient à un choix court (S…XL) ; « liste » convient mieux à un
+  // choix long comme des pointures.
+  produitAffichageTailles: 'grille',
 };
 
 export async function chargerReglages() {
   const { data, error } = await supabase.from('shop_settings').select('key, value');
   if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT } };
   const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
+  const themeSauve = map.theme || {};
   return {
     ...REGLAGES_DEFAUT, ...(map.boutique || {}),
     pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
-    theme: { ...THEME_DEFAUT, ...(map.theme || {}) },
+    theme: {
+      ...THEME_DEFAUT, ...themeSauve,
+      hero: { ...THEME_DEFAUT.hero, ...(themeSauve.hero || {}) },
+      texteSousHero: { ...THEME_DEFAUT.texteSousHero, ...(themeSauve.texteSousHero || {}) },
+      footer: { ...THEME_DEFAUT.footer, ...(themeSauve.footer || {}) },
+    },
   };
 }
 

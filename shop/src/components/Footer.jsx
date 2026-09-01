@@ -2,39 +2,45 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Wordmark from './Wordmark';
 
-const PAGES = [
-  { slug: 'conditions-generales-de-vente', titre: 'Conditions générales de vente' },
-  { slug: 'politique-de-livraison', titre: 'Politique de livraison' },
-  { slug: 'politique-dechange', titre: "Politique d'échange" },
-  { slug: 'politique-de-confidentialite', titre: 'Politique de confidentialité' },
-];
+/* Pied de page — description, liens de collections, réseaux sociaux et
+   mentions légales viennent tous de /store/theme. Les listes sont vides par
+   défaut plutôt que pré-remplies d'une marque qui n'est pas la vôtre : rien
+   n'apparaît tant que l'administration n'a rien réglé. */
+export default function Footer({ telephone, theme }) {
+  const f = theme?.footer || {};
+  const liens = (titre, items) => items?.length > 0 && (
+    <div>
+      <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">{titre}</h3>
+      <ul className="space-y-2">
+        {items.map((it, i) => (
+          <li key={i}>
+            {/^https?:\/\//.test(it.url)
+              ? <a href={it.url} target="_blank" rel="noreferrer" className="text-xs text-gray-600 hover:text-ink">{it.label}</a>
+              : <Link to={it.url} className="text-xs text-gray-600 hover:text-ink">{it.label}</Link>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 
-export default function Footer({ telephone }) {
   return (
-    <footer className="mt-20 border-t border-gray-100 bg-sand">
-      <div className="max-w-7xl mx-auto px-6 py-12 grid gap-8 sm:grid-cols-3">
+    <footer className="mt-20 border-t border-gray-100" style={{ background: f.couleurFond, color: f.couleurTexte }}>
+      <div className="max-w-7xl mx-auto px-6 py-12 grid gap-8 sm:grid-cols-4">
         <div>
           <Wordmark className="text-lg" />
-          <p className="mt-3 text-xs text-gray-500 leading-relaxed">
-            Ensembles sport, burkinis et robes.<br />Livraison partout au Maroc.
-          </p>
+          {f.description && <p className="mt-3 text-xs opacity-70 leading-relaxed">{f.description}</p>}
         </div>
-        <div>
-          <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Informations</h3>
-          <ul className="space-y-2">
-            {PAGES.map(p => (
-              <li key={p.slug}>
-                <Link to={`/${p.slug}/`} className="text-xs text-gray-600 hover:text-ink">{p.titre}</Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Contact</h3>
-          {telephone && <a href={`tel:${telephone}`} className="text-xs text-gray-600 hover:text-ink">{telephone}</a>}
-          <p className="mt-4 text-[11px] text-gray-400">© {new Date().getFullYear()} Victoury</p>
-        </div>
+        {liens('Collections', f.collections)}
+        {liens('Suivez-nous', f.reseaux)}
+        {liens('Mentions légales', f.mentions)}
+        {telephone && (
+          <div>
+            <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Contact</h3>
+            <a href={`tel:${telephone}`} className="text-xs opacity-70 hover:opacity-100">{telephone}</a>
+          </div>
+        )}
       </div>
+      <p className="text-center text-[11px] opacity-40 pb-6">© {new Date().getFullYear()} Victoury</p>
     </footer>
   );
 }
