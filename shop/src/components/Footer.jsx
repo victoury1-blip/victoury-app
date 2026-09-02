@@ -10,7 +10,7 @@ import { IconeWhatsApp, IconeTikTok } from './icons';
 export default function Footer({ theme, collections }) {
   const f = theme?.footer || {};
   const liens = (titre, items) => items?.length > 0 && (
-    <div>
+    <div className="text-center">
       <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">{titre}</h3>
       <ul className="space-y-2">
         {items.map((it, i) => (
@@ -63,13 +63,13 @@ export default function Footer({ theme, collections }) {
   return (
     <footer className="mt-20 border-t border-gray-100" style={{ background: f.couleurFond, color: f.couleurTexte }}>
       <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-2 gap-8 sm:grid-cols-3">
-        <div className="col-span-2 sm:col-span-1">
+        <div className="col-span-2 sm:col-span-1 text-center flex flex-col items-center">
           <Wordmark className="text-lg" />
-          {f.description && <p className="mt-3 text-xs opacity-70 leading-relaxed">{f.description}</p>}
+          {f.description && <p className="mt-3 text-xs opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           {badgesPaiement.length > 0 && (
             <div className="mt-4 space-y-1.5">
               {badgesPaiement.map(({ texte, Icone }) => (
-                <p key={texte} className="flex items-center gap-1.5 text-xs opacity-70">
+                <p key={texte} className="flex items-center justify-center gap-1.5 text-xs opacity-70">
                   <Icone size={13} /> {texte}
                 </p>
               ))}
