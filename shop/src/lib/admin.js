@@ -18,6 +18,12 @@ export const enregistrerCollection = (c) =>
 export const supprimerCollection = (id) =>
   supabase.from('shop_collections').delete().eq('id', id).then(jeter);
 
+// Écriture partielle (ex. juste la photo de couverture) : un update direct,
+// pas d'upsert+.single() qui échouerait pour rien si la ré-sélection après
+// écriture bute sur autre chose que la donnée elle-même.
+export const majCollection = (id, champs) =>
+  supabase.from('shop_collections').update(champs).eq('id', id).then(jeter);
+
 /* ── Groupes (couleurs d'un même modèle) ── */
 export const listerGroupes = () =>
   supabase.from('shop_groups').select('*').order('name').then(jeter);

@@ -3,13 +3,16 @@ import { Link } from 'react-router-dom';
 import CarteProduit from '../components/CarteProduit';
 import AvisClients from '../components/AvisClients';
 import Reassurance from '../components/Reassurance';
-import { chargerNouveautes, chargerAvis } from '../lib/catalog';
+import CategoriesGrid from '../components/CategoriesGrid';
+import { chargerNouveautes, chargerAvis, chargerCollectionsAvecCompte } from '../lib/catalog';
 
 export default function Accueil({ collections, reglages }) {
   const [produits, setProduits] = useState([]);
   const [avis, setAvis] = useState([]);
+  const [collectionsCompte, setCollectionsCompte] = useState([]);
   useEffect(() => { chargerNouveautes(8).then(setProduits).catch(() => {}); }, []);
   useEffect(() => { chargerAvis().then(setAvis).catch(() => {}); }, []);
+  useEffect(() => { chargerCollectionsAvecCompte().then(setCollectionsCompte).catch(() => {}); }, []);
   const hero = reglages?.theme?.hero || {};
   const sh = reglages?.theme?.texteSousHero || {};
 
@@ -75,6 +78,8 @@ export default function Accueil({ collections, reglages }) {
           {sh.texte}
         </p>
       )}
+
+      <CategoriesGrid collections={collectionsCompte} />
 
       {produits.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">

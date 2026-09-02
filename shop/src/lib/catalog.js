@@ -28,6 +28,18 @@ export async function chargerCollections() {
   return data || [];
 }
 
+/** Collections avec leur nombre de produits actifs — pour la vignette
+    "24 PRODUITS" affichée sous chaque catégorie sur l'accueil. */
+export async function chargerCollectionsAvecCompte() {
+  const [collections, { data: produits }] = await Promise.all([
+    chargerCollections(),
+    supabase.from('shop_products').select('collection_id').eq('status', 'Actif'),
+  ]);
+  const comptes = {};
+  (produits || []).forEach(p => { if (p.collection_id) comptes[p.collection_id] = (comptes[p.collection_id] || 0) + 1; });
+  return collections.map(c => ({ ...c, count: comptes[c.id] || 0 }));
+}
+
 export async function chargerCollection(slug) {
   const { data, error } = await supabase
     .from('shop_collections').select('*').eq('slug', slug).maybeSingle();

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical, Check } from 'lucide-react';
-import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, majPosition } from '../lib/admin';
+import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical, Check, Upload } from 'lucide-react';
+import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, majPosition, majCollection, televerserPhoto } from '../lib/admin';
 import { slugifier } from '../lib/slug';
 
 const champ = 'border border-gray-200 px-3 py-2 text-sm bg-white';
@@ -27,6 +27,15 @@ export default function CollectionsListe() {
     if (!nom.trim()) return;
     await enregistrerCollection({ slug: slugifier(nom), name: nom.trim(), position: collections.length });
     setNom('');
+    recharger();
+  }
+
+  // La photo de couverture est celle montrée sur la grille "Nos catégories"
+  // de l'accueil — sans elle, la carte affiche juste un fond neutre.
+  async function changerPhoto(c, fichier) {
+    if (!fichier) return;
+    const image_url = await televerserPhoto(fichier);
+    await majCollection(c.id, { image_url });
     recharger();
   }
 
@@ -91,16 +100,28 @@ export default function CollectionsListe() {
       <div className="mt-5 bg-white border border-gray-200 rounded-xl divide-y divide-gray-50">
         {collections.map(c => (
           <div key={c.id}>
-            <button onClick={() => basculer(c)} className="w-full flex items-center justify-between px-4 py-3 text-left">
-              <div>
-                <p className="text-sm font-medium">{c.name}</p>
-                <p className="text-xs text-gray-400">/product-category/{c.slug}/</p>
+            <div className="w-full flex items-center justify-between px-4 py-3 text-left">
+              <button onClick={() => basculer(c)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                <div className="relative w-11 h-11 rounded bg-sand shrink-0 overflow-hidden group">
+                  {c.image_url ? <img src={c.image_url} alt="" className="w-full h-full object-cover" /> : null}
+                  <label onClick={(e) => e.stopPropagation()}
+                    className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center cursor-pointer transition-colors">
+                    <Upload size={13} className="text-white opacity-0 group-hover:opacity-100" />
+                    <input type="file" accept="image/*" hidden onChange={e => changerPhoto(c, e.target.files?.[0])} />
+                  </label>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{c.name}</p>
+                  <p className="text-xs text-gray-400">/product-category/{c.slug}/</p>
+                </div>
+              </button>
+              <div className="flex items-center gap-3 shrink-0">
+                <span onClick={() => retirer(c)} className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"><Trash2 size={16} /></span>
+                <span onClick={() => basculer(c)} className="cursor-pointer">
+                  {ouvert === c.id ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                </span>
               </div>
-              <div className="flex items-center gap-3">
-                <span onClick={(e) => { e.stopPropagation(); retirer(c); }} className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={16} /></span>
-                {ouvert === c.id ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-              </div>
-            </button>
+            </div>
 
             {ouvert === c.id && (
               <div className="px-4 pb-4">
