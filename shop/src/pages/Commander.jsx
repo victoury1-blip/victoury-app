@@ -120,7 +120,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
             </div>
           </div>
 
-          <div className="border border-ink px-4 py-3 flex items-center gap-3">
+          <div className="border border-ink px-4 py-3 flex items-center justify-center gap-3">
             <span className="w-3 h-3 rounded-full bg-ink" />
             <span dir="rtl" lang="ar" className="text-xs">الدفع عند الاستلام</span>
           </div>
