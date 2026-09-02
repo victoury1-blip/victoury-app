@@ -64,6 +64,43 @@ export function remiseQuantiteGroupee(lignes, remises = []) {
   return arrondi(remise);
 }
 
+/* Même calcul que remiseQuantiteGroupee, mais réparti ligne par ligne — pour
+   afficher "-20% (-90 DH)" sous chaque article, comme sur sa fiche produit,
+   au lieu d'un seul total de remise en bas du panier. */
+export function lignesAvecRemise(lignes, remises = []) {
+  if (!remises?.length) return lignes.map(l => ({ ...l, remiseDh: 0, remisePourcent: 0 }));
+  const actifs = remises.filter(r => r.active && r.type !== 'inactive');
+  const collectionsCiblees = new Set(actifs.filter(r => r.collectionId).map(r => r.collectionId));
+
+  const groupes = new Map(); // collectionId ('' pour global) -> [{ ligne, index }]
+  lignes.forEach((ligne, index) => {
+    const cle = ligne.collectionId && collectionsCiblees.has(ligne.collectionId) ? ligne.collectionId : '';
+    if (!groupes.has(cle)) groupes.set(cle, []);
+    groupes.get(cle).push({ ligne, index });
+  });
+
+  const remiseParIndex = new Array(lignes.length).fill(0);
+  for (const [cle, entrees] of groupes) {
+    const paliers = paliersEffectifs(remises, cle || null);
+    if (!paliers.length) continue;
+    const unites = [];
+    for (const { ligne, index } of entrees) for (let i = 0; i < (ligne.qty || 0); i++) unites.push({ prix: ligne.price || 0, index });
+    if (unites.length < 2) continue;
+    unites.sort((a, b) => b.prix - a.prix);
+    unites.forEach((u, i) => {
+      const rang = i + 1;
+      const p = paliers.filter(x => rang >= x.rang).sort((a, b) => b.rang - a.rang)[0];
+      if (p) remiseParIndex[u.index] += u.prix * (p.pourcent / 100);
+    });
+  }
+
+  return lignes.map((l, i) => {
+    const remiseDh = arrondi(remiseParIndex[i]);
+    const totalLigne = (l.price || 0) * (l.qty || 0);
+    return { ...l, remiseDh, remisePourcent: totalLigne > 0 ? Math.round((remiseDh / totalLigne) * 100) : 0 };
+  });
+}
+
 /** Remise d'un code promo, sur le montant déjà remisé. */
 export function remisePromo(montant, promo) {
   if (!promo || montant <= 0) return 0;

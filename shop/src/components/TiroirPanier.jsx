@@ -1,12 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { X, Minus, Plus } from 'lucide-react';
-import { fmtPrix, totalPanier } from '../lib/pricing';
+import { X, Minus, Plus, Tag } from 'lucide-react';
+import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
   if (!ouvert) return null;
   const t = totalPanier(lignes, { paliers, remises, livraison, seuilGratuit });
+  // La remise de chaque article, pas seulement le total en bas — le client
+  // voit tout de suite POURQUOI le prix a changé sur cette ligne précise.
+  const lignesRemisees = lignesAvecRemise(lignes, remises?.length ? remises : (paliers?.length ? [{ active: true, paliers }] : []));
   // Ce qu'il manque pour atteindre la livraison gratuite : un rappel concret
   // pousse à ajouter un article, là où « livraison offerte » seul ne dit rien
   // de ce qu'il reste à faire.
@@ -26,7 +29,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
           <p className="flex-1 grid place-items-center text-sm text-gray-400">Votre panier est vide</p>
         ) : (
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-            {lignes.map(l => (
+            {lignesRemisees.map(l => (
               <div key={cleLigne(l)} className="flex gap-3 p-4">
                 <div className="w-20 h-24 bg-sand shrink-0">
                   {l.image && <img src={l.image} alt="" className="w-full h-full object-cover" />}
@@ -35,6 +38,11 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                   <p className="text-sm text-gray-800">{l.name}</p>
                   {l.color && <p className="text-xs text-gray-400 mt-0.5">Couleur : {l.color}</p>}
                   {l.size && <p className="text-xs text-gray-400">Taille : {l.size}</p>}
+                  {l.remiseDh > 0 && (
+                    <span className="inline-block mt-1.5 bg-ink text-white text-[10px] font-medium px-2 py-1 rounded">
+                      RÉDUCTION {l.remisePourcent}% (−{fmtPrix(l.remiseDh)})
+                    </span>
+                  )}
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={() => onQuantite(cleLigne(l), l.qty - 1)}
                       className="w-7 h-7 border border-gray-200 grid place-items-center" aria-label="Diminuer">
@@ -48,7 +56,14 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium">{fmtPrix(l.price * l.qty)}</p>
+                  {l.remiseDh > 0 ? (
+                    <>
+                      <p className="text-sm font-medium text-red-600">{fmtPrix(l.price * l.qty - l.remiseDh)}</p>
+                      <p className="text-xs text-gray-400 line-through">{fmtPrix(l.price * l.qty)}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-medium">{fmtPrix(l.price * l.qty)}</p>
+                  )}
                   <button onClick={() => onRetirer(cleLigne(l))}
                     className="mt-2 text-gray-300 hover:text-red-500" aria-label="Retirer"><X size={14} /></button>
                 </div>
@@ -71,7 +86,8 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
             </div>
             {t.remiseQuantite > 0 && (
               <div className="flex justify-between text-sm text-green-700">
-                <span>Remise</span><span>−{fmtPrix(t.remiseQuantite)}</span>
+                <span className="flex items-center gap-1.5"><Tag size={13} /> Remise</span>
+                <span className="font-medium">−{fmtPrix(t.remiseQuantite)}</span>
               </div>
             )}
             <Link to="/commander" onClick={onFermer}

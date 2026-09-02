@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { totalPanier, remiseQuantite, remiseQuantiteGroupee, remisePromo, sousTotal, nbArticles } from '../lib/pricing';
+import { totalPanier, remiseQuantite, remiseQuantiteGroupee, lignesAvecRemise, remisePromo, sousTotal, nbArticles } from '../lib/pricing';
 
 const PALIERS = [{ rang: 2, pourcent: 20 }, { rang: 3, pourcent: 30 }];
 const ligne = (price, qty = 1, collectionId) => ({ price, qty, collectionId });
@@ -142,5 +142,31 @@ describe('remise par quantité, groupée par collection', () => {
 
   it('sans règle, aucune remise', () => {
     expect(remiseQuantiteGroupee([ligne(500, 2)], [])).toBe(0);
+  });
+});
+
+/* Le même calcul, mais réparti ligne par ligne pour l'affichage du panier
+   ("-20% (-90 DH)" sous l'article concerné, comme sur sa fiche produit). */
+describe('remise répartie par ligne', () => {
+  it('le moins cher des deux articles porte la remise', () => {
+    const remises = [{ active: true, paliers: [{ rang: 2, pourcent: 20 }] }];
+    const lignes = [ligne(450, 1), ligne(500, 1)];
+    const [a, b] = lignesAvecRemise(lignes, remises);
+    expect(b.remiseDh).toBe(0);       // le plus cher (500) reste plein tarif
+    expect(a.remiseDh).toBe(90);      // 450 × 20 %
+    expect(a.remisePourcent).toBe(20);
+  });
+
+  it('une remise ciblée ne touche pas les lignes d’une autre collection', () => {
+    const remises = [{ active: true, collectionId: 'sport', paliers: [{ rang: 2, pourcent: 20 }] }];
+    const lignes = [ligne(450, 1, 'sport'), ligne(500, 1, 'sport'), ligne(300, 1, 'robes')];
+    const [a, b, c] = lignesAvecRemise(lignes, remises);
+    expect(a.remiseDh).toBe(90);
+    expect(b.remiseDh).toBe(0);
+    expect(c.remiseDh).toBe(0);
+  });
+
+  it('sans remise, chaque ligne reste à zéro', () => {
+    expect(lignesAvecRemise([ligne(450, 1)], [])).toEqual([{ price: 450, qty: 1, collectionId: undefined, remiseDh: 0, remisePourcent: 0 }]);
   });
 });
