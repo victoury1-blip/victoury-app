@@ -75,13 +75,15 @@ export default function Footer({ theme, collections }) {
               ))}
             </div>
           )}
-          <div className="mt-4">
-            <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Suivez-nous</h3>
-            {rangeeIcones(reseaux)}
-          </div>
-          <div className="mt-4">
-            <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Contact</h3>
-            {rangeeIcones(contactsDirects)}
+          <div className="mt-4 flex gap-8">
+            <div>
+              <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Suivez-nous</h3>
+              {rangeeIcones(reseaux)}
+            </div>
+            <div>
+              <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Contact</h3>
+              {rangeeIcones(contactsDirects)}
+            </div>
           </div>
         </div>
         {liens('Collections', categories)}
