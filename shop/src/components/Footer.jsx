@@ -78,12 +78,15 @@ export default function Footer({ theme, collections }) {
               ))}
             </div>
           )}
-          <div className="mt-4 flex gap-3">
-            {contacts.map(({ cle, Icone, href }) => (
-              href
-                ? <a key={cle} href={href} target="_blank" rel="noreferrer" className="opacity-70 hover:opacity-100 transition-opacity"><Icone size={16} /></a>
-                : <span key={cle} className="opacity-25" title="Lien non réglé dans /store/theme"><Icone size={16} /></span>
-            ))}
+          <div className="mt-4">
+            <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Contact</h3>
+            <div className="flex justify-center gap-4">
+              {contacts.map(({ cle, Icone, href }) => (
+                href
+                  ? <a key={cle} href={href} target="_blank" rel="noreferrer" className="opacity-70 hover:opacity-100 transition-opacity"><Icone size={16} /></a>
+                  : <span key={cle} className="opacity-25" title="Lien non réglé dans /store/theme"><Icone size={16} /></span>
+              ))}
+            </div>
           </div>
         </div>
         {liens('Collections', categories)}
