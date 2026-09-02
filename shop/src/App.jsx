@@ -4,6 +4,7 @@ import AnnonceBar from './components/AnnonceBar';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
+import WhatsAppBulle from './components/WhatsAppBulle';
 import Accueil from './pages/Accueil';
 import Collection from './pages/Collection';
 import Produit from './pages/Produit';
@@ -17,6 +18,7 @@ import ProduitsListe from './store/ProduitsListe';
 import ProduitForm from './store/ProduitForm';
 import CollectionsListe from './store/CollectionsListe';
 import ImportWoo from './store/ImportWoo';
+import AvisListe from './store/AvisListe';
 import PagesListe from './store/PagesListe';
 import CodesPromo from './store/CodesPromo';
 import MetaPixel from './store/MetaPixel';
@@ -129,6 +131,7 @@ function Vitrine() {
         livraison={reglages.livraison} seuilGratuit={reglages.seuilGratuit}
         onFermer={() => setPanierOuvert(false)} onQuantite={onQuantite} onRetirer={onRetirer}
       />
+      <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} />
     </div>
   );
 }
@@ -144,6 +147,7 @@ function Administration() {
           <Route path="collections" element={<CollectionsListe />} />
           <Route path="import-woo" element={<ImportWoo />} />
           <Route path="pages" element={<PagesListe />} />
+          <Route path="avis" element={<AvisListe />} />
           <Route path="codes-promo" element={<CodesPromo />} />
           <Route path="meta-pixel" element={<MetaPixel />} />
           <Route path="theme" element={<EditTheme />} />

@@ -89,6 +89,10 @@ export const supprimerPage = (id) => supabase.from('shop_pages').delete().eq('id
 export const enregistrerReglages = (valeur) =>
   supabase.from('shop_settings').upsert({ key: 'boutique', value: valeur, updated_at: new Date().toISOString() }).then(jeter);
 
+/* ── Avis clients (captures d'écran) ── */
+export const enregistrerAvis = (valeur) =>
+  supabase.from('shop_settings').upsert({ key: 'avis', value: valeur, updated_at: new Date().toISOString() }).then(jeter);
+
 /* ── Codes promo ── */
 export const listerCodes = () => supabase.from('shop_promo_codes').select('*').order('created_at', { ascending: false }).then(jeter);
 export const enregistrerCode = (c) => supabase.from('shop_promo_codes').upsert(c).select().single().then(jeter);

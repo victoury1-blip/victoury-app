@@ -71,6 +71,14 @@ export async function chargerNouveautes(limite = 8) {
   return (data || []).map(trier);
 }
 
+/* Avis clients : captures d'écran de conversations WhatsApp ou de messages
+   de clientes satisfaites, déposées telles quelles depuis /store/avis — pas
+   un système de notation, juste une preuve sociale que l'admin choisit. */
+export async function chargerAvis() {
+  const { data } = await supabase.from('shop_settings').select('value').eq('key', 'avis').maybeSingle();
+  return Array.isArray(data?.value) ? data.value : [];
+}
+
 export async function chargerPage(slug) {
   const { data, error } = await supabase
     .from('shop_pages').select('*').eq('slug', slug).maybeSingle();

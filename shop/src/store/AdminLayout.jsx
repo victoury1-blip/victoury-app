@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Wordmark from '../components/Wordmark';
 
@@ -11,6 +11,7 @@ const LIENS = [
   { to: '/store/import-woo', label: 'Importer WooCommerce', icon: DownloadCloud },
   { to: '/store/commandes', label: 'Commandes', icon: ShoppingCart },
   { to: '/store/pages', label: 'Pages', icon: FileText },
+  { to: '/store/avis', label: 'Avis clients', icon: MessageSquareQuote },
   { to: '/store/theme', label: 'Edit Theme', icon: Palette },
   { to: '/store/remises', label: 'Remises', icon: Percent },
   { to: '/store/codes-promo', label: 'Codes promo', icon: Ticket },

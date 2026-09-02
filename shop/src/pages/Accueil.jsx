@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import CarteProduit from '../components/CarteProduit';
-import { chargerNouveautes } from '../lib/catalog';
+import AvisClients from '../components/AvisClients';
+import { chargerNouveautes, chargerAvis } from '../lib/catalog';
 
 export default function Accueil({ collections, reglages }) {
   const [produits, setProduits] = useState([]);
+  const [avis, setAvis] = useState([]);
   useEffect(() => { chargerNouveautes(8).then(setProduits).catch(() => {}); }, []);
+  useEffect(() => { chargerAvis().then(setAvis).catch(() => {}); }, []);
   const hero = reglages?.theme?.hero || {};
   const sh = reglages?.theme?.texteSousHero || {};
 
@@ -80,6 +83,8 @@ export default function Accueil({ collections, reglages }) {
           </div>
         </section>
       )}
+
+      <AvisClients avis={avis} />
     </>
   );
 }
