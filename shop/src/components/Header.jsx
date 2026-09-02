@@ -11,8 +11,9 @@ import Wordmark from './Wordmark';
  * recherche, panier et menu mobile ne doit exister qu'à un seul endroit. */
 export default function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, logoPosition = 'gauche' }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
-  const lien = ({ isActive }) =>
-    `text-[13px] tracking-widest uppercase transition-colors ${isActive ? 'text-ink' : 'text-gray-500 hover:text-ink'}`;
+  // Une collection « Soldes » se distingue en rouge, comme sur l'ancien site —
+  // c'est le seul lien de la barre qui doit sauter aux yeux.
+  const estSoldes = (c) => /soldes?/i.test(c.slug || c.name || '');
 
   const Logo = (
     <Link to="/" className="shrink-0">
@@ -22,12 +23,21 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
     </Link>
   );
 
-  const Nav = (
-    <nav className="hidden lg:flex items-center gap-7">
-      {collections.map(c => (
-        <NavLink key={c.slug} to={`/product-category/${c.slug}/`} className={lien}>{c.name}</NavLink>
-      ))}
-    </nav>
+  // Bandeau catégories plein-largeur, fond gris — comme l'ancien site : une
+  // seconde ligne clairement séparée du logo/panier, pas mêlée à eux.
+  const BarreCategories = collections.length > 0 && (
+    <div className="hidden lg:block bg-gray-100 border-b border-gray-200">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-center gap-10 py-2.5">
+        {collections.map(c => (
+          <NavLink key={c.slug} to={`/product-category/${c.slug}/`}
+            className={({ isActive }) => `text-[12px] font-semibold tracking-widest uppercase transition-colors ${
+              estSoldes(c) ? 'text-red-600 hover:text-red-700' : isActive ? 'text-ink' : 'text-gray-700 hover:text-ink'
+            }`}>
+            {c.name}
+          </NavLink>
+        ))}
+      </nav>
+    </div>
   );
 
   const Icones = (
@@ -58,35 +68,33 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {logoPosition === 'centre' ? (
-          <div className="py-2.5">
-            <div className="flex items-center h-11">
-              {MenuMobile}
-              <div className="flex-1 flex justify-center">{Logo}</div>
-              {Icones}
-            </div>
-            <div className="hidden lg:flex justify-center pb-2">{Nav}</div>
+          <div className="flex items-center h-16">
+            {MenuMobile}
+            <div className="flex-1 flex justify-center">{Logo}</div>
+            {Icones}
           </div>
         ) : logoPosition === 'droite' ? (
           <div className="flex items-center gap-4 h-16">
             {MenuMobile}
             {Icones}
-            <div className="ml-auto flex items-center gap-8">{Nav}{Logo}</div>
+            <div className="ml-auto">{Logo}</div>
           </div>
         ) : (
           <div className="flex items-center gap-4 h-16">
             {MenuMobile}
             {Logo}
-            <div className="ml-8">{Nav}</div>
             <div className="ml-auto">{Icones}</div>
           </div>
         )}
       </div>
 
+      {BarreCategories}
+
       {menuOuvert && (
         <nav className="lg:hidden border-t border-gray-100 bg-white">
           {collections.map(c => (
             <NavLink key={c.slug} to={`/product-category/${c.slug}/`} onClick={() => setMenuOuvert(false)}
-              className="block px-6 py-3.5 text-sm tracking-widest uppercase text-gray-700 border-b border-gray-50">
+              className={`block px-6 py-3.5 text-sm tracking-widest uppercase border-b border-gray-50 ${estSoldes(c) ? 'text-red-600' : 'text-gray-700'}`}>
               {c.name}
             </NavLink>
           ))}
