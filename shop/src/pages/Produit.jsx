@@ -106,7 +106,7 @@ export default function Produit({ onAjouter, theme }) {
                   className={`${liste ? 'w-full flex items-center justify-between' : 'min-w-[3rem]'} px-3 py-2.5 text-sm border transition-colors relative
                     ${epuisee
                       ? 'border-gray-200 text-ink cursor-not-allowed'
-                      : taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
+                      : taille === s.size ? 'border-green-600 bg-green-600 text-white' : 'border-gray-200 hover:border-gray-400'}`}>
                   {s.size}
                   {liste && epuisee && <span className="text-xs text-red-500">Épuisé</span>}
                   {/* Une croix au-dessus du chiffre : le chiffre reste lisible,
