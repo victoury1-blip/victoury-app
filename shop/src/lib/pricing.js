@@ -147,9 +147,11 @@ export function totalPanier(lignes, { paliers = [], remises = null, promo = null
   };
 }
 
-/** Prix affiché sur une fiche, formaté comme le reste du site. */
+/** Prix affiché sur une fiche, formaté comme le reste du site. Toujours deux
+    décimales (199.00 DH) — même un prix rond, pour un affichage uniforme
+    partout, comme sur la plupart des sites marchands. */
 export const fmtPrix = (n) => `${Number(n || 0).toLocaleString('fr-MA', {
-  minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2,
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 })} DH`;
 
