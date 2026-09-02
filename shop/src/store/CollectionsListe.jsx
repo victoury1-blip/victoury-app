@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical, Check, Upload } from 'lucide-react';
-import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, majPosition, majCollection, televerserPhoto } from '../lib/admin';
+import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, majPosition, majCollection, majProduit, televerserPhoto } from '../lib/admin';
 import { slugifier } from '../lib/slug';
 
 const champ = 'border border-gray-200 px-3 py-2 text-sm bg-white';
@@ -19,6 +19,8 @@ export default function CollectionsListe() {
   const [traine, setTraine] = useState(null); // { collectionId, index } de la ligne saisie
   const [modifie, setModifie] = useState(null); // id de collection dont l'ordre n'est pas encore enregistré
   const [enregistre, setEnregistre] = useState(null); // id de collection venant d'être confirmée (icône ✓ temporaire)
+  const [prixMasse, setPrixMasse] = useState({}); // { [collectionId]: { prix, prixBarre } }
+  const [enCoursPrix, setEnCoursPrix] = useState(null);
 
   const recharger = () => listerCollections().then(setCollections).catch(() => {});
   useEffect(() => { recharger(); }, []);
@@ -86,6 +88,26 @@ export default function CollectionsListe() {
     }
   }
 
+  // Change le prix (et son prix barré) de TOUS les produits de la collection
+  // d'un coup — plus rapide qu'un aller-retour par fiche pour un déstockage
+  // ou une nouvelle campagne sur toute une catégorie.
+  async function appliquerPrixMasse(collectionId) {
+    const liste = produits[collectionId];
+    const { prix, prixBarre } = prixMasse[collectionId] || {};
+    if (!liste?.length || !prix) return;
+    setEnCoursPrix(collectionId);
+    try {
+      const champs = { price: Number(prix), compare_at: prixBarre ? Number(prixBarre) : null };
+      await Promise.all(liste.map(pr => majProduit(pr.id, champs)));
+      setProduits(p => ({ ...p, [collectionId]: liste.map(pr => ({ ...pr, ...champs })) }));
+      setPrixMasse(p => ({ ...p, [collectionId]: {} }));
+    } catch (e) {
+      alert(e.message || "Échec de la mise à jour des prix");
+    } finally {
+      setEnCoursPrix(null);
+    }
+  }
+
   return (
     <div className="max-w-2xl">
       <h1 className="text-lg font-medium">Collections</h1>
@@ -137,6 +159,28 @@ export default function CollectionsListe() {
                     <span className="flex items-center gap-1 text-[11px] text-green-700"><Check size={13} /> Ordre enregistré</span>
                   )}
                 </div>
+                {produits[c.id]?.length > 0 && (
+                  <div className="flex items-end gap-2 mb-3 p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <label className="block text-[11px] text-gray-500 mb-1">Nouveau prix (tous les produits)</label>
+                      <input type="number" min="0" placeholder="249"
+                        value={prixMasse[c.id]?.prix || ''}
+                        onChange={e => setPrixMasse(p => ({ ...p, [c.id]: { ...p[c.id], prix: e.target.value } }))}
+                        className="border border-gray-200 px-2 py-1.5 text-sm bg-white w-24" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-gray-500 mb-1">Prix barré (optionnel)</label>
+                      <input type="number" min="0" placeholder="299"
+                        value={prixMasse[c.id]?.prixBarre || ''}
+                        onChange={e => setPrixMasse(p => ({ ...p, [c.id]: { ...p[c.id], prixBarre: e.target.value } }))}
+                        className="border border-gray-200 px-2 py-1.5 text-sm bg-white w-24" />
+                    </div>
+                    <button onClick={() => appliquerPrixMasse(c.id)} disabled={!prixMasse[c.id]?.prix || enCoursPrix === c.id}
+                      className="bg-ink text-white text-[11px] tracking-widest uppercase px-3 py-2 disabled:opacity-40">
+                      {enCoursPrix === c.id ? 'Application…' : `Appliquer à ${produits[c.id].length} produits`}
+                    </button>
+                  </div>
+                )}
                 {!produits[c.id] ? (
                   <p className="text-xs text-gray-300 py-3">Chargement…</p>
                 ) : produits[c.id].length === 0 ? (
@@ -159,6 +203,9 @@ export default function CollectionsListe() {
                           ? <img src={pr.images[0].url} alt="" className="w-8 h-8 object-cover bg-sand shrink-0" />
                           : <span className="w-8 h-8 bg-sand shrink-0" />}
                         <span className="text-sm flex-1 truncate">{pr.name}</span>
+                        <span className="text-xs text-gray-400 shrink-0">
+                          {pr.price} DH{pr.compare_at ? <span className="line-through ml-1">{pr.compare_at} DH</span> : null}
+                        </span>
                       </div>
                     ))}
                   </div>

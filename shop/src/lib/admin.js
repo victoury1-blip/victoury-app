@@ -53,6 +53,11 @@ export const enregistrerProduit = (p) =>
 export const supprimerProduit = (id) =>
   supabase.from('shop_products').delete().eq('id', id).then(jeter);
 
+// Écriture partielle générique (ex. prix en masse sur une collection) — même
+// raison que majPosition : un update direct, sans .select().single().
+export const majProduit = (id, champs) =>
+  supabase.from('shop_products').update({ ...champs, updated_at: new Date().toISOString() }).eq('id', id).then(jeter);
+
 /* Réordonner une collection ne touche qu'à la position — pas de .single()
    ici, qui échouerait (et ferait tout échouer avec lui) au moindre souci de
    ré-sélection après écriture, sans rien changer au résultat attendu. */
