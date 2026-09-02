@@ -16,6 +16,7 @@ import Dashboard from './store/Dashboard';
 import ProduitsListe from './store/ProduitsListe';
 import ProduitForm from './store/ProduitForm';
 import CollectionsListe from './store/CollectionsListe';
+import ImportWoo from './store/ImportWoo';
 import PagesListe from './store/PagesListe';
 import CodesPromo from './store/CodesPromo';
 import MetaPixel from './store/MetaPixel';
@@ -141,6 +142,7 @@ function Administration() {
           <Route path="produits" element={<ProduitsListe />} />
           <Route path="produits/:id" element={<ProduitForm />} />
           <Route path="collections" element={<CollectionsListe />} />
+          <Route path="import-woo" element={<ImportWoo />} />
           <Route path="pages" element={<PagesListe />} />
           <Route path="codes-promo" element={<CodesPromo />} />
           <Route path="meta-pixel" element={<MetaPixel />} />
