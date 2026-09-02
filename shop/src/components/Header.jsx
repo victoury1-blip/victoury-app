@@ -26,11 +26,13 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
   // Bandeau catégories plein-largeur, fond gris — comme l'ancien site : une
   // seconde ligne clairement séparée du logo/panier, pas mêlée à eux.
   const BarreCategories = collections.length > 0 && (
-    <div className="hidden lg:block bg-gray-100 border-b border-gray-200">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-center gap-10 py-2.5">
+    <div className="bg-gray-100 border-b border-gray-200">
+      {/* Sur mobile la ligne défile plutôt que de passer à la ligne : un
+          bandeau sur deux rangs mangerait trop de hauteur d'écran. */}
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 flex lg:justify-center gap-6 sm:gap-10 py-2.5 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {collections.map(c => (
           <NavLink key={c.slug} to={`/product-category/${c.slug}/`}
-            className={({ isActive }) => `text-[12px] font-semibold tracking-widest uppercase transition-colors ${
+            className={({ isActive }) => `shrink-0 text-[12px] font-semibold tracking-widest uppercase transition-colors ${
               estSoldes(c) ? 'text-red-600 hover:text-red-700' : isActive ? 'text-ink' : 'text-gray-700 hover:text-ink'
             }`}>
             {c.name}
