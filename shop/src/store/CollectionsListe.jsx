@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Trash2, Plus, ChevronDown, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, enregistrerProduit } from '../lib/admin';
 import { slugifier } from '../lib/slug';
 
@@ -16,6 +16,7 @@ export default function CollectionsListe() {
   const [ouvert, setOuvert] = useState(null);
   const [produits, setProduits] = useState({});
   const [enCours, setEnCours] = useState(false);
+  const [traine, setTraine] = useState(null); // { collectionId, index } de la ligne saisie
 
   const recharger = () => listerCollections().then(setCollections).catch(() => {});
   useEffect(() => { recharger(); }, []);
@@ -46,14 +47,15 @@ export default function CollectionsListe() {
   // L'ordre ici décide de l'ordre affiché sur la page de la collection — les
   // positions se réattribuent 0, 1, 2… pour que le prochain tri reste stable
   // même si elles étaient toutes à 0 au départ.
-  async function deplacer(collectionId, index, sens) {
+  async function deposer(collectionId, indexCible) {
+    if (!traine || traine.collectionId !== collectionId || traine.index === indexCible || enCours) { setTraine(null); return; }
     const liste = produits[collectionId];
-    const j = index + sens;
-    if (j < 0 || j >= liste.length || enCours) return;
-    setEnCours(true);
     const reordonnee = [...liste];
-    [reordonnee[index], reordonnee[j]] = [reordonnee[j], reordonnee[index]];
+    const [dep] = reordonnee.splice(traine.index, 1);
+    reordonnee.splice(indexCible, 0, dep);
+    setTraine(null);
     setProduits(p => ({ ...p, [collectionId]: reordonnee }));
+    setEnCours(true);
     try {
       await Promise.all(reordonnee.map((pr, i) => pr.position === i ? null : enregistrerProduit({ id: pr.id, position: i })));
       setProduits(p => ({ ...p, [collectionId]: reordonnee.map((pr, i) => ({ ...pr, position: i })) }));
@@ -96,21 +98,22 @@ export default function CollectionsListe() {
                   <p className="text-xs text-gray-300 py-3">Aucun produit dans cette collection.</p>
                 ) : (
                   <div className="border border-gray-100 rounded-lg divide-y divide-gray-50">
+                    {/* Glisser-déposer : on saisit une ligne par sa poignée et on la
+                        lâche où on veut — plus rapide qu'un clic répété pour
+                        descendre un produit de dix rangs. */}
                     {produits[c.id].map((pr, i) => (
-                      <div key={pr.id} className="flex items-center gap-3 px-3 py-2">
+                      <div key={pr.id} draggable
+                        onDragStart={() => setTraine({ collectionId: c.id, index: i })}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => deposer(c.id, i)}
+                        onDragEnd={() => setTraine(null)}
+                        className={`flex items-center gap-3 px-3 py-2 ${traine?.collectionId === c.id && traine.index === i ? 'opacity-40' : ''}`}>
+                        <GripVertical size={14} className="text-gray-300 cursor-grab shrink-0" />
                         <span className="text-[11px] text-gray-300 w-5">{i + 1}</span>
                         {pr.images?.[0]?.url
                           ? <img src={pr.images[0].url} alt="" className="w-8 h-8 object-cover bg-sand shrink-0" />
                           : <span className="w-8 h-8 bg-sand shrink-0" />}
                         <span className="text-sm flex-1 truncate">{pr.name}</span>
-                        <button onClick={() => deplacer(c.id, i, -1)} disabled={i === 0 || enCours}
-                          className="p-1 text-gray-400 hover:text-ink disabled:opacity-20" aria-label="Monter">
-                          <ArrowUp size={14} />
-                        </button>
-                        <button onClick={() => deplacer(c.id, i, 1)} disabled={i === produits[c.id].length - 1 || enCours}
-                          className="p-1 text-gray-400 hover:text-ink disabled:opacity-20" aria-label="Descendre">
-                          <ArrowDown size={14} />
-                        </button>
                       </div>
                     ))}
                   </div>
