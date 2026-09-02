@@ -17,7 +17,7 @@ export default function Accueil({ collections, reglages }) {
   useEffect(() => {
     setIndice(0);
     if (diapos.length < 2) return;
-    const id = setInterval(() => setIndice(i => (i + 1) % diapos.length), 5000);
+    const id = setInterval(() => setIndice(i => (i + 1) % diapos.length), 3000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diapos.length]);
