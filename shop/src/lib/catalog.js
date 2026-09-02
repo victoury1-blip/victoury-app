@@ -118,7 +118,7 @@ export const THEME_DEFAUT = {
   couleurAnnonceTexte: '#ffffff',
 
   hero: {
-    imageDesktop: '', imageMobile: '',
+    imageDesktop: '/hero-victoury.jpg', imageMobile: '/hero-victoury.jpg',
     titre: 'Bienvenue chez Victoury', sousTitre: 'Le confort au quotidien',
     boutonTexte: 'Voir la collection', boutonLien: '',
   },

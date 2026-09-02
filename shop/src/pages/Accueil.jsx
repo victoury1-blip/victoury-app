@@ -23,15 +23,20 @@ export default function Accueil({ collections, reglages }) {
             <div className="w-full h-full bg-gradient-to-br from-sand to-gray-200" />
           )}
         </div>
+        {/* Un fond photo peut être chargé n'importe où : ce voile assombrit
+            juste assez pour que le texte blanc reste lisible dessus. */}
+        {(hero.imageDesktop || hero.imageMobile) && <div className="absolute inset-0 bg-black/25" />}
         <div className="absolute inset-0 grid place-items-center text-center px-6">
           <div>
-            <h1 className="text-2xl sm:text-4xl tracking-[0.2em] uppercase text-ink">
+            <h1 className={`text-2xl sm:text-4xl tracking-[0.2em] uppercase ${(hero.imageDesktop || hero.imageMobile) ? 'text-white' : 'text-ink'}`}>
               {hero.titre || 'Bienvenue chez Victoury'}
             </h1>
-            <p className="mt-3 text-sm text-gray-600">{hero.sousTitre || 'Le confort au quotidien'}</p>
+            <p className={`mt-3 text-sm ${(hero.imageDesktop || hero.imageMobile) ? 'text-white/85' : 'text-gray-600'}`}>{hero.sousTitre || 'Le confort au quotidien'}</p>
             <Link to={hero.boutonLien || (collections[0] ? `/product-category/${collections[0].slug}/` : '/')}
-              className="inline-block mt-7 border border-ink px-8 py-3 text-[11px] tracking-widest uppercase
-                         hover:bg-ink hover:text-white transition-colors">
+              className={`inline-block mt-7 border px-8 py-3 text-[11px] tracking-widest uppercase transition-colors
+                         ${(hero.imageDesktop || hero.imageMobile)
+                            ? 'border-white text-white hover:bg-white hover:text-ink'
+                            : 'border-ink hover:bg-ink hover:text-white'}`}>
               {hero.boutonTexte || 'Voir la collection'} →
             </Link>
           </div>
