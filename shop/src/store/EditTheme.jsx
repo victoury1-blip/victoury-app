@@ -22,8 +22,12 @@ function DeposeImage({ titre, aide, url, onChange, className }) {
     finally { setEnvoi(false); }
   }
   return (
-    <div className="flex items-center gap-4">
-      <div className={`relative bg-sand border border-gray-100 grid place-items-center overflow-hidden shrink-0 ${className}`}>
+    // Empilé (image au-dessus, bouton en dessous) : à côté, sur un petit
+    // écran le bouton "Choisir un fichier" se retrouvait poussé hors du
+    // cadre visible par une vignette large (w-full) qui prenait toute la
+    // largeur de la ligne.
+    <div className="space-y-2">
+      <div className={`relative bg-sand border border-gray-100 grid place-items-center overflow-hidden ${className}`}>
         {url ? <img src={url} alt="" className="max-w-full max-h-full object-cover w-full h-full" /> : <span className="text-[10px] text-gray-300">Aucun</span>}
         {url && (
           <button type="button" onClick={() => onChange('')} className="absolute top-0.5 right-0.5 bg-white rounded-full p-0.5 shadow text-gray-400 hover:text-red-500">
