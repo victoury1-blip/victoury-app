@@ -128,7 +128,7 @@ export const THEME_DEFAUT = {
   texteSousHero: { texte: '', taille: 14, couleurTexte: '#000000', couleurFond: '#f9f6f0' },
 
   footer: {
-    description: 'Ensembles sport, burkinis et robes. Livraison partout au Maroc.',
+    description: '',
     couleurFond: '#f7f5f2', couleurTexte: '#111111',
     collections: [], reseaux: [], mentions: [
       { label: 'Conditions générales de vente', url: '/conditions-generales-de-vente' },
