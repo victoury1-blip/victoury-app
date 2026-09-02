@@ -70,11 +70,11 @@ export default function Footer({ telephone, theme, collections }) {
           <Wordmark className="text-lg" />
           {f.description && <p className="mt-3 text-xs opacity-70 leading-relaxed">{f.description}</p>}
           {badgesPaiement.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 space-y-1.5">
               {badgesPaiement.map(({ texte, Icone }) => (
-                <span key={texte} className="inline-flex items-center gap-1.5 text-[10px] border rounded-full px-2.5 py-1 opacity-80" style={{ borderColor: 'currentColor' }}>
-                  <Icone size={11} /> {texte}
-                </span>
+                <p key={texte} className="flex items-center gap-1.5 text-xs opacity-70">
+                  <Icone size={13} /> {texte}
+                </p>
               ))}
             </div>
           )}

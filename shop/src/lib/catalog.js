@@ -137,7 +137,7 @@ export const THEME_DEFAUT = {
       { label: 'Politique de confidentialité', url: '/politique-de-confidentialite' },
     ],
     // Moyens de paiement acceptés, affichés en badges dans le footer.
-    paiement: { livraison: true, virement: false },
+    paiement: { livraison: true, virement: true },
     // Icônes de contact toujours visibles (même vides) pour que l'admin voie
     // tout de suite lesquelles restent à renseigner.
     contacts: { whatsapp: '', appel: '', instagram: '', tiktok: '', facebook: '' },
