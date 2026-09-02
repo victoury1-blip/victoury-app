@@ -342,6 +342,8 @@ export default function OrderModal({ order, onClose, onSave }) {
               <Field label="Prix total" icon="💵">
                 <input
                   type="number"
+                  inputMode="decimal"
+                  autoComplete="off"
                   value={form.price}
                   onChange={(e) => { update('price', Number(e.target.value)); setErrors(p => ({ ...p, price: undefined })); }}
                   className={`${inputCls} ${errors.price ? 'border-red-400' : ''}`}

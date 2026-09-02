@@ -222,7 +222,7 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
             <SectionTitle icon="💰" label="Paiement & Options" />
             <div className="grid grid-cols-2 gap-4 items-end">
               <Field label="Prix total (DH)" icon="💵">
-                <input type="number" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={inputCls} placeholder="0.00" />
+                <input type="number" inputMode="decimal" autoComplete="off" value={form.prix} onChange={(e) => u('prix', e.target.value)} className={inputCls} placeholder="0.00" />
               </Field>
               <Field label="Échange" icon="🔄">
                 <button onClick={() => u('echange', !form.echange)}
