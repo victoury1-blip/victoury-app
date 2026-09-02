@@ -38,18 +38,31 @@ export default function Footer({ theme, collections }) {
 
   const c = f.contacts || {};
   // Toujours affichées : même sans lien encore réglé, l'admin voit tout de
-  // suite quelles icônes de contact restent à compléter dans /store/theme.
-  const contacts = [
-    { cle: 'whatsapp', Icone: IconeWhatsApp, href: c.whatsapp ? `https://wa.me/${c.whatsapp.replace(/\D/g, '')}` : '' },
-    { cle: 'appel', Icone: Phone, href: c.appel ? `tel:${c.appel}` : '' },
+  // suite quelles icônes restent à compléter dans /store/theme.
+  // Deux groupes distincts : les réseaux sociaux (Suivez-nous) et les moyens
+  // de contact direct (Contact) — pas mêlés dans une même rangée.
+  const reseaux = [
     { cle: 'instagram', Icone: Instagram, href: c.instagram },
     { cle: 'tiktok', Icone: IconeTikTok, href: c.tiktok },
     { cle: 'facebook', Icone: Facebook, href: c.facebook },
   ];
+  const contactsDirects = [
+    { cle: 'whatsapp', Icone: IconeWhatsApp, href: c.whatsapp ? `https://wa.me/${c.whatsapp.replace(/\D/g, '')}` : '' },
+    { cle: 'appel', Icone: Phone, href: c.appel ? `tel:${c.appel}` : '' },
+  ];
+  const rangeeIcones = (items) => (
+    <div className="flex justify-center gap-4">
+      {items.map(({ cle, Icone, href }) => (
+        href
+          ? <a key={cle} href={href} target="_blank" rel="noreferrer" className="opacity-70 hover:opacity-100 transition-opacity"><Icone size={16} /></a>
+          : <span key={cle} className="opacity-25" title="Lien non réglé dans /store/theme"><Icone size={16} /></span>
+      ))}
+    </div>
+  );
 
   return (
     <footer className="mt-20 border-t border-gray-100" style={{ background: f.couleurFond, color: f.couleurTexte }}>
-      <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-2 gap-8 sm:grid-cols-4">
+      <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-2 gap-8 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-1">
           <Wordmark className="text-lg" />
           {f.description && <p className="mt-3 text-xs opacity-70 leading-relaxed">{f.description}</p>}
@@ -63,18 +76,15 @@ export default function Footer({ theme, collections }) {
             </div>
           )}
           <div className="mt-4">
+            <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Suivez-nous</h3>
+            {rangeeIcones(reseaux)}
+          </div>
+          <div className="mt-4">
             <h3 className="text-[11px] uppercase tracking-widest text-gray-400 mb-3">Contact</h3>
-            <div className="flex justify-center gap-4">
-              {contacts.map(({ cle, Icone, href }) => (
-                href
-                  ? <a key={cle} href={href} target="_blank" rel="noreferrer" className="opacity-70 hover:opacity-100 transition-opacity"><Icone size={16} /></a>
-                  : <span key={cle} className="opacity-25" title="Lien non réglé dans /store/theme"><Icone size={16} /></span>
-              ))}
-            </div>
+            {rangeeIcones(contactsDirects)}
           </div>
         </div>
         {liens('Collections', categories)}
-        {liens('Suivez-nous', f.reseaux)}
         {liens('Mentions légales', f.mentions)}
       </div>
       <div className="border-t border-gray-200">
