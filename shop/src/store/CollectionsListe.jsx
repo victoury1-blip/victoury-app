@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical, Check } from 'lucide-react';
 import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, enregistrerProduit } from '../lib/admin';
 import { slugifier } from '../lib/slug';
 
@@ -17,6 +17,8 @@ export default function CollectionsListe() {
   const [produits, setProduits] = useState({});
   const [enCours, setEnCours] = useState(false);
   const [traine, setTraine] = useState(null); // { collectionId, index } de la ligne saisie
+  const [modifie, setModifie] = useState(null); // id de collection dont l'ordre n'est pas encore enregistré
+  const [enregistre, setEnregistre] = useState(null); // id de collection venant d'être confirmée (icône ✓ temporaire)
 
   const recharger = () => listerCollections().then(setCollections).catch(() => {});
   useEffect(() => { recharger(); }, []);
@@ -44,21 +46,30 @@ export default function CollectionsListe() {
     setProduits(p => ({ ...p, [c.id]: trierProduits(tous.filter(pr => pr.collection_id === c.id)) }));
   }
 
-  // L'ordre ici décide de l'ordre affiché sur la page de la collection — les
-  // positions se réattribuent 0, 1, 2… pour que le prochain tri reste stable
-  // même si elles étaient toutes à 0 au départ.
-  async function deposer(collectionId, indexCible) {
-    if (!traine || traine.collectionId !== collectionId || traine.index === indexCible || enCours) { setTraine(null); return; }
+  // Le glisser-déposer ne fait que réordonner en local — plusieurs glissés
+  // rapides déclenchaient chacun leur propre écriture en base, et l'un
+  // pouvait écraser le résultat d'un autre encore en vol. Un seul bouton
+  // "Enregistrer" envoie l'ordre final une fois que l'admin a fini.
+  function deposer(collectionId, indexCible) {
+    if (!traine || traine.collectionId !== collectionId || traine.index === indexCible) { setTraine(null); return; }
     const liste = produits[collectionId];
     const reordonnee = [...liste];
     const [dep] = reordonnee.splice(traine.index, 1);
     reordonnee.splice(indexCible, 0, dep);
     setTraine(null);
     setProduits(p => ({ ...p, [collectionId]: reordonnee }));
+    setModifie(collectionId);
+  }
+
+  async function enregistrerOrdre(collectionId) {
+    const liste = produits[collectionId];
     setEnCours(true);
     try {
-      await Promise.all(reordonnee.map((pr, i) => pr.position === i ? null : enregistrerProduit({ id: pr.id, position: i })));
-      setProduits(p => ({ ...p, [collectionId]: reordonnee.map((pr, i) => ({ ...pr, position: i })) }));
+      await Promise.all(liste.map((pr, i) => pr.position === i ? null : enregistrerProduit({ id: pr.id, position: i })));
+      setProduits(p => ({ ...p, [collectionId]: liste.map((pr, i) => ({ ...pr, position: i })) }));
+      setModifie(null);
+      setEnregistre(collectionId);
+      setTimeout(() => setEnregistre(e => (e === collectionId ? null : e)), 2000);
     } finally {
       setEnCours(false);
     }
@@ -91,7 +102,18 @@ export default function CollectionsListe() {
 
             {ouvert === c.id && (
               <div className="px-4 pb-4">
-                <p className="text-[11px] text-gray-400 mb-2">Ordre d'affichage sur la page de la collection</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] text-gray-400">Ordre d'affichage sur la page de la collection</p>
+                  {modifie === c.id && (
+                    <button onClick={() => enregistrerOrdre(c.id)} disabled={enCours}
+                      className="flex items-center gap-1.5 bg-ink text-white text-[11px] tracking-widest uppercase px-3 py-1.5 disabled:opacity-50">
+                      {enCours ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                  )}
+                  {enregistre === c.id && (
+                    <span className="flex items-center gap-1 text-[11px] text-green-700"><Check size={13} /> Ordre enregistré</span>
+                  )}
+                </div>
                 {!produits[c.id] ? (
                   <p className="text-xs text-gray-300 py-3">Chargement…</p>
                 ) : produits[c.id].length === 0 ? (
