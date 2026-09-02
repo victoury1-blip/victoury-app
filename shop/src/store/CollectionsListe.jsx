@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical, Check } from 'lucide-react';
-import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, enregistrerProduit } from '../lib/admin';
+import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, majPosition } from '../lib/admin';
 import { slugifier } from '../lib/slug';
 
 const champ = 'border border-gray-200 px-3 py-2 text-sm bg-white';
@@ -65,11 +65,13 @@ export default function CollectionsListe() {
     const liste = produits[collectionId];
     setEnCours(true);
     try {
-      await Promise.all(liste.map((pr, i) => pr.position === i ? null : enregistrerProduit({ id: pr.id, position: i })));
+      await Promise.all(liste.map((pr, i) => pr.position === i ? null : majPosition(pr.id, i)));
       setProduits(p => ({ ...p, [collectionId]: liste.map((pr, i) => ({ ...pr, position: i })) }));
       setModifie(null);
       setEnregistre(collectionId);
       setTimeout(() => setEnregistre(e => (e === collectionId ? null : e)), 2000);
+    } catch (e) {
+      alert(e.message || "Échec de l'enregistrement de l'ordre");
     } finally {
       setEnCours(false);
     }

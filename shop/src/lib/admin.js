@@ -47,6 +47,12 @@ export const enregistrerProduit = (p) =>
 export const supprimerProduit = (id) =>
   supabase.from('shop_products').delete().eq('id', id).then(jeter);
 
+/* Réordonner une collection ne touche qu'à la position — pas de .single()
+   ici, qui échouerait (et ferait tout échouer avec lui) au moindre souci de
+   ré-sélection après écriture, sans rien changer au résultat attendu. */
+export const majPosition = (id, position) =>
+  supabase.from('shop_products').update({ position, updated_at: new Date().toISOString() }).eq('id', id).then(jeter);
+
 /* Les tailles sont remplacées en bloc : les modifier une à une laisserait, au
    moindre échec, un produit à moitié corrigé — donc du stock faux. */
 export async function remplacerTailles(produitId, tailles) {
