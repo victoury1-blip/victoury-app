@@ -121,7 +121,7 @@ function Vitrine() {
         </Routes>
       </main>
 
-      <Footer telephone={reglages.telephone} theme={reglages.theme} />
+      <Footer telephone={reglages.telephone} theme={reglages.theme} collections={collections} />
 
       <TiroirPanier
         ouvert={panierOuvert} lignes={lignes} paliers={reglages.paliers}

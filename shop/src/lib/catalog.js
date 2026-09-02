@@ -136,6 +136,11 @@ export const THEME_DEFAUT = {
       { label: "Politique d'échange", url: '/politique-dechange' },
       { label: 'Politique de confidentialité', url: '/politique-de-confidentialite' },
     ],
+    // Moyens de paiement acceptés, affichés en badges dans le footer.
+    paiement: { livraison: true, virement: false },
+    // Icônes de contact toujours visibles (même vides) pour que l'admin voie
+    // tout de suite lesquelles restent à renseigner.
+    contacts: { whatsapp: '', appel: '', instagram: '', tiktok: '', facebook: '' },
   },
 
   // Filtre par taille sur les pages de collection : pertinent quand une même
@@ -165,7 +170,11 @@ export async function chargerReglages() {
       ...THEME_DEFAUT, ...themeSauve,
       hero: { ...THEME_DEFAUT.hero, ...(themeSauve.hero || {}) },
       texteSousHero: { ...THEME_DEFAUT.texteSousHero, ...(themeSauve.texteSousHero || {}) },
-      footer: { ...THEME_DEFAUT.footer, ...(themeSauve.footer || {}) },
+      footer: {
+        ...THEME_DEFAUT.footer, ...(themeSauve.footer || {}),
+        paiement: { ...THEME_DEFAUT.footer.paiement, ...(themeSauve.footer?.paiement || {}) },
+        contacts: { ...THEME_DEFAUT.footer.contacts, ...(themeSauve.footer?.contacts || {}) },
+      },
     },
   };
 }

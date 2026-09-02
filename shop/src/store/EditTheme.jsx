@@ -382,7 +382,41 @@ export default function EditTheme() {
             </div>
           </section>
 
-          <ListeDeLiens titre="Collections" aide="Liens de collections affichés dans le footer"
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <h2 className="text-sm font-medium">Moyens de paiement</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Badges affichés sous la description du footer</p>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between max-w-xs">
+                <span className="text-sm">Paiement à la livraison</span>
+                <Bascule actif={t.footer.paiement?.livraison !== false}
+                  onChange={() => uFooter('paiement', { ...t.footer.paiement, livraison: t.footer.paiement?.livraison === false })} />
+              </div>
+              <div className="flex items-center justify-between max-w-xs">
+                <span className="text-sm">Virement bancaire</span>
+                <Bascule actif={!!t.footer.paiement?.virement}
+                  onChange={() => uFooter('paiement', { ...t.footer.paiement, virement: !t.footer.paiement?.virement })} />
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <h2 className="text-sm font-medium">Contact</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Icônes toujours affichées dans le footer ; grisées tant qu'aucun lien n'est réglé ici.</p>
+            <div className="mt-4 grid sm:grid-cols-2 gap-4">
+              <div><label className={label}>WhatsApp (numéro)</label>
+                <input value={t.footer.contacts?.whatsapp || ''} onChange={e => uFooter('contacts', { ...t.footer.contacts, whatsapp: e.target.value })} placeholder="0612345678" className={champ} /></div>
+              <div><label className={label}>Appel (numéro)</label>
+                <input value={t.footer.contacts?.appel || ''} onChange={e => uFooter('contacts', { ...t.footer.contacts, appel: e.target.value })} placeholder="0612345678" className={champ} /></div>
+              <div><label className={label}>Instagram (lien)</label>
+                <input value={t.footer.contacts?.instagram || ''} onChange={e => uFooter('contacts', { ...t.footer.contacts, instagram: e.target.value })} placeholder="https://instagram.com/…" className={champ} /></div>
+              <div><label className={label}>TikTok (lien)</label>
+                <input value={t.footer.contacts?.tiktok || ''} onChange={e => uFooter('contacts', { ...t.footer.contacts, tiktok: e.target.value })} placeholder="https://tiktok.com/@…" className={champ} /></div>
+              <div><label className={label}>Facebook (lien)</label>
+                <input value={t.footer.contacts?.facebook || ''} onChange={e => uFooter('contacts', { ...t.footer.contacts, facebook: e.target.value })} placeholder="https://facebook.com/…" className={champ} /></div>
+            </div>
+          </section>
+
+          <ListeDeLiens titre="Collections" aide="Liens de collections affichés dans le footer — laissez vide pour reprendre automatiquement les collections du site"
             items={t.footer.collections} onChange={v => uFooter('collections', v)} placeholderUrl="/product-category/ensemble-sport/" />
           <ListeDeLiens titre="Réseaux sociaux" aide='Liens affichés dans la section "Suivez-nous"'
             items={t.footer.reseaux} onChange={v => uFooter('reseaux', v)} placeholderUrl="https://instagram.com/…" />
