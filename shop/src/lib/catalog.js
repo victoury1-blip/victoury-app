@@ -76,6 +76,18 @@ export async function chargerCouleurs(groupId) {
   return (data || []).map(p => ({ ...p, images: (p.images || []).sort((a, b) => a.position - b.position) }));
 }
 
+/** Autres produits de la même collection — pour la fiche produit, la
+    suggestion la plus pertinente reste "ce qui ressemble à ce que je regarde". */
+export async function chargerProduitsLies(collectionId, produitIdAExclure, limite = 4) {
+  if (!collectionId) return [];
+  const { data, error } = await supabase
+    .from('shop_products').select(PRODUIT)
+    .eq('collection_id', collectionId).neq('id', produitIdAExclure)
+    .order('position').limit(limite);
+  if (error) return [];
+  return (data || []).map(trier);
+}
+
 export async function chargerNouveautes(limite = 8) {
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT).order('created_at', { ascending: false }).limit(limite);

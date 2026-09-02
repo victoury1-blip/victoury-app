@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronDown, X } from 'lucide-react';
 import { fmtPrix, ordinal } from '../lib/pricing';
-import { chargerProduit, chargerCouleurs } from '../lib/catalog';
+import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel } from '../lib/pixel';
+import CarteProduit from '../components/CarteProduit';
 
 function Accordeon({ titre, children }) {
   const [ouvert, setOuvert] = useState(false);
@@ -27,6 +28,7 @@ export default function Produit({ onAjouter, theme, remises }) {
   const [couleurs, setCouleurs] = useState([]);
   const [taille, setTaille] = useState('');
   const [chargement, setChargement] = useState(true);
+  const [produitsLies, setProduitsLies] = useState([]);
 
   useEffect(() => {
     setChargement(true); setTaille('');
@@ -41,6 +43,7 @@ export default function Produit({ onAjouter, theme, remises }) {
         // La couleur actuellement affichée ressort en tête des pastilles —
         // les « autres » couleurs viennent après, jamais avant elle.
         setCouleurs(p ? [...cs].sort((a, b) => (a.slug === p.slug ? -1 : b.slug === p.slug ? 1 : 0)) : cs);
+        setProduitsLies(p ? await chargerProduitsLies(p.collection_id, p.id) : []);
         if (p) trackPixel('ViewContent', {
           content_name: p.name, content_ids: [p.slug], content_type: 'product',
           value: p.price, currency: 'MAD',
@@ -156,6 +159,15 @@ export default function Produit({ onAjouter, theme, remises }) {
           <Accordeon titre="Livraison">Livraison partout au Maroc. Paiement à la livraison.</Accordeon>
         </div>
       </div>
+
+      {produitsLies.length > 0 && (
+        <div className="col-span-full mt-6 border-t border-gray-100 pt-10">
+          <h2 className="text-sm tracking-[0.2em] uppercase text-gray-500">Produits similaires</h2>
+          <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
+            {produitsLies.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
