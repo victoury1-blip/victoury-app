@@ -5,6 +5,10 @@ import { fmtPrix } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs } from '../lib/catalog';
 import { trackPixel } from '../lib/pixel';
 
+// 2 → "2ème", 3 → "3ème"… le seul cas particulier du français (1er) ne
+// concerne jamais un palier de remise, qui commence toujours au 2ᵉ article.
+const ordinal = (n) => `${n}ème`;
+
 function Accordeon({ titre, children }) {
   const [ouvert, setOuvert] = useState(false);
   if (!children) return null;
@@ -20,7 +24,7 @@ function Accordeon({ titre, children }) {
   );
 }
 
-export default function Produit({ onAjouter, theme }) {
+export default function Produit({ onAjouter, theme, paliers }) {
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
@@ -69,8 +73,15 @@ export default function Produit({ onAjouter, theme }) {
         <h1 className="text-xl tracking-wide">{produit.name}</h1>
         <p className="mt-2">
           <span className="text-lg">{fmtPrix(produit.price)}</span>
-          {promo && <span className="ml-3 text-sm text-gray-400 line-through">{fmtPrix(produit.compare_at)}</span>}
+          {/* Le prix barré doit sauter aux yeux : c'est lui qui vend la
+              réduction, un gris discret le rendait presque invisible. */}
+          {promo && <span className="ml-3 text-sm text-red-500 line-through">{fmtPrix(produit.compare_at)}</span>}
         </p>
+        {paliers?.length > 0 && (
+          <p className="mt-2 inline-flex items-center gap-1.5 bg-red-50 text-red-600 text-xs font-medium px-2.5 py-1 rounded-full">
+            −{paliers[0].pourcent}% dès le {ordinal(paliers[0].rang)} article
+          </p>
+        )}
 
         {couleurs.length > 1 && (
           <div className="mt-6">
