@@ -79,3 +79,7 @@ export const fmtPrix = (n) => `${Number(n || 0).toLocaleString('fr-MA', {
   minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2,
   maximumFractionDigits: 2,
 })} DH`;
+
+// 2 → "2ème", 3 → "3ème"… le seul cas particulier du français (1er) ne
+// concerne jamais un palier de remise, qui commence toujours au 2ᵉ article.
+export const ordinal = (n) => `${n}ème`;

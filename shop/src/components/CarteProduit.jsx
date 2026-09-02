@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { fmtPrix } from '../lib/pricing';
+import { fmtPrix, ordinal } from '../lib/pricing';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
-export default function CarteProduit({ produit }) {
+export default function CarteProduit({ produit, paliers }) {
   const image = produit.images?.[0]?.url;
   const tailles = (produit.sizes || []).filter(s => s.stock > 0);
   const promo = produit.compare_at > produit.price;
@@ -38,8 +38,13 @@ export default function CarteProduit({ produit }) {
       <h3 className="mt-2 text-sm text-gray-800">{produit.name}</h3>
       <p className="mt-0.5 text-sm">
         <span className="font-medium">{fmtPrix(produit.price)}</span>
-        {promo && <span className="ml-2 text-xs text-gray-400 line-through">{fmtPrix(produit.compare_at)}</span>}
+        {promo && <span className="ml-2 text-xs text-red-500 line-through">{fmtPrix(produit.compare_at)}</span>}
       </p>
+      {paliers?.length > 0 && (
+        <p className="mt-1 inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
+          −{paliers[0].pourcent}% dès le {ordinal(paliers[0].rang)} article
+        </p>
+      )}
     </Link>
   );
 }

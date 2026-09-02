@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronDown, X } from 'lucide-react';
-import { fmtPrix } from '../lib/pricing';
+import { fmtPrix, ordinal } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs } from '../lib/catalog';
 import { trackPixel } from '../lib/pixel';
-
-// 2 → "2ème", 3 → "3ème"… le seul cas particulier du français (1er) ne
-// concerne jamais un palier de remise, qui commence toujours au 2ᵉ article.
-const ordinal = (n) => `${n}ème`;
 
 function Accordeon({ titre, children }) {
   const [ouvert, setOuvert] = useState(false);
