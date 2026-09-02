@@ -85,7 +85,7 @@ export default function Accueil({ collections, reglages }) {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
           <h2 className="text-center text-sm tracking-[0.2em] uppercase text-gray-500">Nos nouveautés</h2>
           <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
-            {produits.map(p => <CarteProduit key={p.id} produit={p} paliers={reglages?.paliers} />)}
+            {produits.map(p => <CarteProduit key={p.id} produit={p} remises={reglages?.remises} />)}
           </div>
         </section>
       )}

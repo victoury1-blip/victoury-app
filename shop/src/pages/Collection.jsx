@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import CarteProduit from '../components/CarteProduit';
 import { chargerProduitsDeCollection } from '../lib/catalog';
 
-export default function Collection({ theme, paliers }) {
+export default function Collection({ theme, remises }) {
   const { slug } = useParams();
   const [etat, setEtat] = useState({ chargement: true, collection: null, produits: [] });
   const [taille, setTaille] = useState('');
@@ -60,7 +60,7 @@ export default function Collection({ theme, paliers }) {
         <p className="py-24 text-center text-sm text-gray-400">Aucun article disponible dans cette taille.</p>
       ) : (
         <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
-          {visibles.map(p => <CarteProduit key={p.id} produit={p} paliers={paliers} />)}
+          {visibles.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
         </div>
       )}
     </div>

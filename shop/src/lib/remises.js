@@ -8,8 +8,13 @@
  * remise la plus avantageuse pour le client qui s'applique — jamais la somme
  * des deux, qui donnerait un rabais plus fort que ce qui a été annoncé.
  */
-export function paliersEffectifs(remises) {
-  const actifs = (remises || []).filter(r => r.active && r.type !== 'inactive');
+// Une règle peut être limitée à une collection (rang, cible, ex. "Ensemble
+// Sport") ; sans collectionId, elle s'applique à tout le catalogue. Pour la
+// fiche d'un produit donné, seules les règles globales et celles ciblant sa
+// propre collection comptent — pas celles réglées pour une autre collection.
+export function paliersEffectifs(remises, collectionId = null) {
+  const actifs = (remises || []).filter(r =>
+    r.active && r.type !== 'inactive' && (!r.collectionId || r.collectionId === collectionId));
   const parRang = new Map();
   for (const r of actifs) {
     for (const p of (r.paliers || [])) {

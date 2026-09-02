@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ChevronDown, X } from 'lucide-react';
 import { fmtPrix, ordinal } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs } from '../lib/catalog';
+import { paliersEffectifs } from '../lib/remises';
 import { trackPixel } from '../lib/pixel';
 
 function Accordeon({ titre, children }) {
@@ -20,7 +21,7 @@ function Accordeon({ titre, children }) {
   );
 }
 
-export default function Produit({ onAjouter, theme, paliers }) {
+export default function Produit({ onAjouter, theme, remises }) {
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
@@ -58,6 +59,8 @@ export default function Produit({ onAjouter, theme, paliers }) {
   // Le client la voit, comprend qu'elle reviendra, et choisit parmi les autres.
   const tailles = produit.sizes || [];
   const promo = produit.compare_at > produit.price;
+  // Règles globales + celles ciblant justement la collection de ce produit.
+  const paliers = paliersEffectifs(remises, produit.collection_id);
   const stockTaille = tailles.find(s => s.size === taille)?.stock;
 
   return (

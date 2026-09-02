@@ -192,7 +192,12 @@ export async function chargerReglages() {
     ...REGLAGES_DEFAUT, ...(map.boutique || {}),
     // Plusieurs remises nommées peuvent exister (/store/remises) ; seules
     // celles activées comptent, et c'est leur fusion qui s'applique au panier.
+    // Ici, seules les règles globales (sans collection ciblée) — le panier
+    // peut mélanger plusieurs collections, jamais réduit à une seule.
     paliers: remises.length ? paliersEffectifs(remises) : (map.boutique?.paliers || []),
+    // Bruts, pour qu'une fiche produit calcule la remise propre à SA
+    // collection (règles globales + celles ciblant justement cette collection).
+    remises,
     pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
     clarity: { ...CLARITY_DEFAUT, ...(map.microsoft_clarity || {}) },
     theme: {

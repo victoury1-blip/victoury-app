@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { listerCollections } from '../lib/admin';
 
 const champ = 'border border-gray-200 px-3 py-2 text-sm bg-white';
-const VIDE_REGLE = () => ({ id: crypto.randomUUID(), nom: '', active: true, paliers: [{ rang: 2, pourcent: 20 }] });
+const VIDE_REGLE = () => ({ id: crypto.randomUUID(), nom: '', active: true, collectionId: '', paliers: [{ rang: 2, pourcent: 20 }] });
 
 export default function RemisesListe() {
   const [remises, setRemises] = useState(null);
+  const [collections, setCollections] = useState([]);
   const [edite, setEdite] = useState(null);
 
   useEffect(() => {
     supabase.from('shop_settings').select('value').eq('key', 'remises').maybeSingle()
       .then(({ data }) => setRemises(Array.isArray(data?.value) ? data.value : []));
+    listerCollections().then(setCollections).catch(() => {});
   }, []);
 
   async function sauver(liste) {
@@ -36,6 +39,8 @@ export default function RemisesListe() {
   const majPalier = (i, k, v) => setEdite(x => ({ ...x, paliers: x.paliers.map((p, j) => (j === i ? { ...p, [k]: v } : p)) }));
   const ajouterPalier = () => setEdite(x => ({ ...x, paliers: [...x.paliers, { rang: (x.paliers.length ? Math.max(...x.paliers.map(p => p.rang)) : 1) + 1, pourcent: 0 }] }));
   const retirerPalier = (i) => setEdite(x => ({ ...x, paliers: x.paliers.filter((_, j) => j !== i) }));
+
+  const nomCollection = (id) => (id && collections.find(c => c.id === id)?.name) || 'Toutes les collections';
 
   const resume = (paliers) => paliers.length
     ? paliers.map(p => `${p.rang}${p.rang === 2 ? 'ème' : p.rang === 3 ? 'ème' : 'e'} article -${p.pourcent}%`).join(' · ')
@@ -72,6 +77,14 @@ export default function RemisesListe() {
               placeholder="Ex. : 2ème -20%" className={`${champ} w-full`} />
           </div>
           <div>
+            <label className="block text-xs text-gray-500 mb-1.5">Collection concernée</label>
+            <select value={edite.collectionId || ''} onChange={e => setEdite(x => ({ ...x, collectionId: e.target.value }))} className={`${champ} w-full`}>
+              <option value="">Toutes les collections</option>
+              {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <p className="mt-1 text-[11px] text-gray-400">Laissez « Toutes les collections » pour une remise valable sur tout le catalogue.</p>
+          </div>
+          <div>
             <p className="text-xs text-gray-500 mb-2">Paliers</p>
             <div className="space-y-2">
               {edite.paliers.map((p, i) => (
@@ -99,6 +112,7 @@ export default function RemisesListe() {
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
             <tr>
               <th className="text-left px-4 py-3">Nom</th>
+              <th className="text-left px-4 py-3">Collection</th>
               <th className="text-left px-4 py-3">Type</th>
               <th className="text-left px-4 py-3">Paliers</th>
               <th className="text-left px-4 py-3">Statut</th>
@@ -109,6 +123,7 @@ export default function RemisesListe() {
             {remises.map(r => (
               <tr key={r.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium cursor-pointer" onClick={() => setEdite(r)}>{r.nom}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{nomCollection(r.collectionId)}</td>
                 <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700">% Remise progressive</span></td>
                 <td className="px-4 py-3 text-xs text-gray-500">{resume(r.paliers)}</td>
                 <td className="px-4 py-3">
@@ -122,7 +137,7 @@ export default function RemisesListe() {
               </tr>
             ))}
             {remises.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">Aucune remise</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">Aucune remise</td></tr>
             )}
           </tbody>
         </table>

@@ -1,11 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { fmtPrix, ordinal } from '../lib/pricing';
+import { paliersEffectifs } from '../lib/remises';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
-export default function CarteProduit({ produit, paliers }) {
+export default function CarteProduit({ produit, remises }) {
+  // Règles globales + celles ciblant justement la collection de CE produit —
+  // une remise réglée pour une autre collection ne doit pas s'afficher ici.
+  const paliers = paliersEffectifs(remises, produit.collection_id);
   const image = produit.images?.[0]?.url;
   const tailles = (produit.sizes || []).filter(s => s.stock > 0);
   const promo = produit.compare_at > produit.price;
