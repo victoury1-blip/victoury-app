@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nouvelId, horodatage, normaliserTelephone, telephoneValide, champsManquants, construireCommande } from '../lib/commande';
+import { nouvelId, horodatage, normaliserTelephone, telephoneValide, numeroWhatsApp, champsManquants, construireCommande } from '../lib/commande';
 
 const client = { nom: 'Fatima Zahra', telephone: '0612345678', ville: 'Casablanca', adresse: 'Hay Mohammadi' };
 const panier = [{ name: 'Ensemble Sporte Noir', size: 'L', qty: 2, price: 220 }];
@@ -17,6 +17,14 @@ describe('téléphone', () => {
     expect(telephoneValide('061234567')).toBe(false);   // trop court
     expect(telephoneValide('0812345678')).toBe(false);  // préfixe inexistant
     expect(telephoneValide('')).toBe(false);
+  });
+
+  it('convertit vers le format international attendu par wa.me', () => {
+    expect(numeroWhatsApp('0612345678')).toBe('212612345678');
+    expect(numeroWhatsApp('+212 612-345-678')).toBe('212612345678');
+    // Un numéro incomplet ou invalide ne doit jamais donner un lien mort.
+    expect(numeroWhatsApp('0663913')).toBe('');
+    expect(numeroWhatsApp('')).toBe('');
   });
 });
 

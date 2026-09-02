@@ -1,13 +1,15 @@
 import React from 'react';
 import { IconeWhatsApp } from './icons';
+import { numeroWhatsApp } from '../lib/commande';
 
 /* Bulle flottante visible sur toutes les pages de la vitrine — le client
    marocain écrit d'abord sur WhatsApp avant de commander, bien plus que par
-   e-mail. N'apparaît que si un numéro est réglé (/store/theme → Footer),
-   jamais un lien mort. */
+   e-mail. N'apparaît que si un numéro VALIDE est réglé (/store/theme →
+   Footer), jamais un lien mort ("numéro non valide"). */
 export default function WhatsAppBulle({ numero }) {
-  if (!numero) return null;
-  const href = `https://wa.me/${numero.replace(/\D/g, '')}?text=${encodeURIComponent('السلام، بغيت نسولك على...')}`;
+  const digits = numeroWhatsApp(numero);
+  if (!digits) return null;
+  const href = `https://wa.me/${digits}?text=${encodeURIComponent('السلام، بغيت نسولك على...')}`;
 
   return (
     <a href={href} target="_blank" rel="noreferrer"

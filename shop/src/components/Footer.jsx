@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Instagram, Facebook, Phone, Truck, Wallet } from 'lucide-react';
 import Wordmark from './Wordmark';
 import { IconeWhatsApp, IconeTikTok } from './icons';
+import { numeroWhatsApp } from '../lib/commande';
 
 /* Pied de page — description, contact et mentions viennent de /store/theme.
    Les listes sont vides par défaut plutôt que pré-remplies d'une marque qui
@@ -47,7 +48,7 @@ export default function Footer({ theme, collections }) {
     { cle: 'facebook', Icone: Facebook, href: c.facebook },
   ];
   const contactsDirects = [
-    { cle: 'whatsapp', Icone: IconeWhatsApp, href: c.whatsapp ? `https://wa.me/${c.whatsapp.replace(/\D/g, '')}` : '' },
+    { cle: 'whatsapp', Icone: IconeWhatsApp, href: numeroWhatsApp(c.whatsapp) ? `https://wa.me/${numeroWhatsApp(c.whatsapp)}` : '' },
     { cle: 'appel', Icone: Phone, href: c.appel ? `tel:${c.appel}` : '' },
   ];
   const rangeeIcones = (items) => (

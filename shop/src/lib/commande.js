@@ -35,6 +35,15 @@ export function normaliserTelephone(tel) {
 
 export const telephoneValide = (tel) => /^0[5-7]\d{8}$/.test(normaliserTelephone(tel));
 
+/* wa.me exige le format international SANS le 0 initial (2126XXXXXXXX) — un
+   numéro local (06XXXXXXXX) ou mal saisi donne un lien mort ("numéro non
+   valide"). Vide si le numéro n'est de toute façon pas un mobile marocain
+   correct, plutôt que d'envoyer wa.me vers un lien cassé. */
+export function numeroWhatsApp(tel) {
+  const local = normaliserTelephone(tel);
+  return /^0[5-7]\d{8}$/.test(local) ? '212' + local.slice(1) : '';
+}
+
 /** Ce qui manque pour que la commande puisse partir. */
 export function champsManquants(form, lignes) {
   const manque = [];
