@@ -1,0 +1,21 @@
+name: Trigger shop deploy
+
+# L'auto-deploy Git de Vercel (webhook GitHub) s'est montré peu fiable pour
+# ce projet : des pushs vers main n'ont pas toujours déclenché de build. Ce
+# workflow appelle directement le Deploy Hook de Vercel à chaque push sur
+# main, sans dépendre de ce webhook.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Vercel deploy hook
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL secret non réglé — voir Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
