@@ -42,21 +42,23 @@ export default function Footer({ theme, collections }) {
   // suite quelles icônes restent à compléter dans /store/theme.
   // Deux groupes distincts : les réseaux sociaux (Suivez-nous) et les moyens
   // de contact direct (Contact) — pas mêlés dans une même rangée.
+  // Couleurs de marque plutôt que la couleur du thème — ce sont des logos
+  // reconnaissables, les rendre monochromes les rend juste plus durs à repérer.
   const reseaux = [
-    { cle: 'instagram', Icone: Instagram, href: c.instagram },
-    { cle: 'tiktok', Icone: IconeTikTok, href: c.tiktok },
-    { cle: 'facebook', Icone: Facebook, href: c.facebook },
+    { cle: 'instagram', Icone: Instagram, href: c.instagram, couleur: '#E4405F' },
+    { cle: 'tiktok', Icone: IconeTikTok, href: c.tiktok, couleur: '#25F4EE' },
+    { cle: 'facebook', Icone: Facebook, href: c.facebook, couleur: '#1877F2' },
   ];
   const contactsDirects = [
-    { cle: 'whatsapp', Icone: IconeWhatsApp, href: numeroWhatsApp(c.whatsapp) ? `https://wa.me/${numeroWhatsApp(c.whatsapp)}` : '' },
-    { cle: 'appel', Icone: Phone, href: c.appel ? `tel:${c.appel}` : '' },
+    { cle: 'whatsapp', Icone: IconeWhatsApp, href: numeroWhatsApp(c.whatsapp) ? `https://wa.me/${numeroWhatsApp(c.whatsapp)}` : '', couleur: '#25D366' },
+    { cle: 'appel', Icone: Phone, href: c.appel ? `tel:${c.appel}` : '', couleur: '#34B7F1' },
   ];
   const rangeeIcones = (items) => (
     <div className="flex justify-center gap-5">
-      {items.map(({ cle, Icone, href }) => (
+      {items.map(({ cle, Icone, href, couleur }) => (
         href
-          ? <a key={cle} href={href} target="_blank" rel="noreferrer" className="opacity-70 hover:opacity-100 transition-opacity"><Icone size={20} /></a>
-          : <span key={cle} className="opacity-25" title="Lien non réglé dans /store/theme"><Icone size={20} /></span>
+          ? <a key={cle} href={href} target="_blank" rel="noreferrer" style={{ color: couleur }} className="opacity-90 hover:opacity-100 transition-opacity"><Icone size={20} /></a>
+          : <span key={cle} style={{ color: couleur }} className="opacity-30" title="Lien non réglé dans /store/theme"><Icone size={20} /></span>
       ))}
     </div>
   );
