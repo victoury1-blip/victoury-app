@@ -8,7 +8,10 @@ import { envoyerCommande } from '../lib/envoi';
 import { verifierPromo } from '../lib/catalog';
 import { trackPixel, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from '../lib/pixel';
 
-const champ = 'w-full border-2 border-gray-400 px-3 py-3 text-sm focus:outline-none focus:border-ink transition-colors';
+// La couleur du thème (--ink, réglable dans /store/theme), pas le vert de la
+// sélection de taille — un champ de saisie n'est pas un choix, il ne doit pas
+// emprunter la couleur d'un autre geste.
+const champ = 'w-full border-2 border-ink px-3 py-3 text-sm focus:outline-none transition-colors';
 
 export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   const navigate = useNavigate();
