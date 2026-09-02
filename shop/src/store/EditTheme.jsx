@@ -272,7 +272,45 @@ export default function EditTheme() {
               <DeposeImage titre="Image Desktop" url={t.hero.imageDesktop} onChange={v => uHero('imageDesktop', v)} className="w-full h-28" />
               <DeposeImage titre="Image Mobile" url={t.hero.imageMobile} onChange={v => uHero('imageMobile', v)} className="w-full h-28" />
             </div>
-            <div className="mt-4 grid sm:grid-cols-2 gap-4">
+            <p className="mt-2 text-[11px] text-gray-400">
+              {t.hero.slides?.length ? "Utilisée seulement si aucune diapositive n'est réglée ci-dessous." : "Photo affichée tant qu'aucune diapositive n'est ajoutée ci-dessous."}
+            </p>
+
+            <div className="mt-5 pt-5 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium">Diapositives (2-3 photos qui défilent)</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Remplace la photo unique ci-dessus si au moins une est ajoutée.</p>
+                </div>
+                <button type="button"
+                  onClick={() => uHero('slides', [...(t.hero.slides || []), { imageDesktop: '', imageMobile: '' }])}
+                  className="flex items-center gap-1.5 text-xs border border-gray-200 px-3 py-1.5 uppercase tracking-wide shrink-0">
+                  <Plus size={13} /> Ajouter
+                </button>
+              </div>
+              <div className="mt-4 space-y-4">
+                {(t.hero.slides || []).map((s, i) => (
+                  <div key={i} className="flex items-start gap-4 border border-gray-100 rounded-lg p-3">
+                    <span className="text-xs text-gray-300 mt-2">{i + 1}</span>
+                    <div className="flex-1 grid sm:grid-cols-2 gap-4">
+                      <DeposeImage titre="Desktop" url={s.imageDesktop}
+                        onChange={v => uHero('slides', t.hero.slides.map((x, j) => j === i ? { ...x, imageDesktop: v } : x))}
+                        className="w-full h-24" />
+                      <DeposeImage titre="Mobile" url={s.imageMobile}
+                        onChange={v => uHero('slides', t.hero.slides.map((x, j) => j === i ? { ...x, imageMobile: v } : x))}
+                        className="w-full h-24" />
+                    </div>
+                    <button type="button" onClick={() => uHero('slides', t.hero.slides.filter((_, j) => j !== i))}
+                      className="mt-2 text-gray-300 hover:text-red-500 shrink-0">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                {!t.hero.slides?.length && <p className="text-xs text-gray-300">Aucune diapositive ajoutée.</p>}
+              </div>
+            </div>
+
+            <div className="mt-5 pt-5 border-t border-gray-100 grid sm:grid-cols-2 gap-4">
               <div><label className={label}>Titre</label><input value={t.hero.titre} onChange={e => uHero('titre', e.target.value)} className={champ} /></div>
               <div><label className={label}>Sous-titre</label><input value={t.hero.sousTitre} onChange={e => uHero('sousTitre', e.target.value)} className={champ} /></div>
             </div>

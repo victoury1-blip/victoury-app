@@ -119,6 +119,9 @@ export const THEME_DEFAUT = {
 
   hero: {
     imageDesktop: '/hero-victoury.jpg', imageMobile: '/hero-victoury.jpg',
+    // Plusieurs diapositives possibles (2-3 photos qui défilent). Une boutique
+    // qui n'en a réglé aucune retombe sur la photo unique ci-dessus.
+    slides: [],
     titre: 'Bienvenue chez Victoury', sousTitre: 'Le confort au quotidien',
     boutonTexte: 'Voir la collection', boutonLien: '',
   },
