@@ -24,7 +24,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   const [manque, setManque] = useState([]);
 
   const t = totalPanier(lignes, {
-    paliers: reglages?.paliers, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
+    paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
   });
   const u = (k, v) => { setForm(f => ({ ...f, [k]: v })); setManque(m => m.filter(x => x !== k)); };
 

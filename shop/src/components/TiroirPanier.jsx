@@ -4,9 +4,9 @@ import { X, Minus, Plus } from 'lucide-react';
 import { fmtPrix, totalPanier } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 
-export default function TiroirPanier({ ouvert, lignes, paliers, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
+export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
   if (!ouvert) return null;
-  const t = totalPanier(lignes, { paliers, livraison, seuilGratuit });
+  const t = totalPanier(lignes, { paliers, remises, livraison, seuilGratuit });
   // Ce qu'il manque pour atteindre la livraison gratuite : un rappel concret
   // pousse à ajouter un article, là où « livraison offerte » seul ne dit rien
   // de ce qu'il reste à faire.

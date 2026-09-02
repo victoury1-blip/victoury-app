@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { totalPanier, remiseQuantite, remisePromo, sousTotal, nbArticles } from '../lib/pricing';
+import { totalPanier, remiseQuantite, remiseQuantiteGroupee, remisePromo, sousTotal, nbArticles } from '../lib/pricing';
 
 const PALIERS = [{ rang: 2, pourcent: 20 }, { rang: 3, pourcent: 30 }];
-const ligne = (price, qty = 1) => ({ price, qty });
+const ligne = (price, qty = 1, collectionId) => ({ price, qty, collectionId });
 
 describe('panier', () => {
   it('compte les articles, quantités comprises', () => {
@@ -118,5 +118,29 @@ describe('seuil de livraison gratuite', () => {
 
   it('sans seuil configuré, la livraison reste toujours due', () => {
     expect(totalPanier([ligne(1000)], { livraison: 35 }).livraison).toBe(35);
+  });
+});
+
+/* Le panier peut mélanger plusieurs collections : une remise réglée pour
+   "Ensemble Sport" ne doit profiter qu'aux lignes de cette collection, pas à
+   une robe achetée dans le même panier. */
+describe('remise par quantité, groupée par collection', () => {
+  const regle = (nom, collectionId) => ({ nom, active: true, collectionId, paliers: [{ rang: 2, pourcent: 20 }] });
+
+  it("une règle ciblée ne remise que sa propre collection", () => {
+    const remises = [regle('Sport -20%', 'sport')];
+    const lignes = [ligne(500, 1, 'sport'), ligne(500, 1, 'sport'), ligne(500, 1, 'robes')];
+    // 2 articles "sport" : le 2ᵉ à -20%. L'article "robes" n'a aucune remise.
+    expect(remiseQuantiteGroupee(lignes, remises)).toBe(100);
+  });
+
+  it('une règle globale (sans collection) profite à tout le panier', () => {
+    const remises = [regle('Toutes -20%', undefined)];
+    const lignes = [ligne(500, 1, 'sport'), ligne(500, 1, 'robes')];
+    expect(remiseQuantiteGroupee(lignes, remises)).toBe(100);
+  });
+
+  it('sans règle, aucune remise', () => {
+    expect(remiseQuantiteGroupee([ligne(500, 2)], [])).toBe(0);
   });
 });

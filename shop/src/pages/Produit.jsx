@@ -146,7 +146,7 @@ export default function Produit({ onAjouter, theme, remises }) {
           onClick={() => onAjouter({
             slug: produit.slug, name: produit.name, price: produit.price,
             size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
-            stock: stockTaille,
+            stock: stockTaille, collectionId: produit.collection_id,
           })}
           className="mt-7 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase
                      disabled:bg-gray-200 disabled:text-gray-400 transition-colors">

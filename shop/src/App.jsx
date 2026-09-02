@@ -127,7 +127,7 @@ function Vitrine() {
       <Footer telephone={reglages.telephone} theme={reglages.theme} collections={collections} />
 
       <TiroirPanier
-        ouvert={panierOuvert} lignes={lignes} paliers={reglages.paliers}
+        ouvert={panierOuvert} lignes={lignes} paliers={reglages.paliers} remises={reglages.remises}
         livraison={reglages.livraison} seuilGratuit={reglages.seuilGratuit}
         onFermer={() => setPanierOuvert(false)} onQuantite={onQuantite} onRetirer={onRetirer}
       />

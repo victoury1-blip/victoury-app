@@ -4,6 +4,7 @@
  * code promo, puis la livraison. Les intervertir donnerait un total différent
  * de celui annoncé sur la fiche produit — et une réclamation à la livraison.
  */
+import { paliersEffectifs } from './remises';
 
 /** Nombre d'articles dans le panier, quantités comprises. */
 export const nbArticles = (lignes) => lignes.reduce((n, l) => n + (l.qty || 0), 0);
@@ -27,6 +28,38 @@ export function remiseQuantite(lignes, paliers = []) {
     // Le palier applicable est le plus élevé dont le rang est atteint.
     const p = paliers.filter(x => rang >= x.rang).sort((a, b) => b.rang - a.rang)[0];
     if (p) remise += prix[rang - 1] * (p.pourcent / 100);
+  }
+  return arrondi(remise);
+}
+
+/* Une remise peut être limitée à une collection (/store/remises). Le panier
+ * mélange souvent plusieurs collections : chaque groupe (par collectionId)
+ * applique ses propres paliers effectifs (règles globales + celles ciblant
+ * justement sa collection), et les remises se cumulent groupe par groupe —
+ * jamais une remise "Ensemble Sport" appliquée à une robe dans le même panier. */
+export function remiseQuantiteGroupee(lignes, remises = []) {
+  if (!remises?.length) return 0;
+  const actifs = remises.filter(r => r.active && r.type !== 'inactive');
+  // Collections qui ont leur propre règle : ces lignes-là comptent à part,
+  // dans leur groupe. Les autres lignes (aucune règle spécifique) comptent
+  // TOUTES ENSEMBLE — une remise globale porte sur le panier entier, pas
+  // sur chaque collection séparément.
+  const collectionsCiblees = new Set(actifs.filter(r => r.collectionId).map(r => r.collectionId));
+
+  const parCollection = new Map();
+  const reste = [];
+  for (const l of lignes) {
+    if (l.collectionId && collectionsCiblees.has(l.collectionId)) {
+      if (!parCollection.has(l.collectionId)) parCollection.set(l.collectionId, []);
+      parCollection.get(l.collectionId).push(l);
+    } else {
+      reste.push(l);
+    }
+  }
+
+  let remise = remiseQuantite(reste, paliersEffectifs(remises, null));
+  for (const [collectionId, groupe] of parCollection) {
+    remise += remiseQuantite(groupe, paliersEffectifs(remises, collectionId));
   }
   return arrondi(remise);
 }
@@ -55,9 +88,12 @@ export function fraisLivraison(montantApresRemises, { livraison = 0, seuilGratui
 }
 
 /** Détail complet du panier — c'est ce qui s'affiche ET ce qui est facturé. */
-export function totalPanier(lignes, { paliers = [], promo = null, livraison = 0, seuilGratuit = null } = {}) {
+export function totalPanier(lignes, { paliers = [], remises = null, promo = null, livraison = 0, seuilGratuit = null } = {}) {
   const st = arrondi(sousTotal(lignes));
-  const rq = remiseQuantite(lignes, paliers);
+  // `remises` (règles brutes, avec leur collection éventuelle) prime sur
+  // `paliers` (une seule liste, globale) quand on l'a — sinon on retombe sur
+  // l'ancien calcul, pour les appelants qui ne connaissent que les paliers.
+  const rq = remises?.length ? remiseQuantiteGroupee(lignes, remises) : remiseQuantite(lignes, paliers);
   const apresQuantite = arrondi(st - rq);
   const rp = remisePromo(apresQuantite, promo);
   const apresRemises = arrondi(apresQuantite - rp);
