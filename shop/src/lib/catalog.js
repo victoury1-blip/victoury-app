@@ -135,6 +135,15 @@ export const THEME_DEFAUT = {
   },
   texteSousHero: { texte: '', taille: 14, couleurTexte: '#000000', couleurFond: '#f9f6f0' },
 
+  // Trois arguments de réassurance sous le Hero — livraison, contact, paiement
+  // à la livraison : ce qui rassure le plus un premier achat en ligne au Maroc.
+  reassuranceActive: true,
+  reassurance: [
+    { titre: 'Livraison gratuite sur toutes les commandes', texte: 'Bénéficiez de la livraison gratuite pour toute commande supérieure à 200 dh ; Livraison sous 12 à 24 heures dans toutes les villes marocaines.' },
+    { titre: 'Service client 7j/7', texte: "Notre équipe est à votre disposition pour répondre à toutes vos questions et confirmer vos commandes via WhatsApp ou par téléphone." },
+    { titre: 'Paiement à la livraison', texte: "Commandez en toute sécurité ! Vous ne payez qu'après avoir reçu, vérifié et testé votre produit entre vos mains." },
+  ],
+
   footer: {
     description: '',
     couleurFond: '#f7f5f2', couleurTexte: '#111111',

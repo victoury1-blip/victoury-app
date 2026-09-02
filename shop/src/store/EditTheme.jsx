@@ -328,6 +328,26 @@ export default function EditTheme() {
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">Réassurance</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Les 3 arguments affichés sous le Hero (livraison, contact, paiement)</p>
+              </div>
+              <Bascule actif={t.reassuranceActive !== false} onChange={() => u('reassuranceActive', t.reassuranceActive === false)} />
+            </div>
+            <div className="mt-4 space-y-4">
+              {t.reassurance.map((r, i) => (
+                <div key={i} className="border border-gray-100 rounded-lg p-3">
+                  <label className={label}>Titre {i + 1}</label>
+                  <input value={r.titre} onChange={e => u('reassurance', t.reassurance.map((x, j) => j === i ? { ...x, titre: e.target.value } : x))} className={champ} />
+                  <label className={`${label} mt-2`}>Texte {i + 1}</label>
+                  <textarea value={r.texte} onChange={e => u('reassurance', t.reassurance.map((x, j) => j === i ? { ...x, texte: e.target.value } : x))} rows={2} className={champ} />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
             <h2 className="text-sm font-medium">Texte sous Hero</h2>
             <p className="text-xs text-gray-400 mt-0.5">Phrase éditoriale affichée sous l'image principale</p>
             <textarea value={t.texteSousHero.texte} onChange={e => uSousHero('texte', e.target.value)} rows={2} className={`${champ} mt-3`} />

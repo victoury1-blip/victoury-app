@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import CarteProduit from '../components/CarteProduit';
 import AvisClients from '../components/AvisClients';
+import Reassurance from '../components/Reassurance';
 import { chargerNouveautes, chargerAvis } from '../lib/catalog';
 
 export default function Accueil({ collections, reglages }) {
@@ -68,6 +69,8 @@ export default function Accueil({ collections, reglages }) {
           </div>
         </div>
       </section>
+
+      <Reassurance items={reglages?.theme?.reassurance} active={reglages?.theme?.reassuranceActive} />
 
       {sh.texte && (
         <p className="text-center px-6 py-6" style={{ fontSize: `${sh.taille || 14}px`, color: sh.couleurTexte, background: sh.couleurFond }}>

@@ -77,7 +77,21 @@ export default function Footer({ theme, collections }) {
         {liens('Suivez-nous', f.reseaux)}
         {liens('Mentions légales', f.mentions)}
       </div>
-      <p className="text-center text-[11px] opacity-40 pb-6">© {new Date().getFullYear()} Victoury</p>
+      <div className="border-t border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-[11px] opacity-50 text-center sm:text-left">
+            © {new Date().getFullYear()} <strong className="font-semibold">VICTOURY</strong> — Tous droits réservés.
+          </p>
+          {/* Libellés textuels plutôt que des logos de marque copiés — le
+              message ("on accepte ces moyens de paiement") passe pareil sans
+              reproduire des marques déposées. */}
+          <div className="flex items-center gap-2">
+            {['Visa', 'Mastercard', 'PayPal', 'Paiement à la livraison'].map(m => (
+              <span key={m} className="text-[10px] font-medium border border-gray-300 rounded px-2 py-1 opacity-60">{m}</span>
+            ))}
+          </div>
+        </div>
+      </div>
     </footer>
   );
 }
