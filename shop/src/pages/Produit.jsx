@@ -68,9 +68,13 @@ export default function Produit({ onAjouter, theme, remises }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-2 gap-10">
-      <div className="space-y-2">
+      {/* Sur mobile, les photos défilent au doigt une par une (comme une story) —
+          empilées les unes sous les autres, il fallait scroller toute la page
+          juste pour voir la 2ᵉ photo. Le bureau garde l'empilement classique. */}
+      <div className="flex overflow-x-auto snap-x snap-mandatory lg:flex-col lg:overflow-visible lg:snap-none gap-2
+                      [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {(produit.images?.length ? produit.images : [{ url: '' }]).map((img, i) => (
-          <div key={i} className="bg-sand aspect-square overflow-hidden">
+          <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center lg:shrink">
             {img.url
               ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
               : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">Photo à venir</div>}
