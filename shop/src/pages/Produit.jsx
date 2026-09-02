@@ -32,7 +32,14 @@ export default function Produit({ onAjouter, theme, paliers }) {
     chargerProduit(slug)
       .then(async p => {
         setProduit(p);
-        setCouleurs(p?.group_id ? await chargerCouleurs(p.group_id) : []);
+        // La première taille disponible est déjà choisie : le client qui ne
+        // regarde même pas cette ligne peut quand même ajouter au panier, et
+        // celui qui veut une autre taille n'a qu'à cliquer dessus.
+        setTaille(p?.sizes?.find(s => s.stock > 0)?.size || '');
+        const cs = p?.group_id ? await chargerCouleurs(p.group_id) : [];
+        // La couleur actuellement affichée ressort en tête des pastilles —
+        // les « autres » couleurs viennent après, jamais avant elle.
+        setCouleurs(p ? [...cs].sort((a, b) => (a.slug === p.slug ? -1 : b.slug === p.slug ? 1 : 0)) : cs);
         if (p) trackPixel('ViewContent', {
           content_name: p.name, content_ids: [p.slug], content_type: 'product',
           value: p.price, currency: 'MAD',
