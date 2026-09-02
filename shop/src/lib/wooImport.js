@@ -44,16 +44,33 @@ const recupererVariations = (productId, ck, cs) =>
 
 const nettoyerHtml = (html) => String(html || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
+// Cible l'attribut « Taille/Pointure/Size » plutôt que le premier attribut
+// trouvé : un produit variant aussi par couleur peut lister la couleur en
+// premier, ce qui donnerait des tailles fausses (ou dupliquées).
+const attributTaille = (v) =>
+  v.attributes?.find(a => /taille|pointure|size/i.test(a.name || ''))?.option
+  || v.attributes?.[0]?.option;
+
 /** Convertit un produit WooCommerce (+ ses variations) en la forme attendue par shop_products. */
 export function mapperProduitWoo(wp, variations, collectionId) {
   const prix = parseFloat(wp.price ?? wp.regular_price) || 0;
   const compareAt = parseFloat(wp.regular_price) || 0;
-  const tailles = variations.length > 0
-    ? variations.map((v, i) => ({
-        size: v.attributes?.[0]?.option || `Taille ${i + 1}`,
-        stock: v.stock_quantity ?? (v.stock_status === 'instock' ? 1 : 0),
-      }))
-    : [{ size: 'Unique', stock: wp.stock_quantity ?? (wp.stock_status === 'instock' ? 1 : 0) }];
+
+  let tailles;
+  if (variations.length > 0) {
+    // Une même taille peut revenir sur plusieurs variations (combinée à une
+    // couleur que ce produit ne modélise pas séparément) : le stock se
+    // cumule au lieu de tenter d'insérer deux fois la même taille.
+    const parTaille = new Map();
+    variations.forEach((v, i) => {
+      const taille = attributTaille(v) || `Taille ${i + 1}`;
+      const stock = v.stock_quantity ?? (v.stock_status === 'instock' ? 1 : 0);
+      parTaille.set(taille, (parTaille.get(taille) || 0) + Math.max(0, stock));
+    });
+    tailles = [...parTaille.entries()].map(([size, stock]) => ({ size, stock }));
+  } else {
+    tailles = [{ size: 'Unique', stock: wp.stock_quantity ?? (wp.stock_status === 'instock' ? 1 : 0) }];
+  }
 
   return {
     produit: {
