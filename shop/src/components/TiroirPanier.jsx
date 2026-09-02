@@ -38,8 +38,11 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                   <p className="text-sm text-gray-800">{l.name}</p>
                   {l.color && <p className="text-xs text-gray-400 mt-0.5">Couleur : {l.color}</p>}
                   {l.size && <p className="text-xs text-gray-400">Taille : {l.size}</p>}
+                  {/* Rouge, comme partout ailleurs sur le site où une remise est
+                      signalée (badge produit, prix barré, palier) — le noir est déjà
+                      pris par le texte et les boutons, le rouge reste le signal promo. */}
                   {l.remiseDh > 0 && (
-                    <span className="inline-block mt-1.5 bg-ink text-white text-[10px] font-medium px-2 py-1 rounded">
+                    <span className="inline-block mt-1.5 bg-red-600 text-white text-[10px] font-medium px-2 py-1 rounded">
                       RÉDUCTION {l.remisePourcent}% (−{fmtPrix(l.remiseDh)})
                     </span>
                   )}
