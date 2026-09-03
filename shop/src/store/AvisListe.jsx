@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Trash2, Upload, GripVertical } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { televerserPhoto, enregistrerAvis } from '../lib/admin';
+import RecadrageModal from '../components/RecadrageModal';
 
 /* Preuve sociale sous forme de captures d'écran — pas un système de note
    avec formulaire client, ce que l'ancien site n'avait pas non plus.
@@ -10,6 +11,9 @@ export default function AvisListe() {
   const [avis, setAvis] = useState(null);
   const [envoi, setEnvoi] = useState(false);
   const [traine, setTraine] = useState(null);
+  // File(s) en attente de recadrage, une à la fois — la modale se ré-ouvre
+  // toute seule sur la suivante tant qu'il en reste dans la file.
+  const [aRecadrer, setARecadrer] = useState([]);
 
   useEffect(() => {
     supabase.from('shop_settings').select('value').eq('key', 'avis').maybeSingle()
@@ -21,17 +25,34 @@ export default function AvisListe() {
     await enregistrerAvis(liste);
   }
 
-  async function ajouterFichiers(fichiers) {
+  function ajouterFichiers(fichiers) {
     if (!fichiers?.length) return;
+    setARecadrer([...fichiers]);
+  }
+
+  async function envoyerUneCapture(fichier) {
     setEnvoi(true);
     try {
-      const urls = await Promise.all([...fichiers].map(televerserPhoto));
-      await sauver([...avis, ...urls.map(url => ({ id: crypto.randomUUID(), url }))]);
+      const url = await televerserPhoto(fichier);
+      await sauver([...avis, { id: crypto.randomUUID(), url }]);
     } catch (e) {
       alert(e.message || 'Envoi impossible');
     } finally {
       setEnvoi(false);
     }
+  }
+
+  function apresRecadrage(fichierRecadre) {
+    setARecadrer(reste => reste.slice(1));
+    envoyerUneCapture(fichierRecadre);
+  }
+
+  function passerRecadrage() {
+    // Le client refuse de recadrer cette capture : elle est envoyée telle
+    // quelle plutôt que perdue silencieusement.
+    const [fichier, ...reste] = aRecadrer;
+    setARecadrer(reste);
+    if (fichier) envoyerUneCapture(fichier);
   }
 
   function retirer(id) {
@@ -54,12 +75,14 @@ export default function AvisListe() {
       <h1 className="text-lg font-medium">Avis clients</h1>
       <p className="text-sm text-gray-500 mt-1">
         Déposez des captures d'écran (WhatsApp, messages...) — elles s'affichent sur la page d'accueil,
-        dans l'ordre ci-dessous. Glissez-déposez pour réordonner.
+        dans l'ordre ci-dessous. Glissez-déposez pour réordonner. Chaque capture peut être recadrée
+        avant l'envoi pour cacher le nom ou le numéro du client.
       </p>
 
       <label className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-xs tracking-widest uppercase cursor-pointer bg-white">
         <Upload size={14} /> {envoi ? 'Envoi…' : 'Ajouter des captures'}
-        <input type="file" accept="image/*" multiple hidden disabled={envoi} onChange={e => ajouterFichiers(e.target.files)} />
+        <input type="file" accept="image/*" multiple hidden disabled={envoi}
+          onChange={e => { ajouterFichiers(e.target.files); e.target.value = ''; }} />
       </label>
 
       {avis.length === 0 ? (
@@ -82,6 +105,10 @@ export default function AvisListe() {
             </div>
           ))}
         </div>
+      )}
+
+      {aRecadrer.length > 0 && (
+        <RecadrageModal fichier={aRecadrer[0]} onValider={apresRecadrage} onAnnuler={passerRecadrage} />
       )}
     </div>
   );
