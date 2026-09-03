@@ -107,7 +107,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
                 inputMode="tel" placeholder="06 12 34 56 78" className={`${champ} ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
-                <p className="mt-1 text-[11px] text-red-500">{lang === 'ar' ? 'رقم مغربي ب10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
+                <p className="mt-1 text-[11px] text-red-500">{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
               )}
             </div>
           </div>

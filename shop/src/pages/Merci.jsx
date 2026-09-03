@@ -11,7 +11,7 @@ export default function Merci() {
       <div className="w-14 h-14 rounded-full bg-ink text-white grid place-items-center mx-auto"><Check size={26} /></div>
       <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{lang === 'ar' ? 'تم تسجيل الطلب' : 'Commande enregistrée'}</h1>
       <p className="mt-3 text-sm text-gray-600">
-        {lang === 'ar' ? 'شكرا! غادي نعيطو ليكم دغيا باش نأكدو الطلب.' : 'Merci ! Nous vous appelons très vite pour confirmer votre commande.'}
+        {lang === 'ar' ? 'شكرًا لكم! سنتصل بكم قريبًا لتأكيد طلبكم.' : 'Merci ! Nous vous appelons très vite pour confirmer votre commande.'}
       </p>
       {/* Le numéro sert au client au téléphone : sans lui, il faut chercher par nom. */}
       {id && <p className="mt-4 text-xs text-gray-400">{t('numeroCommande')} : <span className="font-mono">{id}</span></p>}
