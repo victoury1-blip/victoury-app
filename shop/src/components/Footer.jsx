@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Facebook, Phone, Truck, Wallet } from 'lucide-react';
 import Wordmark from './Wordmark';
-import { IconeWhatsApp, IconeTikTok } from './icons';
+import { IconeWhatsApp, IconeTikTok, IconeVisa, IconeMastercard, IconePayPal } from './icons';
 import { numeroWhatsApp } from '../lib/commande';
 
 /* Pied de page — description, contact et mentions viennent de /store/theme.
@@ -97,13 +97,14 @@ export default function Footer({ theme, collections }) {
           <p className="text-xs opacity-50 text-center sm:text-left">
             © {new Date().getFullYear()} <strong className="font-semibold">VICTOURY</strong> — Tous droits réservés.
           </p>
-          {/* Libellés textuels plutôt que des logos de marque copiés — le
-              message ("on accepte ces moyens de paiement") passe pareil sans
-              reproduire des marques déposées. */}
-          <div className="flex flex-wrap items-center justify-center gap-2.5">
-            {['Visa', 'Mastercard', 'PayPal', 'Paiement à la livraison'].map(m => (
-              <span key={m} className="text-xs font-medium border border-gray-300 rounded px-3 py-1.5 opacity-60">{m}</span>
-            ))}
+          {/* Repères reconnaissables (silhouette Mastercard, "P" PayPal, VISA
+              en italique) plutôt qu'une reproduction exacte des logos déposés
+              — le message ("on accepte ces moyens") passe pareil. */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconeVisa /></span>
+            <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconeMastercard /></span>
+            <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconePayPal /></span>
+            <span className="text-xs font-medium border border-gray-300 rounded px-3 py-1.5 opacity-60">Paiement à la livraison</span>
           </div>
         </div>
       </div>

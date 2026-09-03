@@ -18,3 +18,30 @@ export function IconeTikTok({ size = 16, ...props }) {
     </svg>
   );
 }
+
+/* Repères de moyens de paiement — leur silhouette reconnaissable (les deux
+   cercles Mastercard, le "P" bleu PayPal), pas une reproduction exacte du
+   logo déposé. Sert à indiquer les moyens acceptés, pas à imiter la marque. */
+export function IconeVisa({ height = 16, ...props }) {
+  return (
+    <svg viewBox="0 0 48 16" height={height} width={height * 3} {...props}>
+      <text x="0" y="13" fontFamily="Georgia, serif" fontStyle="italic" fontWeight="700" fontSize="15" fill="#1A1F71">VISA</text>
+    </svg>
+  );
+}
+export function IconeMastercard({ size = 20, ...props }) {
+  return (
+    <svg viewBox="0 0 36 22" width={size * 1.6} height={size} {...props}>
+      <circle cx="14" cy="11" r="10" fill="#EB001B" />
+      <circle cx="22" cy="11" r="10" fill="#F79E1B" fillOpacity="0.9" />
+    </svg>
+  );
+}
+export function IconePayPal({ size = 16, ...props }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} {...props}>
+      <path fill="#003087" d="M8.5 20.5 10 6.8h5.4c3 0 4.9 1.6 4.5 4.4-.5 3.3-2.9 5-6 5h-2l-.7 4.3H8.5Z" />
+      <path fill="#009cde" d="M6.5 17.5 8 3.8h5.4c3 0 4.9 1.6 4.5 4.4-.5 3.3-2.9 5-6 5h-2l-.7 4.3H6.5Z" />
+    </svg>
+  );
+}
