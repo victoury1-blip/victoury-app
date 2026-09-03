@@ -42,6 +42,41 @@ async function localiser(ip) {
   }
 }
 
+/* Filet de secours : une copie de chaque commande part vers une feuille
+   Google Sheets (Apps Script déployé en Web App, réglé dans /store/reglages)
+   — consultable même si l'application ou Supabase a un souci. Jamais
+   bloquant : un webhook injoignable ne doit jamais faire échouer la vente. */
+async function copierVersSheet(url, key, commande) {
+  try {
+    const ac = new AbortController();
+    const to = setTimeout(() => ac.abort(), 3000);
+    const r = await fetch(`${url}/rest/v1/shop_settings?key=eq.boutique&select=value`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: ac.signal,
+    });
+    clearTimeout(to);
+    if (!r.ok) return;
+    const lignes = await r.json();
+    const webhook = lignes?.[0]?.value?.sheetWebhookUrl;
+    if (!webhook) return;
+
+    const produits = (commande.products || []).map(p => `${p.name}${p.size ? ` (${p.size})` : ''} ×${p.qty}`).join(', ');
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: commande.id,
+        date: commande.date_added,
+        nom: commande.recipient.name,
+        telephone: commande.recipient.phone,
+        ville: commande.recipient.city,
+        adresse: commande.recipient.address,
+        produits,
+        total: commande.price,
+      }),
+    });
+  } catch { /* le pire cas est une ligne manquante dans la feuille, jamais une vente perdue */ }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
 
@@ -92,6 +127,11 @@ export default async function handler(req, res) {
       body: JSON.stringify({ p_slug: l.slug, p_size: l.size || '', p_qty: l.qty || 1 }),
     }).catch(() => {})
   ));
+
+  // Attendu (pas laissé en arrière-plan) : une fois la réponse envoyée, Vercel
+  // peut geler la fonction avant qu'un appel encore en vol n'ait eu le temps
+  // d'aboutir — la copie vers la feuille ne partirait alors jamais.
+  await copierVersSheet(url, key, commande);
 
   return res.status(200).json({ ok: true, id: commande.id });
 }

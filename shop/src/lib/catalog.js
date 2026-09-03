@@ -120,6 +120,11 @@ export const REGLAGES_DEFAUT = {
   livraison: 0,
   seuilGratuit: null,
   telephone: '',
+  // Sauvegarde chaque commande vers une feuille Google Sheets (au-delà de
+  // Supabase) dès qu'elle est enregistrée — filet de secours en cas de
+  // souci côté base ou côté app principale. URL d'un Google Apps Script
+  // déployé en Web App, voir /store/reglages.
+  sheetWebhookUrl: '',
 };
 
 // Le Meta Pixel vit dans sa propre clé : ni son activation ni son identifiant

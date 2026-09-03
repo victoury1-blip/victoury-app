@@ -64,6 +64,22 @@ export default function Reglages() {
           </div>
         </section>
 
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Sauvegarde Google Sheets</h2>
+          <p className="text-xs text-gray-400 mb-3">
+            Chaque commande est aussi envoyée vers une feuille Google Sheets dès qu'elle est enregistrée —
+            un filet de secours consultable même si l'application ou Supabase a un souci.
+          </p>
+          <label className={label}>URL du Web App (Google Apps Script)</label>
+          <input value={r.sheetWebhookUrl} onChange={e => u('sheetWebhookUrl', e.target.value)}
+            placeholder="https://script.google.com/macros/s/…/exec" className={champ} />
+          <p className="mt-2 text-[11px] text-gray-400 leading-relaxed">
+            Dans votre feuille Google Sheets : Extensions → Apps Script, collez le script fourni par
+            l'équipe, Déployer → Nouveau déploiement → Application Web (accès : Tout le monde), puis
+            collez l'URL obtenue ici. Laissez vide pour désactiver.
+          </p>
+        </section>
+
       </div>
       {/* Le Meta Pixel a sa propre page : /store/meta-pixel — il y a plus qu'un
           identifiant à régler, et le jeton d'accès n'a rien à faire ici. */}
