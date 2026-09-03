@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Facebook, Phone, Truck, Wallet } from 'lucide-react';
+import { Instagram, Facebook, Phone } from 'lucide-react';
 import Wordmark from './Wordmark';
 import { IconeWhatsApp, IconeTikTok, IconeVisa, IconeMastercard, IconePayPal } from './icons';
 import { numeroWhatsApp } from '../lib/commande';
@@ -32,12 +32,6 @@ export default function Footer({ theme, collections }) {
   const categories = f.collections?.length
     ? f.collections
     : (collections || []).map(c => ({ label: c.name, url: `/product-category/${c.slug}/` }));
-
-  const paiement = f.paiement || {};
-  const badgesPaiement = [
-    paiement.livraison !== false && { texte: 'Paiement à la livraison', Icone: Truck },
-    paiement.virement && { texte: 'Virement bancaire', Icone: Wallet },
-  ].filter(Boolean);
 
   const c = f.contacts || {};
   // Toujours affichées : même sans lien encore réglé, l'admin voit tout de
@@ -81,15 +75,6 @@ export default function Footer({ theme, collections }) {
                 style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
             : <Wordmark className="text-[28px]" style={{ color: '#fff' }} />}
           {f.description && <p className="mt-4 text-[15px] opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
-          {badgesPaiement.length > 0 && (
-            <div className="mt-5 space-y-2">
-              {badgesPaiement.map(({ texte, Icone }) => (
-                <p key={texte} className="flex items-center justify-center gap-2 text-[15px] opacity-70">
-                  <Icone size={17} /> {texte}
-                </p>
-              ))}
-            </div>
-          )}
           <div className="mt-6 flex gap-10 sm:gap-12">
             <div>
               <h3 className="text-[13px] uppercase tracking-widest text-gray-400 mb-3 font-medium">{t('suivezNous')}</h3>
