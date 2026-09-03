@@ -11,6 +11,13 @@ export default function Reglages() {
   const [r, setR] = useState(REGLAGES_DEFAUT);
   const [enregistrement, setEnregistrement] = useState(false);
   const [ok, setOk] = useState(false);
+  // Chrome refuse d'afficher la demande d'autorisation "Notifications" si
+  // elle part d'un chargement de page — seul un clic explicite fonctionne à
+  // coup sûr. D'où ce bouton, plutôt que de compter uniquement sur le
+  // premier contact avec l'admin (qui peut lui-même être passé inaperçu).
+  const [permissionNotif, setPermissionNotif] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  );
 
   useEffect(() => {
     supabase.from('shop_settings').select('value').eq('key', 'boutique').maybeSingle()
@@ -82,10 +89,26 @@ export default function Reglages() {
         </section>
 
         <section className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Son de notification</h2>
+          <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Notifications de commande</h2>
           <p className="text-xs text-gray-400 mb-3">
-            Joué dans toute l'administration à chaque nouvelle commande du site. Par défaut, un
-            carillon simple — déposez votre propre son pour le remplacer.
+            Une notification système (dans le centre de notifications du téléphone/ordinateur) et un
+            son, à chaque nouvelle commande du site — où qu'on soit dans l'administration.
+          </p>
+          <div className="flex items-center gap-3 mb-4">
+            {permissionNotif === 'granted' && <span className="text-xs text-green-600 font-medium">✓ Notifications autorisées</span>}
+            {permissionNotif === 'denied' && (
+              <span className="text-xs text-red-500">
+                Bloquées par le navigateur — à réautoriser dans les réglages du site (icône 🔒 à côté de l'adresse).
+              </span>
+            )}
+            {permissionNotif === 'default' && (
+              <button type="button" onClick={() => Notification.requestPermission().then(setPermissionNotif)}
+                className="text-xs text-white bg-ink px-3 py-2">Activer les notifications</button>
+            )}
+            {permissionNotif === 'unsupported' && <span className="text-xs text-gray-400">Non supporté par ce navigateur</span>}
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Par défaut, un carillon simple pour le son — déposez votre propre fichier pour le remplacer.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 text-xs tracking-wide uppercase cursor-pointer">

@@ -46,8 +46,6 @@ export default function AdminLayout() {
   const { pathname } = useLocation();
   useEffect(() => { setMenuOuvert(false); }, [pathname]);
 
-  useEffect(() => { demanderPermissionNotif(); }, []);
-
   useEffect(() => {
     const canal = supabase
       .channel('shop-nouvelle-commande')
@@ -61,10 +59,12 @@ export default function AdminLayout() {
   }, []);
 
   // Les navigateurs (surtout sur téléphone) bloquent tout son déclenché sans
-  // geste préalable de la personne — une notification qui arrive pendant
-  // qu'on tape ailleurs resterait sinon muette. Le premier contact avec la
-  // page "débloque" l'audio pour le reste de la session : on joue et coupe
-  // aussitôt un son inaudible, ce qui suffit à autoriser les suivants.
+  // geste préalable de la personne, ET Chrome refuse carrément d'afficher la
+  // demande d'autorisation "Notifications" si elle part d'un chargement de
+  // page plutôt que d'un clic — la permission restait bloquée à "default"
+  // sans même montrer de pop-up. Le premier contact avec la page débloque
+  // donc les deux à la fois : un son inaudible pour l'audio, et la vraie
+  // demande de permission pour les notifications système.
   useEffect(() => {
     let debloque = false;
     const debloquer = () => {
@@ -79,6 +79,7 @@ export default function AdminLayout() {
         osc.connect(gain).connect(ctx.destination);
         osc.start(); osc.stop(ctx.currentTime + 0.01);
       } catch { /* tant pis, le premier son restera silencieux */ }
+      demanderPermissionNotif();
       window.removeEventListener('pointerdown', debloquer);
       window.removeEventListener('keydown', debloquer);
     };
