@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronDown, X } from 'lucide-react';
-import { fmtPrix, ordinal } from '../lib/pricing';
+import { fmtPrix } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel } from '../lib/pixel';
@@ -24,7 +24,7 @@ function Accordeon({ titre, children }) {
 }
 
 export default function Produit({ onAjouter, theme, remises }) {
-  const { t } = useLang();
+  const { t, remisePalier } = useLang();
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
@@ -115,7 +115,7 @@ export default function Produit({ onAjouter, theme, remises }) {
         </p>
         {paliers?.length > 0 && (
           <p className="mt-2 inline-flex items-center gap-1.5 bg-red-50 text-red-600 text-xs font-medium px-2.5 py-1 rounded-full">
-            −{paliers[0].pourcent}% dès le {ordinal(paliers[0].rang)} article
+            {remisePalier(paliers[0].pourcent, paliers[0].rang)}
           </p>
         )}
 

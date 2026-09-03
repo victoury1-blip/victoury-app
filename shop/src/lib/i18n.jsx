@@ -57,7 +57,19 @@ const DICT = {
   },
 };
 
-const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k });
+// Ordinaux arabes courants (paliers de remise : 2e, 3e article… au-delà de
+// 10 c'est un palier peu réaliste, le repli reste correct même s'il est moins idiomatique).
+const ORDINAUX_AR = { 2: 'الثاني', 3: 'الثالث', 4: 'الرابع', 5: 'الخامس', 6: 'السادس', 7: 'السابع', 8: 'الثامن', 9: 'التاسع', 10: 'العاشر' };
+const ordinalFr = (n) => `${n}ème`;
+const ordinalAr = (n) => ORDINAUX_AR[n] || `رقم ${n}`;
+
+/** "−20% dès le 2ème article" / "−20% ابتداءً من المنتج الثاني" — l'ordinal
+    change de forme d'une langue à l'autre, pas seulement de mot. */
+const remisePalier = (lang, pourcent, rang) => lang === 'ar'
+  ? `−${pourcent}% ابتداءً من المنتج ${ordinalAr(rang)}`
+  : `−${pourcent}% dès le ${ordinalFr(rang)} article`;
+
+const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k, remisePalier: () => '' });
 
 export function LangProvider({ children }) {
   const [lang, setLang] = useState(() => {
@@ -74,7 +86,7 @@ export function LangProvider({ children }) {
 
   const t = (cle) => DICT[lang]?.[cle] ?? DICT.fr[cle] ?? cle;
 
-  return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
+  return <LangContext.Provider value={{ lang, setLang, t, remisePalier: (pourcent, rang) => remisePalier(lang, pourcent, rang) }}>{children}</LangContext.Provider>;
 }
 
 export const useLang = () => useContext(LangContext);

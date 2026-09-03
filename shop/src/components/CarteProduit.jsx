@@ -1,13 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ArrowRight } from 'lucide-react';
-import { fmtPrix, ordinal } from '../lib/pricing';
+import { fmtPrix } from '../lib/pricing';
 import { paliersEffectifs } from '../lib/remises';
+import { useLang } from '../lib/i18n';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
 export default function CarteProduit({ produit, remises, categorie }) {
+  const { t, remisePalier } = useLang();
   // Règles globales + celles ciblant justement la collection de CE produit —
   // une remise réglée pour une autre collection ne doit pas s'afficher ici.
   const paliers = paliersEffectifs(remises, produit.collection_id);
@@ -22,7 +24,7 @@ export default function CarteProduit({ produit, remises, categorie }) {
           <img src={image} alt={produit.images[0].alt || produit.name} loading="lazy"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
-          <div className="w-full h-full grid place-items-center text-gray-300 text-xs">Photo à venir</div>
+          <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>
         )}
         {promo && (
           <span className="absolute top-3 left-3 bg-red-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
@@ -60,7 +62,7 @@ export default function CarteProduit({ produit, remises, categorie }) {
       </p>
       {paliers?.length > 0 && (
         <p className="mt-1 inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
-          −{paliers[0].pourcent}% dès le {ordinal(paliers[0].rang)} article
+          {remisePalier(paliers[0].pourcent, paliers[0].rang)}
         </p>
       )}
     </Link>
