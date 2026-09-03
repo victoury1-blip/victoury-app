@@ -63,7 +63,9 @@ export function LangProvider({ children }) {
   useEffect(() => {
     try { localStorage.setItem(CLE, lang); } catch {}
     document.documentElement.lang = lang;
-    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    // Volontairement toujours LTR : la mise en page (grille, icônes, sens du
+    // panier) est pensée pour un sens de lecture, la faire basculer en RTL
+    // avec l'arabe la casserait — seul le texte change de langue.
   }, [lang]);
 
   const t = (cle) => DICT[lang]?.[cle] ?? DICT.fr[cle] ?? cle;
