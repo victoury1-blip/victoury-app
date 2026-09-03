@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, ImageOff } from 'lucide-react';
-import { listerProduits, supprimerProduit } from '../lib/admin';
+import { listerProduits, archiverProduit } from '../lib/admin';
 import { fmtPrix } from '../lib/pricing';
 
 const BADGE = { Actif: 'bg-green-50 text-green-700', Archivé: 'bg-gray-100 text-gray-500', Brouillon: 'bg-amber-50 text-amber-700' };
@@ -14,9 +14,11 @@ export default function ProduitsListe() {
   useEffect(() => { recharger(); }, []);
 
   async function retirer(p) {
-    // Un produit vendu doit rester traçable : on archive plutôt que d'effacer.
-    if (!confirm(`Supprimer « ${p.name} » ? Cette action est définitive.`)) return;
-    await supprimerProduit(p.id);
+    // Un produit vendu doit rester traçable (commandes passées) : on archive
+    // plutôt que d'effacer — il disparaît de la boutique, pas de la base.
+    if (p.status === 'Archivé') return;
+    if (!confirm(`Archiver « ${p.name} » ? Il disparaîtra de la boutique.`)) return;
+    await archiverProduit(p.id);
     recharger();
   }
 
@@ -65,7 +67,9 @@ export default function ProduitsListe() {
                   <td className="px-4 py-2.5">{fmtPrix(p.price)}</td>
                   <td className="px-4 py-2.5"><span className={stock === 0 ? 'text-red-500' : ''}>{stock}</span></td>
                   <td className="px-4 py-2.5 text-right">
-                    <button onClick={() => retirer(p)} className="text-xs text-gray-400 hover:text-red-500">Supprimer</button>
+                    {p.status === 'Archivé'
+                      ? <span className="text-xs text-gray-300">Archivé</span>
+                      : <button onClick={() => retirer(p)} className="text-xs text-gray-400 hover:text-red-500">Archiver</button>}
                   </td>
                 </tr>
               );

@@ -51,14 +51,17 @@ export async function chargerProduitsDeCollection(slug) {
   const col = await chargerCollection(slug);
   if (!col) return { collection: null, produits: [] };
   const { data, error } = await supabase
-    .from('shop_products').select(PRODUIT).eq('collection_id', col.id).order('position');
+    .from('shop_products').select(PRODUIT).eq('collection_id', col.id).eq('status', 'Actif').order('position');
   if (error) throw error;
   return { collection: col, produits: (data || []).map(trier) };
 }
 
+// Un produit archivé (vendu au moins une fois, retiré de la vente) reste en
+// base pour l'historique des commandes — mais un lien direct (favoris,
+// ancienne pub) ne doit plus l'ouvrir, comme s'il n'existait plus.
 export async function chargerProduit(slug) {
   const { data, error } = await supabase
-    .from('shop_products').select(PRODUIT).eq('slug', slug).maybeSingle();
+    .from('shop_products').select(PRODUIT).eq('slug', slug).eq('status', 'Actif').maybeSingle();
   if (error) throw error;
   return data ? trier(data) : null;
 }
@@ -82,7 +85,7 @@ export async function chargerProduitsLies(collectionId, produitIdAExclure, limit
   if (!collectionId) return [];
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT)
-    .eq('collection_id', collectionId).neq('id', produitIdAExclure)
+    .eq('collection_id', collectionId).eq('status', 'Actif').neq('id', produitIdAExclure)
     .order('position').limit(limite);
   if (error) return [];
   return (data || []).map(trier);
@@ -90,7 +93,7 @@ export async function chargerProduitsLies(collectionId, produitIdAExclure, limit
 
 export async function chargerNouveautes(limite = 8) {
   const { data, error } = await supabase
-    .from('shop_products').select(PRODUIT).order('created_at', { ascending: false }).limit(limite);
+    .from('shop_products').select(PRODUIT).eq('status', 'Actif').order('created_at', { ascending: false }).limit(limite);
   if (error) throw error;
   return (data || []).map(trier);
 }

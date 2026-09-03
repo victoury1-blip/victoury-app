@@ -218,6 +218,29 @@ as $$
 $$;
 grant execute on function shop_check_promo(text, numeric) to anon, authenticated;
 
+-- ─────────────────────────────────────────────
+--  Décrément du stock à la commande
+--
+--  Une fonction plutôt qu'un UPDATE direct : un visiteur n'a normalement
+--  aucun droit d'écriture sur shop_product_sizes (RLS "ecriture
+--  authentifiee" plus haut) — seule cette baisse précise, jamais négative,
+--  lui est ouverte, à l'image de shop_check_promo pour les codes promo.
+-- ─────────────────────────────────────────────
+create or replace function shop_decrement_stock(p_slug text, p_size text, p_qty int)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update shop_product_sizes s
+  set stock = greatest(0, s.stock - p_qty)
+  from shop_products p
+  where s.product_id = p.id and p.slug = p_slug and s.size = p_size;
+end;
+$$;
+grant execute on function shop_decrement_stock(text, text, int) to anon;
+
 -- ============================================================
 --  COMMANDES
 --

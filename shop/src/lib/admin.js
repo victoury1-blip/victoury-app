@@ -53,6 +53,13 @@ export const enregistrerProduit = (p) =>
 export const supprimerProduit = (id) =>
   supabase.from('shop_products').delete().eq('id', id).then(jeter);
 
+// Un produit vendu doit rester traçable (commandes passées, factures) — on
+// l'archive plutôt que de l'effacer. Il reste dans /store/produits (badge
+// "Archivé"), mais n'apparaît plus sur la boutique (chargerProduit filtre
+// sur status = 'Actif').
+export const archiverProduit = (id) =>
+  supabase.from('shop_products').update({ status: 'Archivé', updated_at: new Date().toISOString() }).eq('id', id).then(jeter);
+
 // Écriture partielle générique (ex. prix en masse sur une collection) — même
 // raison que majPosition : un update direct, sans .select().single().
 export const majProduit = (id, champs) =>

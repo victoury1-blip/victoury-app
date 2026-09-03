@@ -79,5 +79,19 @@ export default async function handler(req, res) {
     console.error('commande:', r.status, texte.slice(0, 300));
     return res.status(502).json({ ok: false, error: "L'enregistrement a échoué. Réessayez." });
   }
+
+  // Le stock baisse dès que la commande part, pas seulement à la livraison :
+  // sinon deux clientes peuvent commander la dernière taille S en même temps
+  // sans que ni l'une ni l'autre ne le voie. Un échec ici ne doit jamais faire
+  // échouer la commande elle-même — le pire cas est un stock à corriger à la
+  // main, pas une vente perdue.
+  await Promise.all(lignes.map(l =>
+    fetch(`${url}/rest/v1/rpc/shop_decrement_stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ p_slug: l.slug, p_size: l.size || '', p_qty: l.qty || 1 }),
+    }).catch(() => {})
+  ));
+
   return res.status(200).json({ ok: true, id: commande.id });
 }
