@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
+import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifCommande';
 import { chargerReglages } from '../lib/catalog';
 import Wordmark from '../components/Wordmark';
 
@@ -45,11 +46,15 @@ export default function AdminLayout() {
   const { pathname } = useLocation();
   useEffect(() => { setMenuOuvert(false); }, [pathname]);
 
+  useEffect(() => { demanderPermissionNotif(); }, []);
+
   useEffect(() => {
     const canal = supabase
       .channel('shop-nouvelle-commande')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        if (String(payload.new?.id || '').startsWith('VS-')) jouerSonCommande(sonRef.current);
+        if (!String(payload.new?.id || '').startsWith('VS-')) return;
+        jouerSonCommande(sonRef.current);
+        notifierNouvelleCommande(payload.new);
       })
       .subscribe();
     return () => { supabase.removeChannel(canal); };
