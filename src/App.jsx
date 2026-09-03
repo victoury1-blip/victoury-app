@@ -35,7 +35,8 @@ const replaceOrdersOffline = async (...a) => (await _offlineStore()).replaceOrde
 import { fetchFingerprints, fetchAllOrders, fetchOrdersByIds, staleIds } from './lib/ordersSync';
 import { cloudGet, cloudSet } from './lib/cloudSettings';
 import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
-import { AFFILIATE_LIST, platformOf } from './lib/affiliatePlatforms';
+import { AFFILIATE_LIST, platformOf, matchAffiliateProduct, st } from './lib/affiliatePlatforms';
+import { loadProducts } from './data/products';
 import { tabFromParam, tabPath } from './data/orderTabs';
 import { logAlert } from './lib/errorLog';
 import useAutoSync from './hooks/useAutoSync';
@@ -357,7 +358,7 @@ export default function App() {
        `fpRows` = empreintes de TOUTES les lignes ; `fetched` = lignes
        complètes rapatriées ; `cachedById` = ce qu'on avait déjà. */
     function apply(fpRows, fetched, cachedById) {
-      const fullById = new Map(fetched.map(r => [r.id, mapRow(r)]));
+      const fullById = new Map(fetched.map(r => [r.id, mapRow(reclasserCommandeSite(r))]));
       /* Liste noire : elle se déduit de la MÊME requête que les empreintes —
          l'ancienne requête séparée sur les commandes supprimées disparaît.
          Une ligne redevenue active fait foi : une commande restaurée via la
@@ -502,12 +503,27 @@ export default function App() {
     };
   }, [session]);
 
+  /* Une commande du site (id VS-…) sur un produit importé d'une plateforme
+     d'affiliation (Bouait, Chic…) ne doit pas atterrir dans « À Confirmer » —
+     elle appartient à l'onglet « Nouvelle » de SA plateforme, comme une
+     commande Chic classée à la main. Reclassée dès son arrivée, avant même le
+     premier rendu, elle n'y transite jamais visiblement. */
+  function reclasserCommandeSite(o) {
+    if (!o.id?.startsWith('VS-') || o.status !== 'nouveau') return o;
+    const match = matchAffiliateProduct(mapRow(o), loadProducts());
+    if (!match) return o;
+    const status = st(match.plat, 'nouveau');
+    supabase.from('orders').update({ status }).eq('id', o.id).then(() => {});
+    return { ...o, status };
+  }
+
   /* ── Realtime: sync order changes from other devices ── */
   useEffect(() => {
     if (!session) return;
     const channel = supabase
       .channel('orders-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, ({ new: o }) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, ({ new: raw }) => {
+        const o = reclasserCommandeSite(raw);
         if (o.is_deleted || deletedIdsRef.current.has(o.id)) return;
         setOrders(prev => {
           if (prev.some(x => x.id === o.id)) return prev;

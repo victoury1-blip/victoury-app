@@ -108,3 +108,22 @@ export const platKey = (plat, base) =>
  * sert à choisir, pas à effacer ce qui a été vendu. */
 export const isOwnProduct = (p) => !isAffiliateSource(p?.source);
 export const ownProducts = (list) => (list || []).filter(isOwnProduct);
+
+/** Article(s) d'une commande Victoury, sous forme de liste (commande à un ou
+ *  plusieurs produits). */
+const orderItems = (order) => order?.products?.length ? order.products : [order?.product].filter(Boolean);
+
+/** Le produit d'une commande correspond-il à un article importé d'une
+ *  plateforme d'affiliation (Chic, Bouait, AlphaCod…) ? Match par nom exact,
+ *  identique à celui déjà utilisé pour proposer « Envoyer à Chic » sur une
+ *  commande saisie à la main — une commande venant du site (même nom de
+ *  produit que celui publié depuis le Stock) est détectée de la même façon. */
+export function matchAffiliateProduct(order, stockProducts) {
+  const affiliate = (stockProducts || []).filter(p => isAffiliateSource(p.source));
+  for (const item of orderItems(order)) {
+    if (!item?.name) continue;
+    const match = affiliate.find(p => p.name?.toLowerCase().trim() === item.name.toLowerCase().trim());
+    if (match) return { product: match, plat: platformOfSource(match.source) };
+  }
+  return null;
+}
