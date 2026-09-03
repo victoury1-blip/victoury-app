@@ -14,13 +14,13 @@ export default function Footer({ theme, collections }) {
   const f = theme?.footer || {};
   const liens = (titre, items) => items?.length > 0 && (
     <div className="text-center">
-      <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-4 font-medium">{titre}</h3>
-      <ul className="space-y-3">
+      <h3 className="text-[13px] uppercase tracking-widest text-gray-400 mb-3 font-medium">{titre}</h3>
+      <ul className="space-y-2.5">
         {items.map((it, i) => (
           <li key={i}>
             {/^https?:\/\//.test(it.url)
-              ? <a href={it.url} target="_blank" rel="noreferrer" className="text-sm text-gray-600 hover:text-ink">{it.label}</a>
-              : <Link to={it.url} className="text-sm text-gray-600 hover:text-ink">{it.label}</Link>}
+              ? <a href={it.url} target="_blank" rel="noreferrer" className="text-[15px] text-gray-600 hover:text-ink">{it.label}</a>
+              : <Link to={it.url} className="text-[15px] text-gray-600 hover:text-ink">{it.label}</Link>}
           </li>
         ))}
       </ul>
@@ -56,37 +56,37 @@ export default function Footer({ theme, collections }) {
     { cle: 'appel', Icone: Phone, href: c.appel ? `tel:${c.appel}` : '', couleur: '#34B7F1' },
   ];
   const rangeeIcones = (items) => (
-    <div className="flex justify-center gap-5">
+    <div className="flex justify-center gap-6">
       {items.map(({ cle, Icone, href, couleur }) => (
         href
-          ? <a key={cle} href={href} target="_blank" rel="noreferrer" style={{ color: couleur }} className="opacity-90 hover:opacity-100 transition-opacity"><Icone size={20} /></a>
-          : <span key={cle} style={{ color: couleur }} className="opacity-30" title="Lien non réglé dans /store/theme"><Icone size={20} /></span>
+          ? <a key={cle} href={href} target="_blank" rel="noreferrer" style={{ color: couleur }} className="opacity-90 hover:opacity-100 transition-opacity"><Icone size={23} /></a>
+          : <span key={cle} style={{ color: couleur }} className="opacity-30" title="Lien non réglé dans /store/theme"><Icone size={23} /></span>
       ))}
     </div>
   );
 
   return (
-    <footer className="mt-24 border-t border-gray-100" style={{ background: f.couleurFond, color: f.couleurTexte }}>
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 py-16 grid grid-cols-2 gap-10 sm:gap-14 sm:grid-cols-3">
+    <footer className="mt-16 border-t border-gray-100" style={{ background: f.couleurFond, color: f.couleurTexte }}>
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 py-10 grid grid-cols-2 gap-8 sm:gap-14 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-1 text-center flex flex-col items-center">
-          <Wordmark className="text-2xl" />
-          {f.description && <p className="mt-4 text-sm opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
+          <Wordmark className="text-[28px]" />
+          {f.description && <p className="mt-4 text-[15px] opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           {badgesPaiement.length > 0 && (
             <div className="mt-5 space-y-2">
               {badgesPaiement.map(({ texte, Icone }) => (
-                <p key={texte} className="flex items-center justify-center gap-2 text-sm opacity-70">
-                  <Icone size={16} /> {texte}
+                <p key={texte} className="flex items-center justify-center gap-2 text-[15px] opacity-70">
+                  <Icone size={17} /> {texte}
                 </p>
               ))}
             </div>
           )}
           <div className="mt-6 flex gap-10 sm:gap-12">
             <div>
-              <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-4 font-medium">{t('suivezNous')}</h3>
+              <h3 className="text-[13px] uppercase tracking-widest text-gray-400 mb-3 font-medium">{t('suivezNous')}</h3>
               {rangeeIcones(reseaux)}
             </div>
             <div>
-              <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-4 font-medium">{t('contact')}</h3>
+              <h3 className="text-[13px] uppercase tracking-widest text-gray-400 mb-3 font-medium">{t('contact')}</h3>
               {rangeeIcones(contactsDirects)}
             </div>
           </div>
@@ -95,7 +95,7 @@ export default function Footer({ theme, collections }) {
         {liens(t('mentionsLegales'), f.mentions)}
       </div>
       <div className="border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs opacity-50 text-center sm:text-left">
             © {new Date().getFullYear()} <strong className="font-semibold">VICTOURY</strong> — Tous droits réservés.
           </p>
