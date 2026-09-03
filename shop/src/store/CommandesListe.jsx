@@ -134,7 +134,12 @@ export default function CommandesListe() {
                     {r.source && <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700">{r.source}</span>}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">
-                    {r.geoVille || '—'}{r.geoPays ? `, ${r.geoPays}` : ''}
+                    {/* Estimation à partir de l'IP, pas l'adresse tapée par la
+                        cliente — les réseaux mobiles au Maroc font souvent
+                        sortir le trafic par des serveurs centralisés dans une
+                        autre ville. "(approx.)" le rappelle plutôt que de
+                        laisser croire à une localisation fiable. */}
+                    {r.geoVille ? <>{r.geoVille}{r.geoPays ? `, ${r.geoPays}` : ''} <span className="text-gray-400">(approx.)</span></> : '—'}
                     {r.ip && <div className="text-[10px] text-gray-300 font-mono">{r.ip}</div>}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{c.date_added}</td>
