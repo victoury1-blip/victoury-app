@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import CarteProduit from '../components/CarteProduit';
-import { chargerProduitsDeCollection } from '../lib/catalog';
+import AvisClients from '../components/AvisClients';
+import { chargerProduitsDeCollection, chargerAvis } from '../lib/catalog';
 
 export default function Collection({ theme, remises }) {
   const { slug } = useParams();
   const [etat, setEtat] = useState({ chargement: true, collection: null, produits: [] });
   const [taille, setTaille] = useState('');
+  const [avis, setAvis] = useState([]);
 
   useEffect(() => {
     setEtat(e => ({ ...e, chargement: true }));
@@ -14,6 +16,8 @@ export default function Collection({ theme, remises }) {
       .then(r => setEtat({ chargement: false, ...r }))
       .catch(() => setEtat({ chargement: false, collection: null, produits: [] }));
   }, [slug]);
+
+  useEffect(() => { chargerAvis().then(setAvis).catch(() => {}); }, []);
 
   // Réglable depuis /store/theme : superflu quand la collection ne mélange
   // pas de tailles disparates.
@@ -63,6 +67,8 @@ export default function Collection({ theme, remises }) {
           {visibles.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
         </div>
       )}
+
+      <AvisClients avis={avis} />
     </div>
   );
 }
