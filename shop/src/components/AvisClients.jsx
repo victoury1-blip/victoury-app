@@ -9,7 +9,7 @@ export default function AvisClients({ avis }) {
 
   // Défilement automatique vers la gauche : une capture à peine visible
   // dans le coin ne donne pas envie de la faire glisser soi-même — un
-  // léger mouvement toutes les 3 s donne à voir qu'il y en a d'autres.
+  // léger mouvement toutes les 1 s donne à voir qu'il y en a d'autres.
   // En pause tant qu'un doigt (ou la souris) est sur la piste.
   useEffect(() => {
     if (!avis?.length || avis.length < 2) return;
@@ -22,7 +22,7 @@ export default function AvisClients({ avis }) {
       const pas = largeurCarte + 16; // gap-4
       const findu = piste.scrollLeft + piste.clientWidth >= piste.scrollWidth - 4;
       piste.scrollTo({ left: findu ? 0 : piste.scrollLeft + pas, behavior: 'smooth' });
-    }, 3000);
+    }, 1000);
     const surPause = () => { enPause = true; };
     const surReprise = () => { enPause = false; };
     piste.addEventListener('pointerdown', surPause);
