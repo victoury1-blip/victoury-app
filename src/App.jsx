@@ -647,10 +647,10 @@ export default function App() {
       // toutes les 45 s. Le bouton « Réessayer » force le passage.
       if (!manual && Date.now() < wooNextTryRef.current) return;
       try {
-        if (!wooConfigRef.current) {
-          const stored = localStorage.getItem('woo_config');
-          wooConfigRef.current = stored ? JSON.parse(stored) : (await cloudGet('woo_config') || {});
-        }
+        // Relu à chaque appel (pas mis en cache) : un bascule dans Paramètres
+        // doit stopper/reprendre le sondage immédiatement, sans recharger la page.
+        const stored = localStorage.getItem('woo_config');
+        wooConfigRef.current = stored ? JSON.parse(stored) : (wooConfigRef.current || await cloudGet('woo_config') || {});
         const config = wooConfigRef.current;
         // Désactivé depuis Paramètres (ex. la boutique WooCommerce n'existe
         // plus) : ni sondage ni bandeau d'erreur, comme si rien n'était réglé.

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Trash2, Upload, GripVertical } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { televerserPhoto, enregistrerAvis } from '../lib/admin';
@@ -14,13 +14,23 @@ export default function AvisListe() {
   // File(s) en attente de recadrage, une à la fois — la modale se ré-ouvre
   // toute seule sur la suivante tant qu'il en reste dans la file.
   const [aRecadrer, setARecadrer] = useState([]);
+  // Miroir synchrone de `avis` : deux captures envoyées coup sur coup
+  // (recadrées l'une après l'autre) déclenchent sauver() avant que le state
+  // React n'ait eu le temps de se mettre à jour — lire depuis `avis` dans la
+  // closure perdrait la première capture. Le ref, lui, est toujours à jour.
+  const avisRef = useRef([]);
 
   useEffect(() => {
     supabase.from('shop_settings').select('value').eq('key', 'avis').maybeSingle()
-      .then(({ data }) => setAvis(Array.isArray(data?.value) ? data.value : []));
+      .then(({ data }) => {
+        const liste = Array.isArray(data?.value) ? data.value : [];
+        avisRef.current = liste;
+        setAvis(liste);
+      });
   }, []);
 
   async function sauver(liste) {
+    avisRef.current = liste;
     setAvis(liste);
     await enregistrerAvis(liste);
   }
@@ -34,7 +44,7 @@ export default function AvisListe() {
     setEnvoi(true);
     try {
       const url = await televerserPhoto(fichier);
-      await sauver([...avis, { id: crypto.randomUUID(), url }]);
+      await sauver([...avisRef.current, { id: crypto.randomUUID(), url }]);
     } catch (e) {
       alert(e.message || 'Envoi impossible');
     } finally {
