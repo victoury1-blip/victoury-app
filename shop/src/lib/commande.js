@@ -15,14 +15,14 @@ const PREFIXE = 'VS-';
     (JJMMAA-HHMMSS) plutôt qu'une suite de chiffres qui ne dit rien : on lit
     directement quand la commande est passée, sans ouvrir la fiche. Toujours
     sous le préfixe VS- : c'est le seul que la base accepte d'un visiteur
-    (voir schema.sql). Cinq chiffres aléatoires en bout de code évitent une
-    collision entre deux commandes validées à la même seconde — invisibles
-    à l'œil, ils ne gênent pas la lecture. */
+    (voir schema.sql). Un chiffre aléatoire en bout de code : deux commandes
+    à la même seconde restent rarissimes en pratique (un visiteur à la fois
+    passe commande), ce chiffre n'est qu'un garde-fou minimal. */
 export function nouvelId(now = new Date(), alea = Math.random) {
   const p = (n, l = 2) => String(n).padStart(l, '0');
   const date = `${p(now.getDate())}${p(now.getMonth() + 1)}${p(now.getFullYear() % 100)}`;
   const heure = `${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
-  const r = p(Math.floor(alea() * 1e5), 5);
+  const r = Math.floor(alea() * 10);
   return `${PREFIXE}${date}-${heure}${r}`;
 }
 

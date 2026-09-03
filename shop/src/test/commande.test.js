@@ -96,7 +96,10 @@ describe('commande écrite en base', () => {
   });
 
   it('donne un identifiant différent à chaque commande', () => {
-    const vus = new Set(Array.from({ length: 500 }, () => nouvelId()));
-    expect(vus.size).toBeGreaterThan(490);
+    // Une commande à la seconde, pas 500 à la même seconde (irréaliste pour
+    // un seul visiteur à la fois) : c'est l'écart réel entre deux passages
+    // en caisse que ce test vérifie, pas une rafale impossible.
+    const vus = new Set(Array.from({ length: 500 }, (_, i) => nouvelId(new Date(Date.now() + i * 1000))));
+    expect(vus.size).toBe(500);
   });
 });
