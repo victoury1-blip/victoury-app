@@ -3,17 +3,19 @@ import { Link } from 'react-router-dom';
 import { X, Minus, Plus, Tag } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
+import { useLang } from '../lib/i18n';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
+  const { t } = useLang();
   if (!ouvert) return null;
-  const t = totalPanier(lignes, { paliers, remises, livraison, seuilGratuit });
+  const tot = totalPanier(lignes, { paliers, remises, livraison, seuilGratuit });
   // La remise de chaque article, pas seulement le total en bas — le client
   // voit tout de suite POURQUOI le prix a changé sur cette ligne précise.
   const lignesRemisees = lignesAvecRemise(lignes, remises?.length ? remises : (paliers?.length ? [{ active: true, paliers }] : []));
   // Ce qu'il manque pour atteindre la livraison gratuite : un rappel concret
   // pousse à ajouter un article, là où « livraison offerte » seul ne dit rien
   // de ce qu'il reste à faire.
-  const apresRemises = t.sousTotal - t.remiseQuantite;
+  const apresRemises = tot.sousTotal - tot.remiseQuantite;
   const manqueLivraison = seuilGratuit > 0 && apresRemises < seuilGratuit ? seuilGratuit - apresRemises : 0;
 
   return (
@@ -21,12 +23,12 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
       <div className="absolute inset-0 bg-black/30" onClick={onFermer} />
       <aside className="relative bg-white w-full max-w-md h-full flex flex-col shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm tracking-widest uppercase">Votre panier</h2>
+          <h2 className="text-sm tracking-widest uppercase">{t('votrePanier')}</h2>
           <button onClick={onFermer} className="p-1.5 text-gray-400 hover:text-ink" aria-label="Fermer"><X size={18} /></button>
         </div>
 
         {lignes.length === 0 ? (
-          <p className="flex-1 grid place-items-center text-sm text-gray-400">Votre panier est vide</p>
+          <p className="flex-1 grid place-items-center text-sm text-gray-400">{t('panierVide')}</p>
         ) : (
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
             {lignesRemisees.map(l => (
@@ -36,8 +38,8 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-800">{l.name}</p>
-                  {l.color && <p className="text-xs text-gray-400 mt-0.5">Couleur : {l.color}</p>}
-                  {l.size && <p className="text-xs text-gray-400">Taille : {l.size}</p>}
+                  {l.color && <p className="text-xs text-gray-400 mt-0.5">{t('couleur')} : {l.color}</p>}
+                  {l.size && <p className="text-xs text-gray-400">{l.size}</p>}
                   {/* Rouge, comme partout ailleurs sur le site où une remise est
                       signalée (badge produit, prix barré, palier) — le noir est déjà
                       pris par le texte et les boutons, le rouge reste le signal promo. */}
@@ -48,12 +50,12 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                   )}
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={() => onQuantite(cleLigne(l), l.qty - 1)}
-                      className="w-7 h-7 border border-gray-200 grid place-items-center" aria-label="Diminuer">
+                      className="w-7 h-7 border border-gray-200 grid place-items-center" aria-label={t('quantiteMinus')}>
                       <Minus size={12} />
                     </button>
                     <span className="text-sm w-6 text-center">{l.qty}</span>
                     <button onClick={() => onQuantite(cleLigne(l), l.qty + 1)}
-                      className="w-7 h-7 border border-gray-200 grid place-items-center" aria-label="Augmenter">
+                      className="w-7 h-7 border border-gray-200 grid place-items-center" aria-label={t('quantitePlus')}>
                       <Plus size={12} />
                     </button>
                   </div>
@@ -68,7 +70,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                     <p className="text-sm font-medium">{fmtPrix(l.price * l.qty)}</p>
                   )}
                   <button onClick={() => onRetirer(cleLigne(l))}
-                    className="mt-2 text-gray-300 hover:text-red-500" aria-label="Retirer"><X size={14} /></button>
+                    className="mt-2 text-gray-300 hover:text-red-500" aria-label={t('retirer')}><X size={14} /></button>
                 </div>
               </div>
             ))}
@@ -80,24 +82,24 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
             {seuilGratuit > 0 && (
               <p className="text-xs text-gray-500 mb-1">
                 {manqueLivraison > 0
-                  ? <>Plus que <b className="text-ink">{fmtPrix(manqueLivraison)}</b> pour la livraison gratuite</>
-                  : <span className="text-green-700">✓ Livraison gratuite</span>}
+                  ? <>{t('plusQue')} <b className="text-ink">{fmtPrix(manqueLivraison)}</b> {t('pourLivraisonGratuite')}</>
+                  : <span className="text-green-700">{t('livraisonGratuite')}</span>}
               </p>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Sous-total</span><span>{fmtPrix(t.sousTotal)}</span>
+              <span className="text-gray-500">{t('sousTotal')}</span><span>{fmtPrix(tot.sousTotal)}</span>
             </div>
-            {t.remiseQuantite > 0 && (
+            {tot.remiseQuantite > 0 && (
               <div className="flex justify-between text-sm text-green-700">
-                <span className="flex items-center gap-1.5"><Tag size={13} /> Remise</span>
-                <span className="font-medium">−{fmtPrix(t.remiseQuantite)}</span>
+                <span className="flex items-center gap-1.5"><Tag size={13} /> {t('remise')}</span>
+                <span className="font-medium">−{fmtPrix(tot.remiseQuantite)}</span>
               </div>
             )}
             <Link to="/commander" onClick={onFermer}
               className="mt-3 block bg-ink text-white text-center py-3.5 text-xs tracking-widest uppercase">
-              Commander — {fmtPrix(t.total)}
+              {t('commander')} — {fmtPrix(tot.total)}
               <span className="block text-[10px] text-gray-300 mt-0.5 normal-case tracking-normal">
-                Paiement à la livraison
+                {t('paiementLivraison')}
               </span>
             </Link>
           </div>

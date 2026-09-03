@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Search, ShoppingBag, Menu, X } from 'lucide-react';
 import Wordmark from './Wordmark';
+import { useLang } from '../lib/i18n';
 
 /* Position du logo : réglable depuis /store/theme.
  *   gauche — logo et navigation côte à côte, icônes à droite (le plus courant).
@@ -11,6 +12,7 @@ import Wordmark from './Wordmark';
  * recherche, panier et menu mobile ne doit exister qu'à un seul endroit. */
 export default function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, logoPosition = 'gauche' }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
+  const { lang, setLang, t } = useLang();
   // Une collection « Soldes » se distingue en rouge, comme sur l'ancien site —
   // c'est le seul lien de la barre qui doit sauter aux yeux.
   const estSoldes = (c) => /soldes?/i.test(c.slug || c.name || '');
@@ -42,15 +44,26 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
     </div>
   );
 
+  // Bouton FR/AR : bascule manuelle uniquement, pas de détection automatique
+  // du téléphone du client — juste le choix qu'il retient d'une visite à l'autre.
+  const BoutonLangue = (
+    <button onClick={() => setLang(lang === 'fr' ? 'ar' : 'fr')}
+      className="px-2 py-1 text-[11px] font-semibold tracking-wide text-gray-600 hover:text-ink border border-gray-200 rounded"
+      aria-label="Changer de langue / تبديل اللغة">
+      {lang === 'fr' ? 'AR' : 'FR'}
+    </button>
+  );
+
   const Icones = (
     <div className="flex items-center gap-1">
-      <Link to="/recherche" className="p-2 text-gray-600 hover:text-ink" aria-label="Rechercher">
+      {BoutonLangue}
+      <Link to="/recherche" className="p-2 text-gray-600 hover:text-ink" aria-label={t('rechercher')}>
         <Search size={19} />
       </Link>
       {/* Le compteur porte un libellé lisible : « 2 » seul ne dit rien à
           qui n'a pas l'icône sous les yeux. */}
       <button onClick={onOuvrirPanier} className="relative p-2 text-gray-600 hover:text-ink"
-        aria-label={`Panier, ${nbArticles} article${nbArticles > 1 ? 's' : ''}`}>
+        aria-label={`${t('votrePanier')}, ${nbArticles}`}>
         <ShoppingBag size={19} />
         {nbArticles > 0 && (
           <span className="absolute -top-0.5 -right-0.5 bg-ink text-white text-[10px] font-semibold

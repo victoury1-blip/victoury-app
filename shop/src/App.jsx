@@ -31,6 +31,7 @@ import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THE
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel, chargerClarity } from './lib/pixel';
+import { LangProvider } from './lib/i18n';
 
 /* L'habillage de la vitrine — bandeau, en-tête, panier, pied de page — ne
    doit jamais apparaître sur l'administration : elle a sa propre mise en
@@ -102,6 +103,7 @@ function Vitrine() {
   const onVider    = useCallback(() => { vider(); setLignes([]); }, []);
 
   return (
+    <LangProvider>
     <div className="min-h-screen flex flex-col">
       <AnnonceBar theme={reglages.theme} />
       <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
@@ -133,6 +135,7 @@ function Vitrine() {
       />
       <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} />
     </div>
+    </LangProvider>
   );
 }
 

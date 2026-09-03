@@ -7,6 +7,7 @@ import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { verifierPromo } from '../lib/catalog';
 import { trackPixel, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from '../lib/pixel';
+import { useLang } from '../lib/i18n';
 
 // La couleur du thème (--ink, réglable dans /store/theme), pas le vert de la
 // sélection de taille — un champ de saisie n'est pas un choix, il ne doit pas
@@ -14,6 +15,7 @@ import { trackPixel, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from 
 const champ = 'w-full border-2 border-ink px-3 py-3 text-sm focus:outline-none transition-colors';
 
 export default function Commander({ lignes, reglages, onRetirer, onVider }) {
+  const { t: tr, lang } = useLang();
   const navigate = useNavigate();
   const [form, setForm] = useState({ nom: '', telephone: '', ville: '', adresse: '' });
   const [promo, setPromo] = useState(null);
@@ -77,9 +79,9 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   if (!lignes.length) {
     return (
       <div className="max-w-3xl mx-auto px-6 py-24 text-center">
-        <p className="text-sm text-gray-400">Votre panier est vide.</p>
+        <p className="text-sm text-gray-400">{tr('panierVide')}</p>
         <Link to="/" className="inline-block mt-6 border border-ink px-8 py-3 text-[11px] tracking-widest uppercase">
-          Retour à la boutique
+          {tr('retourBoutique')}
         </Link>
       </div>
     );
@@ -89,43 +91,40 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-      <h1 dir="rtl" lang="ar" className="text-center text-sm text-ink font-medium">
-        الرجاء إدخال معلومات التوصيل
+      <h1 className="text-center text-sm text-ink font-medium">
+        {tr('coordonnees')}
       </h1>
 
       <div className="mt-10 grid lg:grid-cols-2 gap-10">
         <div className="space-y-4">
-          {/* Le client marocain lit son marché en arabe : ces quatre champs sont
-              ceux qui décident si le colis arrive au bon endroit — mal compris,
-              c'est un livreur perdu ou un colis qui revient. */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-right">الاسم الكامل <span className="text-red-500">*</span></label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('nomComplet')}</label>
               <input value={form.nom} onChange={e => u('nom', e.target.value)} className={`${champ} ${enErreur('nom')}`} />
             </div>
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-right">الهاتف <span className="text-red-500">*</span></label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('telephone')}</label>
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
                 inputMode="tel" placeholder="06 12 34 56 78" className={`${champ} ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
-                <p className="mt-1 text-[11px] text-red-500">Numéro marocain à 10 chiffres</p>
+                <p className="mt-1 text-[11px] text-red-500">{lang === 'ar' ? 'رقم مغربي ب10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
               )}
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-right">المدينة <span className="text-red-500">*</span></label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('ville')}</label>
               <input value={form.ville} onChange={e => u('ville', e.target.value)} className={`${champ} ${enErreur('ville')}`} />
             </div>
             <div>
-              <label dir="rtl" lang="ar" className="block text-sm text-ink font-medium mb-1.5 text-right">العنوان <span className="text-red-500">*</span></label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('adresse')}</label>
               <input value={form.adresse} onChange={e => u('adresse', e.target.value)} className={`${champ} ${enErreur('adresse')}`} />
             </div>
           </div>
 
           <div className="border border-ink px-4 py-3 flex items-center justify-center gap-3">
             <span className="w-3 h-3 rounded-full bg-ink" />
-            <span dir="rtl" lang="ar" className="text-xs">الدفع عند الاستلام</span>
+            <span className="text-xs">{tr('paiementLivraison')}</span>
           </div>
         </div>
 
@@ -144,7 +143,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm">{fmtPrix(l.price * l.qty)}</p>
-                  <button onClick={() => onRetirer(cleLigne(l))} className="mt-1 text-gray-300 hover:text-red-500" aria-label="Retirer">
+                  <button onClick={() => onRetirer(cleLigne(l))} className="mt-1 text-gray-300 hover:text-red-500" aria-label={tr('retirer')}>
                     <X size={13} />
                   </button>
                 </div>
@@ -153,27 +152,27 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
           </div>
 
           <div className="mt-6 pt-4 border-t border-gray-200 space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Sous-total</span><span>{fmtPrix(t.sousTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">{tr('sousTotal')}</span><span>{fmtPrix(t.sousTotal)}</span></div>
             {t.remiseQuantite > 0 && (
-              <div className="flex justify-between text-green-700"><span>Remise quantité</span><span>−{fmtPrix(t.remiseQuantite)}</span></div>
+              <div className="flex justify-between text-green-700"><span>{tr('remise')}</span><span>−{fmtPrix(t.remiseQuantite)}</span></div>
             )}
             {t.remisePromo > 0 && (
-              <div className="flex justify-between text-green-700"><span>Code promo</span><span>−{fmtPrix(t.remisePromo)}</span></div>
+              <div className="flex justify-between text-green-700"><span>{tr('codePromo')}</span><span>−{fmtPrix(t.remisePromo)}</span></div>
             )}
             <div className="flex justify-between">
-              <span className="text-gray-500">Livraison</span>
-              <span>{t.livraison > 0 ? fmtPrix(t.livraison) : 'Gratuite'}</span>
+              <span className="text-gray-500">{lang === 'ar' ? 'التوصيل' : 'Livraison'}</span>
+              <span>{t.livraison > 0 ? fmtPrix(t.livraison) : (lang === 'ar' ? 'مجاني' : 'Gratuite')}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-gray-200 font-medium">
-              <span>Total</span><span>{fmtPrix(t.total)}</span>
+              <span>{lang === 'ar' ? 'المجموع الكلي' : 'Total'}</span><span>{fmtPrix(t.total)}</span>
             </div>
           </div>
 
           <div className="mt-4 flex gap-2">
-            <input value={code} onChange={e => setCode(e.target.value)} placeholder="Code promo"
+            <input value={code} onChange={e => setCode(e.target.value)} placeholder={tr('codePromo')}
               className="flex-1 border border-gray-200 px-3 py-2.5 text-sm bg-white" />
             <button onClick={appliquerCode} className="px-4 bg-ink text-white text-[11px] tracking-widest uppercase">
-              Appliquer
+              {tr('appliquer')}
             </button>
           </div>
           {codeErreur && <p className="mt-1 text-[11px] text-red-500">{codeErreur}</p>}
@@ -182,7 +181,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
 
           <button onClick={valider} disabled={envoi}
             className="mt-5 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60">
-            {envoi ? 'Envoi…' : `Valider la commande — ${fmtPrix(t.total)}`}
+            {envoi ? tr('envoiEnCours') : `${tr('validerCommande')} — ${fmtPrix(t.total)}`}
           </button>
         </div>
       </div>

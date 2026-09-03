@@ -6,6 +6,7 @@ import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/cat
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel } from '../lib/pixel';
 import CarteProduit from '../components/CarteProduit';
+import { useLang } from '../lib/i18n';
 
 function Accordeon({ titre, children }) {
   const [ouvert, setOuvert] = useState(false);
@@ -23,6 +24,7 @@ function Accordeon({ titre, children }) {
 }
 
 export default function Produit({ onAjouter, theme, remises }) {
+  const { t } = useLang();
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
@@ -55,7 +57,7 @@ export default function Produit({ onAjouter, theme, remises }) {
   }, [slug]);
 
   if (chargement) return <div className="max-w-7xl mx-auto px-6 py-24 animate-pulse"><div className="h-96 bg-gray-100" /></div>;
-  if (!produit) return <p className="max-w-7xl mx-auto px-6 py-24 text-center text-sm text-gray-400">Ce produit n'existe plus.</p>;
+  if (!produit) return <p className="max-w-7xl mx-auto px-6 py-24 text-center text-sm text-gray-400">{t('produitIntrouvable')}</p>;
 
   // Toutes les tailles sont montrées : une pointure absente laisse croire
   // qu'elle n'a jamais existé, quand elle est seulement épuisée pour l'instant.
@@ -77,7 +79,7 @@ export default function Produit({ onAjouter, theme, remises }) {
           <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center lg:shrink">
             {img.url
               ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
-              : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">Photo à venir</div>}
+              : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
           </div>
         ))}
       </div>
@@ -99,7 +101,7 @@ export default function Produit({ onAjouter, theme, remises }) {
         {couleurs.length > 1 && (
           <div className="mt-6">
             <p className="text-[11px] tracking-widest uppercase text-gray-500">
-              Couleur : <span className="text-ink">{produit.color_name}</span>
+              {t('couleur')} : <span className="text-ink">{produit.color_name}</span>
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
               {couleurs.map(c => (
@@ -112,27 +114,24 @@ export default function Produit({ onAjouter, theme, remises }) {
         )}
 
         <div className="mt-6">
-          {/* Le client marocain lit son marché en arabe : l'étiquette de la
-              taille — champ décisif, mal choisi il fait retourner le colis —
-              est celle qui a le plus à gagner à être dans sa langue. */}
-          <p dir="rtl" lang="ar" className="text-[13px] tracking-normal text-ink font-medium">اختر القياس</p>
+          <p className="text-[13px] tracking-normal text-ink font-medium">{t('tailleLabel')}</p>
           {/* Réglable depuis /store/theme : la grille convient à un choix
               court (S…XL), la liste à un choix long comme des pointures. */}
           <div className={theme?.produitAffichageTailles === 'liste' ? 'flex flex-col gap-2 mt-3 max-w-xs' : 'flex flex-wrap gap-2 mt-3'}>
-            {tailles.length === 0 && <p className="text-sm text-gray-400">Momentanément épuisé</p>}
+            {tailles.length === 0 && <p className="text-sm text-gray-400">{t('epuise')}</p>}
             {tailles.map(s => {
               const epuisee = !(s.stock > 0);
               const liste = theme?.produitAffichageTailles === 'liste';
               return (
                 <button key={s.size} type="button" disabled={epuisee}
                   onClick={() => setTaille(s.size)}
-                  title={epuisee ? 'Épuisé' : undefined}
+                  title={epuisee ? t('epuise') : undefined}
                   className={`${liste ? 'w-full flex items-center justify-between' : 'min-w-[3rem]'} px-3 py-2.5 text-sm border transition-colors relative
                     ${epuisee
                       ? 'border-gray-200 text-ink cursor-not-allowed'
                       : taille === s.size ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white' : 'border-gray-200 hover:border-gray-400'}`}>
                   {s.size}
-                  {liste && epuisee && <span className="text-xs text-red-500">Épuisé</span>}
+                  {liste && epuisee && <span className="text-xs text-red-500">{t('epuise')}</span>}
                   {/* Une croix au-dessus du chiffre : le chiffre reste lisible,
                       la croix rouge dit à elle seule qu'il n'est pas disponible. */}
                   {!liste && epuisee && (
@@ -154,19 +153,19 @@ export default function Produit({ onAjouter, theme, remises }) {
           })}
           className="mt-7 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase
                      disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
-          {taille ? 'Ajouter au panier' : 'Choisissez une taille'}
+          {taille ? t('ajouterPanier') : t('choisirTaille')}
         </button>
 
         {produit.description && <p className="mt-6 text-sm text-gray-600 leading-relaxed">{produit.description}</p>}
         <div className="mt-8">
-          <Accordeon titre="Détails du produit">{produit.details}</Accordeon>
-          <Accordeon titre="Livraison">Livraison partout au Maroc. Paiement à la livraison.</Accordeon>
+          <Accordeon titre={t('detailsProduit')}>{produit.details}</Accordeon>
+          <Accordeon titre={t('livraisonTitre')}>{t('livraisonTexte')}</Accordeon>
         </div>
       </div>
 
       {produitsLies.length > 0 && (
         <div className="col-span-full mt-6 border-t border-gray-100 pt-10">
-          <h2 className="text-sm tracking-[0.2em] uppercase text-gray-500">Produits similaires</h2>
+          <h2 className="text-sm tracking-[0.2em] uppercase text-gray-500">{t('produitsSimilaires')}</h2>
           <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
             {produitsLies.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
           </div>

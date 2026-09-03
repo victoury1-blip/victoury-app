@@ -4,11 +4,13 @@ import { Instagram, Facebook, Phone, Truck, Wallet } from 'lucide-react';
 import Wordmark from './Wordmark';
 import { IconeWhatsApp, IconeTikTok, IconeVisa, IconeMastercard, IconePayPal } from './icons';
 import { numeroWhatsApp } from '../lib/commande';
+import { useLang } from '../lib/i18n';
 
 /* Pied de page — description, contact et mentions viennent de /store/theme.
    Les listes sont vides par défaut plutôt que pré-remplies d'une marque qui
    n'est pas la vôtre : rien n'apparaît tant que l'administration n'a rien réglé. */
 export default function Footer({ theme, collections }) {
+  const { t } = useLang();
   const f = theme?.footer || {};
   const liens = (titre, items) => items?.length > 0 && (
     <div className="text-center">
@@ -80,17 +82,17 @@ export default function Footer({ theme, collections }) {
           )}
           <div className="mt-6 flex gap-10 sm:gap-12">
             <div>
-              <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-4 font-medium">Suivez-nous</h3>
+              <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-4 font-medium">{t('suivezNous')}</h3>
               {rangeeIcones(reseaux)}
             </div>
             <div>
-              <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-4 font-medium">Contact</h3>
+              <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-4 font-medium">{t('contact')}</h3>
               {rangeeIcones(contactsDirects)}
             </div>
           </div>
         </div>
-        {liens('Collections', categories)}
-        {liens('Mentions légales', f.mentions)}
+        {liens(t('collections'), categories)}
+        {liens(t('mentionsLegales'), f.mentions)}
       </div>
       <div className="border-t border-gray-200">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -104,7 +106,7 @@ export default function Footer({ theme, collections }) {
             <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconeVisa /></span>
             <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconeMastercard /></span>
             <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconePayPal /></span>
-            <span className="text-xs font-medium border border-gray-300 rounded px-3 py-1.5 opacity-60">Paiement à la livraison</span>
+            <span className="text-xs font-medium border border-gray-300 rounded px-3 py-1.5 opacity-60">{t('paiementLivraison')}</span>
           </div>
         </div>
       </div>
