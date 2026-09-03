@@ -60,6 +60,12 @@ export const supprimerProduit = (id) =>
 export const archiverProduit = (id) =>
   supabase.from('shop_products').update({ status: 'Archivé', updated_at: new Date().toISOString() }).eq('id', id).then(jeter);
 
+// Changement de statut isolé (liste des produits, colonne Statut) : un
+// update ciblé plutôt que ré-enregistrer toute la fiche, qui écraserait un
+// champ modifié entre-temps par un autre onglet.
+export const changerStatutProduit = (id, status) =>
+  supabase.from('shop_products').update({ status, updated_at: new Date().toISOString() }).eq('id', id).then(jeter);
+
 /* Dupliquer repart d'une fiche déjà photographiée et détaillée — plus rapide
    que retaper une variante (autre couleur, réédition) depuis zéro. En
    Brouillon : la copie ne doit jamais apparaître dans la boutique avant
