@@ -10,7 +10,12 @@
 }
 
 @layer base {
-  body { @apply bg-white text-ink antialiased; }
+  /* Sur iPhone, tirer la page vers le bas au-delà du pied de page noir
+     révélait un blanc qui ne changera jamais (le "rebond" élastique de
+     Safari montre le fond de la page, pas le pied de page) — désactivé
+     plutôt que rafistolé avec une couleur qui resterait fausse ailleurs. */
+  html { overscroll-behavior-y: none; }
+  body { @apply bg-white text-ink antialiased; overscroll-behavior-y: none; }
   /* Le nom de la marque : capitales très espacées, comme sur le logo. */
   .wordmark { @apply font-display font-normal tracking-[0.22em] uppercase; }
 }
