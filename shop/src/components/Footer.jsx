@@ -14,13 +14,13 @@ export default function Footer({ theme, collections }) {
   const f = theme?.footer || {};
   const liens = (titre, items) => items?.length > 0 && (
     <div className="text-center">
-      <h3 className="text-sm uppercase tracking-widest text-gray-400 mb-3 font-medium">{titre}</h3>
-      <ul className="space-y-3">
+      <h3 className="text-base uppercase tracking-widest opacity-60 mb-3.5 font-medium">{titre}</h3>
+      <ul className="space-y-3.5">
         {items.map((it, i) => (
           <li key={i}>
             {/^https?:\/\//.test(it.url)
-              ? <a href={it.url} target="_blank" rel="noreferrer" className="text-base text-gray-600 hover:text-ink">{it.label}</a>
-              : <Link to={it.url} className="text-base text-gray-600 hover:text-ink">{it.label}</Link>}
+              ? <a href={it.url} target="_blank" rel="noreferrer" className="text-lg opacity-90 hover:opacity-100">{it.label}</a>
+              : <Link to={it.url} className="text-lg opacity-90 hover:opacity-100">{it.label}</Link>}
           </li>
         ))}
       </ul>
@@ -77,11 +77,11 @@ export default function Footer({ theme, collections }) {
           {f.description && <p className="mt-4 text-base opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           <div className="mt-7 flex gap-12 sm:gap-14">
             <div>
-              <h3 className="text-sm uppercase tracking-widest text-gray-400 mb-3.5 font-medium">{t('suivezNous')}</h3>
+              <h3 className="text-base uppercase tracking-widest opacity-60 mb-3.5 font-medium">{t('suivezNous')}</h3>
               {rangeeIcones(reseaux)}
             </div>
             <div>
-              <h3 className="text-sm uppercase tracking-widest text-gray-400 mb-3.5 font-medium">{t('contact')}</h3>
+              <h3 className="text-base uppercase tracking-widest opacity-60 mb-3.5 font-medium">{t('contact')}</h3>
               {rangeeIcones(contactsDirects)}
             </div>
           </div>
