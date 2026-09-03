@@ -33,17 +33,23 @@ export default function CommandesListe() {
   const [q, setQ] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
 
+  // Une commande supprimée dans l'application (soft-delete : is_deleted)
+  // reste visible ici, comme une archive — la retirer aussi de cette liste
+  // effacerait la trace qu'elle est bien passée par le site.
   useEffect(() => {
     supabase.from('orders')
-      .select('id, recipient, product, products, price, status, date_added')
-      .like('id', 'VS-%').eq('is_deleted', false)
+      .select('id, recipient, product, products, price, status, date_added, is_deleted')
+      .like('id', 'VS-%')
       .order('date_added', { ascending: false }).limit(300)
       .then(({ data }) => setCommandes(data || []))
       .catch(() => setCommandes([]));
   }, []);
 
   const stats = useMemo(() => {
-    const liste = commandes || [];
+    // Une commande archivée (supprimée côté app) ne doit plus compter dans
+    // le chiffre d'affaires ou les totaux — elle reste visible, mais elle
+    // n'est plus une commande "active".
+    const liste = (commandes || []).filter(c => !c.is_deleted);
     return {
       total: liste.length,
       enAttente: liste.filter(c => c.status === 'nouveau').length,
@@ -55,7 +61,8 @@ export default function CommandesListe() {
   const visibles = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (commandes || []).filter(c => {
-      if (filtreStatut && c.status !== filtreStatut) return false;
+      if (filtreStatut === 'archivee') return c.is_deleted;
+      if (filtreStatut && filtreStatut !== 'archivee' && c.status !== filtreStatut) return false;
       if (!s) return true;
       const r = c.recipient || {};
       return [c.id, r.name, r.phone, r.city].some(v => String(v || '').toLowerCase().includes(s));
@@ -82,6 +89,7 @@ export default function CommandesListe() {
         <select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)} className="border border-gray-200 px-3 py-2.5 text-sm bg-white">
           <option value="">Tous les statuts</option>
           {Object.entries(STATUT).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
+          <option value="archivee">Archivées</option>
         </select>
       </div>
 
@@ -106,8 +114,11 @@ export default function CommandesListe() {
               const produits = c.products?.length ? c.products : (c.product ? [c.product] : []);
               const st = statut(c.status);
               return (
-                <tr key={c.id} className="hover:bg-gray-50 align-top">
-                  <td className="px-4 py-3 font-mono text-xs text-blue-700">#{c.id}</td>
+                <tr key={c.id} className={`hover:bg-gray-50 align-top ${c.is_deleted ? 'opacity-50' : ''}`}>
+                  <td className="px-4 py-3 font-mono text-xs text-blue-700">
+                    #{c.id}
+                    {c.is_deleted && <span className="ml-1.5 text-[10px] font-sans px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Archivée</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-800">{r.name}</p>
                     <p className="text-xs text-gray-400">{r.city} · {r.phone}</p>

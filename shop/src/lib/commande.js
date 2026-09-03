@@ -16,8 +16,8 @@ const PREFIXE = 'VS-';
     d'avant, plus simple à lire et à dicter au téléphone. */
 export function nouvelId(now = Date.now(), alea = Math.random) {
   const t = now % 1e6;                               // 6 chiffres tirés de l'horodatage
-  const r = Math.floor(alea() * 1e4);                 // 4 chiffres aléatoires, contre les doublons à la même milliseconde
-  return `${PREFIXE}${String(t).padStart(6, '0')}${String(r).padStart(4, '0')}`;
+  const r = Math.floor(alea() * 1e5);                 // 5 chiffres aléatoires, contre les doublons à la même milliseconde
+  return `${PREFIXE}${String(t).padStart(6, '0')}${String(r).padStart(5, '0')}`;
 }
 
 /* Horodatage au format de l'application : « JJ/MM/AAAA HH:MM:SS ». Un format
