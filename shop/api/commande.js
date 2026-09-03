@@ -15,18 +15,27 @@ const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].t
 
 /* Localisation à partir de l'IP — au mieux : une IP mobile ou un VPN donne
    souvent une ville approximative, parfois rien du tout. Une géolocalisation
-   absente ne doit jamais empêcher la commande de partir. */
+   absente ne doit jamais empêcher la commande de partir.
+   Deux services plutôt qu'un : ipapi.co a un quota gratuit vite atteint, et
+   répond alors par une erreur silencieuse (la ville restait vide très
+   souvent) — ipwho.is prend le relais quand le premier ne répond rien. */
+async function interroger(url, ac) {
+  const r = await fetch(url, { signal: ac.signal });
+  if (!r.ok) return null;
+  return r.json();
+}
+
 async function localiser(ip) {
   if (!ip || ip === '127.0.0.1' || ip.startsWith('::')) return null;
   const ac = new AbortController();
-  const to = setTimeout(() => ac.abort(), 2500);
+  const to = setTimeout(() => ac.abort(), 3500);
   try {
-    const r = await fetch(`https://ipapi.co/${ip}/json/`, { signal: ac.signal });
-    if (!r.ok) return null;
-    const d = await r.json();
-    if (d?.error) return null;
-    return { ville: d.city || null, pays: d.country_name || null };
-  } catch {
+    const d = await interroger(`https://ipapi.co/${ip}/json/`, ac).catch(() => null);
+    if (d && !d.error && d.city) return { ville: d.city, pays: d.country_name || null };
+
+    const d2 = await interroger(`https://ipwho.is/${ip}`, ac).catch(() => null);
+    if (d2?.success && d2.city) return { ville: d2.city, pays: d2.country || null };
+
     return null;
   } finally {
     clearTimeout(to);
