@@ -99,11 +99,11 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
         <div className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('nomComplet')}</label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('nomComplet')} <span className="text-red-500">*</span></label>
               <input value={form.nom} onChange={e => u('nom', e.target.value)} className={`${champ} ${enErreur('nom')}`} />
             </div>
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('telephone')}</label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('telephone')} <span className="text-red-500">*</span></label>
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
                 inputMode="tel" placeholder="06 12 34 56 78" className={`${champ} ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
@@ -113,11 +113,11 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('ville')}</label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('ville')} <span className="text-red-500">*</span></label>
               <input value={form.ville} onChange={e => u('ville', e.target.value)} className={`${champ} ${enErreur('ville')}`} />
             </div>
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('adresse')}</label>
+              <label className="block text-sm text-ink font-medium mb-1.5">{tr('adresse')} <span className="text-red-500">*</span></label>
               <input value={form.adresse} onChange={e => u('adresse', e.target.value)} className={`${champ} ${enErreur('adresse')}`} />
             </div>
           </div>
