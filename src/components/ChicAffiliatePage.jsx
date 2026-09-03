@@ -27,6 +27,7 @@ import { cloudSet, cloudGet } from '../lib/cloudSettings';
 import { now, fmtDate } from '../lib/dateUtils';
 import { platformOf, st, platKey } from '../lib/affiliatePlatforms';
 import { getCityFraisMap, rememberCityFrais, recallCityFrais, setCityFraisValue, cityKey } from '../lib/affiliateFrais';
+import { publierVersBoutique } from '../lib/shopSync';
 
 /* Plateforme courante (Chic, Bouait…). Elle traverse toute la page par un
    contexte plutôt que d'être passée de composant en composant : une trentaine
@@ -513,6 +514,40 @@ function ProductsTab() {
     return false;
   }
 
+  /* Fiche Stock complète (images, tailles, prix d'achat) correspondant à ce
+     produit Chic/Bouait — nécessaire pour la publier, `p` n'étant qu'une
+     ligne scannée sur la page fournisseur. */
+  function stockProductFor(p) {
+    const stored = loadProducts();
+    return stored.find(x => x.source === P.source && (
+      (p.chicId && x.chicId === p.chicId) || (p.name && x.name?.toLowerCase() === p.name.toLowerCase())
+    ));
+  }
+
+  const [publishing, setPublishing] = useState(null);
+  const [published, setPublished] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(platKey(plat, 'published_boutique')) || '[]')); } catch { return new Set(); }
+  });
+  function markPublished(key) {
+    const next = new Set(published); next.add(key);
+    localStorage.setItem(platKey(plat, 'published_boutique'), JSON.stringify([...next]));
+    setPublished(next);
+  }
+  async function publierProduit(p) {
+    const stock = stockProductFor(p);
+    if (!stock) { alert('Importez d\'abord ce produit dans le Stock.'); return; }
+    const key = p.chicId || p.name;
+    setPublishing(key);
+    try {
+      await publierVersBoutique(stock);
+      markPublished(key);
+    } catch (e) {
+      alert('Erreur: ' + e.message);
+    } finally {
+      setPublishing(null);
+    }
+  }
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const notImportedCount = filtered.filter(p => !isImported(p)).length;
 
@@ -588,9 +623,23 @@ function ProductsTab() {
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           {isImported(p) ? (
-                            <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium">
-                              <Check size={12} /> Importé
-                            </span>
+                            <>
+                              <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium">
+                                <Check size={12} /> Importé
+                              </span>
+                              <button
+                                onClick={() => publierProduit(p)}
+                                disabled={publishing === (p.chicId || p.name)}
+                                title="Publier ce produit sur le site, catégorie Soldes"
+                                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition disabled:opacity-50 ${
+                                  published.has(p.chicId || p.name) ? 'bg-purple-100 text-purple-700' : 'bg-purple-600 text-white hover:bg-purple-700'
+                                }`}
+                              >
+                                {publishing === (p.chicId || p.name)
+                                  ? <><Loader2 size={12} className="animate-spin" /> Envoi...</>
+                                  : <><Store size={12} /> {published.has(p.chicId || p.name) ? 'Republier' : 'Publier'}</>}
+                              </button>
+                            </>
                           ) : (
                             <button
                               onClick={() => importProduct(p)}
@@ -634,9 +683,22 @@ function ProductsTab() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {isImported(p) ? (
-                        <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium w-fit">
-                          <Check size={12} /> Importé
-                        </span>
+                        <>
+                          <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium w-fit">
+                            <Check size={12} /> Importé
+                          </span>
+                          <button
+                            onClick={() => publierProduit(p)}
+                            disabled={publishing === (p.chicId || p.name)}
+                            className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition disabled:opacity-50 ${
+                              published.has(p.chicId || p.name) ? 'bg-purple-100 text-purple-700' : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                          >
+                            {publishing === (p.chicId || p.name)
+                              ? <><Loader2 size={12} className="animate-spin" /> Envoi...</>
+                              : <><Store size={12} /> {published.has(p.chicId || p.name) ? 'Republier' : 'Publier'}</>}
+                          </button>
+                        </>
                       ) : (
                         <button
                           onClick={() => importProduct(p)}
