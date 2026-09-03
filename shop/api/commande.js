@@ -7,7 +7,7 @@
 // validation (champs obligatoires, mise en forme) est le même code que
 // l'ancien chemin direct, partagé avec les tests.
 
-import { champsManquants, construireCommande, nouvelId } from '../src/lib/commande.js';
+import { champsManquants, construireCommande } from '../src/lib/commande.js';
 
 const SOURCES_CONNUES = new Set(['Instagram', 'Facebook', 'TikTok', 'Google', 'WhatsApp', 'Direct']);
 
@@ -33,32 +33,6 @@ async function localiser(ip) {
   }
 }
 
-/* Numéro suivant de la série VIxxxxx (partagée avec l'app principale) — via
-   la fonction shop_next_vi_id() (voir schema.sql), qui répond juste le
-   prochain numéro sans jamais laisser le site lire la table des commandes.
-   Un échec (réseau, fonction pas encore posée en base) ne doit jamais
-   empêcher la commande de partir : on retombe sur l'ancien format VS-,
-   toujours accepté par la même règle. */
-async function idSuivant(url, key) {
-  const ac = new AbortController();
-  const to = setTimeout(() => ac.abort(), 3000);
-  try {
-    const r = await fetch(`${url}/rest/v1/rpc/shop_next_vi_id`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
-      body: '{}',
-      signal: ac.signal,
-    });
-    if (!r.ok) return nouvelId();
-    const id = await r.json();
-    return typeof id === 'string' && /^VI[0-9]{5,}$/.test(id) ? id : nouvelId();
-  } catch {
-    return nouvelId();
-  } finally {
-    clearTimeout(to);
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
 
@@ -73,8 +47,8 @@ export default async function handler(req, res) {
   if (manque.length) return res.status(400).json({ ok: false, manque });
 
   const ip = clientIp(req);
-  const [geo, id] = await Promise.all([localiser(ip), idSuivant(url, key)]);
-  const commande = construireCommande(form, lignes, Number(total) || 0, new Date(), id, {
+  const [geo] = await Promise.all([localiser(ip)]);
+  const commande = construireCommande(form, lignes, Number(total) || 0, new Date(), undefined, {
     source: SOURCES_CONNUES.has(source) ? source : 'Direct',
   });
   commande.recipient.ip = ip || undefined;
