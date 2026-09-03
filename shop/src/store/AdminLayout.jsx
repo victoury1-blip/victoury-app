@@ -55,6 +55,36 @@ export default function AdminLayout() {
     return () => { supabase.removeChannel(canal); };
   }, []);
 
+  // Les navigateurs (surtout sur téléphone) bloquent tout son déclenché sans
+  // geste préalable de la personne — une notification qui arrive pendant
+  // qu'on tape ailleurs resterait sinon muette. Le premier contact avec la
+  // page "débloque" l'audio pour le reste de la session : on joue et coupe
+  // aussitôt un son inaudible, ce qui suffit à autoriser les suivants.
+  useEffect(() => {
+    let debloque = false;
+    const debloquer = () => {
+      if (debloque) return;
+      debloque = true;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.01);
+      } catch { /* tant pis, le premier son restera silencieux */ }
+      window.removeEventListener('pointerdown', debloquer);
+      window.removeEventListener('keydown', debloquer);
+    };
+    window.addEventListener('pointerdown', debloquer);
+    window.addEventListener('keydown', debloquer);
+    return () => {
+      window.removeEventListener('pointerdown', debloquer);
+      window.removeEventListener('keydown', debloquer);
+    };
+  }, []);
+
   const Nav = (
     <>
       <nav className="flex-1 py-3 overflow-y-auto">
