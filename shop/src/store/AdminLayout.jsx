@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { jouerSonCommande } from '../lib/sonCommande';
 import Wordmark from '../components/Wordmark';
 
 const LIENS = [
@@ -29,6 +30,20 @@ const LIENS = [
  * Le blanc du texte sur ce fond est le contraste le plus net qui existe — plus
  * lisible qu'un gris, aussi discret soit-il. */
 export default function AdminLayout() {
+  // Un carillon à chaque commande du site (id VS-...), sur n'importe quelle
+  // page de l'administration — pas seulement le Tableau de bord — comme le
+  // fait WooCommerce, pour qu'une commande ne passe pas inaperçue pendant
+  // qu'on travaille ailleurs dans l'admin.
+  useEffect(() => {
+    const canal = supabase
+      .channel('shop-nouvelle-commande')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        if (String(payload.new?.id || '').startsWith('VS-')) jouerSonCommande();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(canal); };
+  }, []);
+
   return (
     <div className="min-h-screen flex bg-gray-50">
       <aside className="w-60 shrink-0 bg-[#0f1424] hidden sm:flex flex-col">
