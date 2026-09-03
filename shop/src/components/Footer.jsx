@@ -70,9 +70,15 @@ export default function Footer({ theme, collections }) {
       <div className="max-w-7xl mx-auto px-6 sm:px-8 py-10 grid grid-cols-2 gap-8 sm:gap-14 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-1 text-center flex flex-col items-center">
           {/* Le même logo qu'en haut de page — un texte "VICTOURY" générique
-              ici contredirait le logo déposé dans /store/theme. */}
+              ici contredirait le logo déposé dans /store/theme. Le fichier
+              déposé est un texte noir sur fond blanc (pensé pour un header
+              clair) : sur ce pied de page sombre, il est inversé (le fond
+              blanc devient noir, le texte noir devient blanc) puis fondu en
+              mode "screen" — sur un fond noir, cela revient à effacer le
+              carré blanc et ne garder que le texte, sans image détourée. */}
           {theme?.logoUrl
-            ? <img src={theme.logoUrl} alt="Victoury" className="h-9 w-auto object-contain" />
+            ? <img src={theme.logoUrl} alt="Victoury" className="h-9 w-auto object-contain"
+                style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
             : <Wordmark className="text-[28px]" style={{ color: '#fff' }} />}
           {f.description && <p className="mt-4 text-[15px] opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           {badgesPaiement.length > 0 && (
