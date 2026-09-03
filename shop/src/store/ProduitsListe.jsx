@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, ImageOff, Copy, Archive } from 'lucide-react';
-import { listerProduits, archiverProduit, dupliquerProduit } from '../lib/admin';
+import { listerProduits, archiverProduit, dupliquerProduit, listerCollections } from '../lib/admin';
 import { fmtPrix } from '../lib/pricing';
 
 const BADGE = { Actif: 'bg-green-50 text-green-700', Archivé: 'bg-gray-100 text-gray-500', Brouillon: 'bg-amber-50 text-amber-700' };
 
 export default function ProduitsListe() {
   const [produits, setProduits] = useState(null);
+  const [collections, setCollections] = useState([]);
   const [q, setQ] = useState('');
+  const [collectionId, setCollectionId] = useState('');
   const [selection, setSelection] = useState(new Set());
   const [enCours, setEnCours] = useState(false);
 
   const recharger = () => listerProduits().then(setProduits).catch(() => setProduits([]));
   useEffect(() => { recharger(); }, []);
+  useEffect(() => { listerCollections().then(setCollections).catch(() => {}); }, []);
 
   async function retirer(p) {
     // Un produit vendu doit rester traçable (commandes passées) : on archive
@@ -41,7 +44,9 @@ export default function ProduitsListe() {
   }
 
   if (!produits) return <p className="text-sm text-gray-400">Chargement…</p>;
-  const visibles = produits.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  const visibles = produits.filter(p =>
+    p.name.toLowerCase().includes(q.toLowerCase()) && (!collectionId || p.collection_id === collectionId)
+  );
   const toutCoche = visibles.length > 0 && visibles.every(p => selection.has(p.id));
 
   const basculerTout = () => setSelection(toutCoche ? new Set() : new Set(visibles.map(p => p.id)));
@@ -63,6 +68,11 @@ export default function ProduitsListe() {
       <div className="mt-4 flex items-center gap-3">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un produit…"
           className="w-full max-w-sm border border-gray-200 px-3 py-2.5 text-sm bg-white" />
+        <select value={collectionId} onChange={e => setCollectionId(e.target.value)}
+          className="border border-gray-200 px-3 py-2.5 text-sm bg-white">
+          <option value="">Toutes les collections</option>
+          {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         {selection.size > 0 && (
           <button onClick={archiverSelection} disabled={enCours}
             className="flex items-center gap-1.5 text-xs text-gray-600 border border-gray-200 px-3 py-2.5 hover:border-red-300 hover:text-red-600 disabled:opacity-50 whitespace-nowrap">
