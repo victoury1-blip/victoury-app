@@ -60,6 +60,23 @@ export const supprimerProduit = (id) =>
 export const archiverProduit = (id) =>
   supabase.from('shop_products').update({ status: 'Archivé', updated_at: new Date().toISOString() }).eq('id', id).then(jeter);
 
+/* Dupliquer repart d'une fiche déjà photographiée et détaillée — plus rapide
+   que retaper une variante (autre couleur, réédition) depuis zéro. En
+   Brouillon : la copie ne doit jamais apparaître dans la boutique avant
+   d'avoir été relue (prix, tailles, description toujours à confirmer). */
+export async function dupliquerProduit(p) {
+  const { id, created_at, images, sizes, ...champs } = p;
+  const nouveau = await enregistrerProduit({
+    ...champs,
+    slug: `${p.slug}-copie-${Date.now().toString(36)}`,
+    name: `${p.name} (copie)`,
+    status: 'Brouillon',
+  });
+  if (images?.length) await remplacerImages(nouveau.id, images.map(({ url, alt }) => ({ url, alt })));
+  if (sizes?.length) await remplacerTailles(nouveau.id, sizes.map(({ size, stock }) => ({ size, stock })));
+  return nouveau;
+}
+
 // Écriture partielle générique (ex. prix en masse sur une collection) — même
 // raison que majPosition : un update direct, sans .select().single().
 export const majProduit = (id, champs) =>
