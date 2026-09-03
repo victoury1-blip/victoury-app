@@ -69,7 +69,11 @@ export default function Footer({ theme, collections }) {
     <footer className="mt-16 border-t border-gray-100" style={{ background: f.couleurFond, color: f.couleurTexte }}>
       <div className="max-w-7xl mx-auto px-6 sm:px-8 py-10 grid grid-cols-2 gap-8 sm:gap-14 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-1 text-center flex flex-col items-center">
-          <Wordmark className="text-[28px]" />
+          {/* Le même logo qu'en haut de page — un texte "VICTOURY" générique
+              ici contredirait le logo déposé dans /store/theme. */}
+          {theme?.logoUrl
+            ? <img src={theme.logoUrl} alt="Victoury" className="h-9 w-auto object-contain" />
+            : <Wordmark className="text-[28px]" />}
           {f.description && <p className="mt-4 text-[15px] opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           {badgesPaiement.length > 0 && (
             <div className="mt-5 space-y-2">
