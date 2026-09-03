@@ -31,6 +31,7 @@ export default function Produit({ onAjouter, theme, remises }) {
   const [taille, setTaille] = useState('');
   const [chargement, setChargement] = useState(true);
   const [produitsLies, setProduitsLies] = useState([]);
+  const [photoActive, setPhotoActive] = useState(0);
 
   useEffect(() => {
     setChargement(true); setTaille('');
@@ -41,6 +42,7 @@ export default function Produit({ onAjouter, theme, remises }) {
         // regarde même pas cette ligne peut quand même ajouter au panier, et
         // celui qui veut une autre taille n'a qu'à cliquer dessus.
         setTaille(p?.sizes?.find(s => s.stock > 0)?.size || '');
+        setPhotoActive(0);
         const cs = p?.group_id ? await chargerCouleurs(p.group_id) : [];
         // La couleur actuellement affichée ressort en tête des pastilles —
         // les « autres » couleurs viennent après, jamais avant elle.
@@ -63,6 +65,7 @@ export default function Produit({ onAjouter, theme, remises }) {
   // qu'elle n'a jamais existé, quand elle est seulement épuisée pour l'instant.
   // Le client la voit, comprend qu'elle reviendra, et choisit parmi les autres.
   const tailles = produit.sizes || [];
+  const photos = produit.images?.length ? produit.images : [{ url: '' }];
   const promo = produit.compare_at > produit.price;
   // Règles globales + celles ciblant justement la collection de ce produit.
   const paliers = paliersEffectifs(remises, produit.collection_id);
@@ -73,15 +76,33 @@ export default function Produit({ onAjouter, theme, remises }) {
       {/* Sur mobile, les photos défilent au doigt une par une (comme une story) —
           empilées les unes sous les autres, il fallait scroller toute la page
           juste pour voir la 2ᵉ photo. Le bureau garde l'empilement classique. */}
-      <div className="flex overflow-x-auto snap-x snap-mandatory lg:flex-col lg:overflow-visible lg:snap-none gap-2
-                      [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {(produit.images?.length ? produit.images : [{ url: '' }]).map((img, i) => (
-          <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center lg:shrink">
-            {img.url
-              ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
-              : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
+      <div>
+        <div
+          onScroll={(e) => {
+            const largeur = e.currentTarget.clientWidth;
+            if (largeur > 0) setPhotoActive(Math.round(e.currentTarget.scrollLeft / largeur));
+          }}
+          className="flex overflow-x-auto snap-x snap-mandatory lg:flex-col lg:overflow-visible lg:snap-none gap-2
+                    [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {photos.map((img, i) => (
+            <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center lg:shrink">
+              {img.url
+                ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
+                : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
+            </div>
+          ))}
+        </div>
+        {/* Repères de position sous les photos, uniquement sur mobile où elles
+            défilent une par une — sur bureau elles sont toutes déjà visibles. */}
+        {photos.length > 1 && (
+          <div className="flex lg:hidden justify-center gap-1.5 mt-2.5">
+            {photos.map((_, i) => (
+              <span key={i} className={`h-1.5 rounded-full transition-all ${
+                i === photoActive ? 'w-4 bg-ink' : 'w-1.5 bg-gray-300'
+              }`} />
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
       <div className="lg:sticky lg:top-24 lg:self-start">
