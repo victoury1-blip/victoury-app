@@ -227,6 +227,12 @@ grant execute on function shop_check_promo(text, numeric) to anon, authenticated
 --  Un visiteur peut UNIQUEMENT créer une commande neuve, et rien d'autre :
 --  ni la lire, ni la modifier, ni fixer son statut. Sans ces conditions,
 --  l'insertion publique laisserait écrire n'importe quoi dans la table.
+--
+--  Les numéros VIxxxxx sont ceux de la série de l'application (voir
+--  src/lib/victId.js) — le site les reprend plutôt que sa propre série,
+--  pour que l'équipe garde une seule suite de numéros au téléphone avec le
+--  transporteur. VS- reste accepté en secours (panne réseau, base
+--  momentanément indisponible côté fonction shop_next_vi_id ci-dessous).
 -- ============================================================
 create policy "creation depuis la boutique" on orders
   for insert to anon
@@ -235,5 +241,49 @@ create policy "creation depuis la boutique" on orders
     and validated is not true
     and is_deleted is not true
     and price >= 0
-    and id like 'VS-%'          -- préfixe réservé aux commandes du site
+    and (id like 'VS-%' or id ~ '^VI[0-9]{5,}$')
   );
+
+-- ─────────────────────────────────────────────
+--  Prochain numéro de la série VIxxxxx
+--
+--  Le site a besoin de savoir où en est la série pour continuer à numéroter
+--  à sa suite — mais un visiteur ne doit jamais pouvoir LIRE la table
+--  `orders` (noms, téléphones, adresses de toutes les clientes). Une
+--  fonction qui ne répond QUE le prochain numéro, comme shop_check_promo
+--  ci-dessus ne répond que la valeur d'un code.
+-- ─────────────────────────────────────────────
+create or replace function shop_next_vi_id()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  max_a_confirmer int := 0;
+  n int;
+  candidat text;
+begin
+  select coalesce(max(
+    greatest(
+      coalesce((regexp_match(id, '^VI([0-9]+)$'))[1]::int, 0),
+      coalesce((regexp_match(tracking_number, '^VI([0-9]+)$'))[1]::int, 0)
+    )
+  ), 0)
+  into max_a_confirmer
+  from orders
+  where status = 'nouveau';
+
+  n := max_a_confirmer + 1;
+  loop
+    candidat := 'VI' || lpad(n::text, 5, '0');
+    exit when not exists (
+      select 1 from orders where id = candidat or tracking_number = candidat
+    );
+    n := n + 1;
+  end loop;
+
+  return candidat;
+end;
+$$;
+grant execute on function shop_next_vi_id() to anon;

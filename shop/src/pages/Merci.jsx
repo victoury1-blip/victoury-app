@@ -8,7 +8,7 @@ export default function Merci() {
   const { t, lang } = useLang();
   return (
     <div className="max-w-2xl mx-auto px-6 py-24 text-center">
-      <div className="w-14 h-14 rounded-full bg-ink text-white grid place-items-center mx-auto"><Check size={26} /></div>
+      <div className="w-14 h-14 rounded-full bg-green-600 text-white grid place-items-center mx-auto"><Check size={26} /></div>
       <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{lang === 'ar' ? 'تم تسجيل الطلب' : 'Commande enregistrée'}</h1>
       <p className="mt-3 text-sm text-gray-600">
         {lang === 'ar' ? 'شكرًا لكم! سنتصل بكم قريبًا لتأكيد طلبكم.' : 'Merci ! Nous vous appelons très vite pour confirmer votre commande.'}

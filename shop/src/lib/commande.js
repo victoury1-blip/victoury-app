@@ -11,12 +11,20 @@
    d'un visiteur que des identifiants de cette forme. */
 const PREFIXE = 'VS-';
 
-/** Identifiant unique, lisible, et impossible à deviner de proche en proche. */
+/** Identifiant unique, lisible, et impossible à deviner de proche en proche.
+    Secours si la suite de la série (voir prochainIdSuite) est indisponible —
+    la base accepte toujours ce format en repli. */
 export function nouvelId(now = Date.now(), alea = Math.random) {
   const t = now.toString(36).toUpperCase().slice(-6);
   const r = Math.floor(alea() * 46656).toString(36).toUpperCase().padStart(3, '0');
   return `${PREFIXE}${t}${r}`;
 }
+
+/* La suite de la série VIxxxxx de l'application (voir src/lib/victId.js) est
+   calculée côté base, par la fonction shop_next_vi_id() (schema.sql) — pas
+   ici : un visiteur du site ne doit jamais avoir besoin de lire la table
+   `orders` (noms, téléphones, adresses de toutes les clientes) pour
+   connaître le prochain numéro. Voir api/commande.js. */
 
 /* Horodatage au format de l'application : « JJ/MM/AAAA HH:MM:SS ». Un format
    différent se lirait mal partout ailleurs — factures, historiques, exports. */
