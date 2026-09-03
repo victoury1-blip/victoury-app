@@ -125,6 +125,10 @@ export const REGLAGES_DEFAUT = {
   // souci côté base ou côté app principale. URL d'un Google Apps Script
   // déployé en Web App, voir /store/reglages.
   sheetWebhookUrl: '',
+  // Son personnalisé pour le carillon "nouvelle commande" (voir
+  // src/lib/sonCommande.js) — un extrait audio en base64, ou vide pour
+  // garder le carillon synthétisé par défaut.
+  sonCommandeUrl: '',
 };
 
 // Le Meta Pixel vit dans sa propre clé : ni son activation ni son identifiant

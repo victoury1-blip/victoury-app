@@ -23,7 +23,13 @@ function note(freq, debut, duree, gain = 0.2) {
   osc.stop(c.currentTime + debut + duree);
 }
 
-export function jouerSonCommande() {
+// `sonUrl` : un son personnalisé déposé dans /store/reglages (base64 ou
+// lien) — sinon le carillon synthétisé ci-dessus.
+export function jouerSonCommande(sonUrl) {
+  if (sonUrl) {
+    try { new Audio(sonUrl).play().catch(() => {}); return; }
+    catch { /* lecture impossible : on retombe sur le carillon */ }
+  }
   try {
     note(880, 0, 0.18);
     note(1318.5, 0.09, 0.35);

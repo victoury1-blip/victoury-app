@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { enregistrerReglages } from '../lib/admin';
 import { REGLAGES_DEFAUT } from '../lib/catalog';
+import { jouerSonCommande } from '../lib/sonCommande';
 
 const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
 const label = 'block text-xs font-medium text-gray-500 mb-1.5';
@@ -78,6 +79,34 @@ export default function Reglages() {
             l'équipe, Déployer → Nouveau déploiement → Application Web (accès : Tout le monde), puis
             collez l'URL obtenue ici. Laissez vide pour désactiver.
           </p>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Son de notification</h2>
+          <p className="text-xs text-gray-400 mb-3">
+            Joué dans toute l'administration à chaque nouvelle commande du site. Par défaut, un
+            carillon simple — déposez votre propre son pour le remplacer.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 text-xs tracking-wide uppercase cursor-pointer">
+              Choisir un fichier
+              <input type="file" accept="audio/*" hidden onChange={e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const lecteur = new FileReader();
+                lecteur.onload = ev => u('sonCommandeUrl', ev.target.result);
+                lecteur.readAsDataURL(f);
+              }} />
+            </label>
+            {r.sonCommandeUrl && (
+              <>
+                <button type="button" onClick={() => jouerSonCommande(r.sonCommandeUrl)}
+                  className="text-xs text-gray-600 border border-gray-200 px-3 py-2 hover:border-gray-400">Tester</button>
+                <button type="button" onClick={() => u('sonCommandeUrl', '')}
+                  className="text-xs text-red-500 hover:underline">Retirer</button>
+              </>
+            )}
+          </div>
         </section>
 
       </div>

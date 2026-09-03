@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
+import { chargerReglages } from '../lib/catalog';
 import Wordmark from '../components/Wordmark';
 
 const LIENS = [
@@ -34,11 +35,14 @@ export default function AdminLayout() {
   // page de l'administration — pas seulement le Tableau de bord — comme le
   // fait WooCommerce, pour qu'une commande ne passe pas inaperçue pendant
   // qu'on travaille ailleurs dans l'admin.
+  const sonRef = useRef('');
+  useEffect(() => { chargerReglages().then(r => { sonRef.current = r.sonCommandeUrl || ''; }).catch(() => {}); }, []);
+
   useEffect(() => {
     const canal = supabase
       .channel('shop-nouvelle-commande')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        if (String(payload.new?.id || '').startsWith('VS-')) jouerSonCommande();
+        if (String(payload.new?.id || '').startsWith('VS-')) jouerSonCommande(sonRef.current);
       })
       .subscribe();
     return () => { supabase.removeChannel(canal); };
