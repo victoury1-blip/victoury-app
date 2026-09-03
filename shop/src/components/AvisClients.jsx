@@ -14,7 +14,7 @@ export default function AvisClients({ avis }) {
         {avis.map(a => (
           <button key={a.id} type="button" onClick={() => setOuvert(a.url)} className="shrink-0">
             <img src={a.url} alt="Avis client"
-              className="w-44 sm:w-56 aspect-[3/4] object-cover rounded-lg border border-gray-100 cursor-zoom-in hover:opacity-90 transition-opacity" />
+              className="w-52 sm:w-64 aspect-[3/4] object-cover rounded-lg border border-gray-100 cursor-zoom-in hover:opacity-90 transition-opacity" />
           </button>
         ))}
       </div>
