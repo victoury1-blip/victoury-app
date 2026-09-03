@@ -96,6 +96,27 @@ export async function televerserPhoto(fichier) {
   return supabase.storage.from('boutique').getPublicUrl(nom).data.publicUrl;
 }
 
+/* ── Médiathèque : toutes les photos déjà déposées (logo, favicon, hero,
+   produits…) au même endroit, pour les réutiliser sans re-uploader. Le bucket
+   'boutique' est plat (pas de dossiers) — on liste tout ce qu'il contient. */
+export async function listerMedias({ limite = 200, decalage = 0 } = {}) {
+  const { data, error } = await supabase.storage.from('boutique')
+    .list('', { limit: limite, offset: decalage, sortBy: { column: 'created_at', order: 'desc' } });
+  if (error) throw new Error(error.message);
+  return (data || [])
+    .filter(f => f.id) // les dossiers renvoyés par l'API n'ont pas d'id
+    .map(f => ({
+      nom: f.name,
+      taille: f.metadata?.size || 0,
+      url: supabase.storage.from('boutique').getPublicUrl(f.name).data.publicUrl,
+    }));
+}
+
+export async function supprimerMedia(nom) {
+  const { error } = await supabase.storage.from('boutique').remove([nom]);
+  if (error) throw new Error(error.message);
+}
+
 /* ── Pages ── */
 export const listerPages = () => supabase.from('shop_pages').select('*').order('title').then(jeter);
 export const enregistrerPage = (p) =>

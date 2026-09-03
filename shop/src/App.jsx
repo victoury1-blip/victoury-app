@@ -17,6 +17,7 @@ import Dashboard from './store/Dashboard';
 import ProduitsListe from './store/ProduitsListe';
 import ProduitForm from './store/ProduitForm';
 import CollectionsListe from './store/CollectionsListe';
+import MediaListe from './store/MediaListe';
 import ImportWoo from './store/ImportWoo';
 import AvisListe from './store/AvisListe';
 import PagesListe from './store/PagesListe';
@@ -148,6 +149,7 @@ function Administration() {
           <Route path="produits" element={<ProduitsListe />} />
           <Route path="produits/:id" element={<ProduitForm />} />
           <Route path="collections" element={<CollectionsListe />} />
+          <Route path="media" element={<MediaListe />} />
           <Route path="import-woo" element={<ImportWoo />} />
           <Route path="pages" element={<PagesListe />} />
           <Route path="avis" element={<AvisListe />} />
