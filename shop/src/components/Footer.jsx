@@ -101,7 +101,6 @@ export default function Footer({ theme, collections }) {
             <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconeVisa /></span>
             <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconeMastercard /></span>
             <span className="border border-gray-300 rounded px-3 py-1.5 bg-white"><IconePayPal /></span>
-            <span className="text-sm font-medium border border-gray-300 rounded px-3 py-1.5 opacity-60">{t('paiementLivraison')}</span>
           </div>
         </div>
       </div>
