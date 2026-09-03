@@ -652,6 +652,9 @@ export default function App() {
           wooConfigRef.current = stored ? JSON.parse(stored) : (await cloudGet('woo_config') || {});
         }
         const config = wooConfigRef.current;
+        // Désactivé depuis Paramètres (ex. la boutique WooCommerce n'existe
+        // plus) : ni sondage ni bandeau d'erreur, comme si rien n'était réglé.
+        if (config.enabled === false) { setWooError(null); return; }
         if (!config.consumerKey || !config.consumerSecret) {
           setWooError('⚙️ WooCommerce non configuré — ajoutez vos clés API dans Paramètres');
           return;

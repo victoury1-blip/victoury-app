@@ -118,7 +118,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   const [ozoneTrackLoading, setOzoneTrackLoading] = useState(false);
 
   /* ── WooCommerce state ── */
-  const [woo, setWoo] = useState({ siteUrl: '', consumerKey: '', consumerSecret: '', showKey: false, showSecret: false, testStatus: 'idle', syncStatus: 'idle', saved: false });
+  const [woo, setWoo] = useState({ siteUrl: '', consumerKey: '', consumerSecret: '', enabled: true, showKey: false, showSecret: false, testStatus: 'idle', syncStatus: 'idle', saved: false });
 
   /* ── Ozon Express state ── */
   const [auzone, setAuzone] = useState({ customerId: '', apiKey: '', showKey: false, testStatus: 'idle', saved: false });
@@ -273,7 +273,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   /* ── Load configs from Supabase on mount ── */
   useEffect(() => {
     cloudGet('woo_config').then(saved => {
-      if (saved?.consumerKey) setWoo(p => ({ ...p, siteUrl: saved.siteUrl || '', consumerKey: saved.consumerKey, consumerSecret: saved.consumerSecret || '', saved: true }));
+      if (saved?.consumerKey) setWoo(p => ({ ...p, siteUrl: saved.siteUrl || '', consumerKey: saved.consumerKey, consumerSecret: saved.consumerSecret || '', enabled: saved.enabled !== false, saved: true }));
     });
     cloudGet('auzone_config').then(saved => {
       if (saved?.apiKey) setAuzone(p => ({ ...p, customerId: saved.customerId || '', apiKey: saved.apiKey, saved: true }));
@@ -448,10 +448,21 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   }
 
   function saveWoo() {
-    const cfg = { siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret };
+    const cfg = { siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, enabled: woo.enabled };
     localStorage.setItem('woo_config', JSON.stringify(cfg));
     cloudSet('woo_config', cfg);
     setWoo((p) => ({ ...p, saved: true }));
+  }
+
+  // Coupe le sondage sans effacer les clés : les réactiver plus tard n'exige
+  // pas de tout ressaisir. Sauvegardé aussitôt — pas besoin de rouvrir la
+  // fenêtre et cliquer "Enregistrer" juste pour que la coupure prenne effet.
+  function basculerWoo() {
+    const enabled = !woo.enabled;
+    setWoo((p) => ({ ...p, enabled }));
+    const cfg = { siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, enabled };
+    localStorage.setItem('woo_config', JSON.stringify(cfg));
+    cloudSet('woo_config', cfg);
   }
 
   async function syncWoo() {
@@ -876,7 +887,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       iconBg: 'bg-purple-100',
       cardBg: 'from-purple-50',
       saved: woo.saved,
-      badge: woo.saved ? { label: 'Configuré', color: 'text-green-600 bg-green-50 border-green-200' } : null,
+      badge: !woo.saved ? null
+        : woo.enabled ? { label: 'Configuré', color: 'text-green-600 bg-green-50 border-green-200' }
+        : { label: 'Désactivé', color: 'text-gray-500 bg-gray-50 border-gray-200' },
     },
     {
       id: 'users',
@@ -1107,6 +1120,16 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         title="WooCommerce" icon={<ShoppingCart size={18} className="text-purple-600" />}
         iconBg="bg-gradient-to-r from-purple-50 to-white">
         <div className="space-y-4">
+          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Synchronisation active</p>
+              <p className="text-xs text-gray-400">Coupez-la si la boutique WooCommerce n'existe plus.</p>
+            </div>
+            <button onClick={basculerWoo} role="switch" aria-checked={woo.enabled}
+              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${woo.enabled ? 'bg-purple-600' : 'bg-gray-300'}`}>
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${woo.enabled ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
           <InputField label="URL de la boutique" value={woo.siteUrl} onChange={(v) => updateWoo('siteUrl', v)} placeholder="https://monboutique.com" />
           <InputField label="Consumer Key" type="password" value={woo.consumerKey} onChange={(v) => updateWoo('consumerKey', v)} placeholder="ck_xxxxxxxxxxxx" show={woo.showKey} onToggleShow={() => setWoo((p) => ({ ...p, showKey: !p.showKey }))} />
           <InputField label="Consumer Secret" type="password" value={woo.consumerSecret} onChange={(v) => updateWoo('consumerSecret', v)} placeholder="cs_xxxxxxxxxxxx" show={woo.showSecret} onToggleShow={() => setWoo((p) => ({ ...p, showSecret: !p.showSecret }))} />
