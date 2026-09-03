@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import CarteProduit from '../components/CarteProduit';
 import AvisClients from '../components/AvisClients';
 import Reassurance from '../components/Reassurance';
 import CategoriesGrid from '../components/CategoriesGrid';
 import { chargerNouveautes, chargerAvis, chargerCollectionsAvecCompte } from '../lib/catalog';
+import { useLang } from '../lib/i18n';
 
 export default function Accueil({ collections, reglages }) {
+  const { t } = useLang();
   const [produits, setProduits] = useState([]);
+  const pisteRef = useRef(null);
+  const defiler = (sens) => {
+    const piste = pisteRef.current;
+    if (!piste) return;
+    piste.scrollBy({ left: sens * piste.clientWidth * 0.9, behavior: 'smooth' });
+  };
   const [avis, setAvis] = useState([]);
   const [collectionsCompte, setCollectionsCompte] = useState([]);
   useEffect(() => { chargerNouveautes(8).then(setProduits).catch(() => {}); }, []);
@@ -83,9 +92,41 @@ export default function Accueil({ collections, reglages }) {
 
       {produits.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
-          <h2 className="text-center text-sm tracking-[0.2em] uppercase text-gray-500">Nos nouveautés</h2>
-          <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
-            {produits.map(p => <CarteProduit key={p.id} produit={p} remises={reglages?.remises} />)}
+          <h2 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight text-ink">{t('nosNouveautes')}</h2>
+          <p className="mt-3 text-center text-sm text-gray-500 max-w-md mx-auto">{t('nosNouveautesTexte')}</p>
+          <Link to={collections[0] ? `/product-category/${collections[0].slug}/` : '/'}
+            className="mt-5 flex items-center justify-center gap-1.5 text-sm font-medium text-ink hover:underline">
+            {t('tousLesProduits')} <ArrowRight size={15} />
+          </Link>
+
+          <div className="relative mt-8">
+            <div ref={pisteRef}
+              className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2
+                        [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {produits.map(p => (
+                <div key={p.id} className="w-[46%] sm:w-[31%] lg:w-[23%] shrink-0 snap-start">
+                  <CarteProduit produit={p} remises={reglages?.remises}
+                    categorie={collections.find(c => c.id === p.collection_id)?.name} />
+                </div>
+              ))}
+            </div>
+            {/* Flèches de défilement, comme un carrousel de rayon — le
+                double-clic répété sur la molette pour voir tout le reste
+                de la nouvelle collection n'était pas évident sur bureau. */}
+            {produits.length > 2 && (
+              <>
+                <button type="button" onClick={() => defiler(-1)} aria-label="Précédent"
+                  className="hidden sm:grid absolute -left-4 top-1/3 -translate-y-1/2 w-10 h-10 rounded-full
+                            bg-white shadow-md border border-gray-100 place-items-center text-ink hover:bg-gray-50">
+                  <ChevronLeft size={18} />
+                </button>
+                <button type="button" onClick={() => defiler(1)} aria-label="Suivant"
+                  className="hidden sm:grid absolute -right-4 top-1/3 -translate-y-1/2 w-10 h-10 rounded-full
+                            bg-white shadow-md border border-gray-100 place-items-center text-ink hover:bg-gray-50">
+                  <ChevronRight size={18} />
+                </button>
+              </>
+            )}
           </div>
         </section>
       )}
