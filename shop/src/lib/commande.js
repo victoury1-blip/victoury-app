@@ -11,13 +11,19 @@
    d'un visiteur que des identifiants de cette forme. */
 const PREFIXE = 'VS-';
 
-/** Identifiant unique, lisible, et impossible à deviner de proche en proche —
-    en chiffres seulement (VS-000483921) plutôt que le mélange lettres/chiffres
-    d'avant, plus simple à lire et à dicter au téléphone. */
-export function nouvelId(now = Date.now(), alea = Math.random) {
-  const t = now % 1e6;                               // 6 chiffres tirés de l'horodatage
-  const r = Math.floor(alea() * 1e5);                 // 5 chiffres aléatoires, contre les doublons à la même milliseconde
-  return `${PREFIXE}${String(t).padStart(6, '0')}${String(r).padStart(5, '0')}`;
+/** Identifiant lisible, date et heure de la commande en clair — VS-030926-093712
+    (JJMMAA-HHMMSS) plutôt qu'une suite de chiffres qui ne dit rien : on lit
+    directement quand la commande est passée, sans ouvrir la fiche. Toujours
+    sous le préfixe VS- : c'est le seul que la base accepte d'un visiteur
+    (voir schema.sql). Cinq chiffres aléatoires en bout de code évitent une
+    collision entre deux commandes validées à la même seconde — invisibles
+    à l'œil, ils ne gênent pas la lecture. */
+export function nouvelId(now = new Date(), alea = Math.random) {
+  const p = (n, l = 2) => String(n).padStart(l, '0');
+  const date = `${p(now.getDate())}${p(now.getMonth() + 1)}${p(now.getFullYear() % 100)}`;
+  const heure = `${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+  const r = p(Math.floor(alea() * 1e5), 5);
+  return `${PREFIXE}${date}-${heure}${r}`;
 }
 
 /* Horodatage au format de l'application : « JJ/MM/AAAA HH:MM:SS ». Un format
