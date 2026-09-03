@@ -73,7 +73,7 @@ export default function Footer({ theme, collections }) {
               ici contredirait le logo déposé dans /store/theme. */}
           {theme?.logoUrl
             ? <img src={theme.logoUrl} alt="Victoury" className="h-9 w-auto object-contain" />
-            : <Wordmark className="text-[28px]" />}
+            : <Wordmark className="text-[28px]" style={{ color: '#fff' }} />}
           {f.description && <p className="mt-4 text-[15px] opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           {badgesPaiement.length > 0 && (
             <div className="mt-5 space-y-2">
