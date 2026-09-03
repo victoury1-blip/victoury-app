@@ -61,7 +61,7 @@ const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k }
 
 export function LangProvider({ children }) {
   const [lang, setLang] = useState(() => {
-    try { return localStorage.getItem(CLE) === 'ar' ? 'ar' : 'fr'; } catch { return 'fr'; }
+    try { return localStorage.getItem(CLE) === 'fr' ? 'fr' : 'ar'; } catch { return 'ar'; }
   });
 
   useEffect(() => {
