@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
 import { chargerReglages } from '../lib/catalog';
@@ -38,6 +38,13 @@ export default function AdminLayout() {
   const sonRef = useRef('');
   useEffect(() => { chargerReglages().then(r => { sonRef.current = r.sonCommandeUrl || ''; }).catch(() => {}); }, []);
 
+  // Le panneau de navigation était entièrement masqué sous sm (hidden sm:flex)
+  // sans aucun moyen de l'ouvrir — sur téléphone, l'administration n'avait
+  // tout simplement pas de menu. Un tiroir coulissant, comme sur la boutique.
+  const [menuOuvert, setMenuOuvert] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => { setMenuOuvert(false); }, [pathname]);
+
   useEffect(() => {
     const canal = supabase
       .channel('shop-nouvelle-commande')
@@ -48,8 +55,53 @@ export default function AdminLayout() {
     return () => { supabase.removeChannel(canal); };
   }, []);
 
+  const Nav = (
+    <>
+      <nav className="flex-1 py-3 overflow-y-auto">
+        {LIENS.map(({ to, label, icon: Icon, fin }) => (
+          <NavLink key={to} to={to} end={fin}
+            className={({ isActive }) => `flex items-center gap-3 px-5 py-2.5 text-sm border-l-2 transition-colors ${
+              isActive
+                ? 'text-white font-medium bg-white/10 border-l-white'
+                : 'text-gray-300 border-l-transparent hover:bg-white/5 hover:text-white'}`}>
+            <Icon size={16} /> {label}
+          </NavLink>
+        ))}
+      </nav>
+      <button onClick={() => supabase.auth.signOut()}
+        className="flex items-center gap-3 px-5 py-4 text-xs text-gray-400 hover:text-white border-t border-white/10 shrink-0">
+        <LogOut size={14} /> Déconnexion
+      </button>
+    </>
+  );
+
   return (
     <div className="min-h-screen flex bg-gray-50">
+      {/* Barre du haut, téléphone seulement : le bouton qui ouvre le tiroir —
+          sans elle, aucun moyen d'atteindre le menu sur petit écran. */}
+      <div className="sm:hidden fixed top-0 inset-x-0 z-30 h-14 bg-[#0f1424] flex items-center justify-between px-4">
+        <Wordmark className="text-white text-sm" />
+        <button onClick={() => setMenuOuvert(true)} className="text-white p-1.5" aria-label="Menu">
+          <Menu size={20} />
+        </button>
+      </div>
+
+      {menuOuvert && (
+        <div className="sm:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOuvert(false)} />
+          <aside className="relative w-64 max-w-[80vw] bg-[#0f1424] flex flex-col">
+            <div className="px-5 py-5 flex items-center justify-between border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Wordmark className="text-white text-base" />
+                <span className="text-[9px] font-semibold tracking-wider uppercase bg-white/10 text-white/70 px-1.5 py-0.5 rounded">Admin</span>
+              </div>
+              <button onClick={() => setMenuOuvert(false)} className="text-white/70 p-1" aria-label="Fermer"><X size={18} /></button>
+            </div>
+            {Nav}
+          </aside>
+        </div>
+      )}
+
       <aside className="w-60 shrink-0 bg-[#0f1424] hidden sm:flex flex-col">
         <div className="px-5 py-5 flex items-center gap-2 border-b border-white/10">
           <Wordmark className="text-white text-base" />
@@ -57,23 +109,9 @@ export default function AdminLayout() {
             Admin
           </span>
         </div>
-        <nav className="flex-1 py-3">
-          {LIENS.map(({ to, label, icon: Icon, fin }) => (
-            <NavLink key={to} to={to} end={fin}
-              className={({ isActive }) => `flex items-center gap-3 px-5 py-2.5 text-sm border-l-2 transition-colors ${
-                isActive
-                  ? 'text-white font-medium bg-white/10 border-l-white'
-                  : 'text-gray-300 border-l-transparent hover:bg-white/5 hover:text-white'}`}>
-              <Icon size={16} /> {label}
-            </NavLink>
-          ))}
-        </nav>
-        <button onClick={() => supabase.auth.signOut()}
-          className="flex items-center gap-3 px-5 py-4 text-xs text-gray-400 hover:text-white border-t border-white/10">
-          <LogOut size={14} /> Déconnexion
-        </button>
+        {Nav}
       </aside>
-      <main className="flex-1 min-w-0 p-5 sm:p-8"><Outlet /></main>
+      <main className="flex-1 min-w-0 p-5 pt-20 sm:p-8"><Outlet /></main>
     </div>
   );
 }

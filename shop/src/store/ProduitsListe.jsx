@@ -81,8 +81,12 @@ export default function ProduitsListe() {
         )}
       </div>
 
-      <div className="mt-5 bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+      {/* overflow-x-auto plutôt qu'overflow-hidden : le tableau (6 colonnes)
+          ne rentre pas sur un écran de téléphone — hidden coupait les
+          colonnes de droite sans même indiquer qu'il y avait de quoi
+          défiler, on peut maintenant glisser latéralement pour tout voir. */}
+      <div className="mt-5 bg-white border border-gray-200 rounded-xl overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
             <tr>
               <th className="px-4 py-3 w-10">

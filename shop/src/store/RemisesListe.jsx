@@ -107,8 +107,8 @@ export default function RemisesListe() {
         </div>
       )}
 
-      <div className="mt-5 bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="mt-5 bg-white border border-gray-200 rounded-xl overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
             <tr>
               <th className="text-left px-4 py-3">Nom</th>
