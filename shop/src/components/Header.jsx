@@ -48,9 +48,9 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
   // du téléphone du client — juste le choix qu'il retient d'une visite à l'autre.
   const BoutonLangue = (
     <button onClick={() => setLang(lang === 'fr' ? 'ar' : 'fr')}
-      className="px-2 py-1 text-[11px] font-semibold tracking-wide text-gray-600 hover:text-ink border border-gray-200 rounded"
-      aria-label="Changer de langue / تبديل اللغة">
-      {lang === 'fr' ? 'AR' : 'FR'}
+      className="px-2 py-1 text-base leading-none hover:opacity-75 border border-gray-200 rounded"
+      aria-label="Changer de langue / تبديل اللغة" title={lang === 'fr' ? 'العربية' : 'Français'}>
+      {lang === 'fr' ? '🇲🇦' : '🇫🇷'}
     </button>
   );
 
