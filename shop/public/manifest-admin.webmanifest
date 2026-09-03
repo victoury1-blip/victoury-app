@@ -1,0 +1,13 @@
+{
+  "name": "Victoury Admin",
+  "short_name": "Victoury",
+  "description": "Administration de la boutique Victoury — commandes, produits, réglages.",
+  "start_url": "/store",
+  "scope": "/store",
+  "display": "standalone",
+  "background_color": "#0f1424",
+  "theme_color": "#0f1424",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

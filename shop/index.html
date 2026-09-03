@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <!-- Permet d'installer l'administration (/store) comme une icône sur
+         l'écran d'accueil du téléphone, à la manière de l'appli mobile
+         WooCommerce — le scope du manifeste limite l'installation à /store,
+         la boutique publique n'en propose jamais l'invite. -->
+    <link rel="manifest" href="/manifest-admin.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0f1424" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
