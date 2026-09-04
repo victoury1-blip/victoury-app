@@ -56,3 +56,21 @@ export async function statutPush() {
   if (!pushDisponible()) return 'non-supporte';
   return Notification.permission;
 }
+
+/** L'abonnement de cet appareil est-il déjà enregistré ? Contrairement à
+ *  activerPushCommande(), ne demande RIEN (ni permission ni abonnement) —
+ *  juste un état à afficher au chargement de la page. Sans ça, revenir sur
+ *  Réglages semblait "désactivé" à chaque fois (l'état local repart à zéro
+ *  au remontage du composant) alors que l'abonnement, lui, était toujours là
+ *  côté serveur — et redemander à chaque visite finissait par lasser. */
+export async function abonnementDejaActif() {
+  if (!pushDisponible() || Notification.permission !== 'granted') return false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/sw-push.js');
+    if (!reg) return false;
+    const sub = await reg.pushManager.getSubscription();
+    return !!sub;
+  } catch {
+    return false;
+  }
+}

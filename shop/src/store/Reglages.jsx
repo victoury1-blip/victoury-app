@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { enregistrerReglages } from '../lib/admin';
 import { REGLAGES_DEFAUT } from '../lib/catalog';
 import { jouerSonCommande } from '../lib/sonCommande';
-import { activerPushCommande, pushDisponible } from '../lib/pushNotif';
+import { activerPushCommande, pushDisponible, abonnementDejaActif } from '../lib/pushNotif';
 
 const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
 const label = 'block text-xs font-medium text-gray-500 mb-1.5';
@@ -39,6 +39,13 @@ export default function Reglages() {
   useEffect(() => {
     supabase.from('shop_settings').select('value').eq('key', 'boutique').maybeSingle()
       .then(({ data }) => { if (data?.value) setR({ ...REGLAGES_DEFAUT, ...data.value }); });
+  }, []);
+
+  // Vérifie l'abonnement déjà en place SANS rien redemander — sinon revenir
+  // sur cette page semblait "désactivé" à chaque fois (l'état local repart à
+  // zéro au remontage), alors que l'appareil restait bel et bien abonné.
+  useEffect(() => {
+    abonnementDejaActif().then(actif => { if (actif) setActivationPush({ ok: true }); });
   }, []);
 
   const u = (k, v) => setR(x => ({ ...x, [k]: v }));
