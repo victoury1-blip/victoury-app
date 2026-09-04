@@ -32,11 +32,12 @@ export default function PaniersAbandonnesListe() {
   useEffect(() => {
     supabase.from('shop_paniers_abandonnes').select('*').order('created_at', { ascending: false }).limit(200)
       .then(({ data }) => setPaniers(data || []));
-    // Une commande VS-… du même téléphone dans les 14 derniers jours = le
-    // client est déjà revenu tout seul — inutile (et un peu gênant) de le
-    // relancer pour un panier qu'il a déjà payé.
-    const depuis = new Date(Date.now() - 14 * 86400000).toISOString();
-    supabase.from('orders').select('recipient').like('id', 'VS-%').gte('date_added', depuis).then(({ data }) => {
+    // Une commande VS-… du même téléphone = le client est déjà revenu tout
+    // seul — inutile (et un peu gênant) de le relancer pour un panier qu'il
+    // a déjà payé. Pas de filtre sur `date_added` : la colonne est un texte
+    // "JJ/MM/AAAA HH:MM:SS", pas une vraie date — la comparer à un ISO ne
+    // filtrait jamais rien correctement (comparaison de texte, pas de date).
+    supabase.from('orders').select('recipient').like('id', 'VS-%').then(({ data }) => {
       setTelsConvertis(new Set((data || []).map(o => chiffres(o.recipient?.phone)).filter(Boolean)));
     }).catch(() => {});
   }, []);
