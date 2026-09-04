@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
 import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifCommande';
@@ -15,6 +15,7 @@ const LIENS = [
   { to: '/store/import-woo', label: 'Importer WooCommerce', icon: DownloadCloud },
   { to: '/store/media', label: 'Médiathèque', icon: Image },
   { to: '/store/commandes', label: 'Commandes', icon: ShoppingCart },
+  { to: '/store/paniers-abandonnes', label: 'Paniers abandonnés', icon: MessageCircle },
   { to: '/store/pages', label: 'Pages', icon: FileText },
   { to: '/store/avis', label: 'Avis clients', icon: MessageSquareQuote },
   { to: '/store/theme', label: 'Edit Theme', icon: Palette },

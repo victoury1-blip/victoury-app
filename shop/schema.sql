@@ -282,3 +282,28 @@ alter table shop_push_subscriptions enable row level security;
 -- que le serveur qui envoie les push (accès via la clé de service).
 create policy "ecriture authentifiee" on shop_push_subscriptions
   for all to authenticated using (true) with check (true);
+
+-- ============================================================
+--  PANIERS ABANDONNÉS
+--
+--  Dès que le client a tapé son téléphone à la caisse mais n'a pas validé —
+--  pour pouvoir le relancer sur WhatsApp. Écriture publique (comme les
+--  commandes), mais lecture réservée à l'administration : personne d'autre
+--  ne doit pouvoir lister les téléphones des visiteurs.
+-- ============================================================
+create table if not exists shop_paniers_abandonnes (
+  id         uuid primary key default gen_random_uuid(),
+  nom        text,
+  telephone  text not null,
+  lignes     jsonb not null default '[]'::jsonb,
+  total      numeric(10,2) not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists shop_paniers_abandonnes_tel_idx on shop_paniers_abandonnes(telephone);
+alter table shop_paniers_abandonnes enable row level security;
+create policy "creation depuis la boutique" on shop_paniers_abandonnes
+  for insert to anon with check (telephone is not null and length(telephone) >= 8);
+create policy "lecture authentifiee" on shop_paniers_abandonnes
+  for select to authenticated using (true);
+create policy "suppression authentifiee" on shop_paniers_abandonnes
+  for delete to authenticated using (true);

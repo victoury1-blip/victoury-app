@@ -25,6 +25,7 @@ import CodesPromo from './store/CodesPromo';
 import MetaPixel from './store/MetaPixel';
 import EditTheme from './store/EditTheme';
 import CommandesListe from './store/CommandesListe';
+import PaniersAbandonnesListe from './store/PaniersAbandonnesListe';
 import MicrosoftClarity from './store/MicrosoftClarity';
 import RemisesListe from './store/RemisesListe';
 import Reglages from './store/Reglages';
@@ -158,6 +159,7 @@ function Administration() {
           <Route path="theme" element={<EditTheme />} />
           <Route path="remises" element={<RemisesListe />} />
           <Route path="commandes" element={<CommandesListe />} />
+          <Route path="paniers-abandonnes" element={<PaniersAbandonnesListe />} />
           <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
           <Route path="reglages" element={<Reglages />} />
         </Route>

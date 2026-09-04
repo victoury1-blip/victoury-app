@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { fmtPrix, totalPanier } from '../lib/pricing';
@@ -8,6 +8,7 @@ import { envoyerCommande } from '../lib/envoi';
 import { verifierPromo } from '../lib/catalog';
 import { trackPixel, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
+import { supabase } from '../lib/supabase';
 
 // La couleur du thème (--ink, réglable dans /store/theme), pas le vert de la
 // sélection de taille — un champ de saisie n'est pas un choix, il ne doit pas
@@ -24,6 +25,10 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState('');
   const [manque, setManque] = useState([]);
+  // Un seul enregistrement par visite : sans ça, chaque fois que le champ
+  // téléphone perd le focus créerait une ligne de plus dans les paniers
+  // abandonnés, pour la même personne qui hésite juste entre deux champs.
+  const panierEnregistre = useRef(false);
 
   const t = totalPanier(lignes, {
     paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
@@ -39,6 +44,22 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Dès que le téléphone est plausible : le client a une vraie intention
+  // d'achat, qu'il valide ou non ensuite. Silencieux et non bloquant — un
+  // souci d'écriture ici ne doit jamais gêner la commande elle-même.
+  function noterPanierAbandonne() {
+    if (panierEnregistre.current) return;
+    const chiffres = form.telephone.replace(/\D/g, '');
+    if (chiffres.length < 9 || !lignes.length) return;
+    panierEnregistre.current = true;
+    supabase.from('shop_paniers_abandonnes').insert({
+      nom: form.nom || null,
+      telephone: form.telephone,
+      lignes: lignes.map(l => ({ name: l.name, size: l.size, color: l.color, qty: l.qty, price: l.price })),
+      total: t.total,
+    }).then(() => {}, () => { panierEnregistre.current = false; });
+  }
 
   async function appliquerCode() {
     setCodeErreur('');
@@ -104,7 +125,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
             </div>
             <div>
               <label className="block text-sm text-ink font-medium mb-1.5">{tr('telephone')} <span className="text-red-500">*</span></label>
-              <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
+              <input value={form.telephone} onChange={e => u('telephone', e.target.value)} onBlur={noterPanierAbandonne}
                 inputMode="tel" placeholder="06 12 34 56 78" className={`${champ} ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
                 <p className="mt-1 text-[11px] text-red-500">{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
