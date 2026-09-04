@@ -260,3 +260,25 @@ create policy "creation depuis la boutique" on orders
     and price >= 0
     and id like 'VS-%'          -- préfixe réservé aux commandes du site
   );
+
+-- ============================================================
+--  NOTIFICATIONS PUSH (nouvelle commande, tél. verrouillé / onglet fermé)
+--
+--  La notification système (Notification API) posée depuis /store ne
+--  fonctionne QUE si l'onglet reste ouvert — un vrai push qui arrive même
+--  téléphone verrouillé demande un abonnement Push (endpoint + clés) et un
+--  serveur qui l'utilise pour réveiller le navigateur. Un abonnement par
+--  appareil connecté (pas par utilisateur) : chaque téléphone/PC qui a
+--  autorisé les notifications a le sien.
+-- ============================================================
+create table if not exists shop_push_subscriptions (
+  endpoint   text primary key,
+  keys       jsonb not null,
+  created_at timestamptz not null default now()
+);
+alter table shop_push_subscriptions enable row level security;
+-- Écriture (s'abonner/se désabonner) réservée à l'administration, comme le
+-- reste du catalogue. Pas de lecture publique : ces endpoints ne regardent
+-- que le serveur qui envoie les push (accès via la clé de service).
+create policy "ecriture authentifiee" on shop_push_subscriptions
+  for all to authenticated using (true) with check (true);

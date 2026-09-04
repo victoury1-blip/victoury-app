@@ -4,6 +4,7 @@ import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
 import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifCommande';
+import { activerPushCommande, pushDisponible } from '../lib/pushNotif';
 import { chargerReglages } from '../lib/catalog';
 import Wordmark from '../components/Wordmark';
 
@@ -80,6 +81,10 @@ export default function AdminLayout() {
         osc.start(); osc.stop(ctx.currentTime + 0.01);
       } catch { /* tant pis, le premier son restera silencieux */ }
       demanderPermissionNotif();
+      // Best-effort : ne bloque rien si le push n'est pas configuré sur ce
+      // site (clé VAPID absente) — la notification "en direct" (onglet
+      // ouvert) reste garantie par demanderPermissionNotif() ci-dessus.
+      if (pushDisponible()) activerPushCommande().catch(() => {});
       window.removeEventListener('pointerdown', debloquer);
       window.removeEventListener('keydown', debloquer);
     };

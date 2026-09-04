@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { enregistrerReglages } from '../lib/admin';
 import { REGLAGES_DEFAUT } from '../lib/catalog';
 import { jouerSonCommande } from '../lib/sonCommande';
+import { activerPushCommande, pushDisponible } from '../lib/pushNotif';
 
 const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
 const label = 'block text-xs font-medium text-gray-500 mb-1.5';
@@ -18,6 +19,22 @@ export default function Reglages() {
   const [permissionNotif, setPermissionNotif] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
+  const [activationPush, setActivationPush] = useState(null); // { ok, raison } | null
+
+  // Comme un simple Notification.requestPermission(), MAIS enregistre en plus
+  // un abonnement Push : c'est lui qui permet à la notification d'arriver
+  // téléphone verrouillé ou onglet fermé, pas seulement pendant qu'on est
+  // dans l'administration.
+  async function activer() {
+    if (pushDisponible()) {
+      const r = await activerPushCommande();
+      setActivationPush(r);
+      setPermissionNotif(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+    } else {
+      const p = await Notification.requestPermission();
+      setPermissionNotif(p);
+    }
+  }
 
   useEffect(() => {
     supabase.from('shop_settings').select('value').eq('key', 'boutique').maybeSingle()
@@ -91,10 +108,11 @@ export default function Reglages() {
         <section className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Notifications de commande</h2>
           <p className="text-xs text-gray-400 mb-3">
-            Une notification système (dans le centre de notifications du téléphone/ordinateur) et un
-            son, à chaque nouvelle commande du site — où qu'on soit dans l'administration.
+            Un son et une notification à chaque nouvelle commande du site pendant qu'on est dans
+            l'administration — et, si le navigateur le permet, une vraie notification qui arrive même
+            l'onglet fermé ou le téléphone verrouillé.
           </p>
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-1">
             {permissionNotif === 'granted' && <span className="text-xs text-green-600 font-medium">✓ Notifications autorisées</span>}
             {permissionNotif === 'denied' && (
               <span className="text-xs text-red-500">
@@ -102,11 +120,29 @@ export default function Reglages() {
               </span>
             )}
             {permissionNotif === 'default' && (
-              <button type="button" onClick={() => Notification.requestPermission().then(setPermissionNotif)}
+              <button type="button" onClick={activer}
                 className="text-xs text-white bg-ink px-3 py-2">Activer les notifications</button>
             )}
             {permissionNotif === 'unsupported' && <span className="text-xs text-gray-400">Non supporté par ce navigateur</span>}
           </div>
+          {/* Cet appareil peut être autorisé (permissionNotif granted) sans que
+              l'abonnement push ait pu s'enregistrer (clé VAPID absente, ou pas
+              encore configurée) — le distinguer évite de croire à tort que le
+              push "écran verrouillé" est actif. */}
+          {permissionNotif === 'granted' && pushDisponible() && (
+            <p className="text-[11px] text-gray-400 mb-4">
+              {activationPush === null
+                ? <button type="button" onClick={activer} className="underline">Activer aussi hors de l'administration (écran verrouillé)</button>
+                : activationPush.ok
+                  ? '✓ Reçoit aussi les notifications écran verrouillé / onglet fermé, sur cet appareil.'
+                  : `Notification "en direct" seulement (push indisponible : ${activationPush.raison}).`}
+            </p>
+          )}
+          {permissionNotif === 'granted' && !pushDisponible() && (
+            <p className="text-[11px] text-gray-400 mb-4">
+              Notification "en direct" seulement — le push écran verrouillé n'est pas encore configuré sur ce site.
+            </p>
+          )}
           <p className="text-xs text-gray-500 mb-3">
             Par défaut, un carillon simple pour le son — déposez votre propre fichier pour le remplacer.
           </p>
