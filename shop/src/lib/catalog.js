@@ -188,6 +188,14 @@ export const THEME_DEFAUT = {
   couleurTexte: '#111111',
   annonceActive: true,
   annonces: ['Livraison partout au Maroc · Paiement à la livraison'],
+  // Rotation séparée pour l'arabe : traduire mot à mot les annonces
+  // françaises donnerait un texte plat, alors qu'une vraie annonce se
+  // rédige différemment dans chaque langue (voir aussi remisePalier dans
+  // i18n.jsx pour la même idée sur les badges de remise).
+  annoncesAr: [
+    'التوصيل لجميع المدن المغربية. الدفع عند الاستلام',
+    'استغلوا الفرصة! تخفيض حصري بنسبة 20% على القطعة الثانية',
+  ],
   tailleAnnonce: 11,
   couleurAnnonceFond: '#111111',
   couleurAnnonceTexte: '#ffffff',

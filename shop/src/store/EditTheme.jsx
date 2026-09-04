@@ -128,12 +128,19 @@ export default function EditTheme() {
   const ajouterAnnonce = () => setT(x => ({ ...x, annonces: [...x.annonces, ''] }));
   const retirerAnnonce = (i) => setT(x => ({ ...x, annonces: x.annonces.filter((_, j) => j !== i) }));
 
+  // Rotation séparée pour la version arabe du bandeau — mêmes gestes, sur
+  // le tableau `annoncesAr` plutôt que `annonces`.
+  const majAnnonceAr = (i, v) => setT(x => ({ ...x, annoncesAr: x.annoncesAr.map((a, j) => (j === i ? v : a)) }));
+  const ajouterAnnonceAr = () => setT(x => ({ ...x, annoncesAr: [...x.annoncesAr, ''] }));
+  const retirerAnnonceAr = (i) => setT(x => ({ ...x, annoncesAr: x.annoncesAr.filter((_, j) => j !== i) }));
+
   async function enregistrer() {
     setEnregistrement(true);
     const nettoyer = (l) => (l || []).filter(it => it.label.trim() && it.url.trim());
     const propre = {
       ...t,
       annonces: t.annonces.filter(a => a.trim()),
+      annoncesAr: t.annoncesAr.filter(a => a.trim()),
       tailleAnnonce: Number(t.tailleAnnonce) || 11,
       texteSousHero: { ...t.texteSousHero, taille: Number(t.texteSousHero.taille) || 14 },
       footer: {
@@ -253,6 +260,23 @@ export default function EditTheme() {
             <p className="mt-2 text-[11px] text-gray-400">
               Entourez un mot de *pour l'afficher en gras*. Ex. : *Livraison offerte* dans tout le Royaume
             </p>
+
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <p className="text-xs font-medium text-gray-600">Version arabe</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Affichée à la place de la version française quand le site est en arabe.</p>
+              <div className="mt-3 space-y-2">
+                {t.annoncesAr.map((a, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <GripVertical size={14} className="text-gray-300 shrink-0" />
+                    <input value={a} onChange={e => majAnnonceAr(i, e.target.value)} dir="rtl" className={`${champ} flex-1`} />
+                    <button onClick={() => retirerAnnonceAr(i)} className="text-gray-300 hover:text-red-500 shrink-0"><Trash2 size={16} /></button>
+                  </div>
+                ))}
+              </div>
+              <button onClick={ajouterAnnonceAr} className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                <Plus size={13} /> Ajouter une annonce arabe
+              </button>
+            </div>
 
             <div className="mt-5">
               <label className="flex justify-between text-xs text-gray-500 mb-1.5">

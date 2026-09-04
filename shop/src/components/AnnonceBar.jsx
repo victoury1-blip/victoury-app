@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { decouperGras } from '../lib/texteEnrichi';
+import { useLang } from '../lib/i18n';
 
 /* Bandeau d'annonce — l'offre du moment, réglée depuis l'administration
  * (/store/theme). Plusieurs messages tournent l'un après l'autre : montrer
- * la livraison gratuite ET la remise par quantité vaut mieux que choisir. */
+ * la livraison gratuite ET la remise par quantité vaut mieux que choisir.
+ * Rotation propre à chaque langue (annoncesAr) — un bandeau en français
+ * pendant qu'on lit le reste du site en arabe se remarque tout de suite. */
 export default function AnnonceBar({ theme }) {
-  const messages = (theme?.annonces || []).filter(Boolean);
+  const { lang } = useLang();
+  const source = lang === 'ar' && theme?.annoncesAr?.length ? theme.annoncesAr : theme?.annonces;
+  const messages = (source || []).filter(Boolean);
   const [i, setI] = useState(0);
 
   useEffect(() => {
