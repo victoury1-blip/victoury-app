@@ -4,7 +4,7 @@ import { X, Minus, Plus, Tag } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { prochainPalier } from '../lib/remises';
 import { cleLigne } from '../lib/panier';
-import { chargerNouveautes } from '../lib/catalog';
+import { chargerNouveautes, chargerProduitsParCollections } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
@@ -16,7 +16,10 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
   // client regarde son panier.
   useEffect(() => {
     if (!ouvert) return;
-    chargerNouveautes(6).then(setSuggestions).catch(() => {});
+    const collectionIds = [...new Set(lignes.map(l => l.collectionId).filter(Boolean))];
+    (collectionIds.length ? chargerProduitsParCollections(collectionIds, 8) : chargerNouveautes(6))
+      .then(setSuggestions).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ouvert]);
 
   if (!ouvert) return null;

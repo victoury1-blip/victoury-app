@@ -98,6 +98,19 @@ export async function chargerNouveautes(limite = 8) {
   return (data || []).map(trier);
 }
 
+/* Suggestions du panier : des articles de la MÊME collection que ce qui est
+   déjà dans le panier plutôt que des nouveautés au hasard — proposer une robe
+   à qui a un ensemble de sport dans son panier n'aide pas à profiter d'un
+   palier de remise par quantité, qui se calcule justement par collection. */
+export async function chargerProduitsParCollections(collectionIds, limite = 8) {
+  if (!collectionIds?.length) return [];
+  const { data, error } = await supabase
+    .from('shop_products').select(PRODUIT).eq('status', 'Actif')
+    .in('collection_id', collectionIds).order('created_at', { ascending: false }).limit(limite);
+  if (error) throw error;
+  return (data || []).map(trier);
+}
+
 /* Avis clients : captures d'écran de conversations WhatsApp ou de messages
    de clientes satisfaites, déposées telles quelles depuis /store/avis — pas
    un système de notation, juste une preuve sociale que l'admin choisit. */
