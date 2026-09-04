@@ -30,6 +30,7 @@ const DICT = {
     photoAVenir: 'Photo à venir', produitIntrouvable: "Ce produit n'existe plus.",
     plusQue: 'Plus que', pourLivraisonGratuite: 'pour la livraison gratuite',
     quantiteMinus: 'Diminuer', quantitePlus: 'Augmenter', retirer: 'Retirer',
+    profitezDuTarif: "Profitez-en pour ajouter :", voirProduit: 'Voir',
   },
   ar: {
     accueil: 'الرئيسية', voirCollection: 'مشاهدة المجموعة',
@@ -54,6 +55,7 @@ const DICT = {
     photoAVenir: 'الصورة قريبًا', produitIntrouvable: 'هذا المنتج لم يعد متوفرًا.',
     plusQue: 'باقي', pourLivraisonGratuite: 'للحصول على توصيل مجاني',
     quantiteMinus: 'إنقاص', quantitePlus: 'زيادة', retirer: 'حذف',
+    profitezDuTarif: 'اغتنم الفرصة وأضف:', voirProduit: 'عرض',
   },
 };
 
@@ -69,7 +71,14 @@ const remisePalier = (lang, pourcent, rang) => lang === 'ar'
   ? `−${pourcent}% ابتداءً من المنتج ${ordinalAr(rang)}`
   : `−${pourcent}% dès le ${ordinalFr(rang)} article`;
 
-const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k, remisePalier: () => '' });
+/** "Encore 1 article et −20% sur toute la commande" / version arabe — le
+    coup de pouce affiché dans le panier quand un palier de remise est à
+    portée. */
+const encoreEtRemise = (lang, manque, pourcent) => lang === 'ar'
+  ? `أضف ${manque} ${manque > 1 ? 'قطع أخرى' : 'قطعة أخرى'} واستفد من خصم ${pourcent}%`
+  : `Encore ${manque} article${manque > 1 ? 's' : ''} et −${pourcent}% sur toute la commande`;
+
+const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k, remisePalier: () => '', encoreEtRemise: () => '' });
 
 export function LangProvider({ children }) {
   const [lang, setLang] = useState(() => {
@@ -86,7 +95,11 @@ export function LangProvider({ children }) {
 
   const t = (cle) => DICT[lang]?.[cle] ?? DICT.fr[cle] ?? cle;
 
-  return <LangContext.Provider value={{ lang, setLang, t, remisePalier: (pourcent, rang) => remisePalier(lang, pourcent, rang) }}>{children}</LangContext.Provider>;
+  return <LangContext.Provider value={{
+    lang, setLang, t,
+    remisePalier: (pourcent, rang) => remisePalier(lang, pourcent, rang),
+    encoreEtRemise: (manque, pourcent) => encoreEtRemise(lang, manque, pourcent),
+  }}>{children}</LangContext.Provider>;
 }
 
 export const useLang = () => useContext(LangContext);

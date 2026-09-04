@@ -1,22 +1,41 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Minus, Plus, Tag } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
+import { prochainPalier } from '../lib/remises';
 import { cleLigne } from '../lib/panier';
+import { chargerNouveautes } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
-  const { t } = useLang();
+  const { t, encoreEtRemise } = useLang();
+  const [suggestions, setSuggestions] = useState([]);
+
+  // Chargées à l'ouverture seulement : inutile de sonder Supabase à chaque
+  // ajout/retrait d'article, la sélection n'a pas à changer pendant que le
+  // client regarde son panier.
+  useEffect(() => {
+    if (!ouvert) return;
+    chargerNouveautes(6).then(setSuggestions).catch(() => {});
+  }, [ouvert]);
+
   if (!ouvert) return null;
   const tot = totalPanier(lignes, { paliers, remises, livraison, seuilGratuit });
   // La remise de chaque article, pas seulement le total en bas — le client
   // voit tout de suite POURQUOI le prix a changé sur cette ligne précise.
-  const lignesRemisees = lignesAvecRemise(lignes, remises?.length ? remises : (paliers?.length ? [{ active: true, paliers }] : []));
+  const remisesEffectives = remises?.length ? remises : (paliers?.length ? [{ active: true, paliers }] : []);
+  const lignesRemisees = lignesAvecRemise(lignes, remisesEffectives);
   // Ce qu'il manque pour atteindre la livraison gratuite : un rappel concret
   // pousse à ajouter un article, là où « livraison offerte » seul ne dit rien
   // de ce qu'il reste à faire.
   const apresRemises = tot.sousTotal - tot.remiseQuantite;
   const manqueLivraison = seuilGratuit > 0 && apresRemises < seuilGratuit ? seuilGratuit - apresRemises : 0;
+  // Idem pour le prochain palier de remise quantité : « encore 1 article et
+  // −20% » pousse plus fort qu'un badge qu'il faut déjà avoir vu ailleurs.
+  const palierSuivant = prochainPalier(lignes, remisesEffectives);
+  // Ne pas proposer un article déjà dans le panier — suggérer ce qu'on a
+  // déjà choisi n'aide pas à ajouter un article de plus.
+  const suggestionsPertinentes = suggestions.filter(s => !lignes.some(l => l.slug === s.slug)).slice(0, 4);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
@@ -26,6 +45,12 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
           <h2 className="text-sm tracking-widest uppercase">{t('votrePanier')}</h2>
           <button onClick={onFermer} className="p-1.5 text-gray-400 hover:text-ink" aria-label="Fermer"><X size={18} /></button>
         </div>
+
+        {palierSuivant && (
+          <p className="px-5 py-2.5 bg-red-50 text-red-700 text-xs font-medium border-b border-red-100">
+            {encoreEtRemise(palierSuivant.manque, palierSuivant.pourcent)}
+          </p>
+        )}
 
         {lignes.length === 0 ? (
           <p className="flex-1 grid place-items-center text-sm text-gray-400">{t('panierVide')}</p>
@@ -74,6 +99,26 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                 </div>
               </div>
             ))}
+
+            {suggestionsPertinentes.length > 0 && (
+              <div className="p-4">
+                <p className="text-xs text-gray-500 mb-2.5">{t('profitezDuTarif')}</p>
+                <div className="flex gap-2.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {suggestionsPertinentes.map(s => (
+                    <Link key={s.id} to={`/product/${s.slug}/`} onClick={onFermer}
+                      className="shrink-0 w-24 group">
+                      <div className="w-24 h-28 bg-sand overflow-hidden">
+                        {s.images?.[0]?.url && (
+                          <img src={s.images[0].url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-gray-600 line-clamp-2">{s.name}</p>
+                      <p className="text-[11px] font-medium">{fmtPrix(s.price)}</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
