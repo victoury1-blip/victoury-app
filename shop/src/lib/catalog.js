@@ -21,6 +21,21 @@ const trier = (p) => ({
   sizes: (p.sizes || []).sort((a, b) => a.position - b.position),
 });
 
+/* Une couleur = une fiche (nécessaire pour ses propres photos et son propre
+   stock), mais une GRILLE ne doit montrer qu'UNE carte par groupe — le choix
+   de couleur se fait sur la fiche produit, via les pastilles. Sans ce filtre,
+   un article publié en 4 couleurs occupe 4 emplacements de grille au lieu
+   d'un, et noie le reste du catalogue (25 imports affichés en 54 cartes). */
+const unProduitParGroupe = (produits) => {
+  const vus = new Set();
+  return produits.filter(p => {
+    if (!p.group_id) return true;
+    if (vus.has(p.group_id)) return false;
+    vus.add(p.group_id);
+    return true;
+  });
+};
+
 export async function chargerCollections() {
   const { data, error } = await supabase
     .from('shop_collections').select('*').order('position');
@@ -53,7 +68,7 @@ export async function chargerProduitsDeCollection(slug) {
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT).eq('collection_id', col.id).eq('status', 'Actif').order('position');
   if (error) throw error;
-  return { collection: col, produits: (data || []).map(trier) };
+  return { collection: col, produits: unProduitParGroupe((data || []).map(trier)) };
 }
 
 // Un produit archivé (vendu au moins une fois, retiré de la vente) reste en
@@ -83,19 +98,22 @@ export async function chargerCouleurs(groupId) {
     suggestion la plus pertinente reste "ce qui ressemble à ce que je regarde". */
 export async function chargerProduitsLies(collectionId, produitIdAExclure, limite = 4) {
   if (!collectionId) return [];
+  // On rapatrie plus large que `limite` : dédoublonner par groupe APRÈS avoir
+  // coupé à `limite` pourrait ne laisser que 2 cartes si les 4 premières
+  // lignes étaient 4 couleurs du même article.
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT)
     .eq('collection_id', collectionId).eq('status', 'Actif').neq('id', produitIdAExclure)
-    .order('position').limit(limite);
+    .order('position').limit(limite * 3);
   if (error) return [];
-  return (data || []).map(trier);
+  return unProduitParGroupe((data || []).map(trier)).slice(0, limite);
 }
 
 export async function chargerNouveautes(limite = 8) {
   const { data, error } = await supabase
-    .from('shop_products').select(PRODUIT).eq('status', 'Actif').order('created_at', { ascending: false }).limit(limite);
+    .from('shop_products').select(PRODUIT).eq('status', 'Actif').order('created_at', { ascending: false }).limit(limite * 3);
   if (error) throw error;
-  return (data || []).map(trier);
+  return unProduitParGroupe((data || []).map(trier)).slice(0, limite);
 }
 
 /* Suggestions du panier : des articles de la MÊME collection que ce qui est
@@ -106,9 +124,9 @@ export async function chargerProduitsParCollections(collectionIds, limite = 8) {
   if (!collectionIds?.length) return [];
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT).eq('status', 'Actif')
-    .in('collection_id', collectionIds).order('created_at', { ascending: false }).limit(limite);
+    .in('collection_id', collectionIds).order('created_at', { ascending: false }).limit(limite * 3);
   if (error) throw error;
-  return (data || []).map(trier);
+  return unProduitParGroupe((data || []).map(trier)).slice(0, limite);
 }
 
 /* Avis clients : captures d'écran de conversations WhatsApp ou de messages
