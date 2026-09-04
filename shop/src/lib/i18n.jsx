@@ -86,6 +86,11 @@ const encoreEtRemise = (lang, manque, pourcent) => lang === 'ar'
   ? <>أضف <Ltr>{manque}</Ltr> {manque > 1 ? 'قطع أخرى' : 'قطعة أخرى'} واستفد من خصم <Ltr>{pourcent}%</Ltr></>
   : <>Encore <Ltr>{manque}</Ltr> article{manque > 1 ? 's' : ''} et −<Ltr>{pourcent}%</Ltr> sur toute la commande</>;
 
+/** Ajouté au message précédent SEULEMENT si la livraison est vraiment déjà
+    gratuite (le composant sait, lui, si le seuil est atteint) — sans quoi
+    "livraison gratuite" serait une fausse promesse. */
+const etLivraisonGratuite = (lang) => lang === 'ar' ? ' والتوصيل مجانا 🔥' : ', livraison gratuite 🔥';
+
 const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k, remisePalier: () => '', encoreEtRemise: () => '' });
 
 export function LangProvider({ children }) {
@@ -107,6 +112,7 @@ export function LangProvider({ children }) {
     lang, setLang, t,
     remisePalier: (pourcent, rang) => remisePalier(lang, pourcent, rang),
     encoreEtRemise: (manque, pourcent) => encoreEtRemise(lang, manque, pourcent),
+    etLivraisonGratuite: () => etLivraisonGratuite(lang),
   }}>{children}</LangContext.Provider>;
 }
 

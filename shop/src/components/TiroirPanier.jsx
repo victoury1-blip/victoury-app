@@ -8,7 +8,7 @@ import { chargerNouveautes, chargerProduitsParCollections } from '../lib/catalog
 import { useLang } from '../lib/i18n';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
-  const { t, encoreEtRemise } = useLang();
+  const { t, encoreEtRemise, etLivraisonGratuite } = useLang();
   const [suggestions, setSuggestions] = useState([]);
 
   // Chargées à l'ouverture seulement : inutile de sonder Supabase à chaque
@@ -36,6 +36,9 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
   // Idem pour le prochain palier de remise quantité : « encore 1 article et
   // −20% » pousse plus fort qu'un badge qu'il faut déjà avoir vu ailleurs.
   const palierSuivant = prochainPalier(lignes, remisesEffectives);
+  // "et livraison gratuite" ne s'ajoute que si c'est vrai — sinon ce serait
+  // une promesse fausse au client qui n'a pas encore atteint le seuil.
+  const livraisonDejaGratuite = !(seuilGratuit > 0) || manqueLivraison === 0;
   // Ne pas proposer un article déjà dans le panier — suggérer ce qu'on a
   // déjà choisi n'aide pas à ajouter un article de plus.
   const suggestionsPertinentes = suggestions.filter(s => !lignes.some(l => l.slug === s.slug)).slice(0, 4);
@@ -52,6 +55,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
         {palierSuivant && (
           <p className="px-5 py-2.5 bg-red-50 text-red-700 text-xs font-medium border-b border-red-100">
             {encoreEtRemise(palierSuivant.manque, palierSuivant.pourcent)}
+            {livraisonDejaGratuite && etLivraisonGratuite()}
           </p>
         )}
 
