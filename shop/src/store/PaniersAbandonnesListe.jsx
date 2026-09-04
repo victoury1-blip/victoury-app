@@ -10,6 +10,12 @@ import { fmtPrix } from '../lib/pricing';
    lui-même d'un clic. */
 
 const chiffres = (s) => (s || '').replace(/\D/g, '');
+// Les 9 derniers chiffres seulement : les commandes stockent le téléphone
+// normalisé ("0612345678"), le panier abandonné garde ce que le client a
+// tapé tel quel ("+212612345678", avec espaces…) — une comparaison brute des
+// chiffres ne matchait jamais, laissant des clients déjà convertis dans la
+// liste de relance.
+const cleTel = (s) => chiffres(s).slice(-9);
 
 function numeroWhatsApp(tel) {
   let d = chiffres(tel);
@@ -38,7 +44,7 @@ export default function PaniersAbandonnesListe() {
     // "JJ/MM/AAAA HH:MM:SS", pas une vraie date — la comparer à un ISO ne
     // filtrait jamais rien correctement (comparaison de texte, pas de date).
     supabase.from('orders').select('recipient').like('id', 'VS-%').then(({ data }) => {
-      setTelsConvertis(new Set((data || []).map(o => chiffres(o.recipient?.phone)).filter(Boolean)));
+      setTelsConvertis(new Set((data || []).map(o => cleTel(o.recipient?.phone)).filter(Boolean)));
     }).catch(() => {});
   }, []);
 
@@ -53,10 +59,10 @@ export default function PaniersAbandonnesListe() {
   // fois en hésitant sur l'adresse ne doit pas créer deux relances.
   const parTel = new Map();
   for (const p of paniers) {
-    const cle = chiffres(p.telephone);
+    const cle = cleTel(p.telephone);
     if (!parTel.has(cle)) parTel.set(cle, p);
   }
-  const visibles = [...parTel.values()].filter(p => !telsConvertis.has(chiffres(p.telephone)));
+  const visibles = [...parTel.values()].filter(p => !telsConvertis.has(cleTel(p.telephone)));
 
   return (
     <div>
