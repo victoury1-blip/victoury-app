@@ -301,8 +301,13 @@ create table if not exists shop_paniers_abandonnes (
 );
 create index if not exists shop_paniers_abandonnes_tel_idx on shop_paniers_abandonnes(telephone);
 alter table shop_paniers_abandonnes enable row level security;
+-- "anon" ET "authenticated" : un membre de l'équipe qui teste la caisse
+-- alors qu'il est connecté à /store dans le même navigateur envoie ses
+-- requêtes en tant qu'utilisateur authentifié, pas visiteur anonyme — une
+-- policy limitée à "anon" seul le bloquerait (403) sans que rien ne semble
+-- cassé côté client.
 create policy "creation depuis la boutique" on shop_paniers_abandonnes
-  for insert to anon with check (telephone is not null and length(telephone) >= 8);
+  for insert to anon, authenticated with check (telephone is not null and length(telephone) >= 8);
 create policy "lecture authentifiee" on shop_paniers_abandonnes
   for select to authenticated using (true);
 create policy "suppression authentifiee" on shop_paniers_abandonnes
