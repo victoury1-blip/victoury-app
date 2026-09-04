@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ChevronDown, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
@@ -44,9 +44,7 @@ export default function Produit({ onAjouter, theme, remises }) {
         setTaille(p?.sizes?.find(s => s.stock > 0)?.size || '');
         setPhotoActive(0);
         const cs = p?.group_id ? await chargerCouleurs(p.group_id) : [];
-        // La couleur actuellement affichée ressort en tête des pastilles —
-        // les « autres » couleurs viennent après, jamais avant elle.
-        setCouleurs(p ? [...cs].sort((a, b) => (a.slug === p.slug ? -1 : b.slug === p.slug ? 1 : 0)) : cs);
+        setCouleurs(cs);
         setProduitsLies(p ? await chargerProduitsLies(p.collection_id, p.id) : []);
         if (p) trackPixel('ViewContent', {
           content_name: p.name, content_ids: [p.slug], content_type: 'product',
@@ -58,8 +56,35 @@ export default function Produit({ onAjouter, theme, remises }) {
     window.scrollTo(0, 0);
   }, [slug]);
 
+  // Changer de couleur ne doit PAS recharger la page : c'est un choix au même
+  // titre que la taille, pas une nouvelle fiche à part. On met juste à jour
+  // l'affichage avec les données de l'autre couleur (déjà connues via les
+  // pastilles) et on aligne l'adresse SANS navigation React Router — sinon
+  // l'effet ci-dessus se redéclenche et redonne le flash "page qui recharge"
+  // que ce changement doit justement éviter.
+  const [changementCouleur, setChangementCouleur] = useState(false);
+  async function choisirCouleur(c) {
+    if (!c || c.slug === produit?.slug || changementCouleur) return;
+    setChangementCouleur(true);
+    try {
+      const p = await chargerProduit(c.slug);
+      if (!p) return;
+      setProduit(p);
+      setTaille(p.sizes?.find(s => s.stock > 0)?.size || '');
+      setPhotoActive(0);
+      window.history.replaceState(null, '', `/product/${c.slug}/`);
+    } finally {
+      setChangementCouleur(false);
+    }
+  }
+
   if (chargement) return <div className="max-w-7xl mx-auto px-6 py-24 animate-pulse"><div className="h-96 bg-gray-100" /></div>;
   if (!produit) return <p className="max-w-7xl mx-auto px-6 py-24 text-center text-sm text-gray-400">{t('produitIntrouvable')}</p>;
+
+  // La couleur actuellement affichée ressort en tête des pastilles — les
+  // « autres » viennent après, jamais avant elle. Calculé à chaque rendu (pas
+  // mémorisé) : `produit.slug` change au clic sans recharger `couleurs`.
+  const couleursTriees = [...couleurs].sort((a, b) => (a.slug === produit.slug ? -1 : b.slug === produit.slug ? 1 : 0));
 
   // Toutes les tailles sont montrées : une pointure absente laisse croire
   // qu'elle n'a jamais existé, quand elle est seulement épuisée pour l'instant.
@@ -125,9 +150,10 @@ export default function Produit({ onAjouter, theme, remises }) {
               {t('couleur')} : <span className="text-ink">{produit.color_name}</span>
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
-              {couleurs.map(c => (
-                <Link key={c.id} to={`/product/${c.slug}/`} title={c.color_name} aria-label={c.color_name}
-                  className={`w-7 h-7 rounded-full border-2 ${c.slug === produit.slug ? 'border-ink' : 'border-gray-200'}`}
+              {couleursTriees.map(c => (
+                <button key={c.id} type="button" onClick={() => choisirCouleur(c)} disabled={changementCouleur}
+                  title={c.color_name} aria-label={c.color_name}
+                  className={`w-7 h-7 rounded-full border-2 disabled:opacity-60 ${c.slug === produit.slug ? 'border-ink' : 'border-gray-200'}`}
                   style={{ background: c.color_hex || '#e5e5e5' }} />
               ))}
             </div>
