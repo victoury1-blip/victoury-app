@@ -66,23 +66,25 @@ const ordinalFr = (n) => `${n}ème`;
 const ordinalAr = (n) => ORDINAUX_AR[n] || `رقم ${n}`;
 
 // Isole un fragment latin (nombre + %) dans le sens LTR au milieu d'une
-// phrase arabe RTL — sans ça, l'algorithme bidi du navigateur peut faire
-// remonter le "%" ou le "−" en tête de ligne, collé au mot suivant ("٪أضف…")
-// au lieu de rester accolé au chiffre : illisible, et pris pour "-20 DH".
-const ltr = (s) => `⁦${s}⁩`;
+// phrase arabe RTL, avec la vraie balise HTML prévue pour ça (<bdi>) — les
+// marques Unicode invisibles (U+2066/U+2069) se sont révélées visibles comme
+// petits traits sur certaines polices Android : <bdi> isole sans jamais
+// s'afficher lui-même. En gras au passage, comme demandé, pour que le chiffre
+// ressorte dans la phrase.
+const Ltr = ({ children }) => <bdi className="font-bold" dir="ltr">{children}</bdi>;
 
 /** "−20% dès le 2ème article" / "−20% ابتداءً من المنتج الثاني" — l'ordinal
     change de forme d'une langue à l'autre, pas seulement de mot. */
 const remisePalier = (lang, pourcent, rang) => lang === 'ar'
-  ? `${ltr(`−${pourcent}%`)} ابتداءً من المنتج ${ordinalAr(rang)}`
-  : `−${pourcent}% dès le ${ordinalFr(rang)} article`;
+  ? <><Ltr>−{pourcent}%</Ltr> ابتداءً من المنتج {ordinalAr(rang)}</>
+  : <>−<Ltr>{pourcent}%</Ltr> dès le {ordinalFr(rang)} article</>;
 
 /** "Encore 1 article et −20% sur toute la commande" / version arabe — le
     coup de pouce affiché dans le panier quand un palier de remise est à
     portée. */
 const encoreEtRemise = (lang, manque, pourcent) => lang === 'ar'
-  ? `أضف ${ltr(manque)} ${manque > 1 ? 'قطع أخرى' : 'قطعة أخرى'} واستفد من خصم ${ltr(`${pourcent}%`)}`
-  : `Encore ${manque} article${manque > 1 ? 's' : ''} et −${pourcent}% sur toute la commande`;
+  ? <>أضف <Ltr>{manque}</Ltr> {manque > 1 ? 'قطع أخرى' : 'قطعة أخرى'} واستفد من خصم <Ltr>{pourcent}%</Ltr></>
+  : <>Encore <Ltr>{manque}</Ltr> article{manque > 1 ? 's' : ''} et −<Ltr>{pourcent}%</Ltr> sur toute la commande</>;
 
 const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k, remisePalier: () => '', encoreEtRemise: () => '' });
 
