@@ -109,6 +109,9 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
   // dernier moment sûr pour forcer la vraie quantité de chaque produit,
   // avant qu'elle ne serve (fausse) au calcul du profit.
   const qtyManquante = !!form.livreur && form.products.some(p => p.name && !(Number(p.qty) > 0));
+  // Somme visible en direct : 1 produit à 1 + un 2ᵉ à 1 → 2, pas besoin de
+  // les additionner soi-même pour savoir ce que le Rapport de Profit verra.
+  const qteTotale = form.products.reduce((s, p) => s + (Number(p.qty) || 0), 0);
 
   async function handleSave() {
     if (!form.nom || !form.telephone || !form.prix || qtyManquante) return;
@@ -231,6 +234,13 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
                   ⚠️ Indiquez la quantité de chaque produit — elle sert au calcul du profit.
                 </p>
               )}
+              {/* Recalculée en direct à chaque produit ajouté/retiré ou
+                  quantité changée — c'est ce total que lira le Rapport de
+                  Profit pour le coût d'achat de cette commande. */}
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                <span className="text-xs font-medium text-blue-700">Quantité totale (utilisée dans Profit)</span>
+                <span className="text-sm font-bold text-blue-800">{qteTotale}</span>
+              </div>
             </div>
           </div>
 
