@@ -66,7 +66,12 @@ export async function statutPush() {
 export async function abonnementDejaActif() {
   if (!pushDisponible() || Notification.permission !== 'granted') return false;
   try {
-    const reg = await navigator.serviceWorker.getRegistration('/sw-push.js');
+    // Sans argument : la registration qui contrôle CETTE page. Un argument
+    // attend une URL de PAGE couverte par le scope du service worker, pas le
+    // chemin du fichier JS lui-même ('/sw-push.js' n'est jamais une page) —
+    // avec l'ancien appel, la recherche ne trouvait jamais rien et l'état
+    // repassait à "non abonné" à chaque visite malgré un abonnement bien réel.
+    const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return false;
     const sub = await reg.pushManager.getSubscription();
     return !!sub;
