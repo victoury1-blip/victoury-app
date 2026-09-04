@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { isAffiliateSource } from '../lib/affiliatePlatforms';
 import {
   ShoppingCart, CheckCircle, Clock, RotateCcw, TrendingUp,
   Package, XCircle, Truck, DollarSign, RefreshCw,
-  Star, AlertTriangle, Users, ArrowRight, ArrowUpRight, ArrowDownRight, Minus, Store,
+  Star, AlertTriangle, Users, ArrowRight, ArrowUpRight, ArrowDownRight, Minus, Store, Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AlertsCenter from './AlertsCenter';
@@ -312,6 +312,18 @@ export default function Dashboard({ orders = [], isLoading = false }) {
 
   const todayOrders = useMemo(() => filterByPeriod(orders, 'today'), [orders]);
 
+  // Période personnalisée : les cartes du haut couvrent les cas courants
+  // (aujourd'hui, hier, semaine, mois) mais pas "du 6 au 9 avril" — un besoin
+  // ponctuel qui revient assez souvent pour mériter son propre sélecteur.
+  const [plage, setPlage] = useState({ debut: '', fin: '' });
+  const plageActive = plage.debut && plage.fin;
+  const ordersPlage = useMemo(() => {
+    if (!plageActive) return [];
+    const debut = startOf(new Date(plage.debut), 'day');
+    const fin = new Date(plage.fin); fin.setHours(23, 59, 59, 999);
+    return orders.filter(o => { const d = parseDate(o.dateAdded); return d && d >= debut && d <= fin; });
+  }, [orders, plage, plageActive]);
+
   const ca = orders.filter(o => ['confirme','livre'].includes(o.status)).reduce((s, o) => s + (o.price || 0), 0);
   const livreCA = orders.filter(o => o.status === 'livre').reduce((s, o) => s + (o.price || 0), 0);
 
@@ -566,9 +578,25 @@ export default function Dashboard({ orders = [], isLoading = false }) {
         </div>
       )}
 
+      {/* Période personnalisée */}
+      <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 w-fit">
+        <input type="date" value={plage.debut} onChange={e => setPlage(p => ({ ...p, debut: e.target.value }))}
+          className="text-sm text-gray-700 outline-none" />
+        <span className="text-gray-300">—</span>
+        <input type="date" value={plage.fin} onChange={e => setPlage(p => ({ ...p, fin: e.target.value }))}
+          className="text-sm text-gray-700 outline-none" />
+        <span className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center shrink-0">
+          <Search size={15} />
+        </span>
+      </div>
+
       {/* Period summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {periodSummaries.map(p => <PeriodCard key={p.label} {...p} />)}
+        {plageActive && (
+          <PeriodCard label="Période choisie" dateHint={`${plage.debut.split('-').reverse().join('/')} → ${plage.fin.split('-').reverse().join('/')}`}
+            orders={ordersPlage} bgClass="bg-gradient-to-br from-fuchsia-500 to-purple-600" />
+        )}
       </div>
 
       {/* KPI cards */}
