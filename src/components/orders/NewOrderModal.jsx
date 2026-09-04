@@ -87,7 +87,11 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
   const { statuses } = useStatuses();
   const [form, setForm] = useState({
     nom: '', telephone: '', ville: '', adresse: '', prix: '', livreur: '',
-    products: [{ name: '', size: '', qty: 1 }],
+    // La quantité par produit part VIDE, pas de "1" pré-rempli : un "1" par
+    // défaut se laisse traverser sans qu'on le regarde, et c'est justement
+    // lui qui fausse le coût d'achat dans le Rapport de Profit dès que la
+    // vraie quantité est différente. Vide oblige à taper un chiffre.
+    products: [{ name: '', size: '', qty: '' }],
     status: 'nouveau', qty: 1, echange: false, noteInterne: '', noteLivraison: '',
   });
   function u(k, v) { setForm((p) => ({ ...p, [k]: v })); }
@@ -98,11 +102,16 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
       return { ...p, products };
     });
   }
-  function addProduct() { setForm(p => ({ ...p, products: [...p.products, { name: '', size: '', qty: 1 }] })); }
+  function addProduct() { setForm(p => ({ ...p, products: [...p.products, { name: '', size: '', qty: '' }] })); }
   function removeProduct(idx) { setForm(p => ({ ...p, products: p.products.filter((_, i) => i !== idx) })); }
 
+  // Un livreur choisi = une commande sur le point de partir : c'est le
+  // dernier moment sûr pour forcer la vraie quantité de chaque produit,
+  // avant qu'elle ne serve (fausse) au calcul du profit.
+  const qtyManquante = !!form.livreur && form.products.some(p => p.name && !(Number(p.qty) > 0));
+
   async function handleSave() {
-    if (!form.nom || !form.telephone || !form.prix) return;
+    if (!form.nom || !form.telephone || !form.prix || qtyManquante) return;
     const count = Math.max(1, Math.min(form.qty || 1, 500));
     const t = now();
     const firstProd = form.products[0] || {};
@@ -203,8 +212,11 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
                       <option value="">Taille</option>
                       {sizeOptions.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                    <input type="number" min={1} value={prod.qty} onChange={(e) => updateProduct(idx, 'qty', Number(e.target.value))}
-                      className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-12 shrink-0" />
+                    <input type="number" min={1} value={prod.qty} placeholder="Qté"
+                      onChange={(e) => updateProduct(idx, 'qty', e.target.value === '' ? '' : Number(e.target.value))}
+                      className={`border rounded-lg px-2 py-2 text-sm text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-14 shrink-0 ${
+                        form.livreur && prod.name && !(Number(prod.qty) > 0) ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                      }`} />
                     <button onClick={() => removeProduct(idx)} aria-label="Supprimer"
                       className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0 transition"><Trash2 size={13} /></button>
                   </div>
@@ -214,6 +226,11 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
                 className="w-full border-2 border-dashed border-gray-200 rounded-lg py-2.5 text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 flex items-center justify-center gap-1.5 transition-colors">
                 <Plus size={14} /> Ajouter un produit
               </button>
+              {qtyManquante && (
+                <p className="text-xs text-red-600 font-medium">
+                  ⚠️ Indiquez la quantité de chaque produit — elle sert au calcul du profit.
+                </p>
+              )}
             </div>
           </div>
 
@@ -256,7 +273,8 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/80 rounded-b-2xl shrink-0 pb-[env(safe-area-inset-bottom,16px)]">
           <button onClick={onClose} className="px-5 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-100 transition">Annuler</button>
-          <button onClick={handleSave} disabled={!form.nom || !form.telephone || !form.prix}
+          <button onClick={handleSave} disabled={!form.nom || !form.telephone || !form.prix || qtyManquante}
+            title={qtyManquante ? 'Indiquez la quantité de chaque produit avant de créer la commande' : undefined}
             className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2">
             <Check size={14} />
             {form.qty > 1 ? `Créer ${form.qty} commandes` : 'Créer la commande'}
