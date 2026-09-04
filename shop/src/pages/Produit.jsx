@@ -81,11 +81,6 @@ export default function Produit({ onAjouter, theme, remises }) {
   if (chargement) return <div className="max-w-7xl mx-auto px-6 py-24 animate-pulse"><div className="h-96 bg-gray-100" /></div>;
   if (!produit) return <p className="max-w-7xl mx-auto px-6 py-24 text-center text-sm text-gray-400">{t('produitIntrouvable')}</p>;
 
-  // La couleur actuellement affichée ressort en tête des pastilles — les
-  // « autres » viennent après, jamais avant elle. Calculé à chaque rendu (pas
-  // mémorisé) : `produit.slug` change au clic sans recharger `couleurs`.
-  const couleursTriees = [...couleurs].sort((a, b) => (a.slug === produit.slug ? -1 : b.slug === produit.slug ? 1 : 0));
-
   // Toutes les tailles sont montrées : une pointure absente laisse croire
   // qu'elle n'a jamais existé, quand elle est seulement épuisée pour l'instant.
   // Le client la voit, comprend qu'elle reviendra, et choisit parmi les autres.
@@ -150,7 +145,7 @@ export default function Produit({ onAjouter, theme, remises }) {
               {t('couleur')} : <span className="text-ink">{produit.color_name}</span>
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
-              {couleursTriees.map(c => (
+              {couleurs.map(c => (
                 <button key={c.id} type="button" onClick={() => choisirCouleur(c)} disabled={changementCouleur}
                   title={c.color_name} aria-label={c.color_name}
                   className={`w-7 h-7 rounded-full border-2 disabled:opacity-60 ${c.slug === produit.slug ? 'border-ink' : 'border-gray-200'}`}
