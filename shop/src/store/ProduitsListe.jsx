@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, ImageOff, Copy, Archive, Pencil, ExternalLink } from 'lucide-react';
-import { listerProduits, archiverProduit, changerStatutProduit, dupliquerProduit, listerCollections, listerGroupes } from '../lib/admin';
+import { Plus, ImageOff, Copy, Archive, Pencil, ExternalLink, Trash2 } from 'lucide-react';
+import { listerProduits, archiverProduit, changerStatutProduit, dupliquerProduit, supprimerProduit, listerCollections, listerGroupes } from '../lib/admin';
 import { fmtPrix } from '../lib/pricing';
 
 const BADGE = { Actif: 'bg-green-50 text-green-700', Archivé: 'bg-gray-100 text-gray-500', Brouillon: 'bg-amber-50 text-amber-700' };
@@ -58,6 +58,20 @@ export default function ProduitsListe() {
     } finally { setEnCours(false); }
   }
 
+  // Suppression définitive (pas un archivage) : pour les couleurs importées
+  // qui n'existent pas vraiment côté fournisseur — les garder archivées
+  // encombrerait cette liste pour rien, alors qu'aucune commande ne les
+  // référence encore.
+  async function supprimerSelection() {
+    if (!confirm(`Supprimer DÉFINITIVEMENT les ${selection.size} produits sélectionnés ? Cette action est irréversible.`)) return;
+    setEnCours(true);
+    try {
+      await Promise.all([...selection].map(id => supprimerProduit(id)));
+      setSelection(new Set());
+      await recharger();
+    } finally { setEnCours(false); }
+  }
+
   if (!produits) return <p className="text-sm text-gray-400">Chargement…</p>;
   const visibles = produits.filter(p =>
     p.name.toLowerCase().includes(q.toLowerCase())
@@ -104,10 +118,17 @@ export default function ProduitsListe() {
           {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         {selection.size > 0 && (
-          <button onClick={archiverSelection} disabled={enCours}
-            className="flex items-center gap-1.5 text-xs text-gray-600 border border-gray-200 px-3 py-2.5 hover:border-red-300 hover:text-red-600 disabled:opacity-50 whitespace-nowrap">
-            <Archive size={13} /> Archiver ({selection.size})
-          </button>
+          <>
+            <button onClick={archiverSelection} disabled={enCours}
+              className="flex items-center gap-1.5 text-xs text-gray-600 border border-gray-200 px-3 py-2.5 hover:border-red-300 hover:text-red-600 disabled:opacity-50 whitespace-nowrap">
+              <Archive size={13} /> Archiver ({selection.size})
+            </button>
+            <button onClick={supprimerSelection} disabled={enCours}
+              title="Suppression définitive — pour des couleurs importées par erreur, jamais commandées"
+              className="flex items-center gap-1.5 text-xs text-red-600 border border-red-200 bg-red-50 px-3 py-2.5 hover:bg-red-100 disabled:opacity-50 whitespace-nowrap">
+              <Trash2 size={13} /> Supprimer ({selection.size})
+            </button>
+          </>
         )}
       </div>
 
