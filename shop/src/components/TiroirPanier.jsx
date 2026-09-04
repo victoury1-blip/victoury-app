@@ -17,8 +17,19 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
   useEffect(() => {
     if (!ouvert) return;
     const collectionIds = [...new Set(lignes.map(l => l.collectionId).filter(Boolean))];
-    (collectionIds.length ? chargerProduitsParCollections(collectionIds, 8) : chargerNouveautes(6))
-      .then(setSuggestions).catch(() => {});
+    // Une collection qui n'a qu'un seul article (le nôtre, déjà dans le
+    // panier) renvoyait une liste vide une fois l'article du panier exclu —
+    // le panier se retrouvait avec un grand vide à la place des suggestions.
+    // On complète toujours avec des nouveautés pour ne jamais rien avoir à
+    // montrer.
+    Promise.all([
+      collectionIds.length ? chargerProduitsParCollections(collectionIds, 8) : Promise.resolve([]),
+      chargerNouveautes(8),
+    ]).then(([parCollection, nouveautes]) => {
+      const vues = new Set();
+      const fusion = [...parCollection, ...nouveautes].filter(p => (vues.has(p.slug) ? false : (vues.add(p.slug), true)));
+      setSuggestions(fusion);
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ouvert]);
 
