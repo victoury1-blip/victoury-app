@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
@@ -32,6 +32,17 @@ export default function Produit({ onAjouter, theme, remises }) {
   const [chargement, setChargement] = useState(true);
   const [produitsLies, setProduitsLies] = useState([]);
   const [photoActive, setPhotoActive] = useState(0);
+  const carouselRef = useRef(null);
+
+  // Rien n'indiquait qu'il y avait d'autres photos à côté du swipe au doigt —
+  // les flèches le rendent visible, et servent aussi de clic direct pour qui
+  // ne pense pas à glisser. Vignette cliquée = même mécanisme.
+  function irVersPhoto(i, total) {
+    const cible = Math.max(0, Math.min(total - 1, i));
+    setPhotoActive(cible);
+    const largeur = carouselRef.current?.clientWidth;
+    if (largeur) carouselRef.current.scrollTo({ left: cible * largeur, behavior: 'smooth' });
+  }
 
   useEffect(() => {
     setChargement(true); setTaille('');
@@ -97,29 +108,56 @@ export default function Produit({ onAjouter, theme, remises }) {
           empilées les unes sous les autres, il fallait scroller toute la page
           juste pour voir la 2ᵉ photo. Le bureau garde l'empilement classique. */}
       <div>
-        <div
-          onScroll={(e) => {
-            const largeur = e.currentTarget.clientWidth;
-            if (largeur > 0) setPhotoActive(Math.round(e.currentTarget.scrollLeft / largeur));
-          }}
-          className="flex overflow-x-auto snap-x snap-mandatory lg:flex-col lg:overflow-visible lg:snap-none gap-2
-                    [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {photos.map((img, i) => (
-            <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center lg:shrink">
-              {img.url
-                ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
-                : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
+        <div className="relative">
+          <div
+            ref={carouselRef}
+            onScroll={(e) => {
+              const largeur = e.currentTarget.clientWidth;
+              if (largeur > 0) setPhotoActive(Math.round(e.currentTarget.scrollLeft / largeur));
+            }}
+            className="flex overflow-x-auto snap-x snap-mandatory lg:flex-col lg:overflow-visible lg:snap-none gap-2
+                      [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {photos.map((img, i) => (
+              <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center lg:shrink">
+                {img.url
+                  ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
+              </div>
+            ))}
+          </div>
+          {/* Flèches visibles seulement là où le swipe est la seule interaction
+              (mobile) : sur bureau les photos sont déjà toutes empilées. */}
+          {photos.length > 1 && (
+            <div className="lg:hidden">
+              {photoActive > 0 && (
+                <button onClick={() => irVersPhoto(photoActive - 1, photos.length)} aria-label="Photo précédente"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow grid place-items-center text-ink">
+                  <ChevronLeft size={18} />
+                </button>
+              )}
+              {photoActive < photos.length - 1 && (
+                <button onClick={() => irVersPhoto(photoActive + 1, photos.length)} aria-label="Photo suivante"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow grid place-items-center text-ink">
+                  <ChevronRight size={18} />
+                </button>
+              )}
             </div>
-          ))}
+          )}
         </div>
-        {/* Repères de position sous les photos, uniquement sur mobile où elles
-            défilent une par une — sur bureau elles sont toutes déjà visibles. */}
+        {/* Vignettes cliquables sous la photo, uniquement sur mobile où elle
+            défile au doigt une par une — sur bureau toutes les photos sont
+            déjà visibles empilées, une deuxième liste ferait doublon. Passé
+            quelques photos, des points ne disent plus laquelle est laquelle :
+            la vignette montre directement l'image visée. */}
         {photos.length > 1 && (
-          <div className="flex lg:hidden justify-center gap-1.5 mt-2.5">
-            {photos.map((_, i) => (
-              <span key={i} className={`h-1.5 rounded-full transition-all ${
-                i === photoActive ? 'w-4 bg-ink' : 'w-1.5 bg-gray-300'
-              }`} />
+          <div className="flex lg:hidden gap-1.5 mt-2.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {photos.map((img, i) => (
+              <button key={i} onClick={() => irVersPhoto(i, photos.length)} aria-label={`Photo ${i + 1}`}
+                className={`shrink-0 w-12 h-12 bg-sand overflow-hidden border-2 transition-colors ${
+                  i === photoActive ? 'border-ink' : 'border-transparent'
+                }`}>
+                {img.url && <img src={img.url} alt="" className="w-full h-full object-cover" />}
+              </button>
             ))}
           </div>
         )}
