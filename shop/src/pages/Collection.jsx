@@ -1,21 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import CarteProduit from '../components/CarteProduit';
 import AvisClients from '../components/AvisClients';
 import { chargerProduitsDeCollection, chargerAvis } from '../lib/catalog';
+
+// Combien de fiches à la fois : le premier écran, puis un lot de plus à
+// chaque défilement — un client qui scrolle 200 fiches d'un coup n'existe
+// pas, mais tout charger sans jamais rien afficher progressivement fait
+// paraître la page figée, sans le petit "ça continue à charger" des autres
+// sites.
+const LOT = 8;
 
 export default function Collection({ theme, remises }) {
   const { slug } = useParams();
   const [etat, setEtat] = useState({ chargement: true, collection: null, produits: [] });
   const [taille, setTaille] = useState('');
   const [avis, setAvis] = useState([]);
+  const [nbAffiches, setNbAffiches] = useState(LOT);
+  const sentinelleRef = useRef(null);
 
   useEffect(() => {
     setEtat(e => ({ ...e, chargement: true }));
+    setNbAffiches(LOT);
     chargerProduitsDeCollection(slug)
       .then(r => setEtat({ chargement: false, ...r }))
       .catch(() => setEtat({ chargement: false, collection: null, produits: [] }));
   }, [slug]);
+
+  // Un changement de filtre taille repart du même petit lot — sinon une
+  // sélection qui réduit la liste de 40 à 6 articles laisserait `nbAffiches`
+  // à 32, sans effet visible ni logique.
+  useEffect(() => { setNbAffiches(LOT); }, [taille]);
+
+  useEffect(() => {
+    const cible = sentinelleRef.current;
+    if (!cible) return;
+    const observateur = new IntersectionObserver(([entree]) => {
+      if (entree.isIntersecting) setNbAffiches(n => n + LOT);
+    }, { rootMargin: '600px' }); // avance l'appel avant que le bas ne soit visible — pas de blanc pendant le scroll
+    observateur.observe(cible);
+    return () => observateur.disconnect();
+  }, [etat.produits, taille]);
 
   useEffect(() => { chargerAvis().then(setAvis).catch(() => {}); }, []);
 
@@ -63,9 +88,14 @@ export default function Collection({ theme, remises }) {
       {visibles.length === 0 ? (
         <p className="py-24 text-center text-sm text-gray-400">Aucun article disponible dans cette taille.</p>
       ) : (
-        <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
-          {visibles.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
-        </div>
+        <>
+          <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
+            {visibles.slice(0, nbAffiches).map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
+          </div>
+          {/* Invisible : sert juste à détecter qu'on approche du bas pour
+              afficher le lot suivant, sans bouton "voir plus" à cliquer. */}
+          {nbAffiches < visibles.length && <div ref={sentinelleRef} className="h-1" />}
+        </>
       )}
 
       <AvisClients avis={avis} />
