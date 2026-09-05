@@ -9,6 +9,15 @@
   --ink: #111111;
 }
 
+/* Bandeau d'annonce : défilement continu droite → gauche, jamais un saut —
+   la piste contient le message deux fois de suite, et on la fait glisser
+   d'exactement une moitié ; la seconde moitié prend alors la place de la
+   première à l'identique, donc la boucle ne se voit pas. */
+@keyframes annonce-defile {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 @layer base {
   /* Sur iPhone, tirer la page vers le bas au-delà du pied de page noir
      révélait un blanc qui ne changera jamais (le "rebond" élastique de
