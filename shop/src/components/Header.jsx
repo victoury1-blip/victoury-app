@@ -46,11 +46,16 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
 
   // Bouton FR/AR : bascule manuelle uniquement, pas de détection automatique
   // du téléphone du client — juste le choix qu'il retient d'une visite à l'autre.
+  // Le drapeau seul ressemblait à un simple décor — un client ne devinait
+  // pas qu'il pouvait cliquer dessus pour changer de langue. Le court texte
+  // à côté (la langue vers laquelle on bascule) rend l'action visible d'un
+  // coup d'œil, sans avoir à survoler pour lire le title.
   const BoutonLangue = (
     <button onClick={() => setLang(lang === 'fr' ? 'ar' : 'fr')}
-      className="px-2 py-1 text-base leading-none hover:opacity-75 border border-gray-200 rounded"
+      className="flex items-center gap-1 px-2 py-1 text-sm leading-none hover:opacity-75 border border-gray-200 rounded"
       aria-label="Changer de langue / تبديل اللغة" title={lang === 'fr' ? 'العربية' : 'Français'}>
-      {lang === 'fr' ? '🇲🇦' : '🇫🇷'}
+      <span className="text-base">{lang === 'fr' ? '🇲🇦' : '🇫🇷'}</span>
+      <span className="text-[11px] font-medium">{lang === 'fr' ? 'AR' : 'FR'}</span>
     </button>
   );
 
