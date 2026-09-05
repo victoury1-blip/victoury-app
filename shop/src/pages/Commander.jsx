@@ -29,6 +29,15 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   // téléphone perd le focus créerait une ligne de plus dans les paniers
   // abandonnés, pour la même personne qui hésite juste entre deux champs.
   const panierEnregistre = useRef(false);
+  // Sur iPhone, quitter Safari (bouton Accueil, balayer l'appli, fermer
+  // l'onglet) ne déclenche PAS toujours l'événement "blur" du champ
+  // téléphone — surtout si le client tape le numéro puis quitte direct sans
+  // toucher un autre champ. Le seul "blur" ratait alors systématiquement ce
+  // cas. Ce ref donne aux évènements de fermeture de page un accès à l'état
+  // le plus récent, sans dépendre de la fermeture (closure) au moment où
+  // l'écouteur a été posé.
+  const etatActuel = useRef({ form, lignes });
+  useEffect(() => { etatActuel.current = { form, lignes }; });
 
   const t = totalPanier(lignes, {
     paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
@@ -48,18 +57,36 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   // Dès que le téléphone est plausible : le client a une vraie intention
   // d'achat, qu'il valide ou non ensuite. Silencieux et non bloquant — un
   // souci d'écriture ici ne doit jamais gêner la commande elle-même.
-  function noterPanierAbandonne() {
+  function noterPanierAbandonne(etat) {
     if (panierEnregistre.current) return;
-    const chiffres = form.telephone.replace(/\D/g, '');
-    if (chiffres.length < 9 || !lignes.length) return;
+    const { form: f, lignes: l } = etat || etatActuel.current;
+    const chiffres = f.telephone.replace(/\D/g, '');
+    if (chiffres.length < 9 || !l.length) return;
     panierEnregistre.current = true;
     supabase.from('shop_paniers_abandonnes').insert({
-      nom: form.nom || null,
-      telephone: form.telephone,
-      lignes: lignes.map(l => ({ name: l.name, size: l.size, color: l.color, qty: l.qty, price: l.price })),
-      total: t.total,
+      nom: f.nom || null,
+      telephone: f.telephone,
+      lignes: l.map(x => ({ name: x.name, size: x.size, color: x.color, qty: x.qty, price: x.price })),
+      total: totalPanier(l, {
+        paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
+      }).total,
     }).then(() => {}, () => { panierEnregistre.current = false; });
   }
+
+  // Filet de sécurité pour iOS : "pagehide" et l'onglet qui devient caché
+  // sont les seuls signaux fiables sur Safari mobile quand l'appli est
+  // quittée sans qu'aucun champ ne perde le focus au sens classique.
+  useEffect(() => {
+    const surFermeture = () => noterPanierAbandonne();
+    const surVisibilite = () => { if (document.visibilityState === 'hidden') surFermeture(); };
+    document.addEventListener('visibilitychange', surVisibilite);
+    window.addEventListener('pagehide', surFermeture);
+    return () => {
+      document.removeEventListener('visibilitychange', surVisibilite);
+      window.removeEventListener('pagehide', surFermeture);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function appliquerCode() {
     setCodeErreur('');
@@ -132,7 +159,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
             </div>
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('telephone')} <span className="text-red-500">*</span></label>
-              <input value={form.telephone} onChange={e => u('telephone', e.target.value)} onBlur={noterPanierAbandonne}
+              <input value={form.telephone} onChange={e => u('telephone', e.target.value)} onBlur={() => noterPanierAbandonne()}
                 inputMode="tel" placeholder="06 12 34 56 78" dir="ltr" className={`${champ} text-left ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
                 <p className={`mt-1 text-[11px] text-red-500 ${alignTexte}`}>{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
