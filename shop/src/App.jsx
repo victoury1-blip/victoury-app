@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AnnonceBar from './components/AnnonceBar';
 import Header from './components/Header';
@@ -6,30 +6,37 @@ import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
 import WhatsAppBulle from './components/WhatsAppBulle';
 import Accueil from './pages/Accueil';
-import Collection from './pages/Collection';
-import Produit from './pages/Produit';
-import Commander from './pages/Commander';
-import Merci from './pages/Merci';
-import PageStatique from './pages/PageStatique';
-import AdminAuth from './store/AdminAuth';
-import AdminLayout from './store/AdminLayout';
-import Dashboard from './store/Dashboard';
-import ProduitsListe from './store/ProduitsListe';
-import ProduitForm from './store/ProduitForm';
-import CollectionsListe from './store/CollectionsListe';
-import MediaListe from './store/MediaListe';
-import ImportWoo from './store/ImportWoo';
-import AvisListe from './store/AvisListe';
-import PagesListe from './store/PagesListe';
-import CodesPromo from './store/CodesPromo';
-import MetaPixel from './store/MetaPixel';
-import EditTheme from './store/EditTheme';
-import CommandesListe from './store/CommandesListe';
-import PaniersAbandonnesListe from './store/PaniersAbandonnesListe';
-import MicrosoftClarity from './store/MicrosoftClarity';
-import RemisesListe from './store/RemisesListe';
-import Reglages from './store/Reglages';
 import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT } from './lib/catalog';
+
+/* Un visiteur qui atterrit sur l'accueil (le cas des clics publicitaires)
+   n'a jamais besoin du code de la caisse, des fiches produit ou — surtout —
+   des 15 pages de l'administration : tout ça partait pourtant dans le même
+   fichier JS que la page d'accueil doit télécharger et parser avant même de
+   s'afficher. Chargées à la demande, elles ne pèsent plus sur ce premier
+   chargement. */
+const Collection = lazy(() => import('./pages/Collection'));
+const Produit = lazy(() => import('./pages/Produit'));
+const Commander = lazy(() => import('./pages/Commander'));
+const Merci = lazy(() => import('./pages/Merci'));
+const PageStatique = lazy(() => import('./pages/PageStatique'));
+const AdminAuth = lazy(() => import('./store/AdminAuth'));
+const AdminLayout = lazy(() => import('./store/AdminLayout'));
+const Dashboard = lazy(() => import('./store/Dashboard'));
+const ProduitsListe = lazy(() => import('./store/ProduitsListe'));
+const ProduitForm = lazy(() => import('./store/ProduitForm'));
+const CollectionsListe = lazy(() => import('./store/CollectionsListe'));
+const MediaListe = lazy(() => import('./store/MediaListe'));
+const ImportWoo = lazy(() => import('./store/ImportWoo'));
+const AvisListe = lazy(() => import('./store/AvisListe'));
+const PagesListe = lazy(() => import('./store/PagesListe'));
+const CodesPromo = lazy(() => import('./store/CodesPromo'));
+const MetaPixel = lazy(() => import('./store/MetaPixel'));
+const EditTheme = lazy(() => import('./store/EditTheme'));
+const CommandesListe = lazy(() => import('./store/CommandesListe'));
+const PaniersAbandonnesListe = lazy(() => import('./store/PaniersAbandonnesListe'));
+const MicrosoftClarity = lazy(() => import('./store/MicrosoftClarity'));
+const RemisesListe = lazy(() => import('./store/RemisesListe'));
+const Reglages = lazy(() => import('./store/Reglages'));
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel, chargerClarity } from './lib/pixel';
@@ -138,20 +145,27 @@ function Vitrine() {
         logoPosition={reglages.theme?.logoPosition} onOuvrirPanier={() => setPanierOuvert(true)} />
 
       <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<Accueil collections={collections} reglages={reglages} />} />
-          {/* Les adresses reprennent EXACTEMENT celles de l'ancienne boutique :
-              une annonce en cours pointe dessus, et la changer l'arrêterait. */}
-          <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
-          <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
-          <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
-          <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
-          <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onRetirer={onRetirer} onVider={onVider} />} />
-          <Route path="/merci/:id" element={<Merci />} />
-          <Route path="/:slug/" element={<PageStatique />} />
-          <Route path="/:slug" element={<PageStatique />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        {/* Repli vide (pas de spinner) : ces pages sont déjà découpées en
+            chunks séparés, et le temps de téléchargement d'un chunk une fois
+            en cache est trop court pour justifier un état de chargement
+            visible — seul le tout premier clic vers l'une d'elles l'attend
+            une fraction de seconde. */}
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/" element={<Accueil collections={collections} reglages={reglages} />} />
+            {/* Les adresses reprennent EXACTEMENT celles de l'ancienne boutique :
+                une annonce en cours pointe dessus, et la changer l'arrêterait. */}
+            <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
+            <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
+            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
+            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
+            <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onRetirer={onRetirer} onVider={onVider} />} />
+            <Route path="/merci/:id" element={<Merci />} />
+            <Route path="/:slug/" element={<PageStatique />} />
+            <Route path="/:slug" element={<PageStatique />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </main>
 
       <Footer telephone={reglages.telephone} theme={reglages.theme} collections={collections} />
@@ -169,28 +183,30 @@ function Vitrine() {
 
 function Administration() {
   return (
-    <AdminAuth>
-      <Routes>
-        <Route element={<AdminLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="produits" element={<ProduitsListe />} />
-          <Route path="produits/:id" element={<ProduitForm />} />
-          <Route path="collections" element={<CollectionsListe />} />
-          <Route path="media" element={<MediaListe />} />
-          <Route path="import-woo" element={<ImportWoo />} />
-          <Route path="pages" element={<PagesListe />} />
-          <Route path="avis" element={<AvisListe />} />
-          <Route path="codes-promo" element={<CodesPromo />} />
-          <Route path="meta-pixel" element={<MetaPixel />} />
-          <Route path="theme" element={<EditTheme />} />
-          <Route path="remises" element={<RemisesListe />} />
-          <Route path="commandes" element={<CommandesListe />} />
-          <Route path="paniers-abandonnes" element={<PaniersAbandonnesListe />} />
-          <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
-          <Route path="reglages" element={<Reglages />} />
-        </Route>
-      </Routes>
-    </AdminAuth>
+    <Suspense fallback={null}>
+      <AdminAuth>
+        <Routes>
+          <Route element={<AdminLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="produits" element={<ProduitsListe />} />
+            <Route path="produits/:id" element={<ProduitForm />} />
+            <Route path="collections" element={<CollectionsListe />} />
+            <Route path="media" element={<MediaListe />} />
+            <Route path="import-woo" element={<ImportWoo />} />
+            <Route path="pages" element={<PagesListe />} />
+            <Route path="avis" element={<AvisListe />} />
+            <Route path="codes-promo" element={<CodesPromo />} />
+            <Route path="meta-pixel" element={<MetaPixel />} />
+            <Route path="theme" element={<EditTheme />} />
+            <Route path="remises" element={<RemisesListe />} />
+            <Route path="commandes" element={<CommandesListe />} />
+            <Route path="paniers-abandonnes" element={<PaniersAbandonnesListe />} />
+            <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
+            <Route path="reglages" element={<Reglages />} />
+          </Route>
+        </Routes>
+      </AdminAuth>
+    </Suspense>
   );
 }
 
