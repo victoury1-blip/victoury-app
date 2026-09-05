@@ -381,3 +381,38 @@ create policy "suppression admin boutique" on shop_paniers_abandonnes
 -- Remplacer l'e-mail par celui/ceux du compte /store réel.
 -- insert into shop_admins (user_id, email)
 --   select id, email from auth.users where email = 'ton-email@exemple.com';
+
+-- ============================================================
+--  IP BLOQUÉES
+--
+--  Un visiteur qui passe des fausses commandes (insultes dans le nom,
+--  spam) — bloqué par IP plutôt que par téléphone : il retape n'importe
+--  quel numéro à chaque fois, mais son IP change rarement d'une commande
+--  à l'autre. Vérifiée côté serveur (api/commande.js), avant l'écriture en
+--  base : la commande est refusée en silence, sans dire au visiteur qu'il
+--  est bloqué (sinon il change de wifi/4G et recommence aussitôt).
+-- ============================================================
+create table if not exists shop_ip_bloquees (
+  ip         text primary key,
+  raison     text,
+  created_at timestamptz not null default now()
+);
+alter table shop_ip_bloquees enable row level security;
+create policy "lecture admin boutique" on shop_ip_bloquees
+  for select to authenticated using (is_shop_admin());
+create policy "ecriture admin boutique" on shop_ip_bloquees
+  for all to authenticated using (is_shop_admin()) with check (is_shop_admin());
+
+-- api/commande.js écrit avec la clé anon (jamais authentifiée comme admin) :
+-- une fonction dédiée répond juste "oui/non" sans jamais exposer la liste
+-- complète des IP bloquées à qui appelle l'API publique.
+create or replace function shop_ip_est_bloquee(p_ip text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from shop_ip_bloquees where ip = p_ip);
+$$;
+grant execute on function shop_ip_est_bloquee(text) to anon, authenticated;

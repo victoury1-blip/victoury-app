@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Ban } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
 
@@ -32,6 +32,20 @@ export default function CommandesListe() {
   const [commandes, setCommandes] = useState(null);
   const [q, setQ] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
+  const [ipsBloquees, setIpsBloquees] = useState(new Set());
+
+  useEffect(() => {
+    supabase.from('shop_ip_bloquees').select('ip').then(({ data }) => {
+      setIpsBloquees(new Set((data || []).map(r => r.ip)));
+    }).catch(() => {});
+  }, []);
+
+  async function bloquerIp(ip) {
+    if (!ip || ipsBloquees.has(ip)) return;
+    if (!window.confirm(`Bloquer l'IP ${ip} ? Ses prochaines commandes seront ignorées en silence.`)) return;
+    setIpsBloquees(s => new Set(s).add(ip));
+    await supabase.from('shop_ip_bloquees').insert({ ip }).catch(() => {});
+  }
 
   // Une commande supprimée dans l'application (soft-delete : is_deleted)
   // reste visible ici, comme une archive — la retirer aussi de cette liste
@@ -140,7 +154,17 @@ export default function CommandesListe() {
                         autre ville. "(approx.)" le rappelle plutôt que de
                         laisser croire à une localisation fiable. */}
                     {r.geoVille ? <>{r.geoVille}{r.geoPays ? `, ${r.geoPays}` : ''} <span className="text-gray-400">(approx.)</span></> : '—'}
-                    {r.ip && <div className="text-[10px] text-gray-300 font-mono">{r.ip}</div>}
+                    {r.ip && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-300 font-mono">{r.ip}</span>
+                        {ipsBloquees.has(r.ip) ? (
+                          <span className="text-[10px] text-red-500">Bloquée</span>
+                        ) : (
+                          <button onClick={() => bloquerIp(r.ip)} title="Bloquer cette IP"
+                            className="text-gray-300 hover:text-red-500"><Ban size={12} /></button>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{c.date_added}</td>
                   <td className="px-4 py-3">

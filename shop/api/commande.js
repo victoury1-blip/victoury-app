@@ -91,6 +91,20 @@ export default async function handler(req, res) {
   if (manque.length) return res.status(400).json({ ok: false, manque });
 
   const ip = clientIp(req);
+
+  // Bloquée depuis /store/commandes : on répond comme si tout s'était bien
+  // passé — dire "vous êtes bloqué" ne ferait que pousser à changer de
+  // wifi/4G et recommencer aussitôt. Une IP absente (rare, mais possible
+  // derrière certains proxys) ne doit jamais bloquer une vraie commande.
+  if (ip) {
+    const estBloquee = await fetch(`${url}/rest/v1/rpc/shop_ip_est_bloquee`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ p_ip: ip }),
+    }).then(r => r.ok ? r.json() : false).catch(() => false);
+    if (estBloquee) return res.status(200).json({ ok: true, id: 'VS-000000-000000' });
+  }
+
   const [geo] = await Promise.all([localiser(ip)]);
   const commande = construireCommande(form, lignes, Number(total) || 0, new Date(), undefined, {
     source: SOURCES_CONNUES.has(source) ? source : 'Direct',
