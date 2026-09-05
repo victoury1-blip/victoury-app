@@ -3,12 +3,16 @@ import { supabase } from '../lib/supabase';
 
 /* Porte d'entrée de l'administration.
  *
- * Le même compte que l'application : aucune inscription séparée à gérer, et
- * quiconque a déjà accès au système peut administrer la boutique. La lecture
- * du catalogue reste ouverte à tous — c'est l'écriture qui est fermée, et déjà
- * fermée côté base : cet écran n'est qu'un confort, pas la vraie barrière. */
+ * Le même compte que l'application, mais PAS le même accès : ce projet
+ * Supabase est partagé avec le CRM des commandes (livreurs compris), et un
+ * compte simplement connecté ("authenticated") n'a plus le droit d'écrire
+ * sur le catalogue de la boutique depuis la base de données (voir
+ * shop_admins / is_shop_admin() dans schema.sql) — seuls les comptes ajoutés
+ * à la table shop_admins le peuvent. Cet écran vérifie donc l'appartenance
+ * à cette table, pas seulement une session active. */
 export default function AdminAuth({ children }) {
   const [session, setSession] = useState(undefined);
+  const [estAdmin, setEstAdmin] = useState(undefined);
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
   const [erreur, setErreur] = useState('');
@@ -20,6 +24,14 @@ export default function AdminAuth({ children }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (session === undefined) return;
+    if (!session) { setEstAdmin(false); return; }
+    setEstAdmin(undefined);
+    supabase.from('shop_admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setEstAdmin(!!data), () => setEstAdmin(false));
+  }, [session]);
+
   const connecter = useCallback(async (e) => {
     e.preventDefault();
     setErreur(''); setEnvoi(true);
@@ -28,7 +40,20 @@ export default function AdminAuth({ children }) {
     if (error) setErreur('E-mail ou mot de passe incorrect.');
   }, [email, motDePasse]);
 
-  if (session === undefined) return null;
+  if (session === undefined || (session && estAdmin === undefined)) return null;
+
+  if (session && estAdmin === false) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-sand px-4 text-center">
+        <div>
+          <p className="text-sm text-gray-600">Ce compte n'a pas accès à l'administration de la boutique.</p>
+          <button onClick={() => supabase.auth.signOut()} className="mt-4 text-xs underline text-gray-400">
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!session) {
     return (

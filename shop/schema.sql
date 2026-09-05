@@ -312,3 +312,66 @@ create policy "lecture authentifiee" on shop_paniers_abandonnes
   for select to authenticated using (true);
 create policy "suppression authentifiee" on shop_paniers_abandonnes
   for delete to authenticated using (true);
+
+-- ============================================================
+--  ADMINISTRATEURS DE LA BOUTIQUE
+--
+--  Ce projet Supabase est PARTAGÉ avec l'application de gestion des
+--  commandes (CRM) — livreurs compris. "to authenticated" sur les policies
+--  d'écriture ci-dessus voulait dire « un compte déjà connecté au système »,
+--  pas « un compte qui a le droit d'administrer la boutique » : un compte
+--  livreur, une fois connecté, pouvait modifier catalogue/prix/codes promo
+--  au même titre qu'un vrai administrateur. Cette table restreint
+--  l'écriture aux seuls comptes qu'on y ajoute explicitement.
+-- ============================================================
+create table if not exists shop_admins (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  email      text,
+  created_at timestamptz not null default now()
+);
+alter table shop_admins enable row level security;
+-- Un administrateur peut voir la liste (utile pour /store/reglages plus
+-- tard) ; personne ne peut s'y ajouter tout seul depuis le client.
+create policy "lecture par un admin" on shop_admins
+  for select to authenticated using (exists (select 1 from shop_admins a where a.user_id = auth.uid()));
+
+create or replace function is_shop_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from shop_admins where user_id = auth.uid());
+$$;
+grant execute on function is_shop_admin() to authenticated;
+
+-- Remplace "to authenticated using (true)" par une vraie vérification de
+-- rôle sur toutes les tables du catalogue/réglages + les abonnements push.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'shop_collections','shop_groups','shop_products','shop_product_images',
+    'shop_product_sizes','shop_pages','shop_promo_codes','shop_settings',
+    'shop_push_subscriptions'
+  ] loop
+    execute format('drop policy if exists "ecriture authentifiee" on %I', t);
+    execute format(
+      'create policy "ecriture admin boutique" on %I for all to authenticated using (is_shop_admin()) with check (is_shop_admin())', t);
+  end loop;
+end $$;
+
+-- Les paniers abandonnés contiennent des téléphones de visiteurs — leur
+-- lecture/suppression doit suivre la même règle que le reste de l'admin.
+drop policy if exists "lecture authentifiee" on shop_paniers_abandonnes;
+drop policy if exists "suppression authentifiee" on shop_paniers_abandonnes;
+create policy "lecture admin boutique" on shop_paniers_abandonnes
+  for select to authenticated using (is_shop_admin());
+create policy "suppression admin boutique" on shop_paniers_abandonnes
+  for delete to authenticated using (is_shop_admin());
+
+-- Étape manuelle, une seule fois : ajouter le ou les comptes autorisés.
+-- Remplacer l'e-mail par celui/ceux du compte /store réel.
+-- insert into shop_admins (user_id, email)
+--   select id, email from auth.users where email = 'ton-email@exemple.com';
