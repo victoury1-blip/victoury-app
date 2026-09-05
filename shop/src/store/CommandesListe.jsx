@@ -44,27 +44,42 @@ export default function CommandesListe() {
     }).catch(() => {});
   }, []);
 
+  // Le "builder" Supabase n'est thenable que via .then — lui chaîner un
+  // .catch() direct (sans .then avant) plante avec "catch is not a
+  // function" avant même que la requête parte : c'était le bug qui rendait
+  // "Bloquer" inactif en silence sur les deux boutons.
+  async function bloquerIpSansConfirmation(ip) {
+    setIpsBloquees(s => new Set(s).add(ip));
+    const { error } = await supabase.from('shop_ip_bloquees').insert({ ip });
+    if (error) { alert(`Échec du blocage IP : ${error.message}`); setIpsBloquees(s => { const n = new Set(s); n.delete(ip); return n; }); }
+  }
+
+  async function bloquerTelephoneSansConfirmation(tel) {
+    setTelsBloques(s => new Set(s).add(tel));
+    const { error } = await supabase.from('shop_telephones_bloquees').insert({ telephone: tel });
+    if (error) { alert(`Échec du blocage téléphone : ${error.message}`); setTelsBloques(s => { const n = new Set(s); n.delete(tel); return n; }); }
+  }
+
   async function bloquerIp(ip) {
     if (!ip || ipsBloquees.has(ip)) return;
     if (!window.confirm(`Bloquer l'IP ${ip} ? Ses prochaines commandes seront ignorées en silence.`)) return;
-    setIpsBloquees(s => new Set(s).add(ip));
-    const { error } = await supabase.from('shop_ip_bloquees').insert({ ip });
-    // Diagnostic temporaire : l'échec précédent était avalé en silence
-    // (.catch(() => {})), rendant le bouton "Bloquer" invisible-mais-inactif
-    // pour l'admin — impossible à distinguer d'un vrai succès sans ceci.
-    if (error) { alert(`Échec du blocage IP : ${error.message}`); setIpsBloquees(s => { const n = new Set(s); n.delete(ip); return n; }); }
+    await bloquerIpSansConfirmation(ip);
   }
 
   async function bloquerTelephone(tel) {
     if (!tel || telsBloques.has(tel)) return;
     if (!window.confirm(`Bloquer le téléphone ${tel} ? Ses prochaines commandes seront ignorées en silence.`)) return;
-    setTelsBloques(s => new Set(s).add(tel));
-    // Le "builder" Supabase n'est thenable que via .then — lui chaîner un
-    // .catch() direct (sans .then avant) plante avec "catch is not a
-    // function" avant même que la requête parte : exactement le bug qui
-    // rendait "Bloquer" inactif en silence (voir bloquerIp ci-dessus).
-    const { error } = await supabase.from('shop_telephones_bloquees').insert({ telephone: tel });
-    if (error) { alert(`Échec du blocage téléphone : ${error.message}`); setTelsBloques(s => { const n = new Set(s); n.delete(tel); return n; }); }
+    await bloquerTelephoneSansConfirmation(tel);
+  }
+
+  // Un client qui recommence bloque en général les deux d'un coup — un
+  // clic au lieu de deux, avec une seule confirmation.
+  async function bloquerToutCela(ip, tel) {
+    const deja = (!ip || ipsBloquees.has(ip)) && (!tel || telsBloques.has(tel));
+    if (deja) return;
+    if (!window.confirm(`Bloquer l'IP${ip ? ` ${ip}` : ''} ET le téléphone${tel ? ` ${tel}` : ''} ? Ses prochaines commandes seront ignorées en silence.`)) return;
+    if (ip && !ipsBloquees.has(ip)) await bloquerIpSansConfirmation(ip);
+    if (tel && !telsBloques.has(tel)) await bloquerTelephoneSansConfirmation(tel);
   }
 
   // Une commande supprimée dans l'application (soft-delete : is_deleted)
@@ -198,6 +213,14 @@ export default function CommandesListe() {
                           </button>
                         )}
                       </div>
+                    )}
+                    {/* Un client qui recommence, on bloque en général IP +
+                        téléphone d'un coup — plutôt que deux clics séparés. */}
+                    {r.ip && r.phone && (!ipsBloquees.has(r.ip) || !telsBloques.has(r.phone)) && (
+                      <button onClick={() => bloquerToutCela(r.ip, r.phone)} title="Bloquer l'IP et le téléphone ensemble"
+                        className="mt-1 flex items-center gap-1 text-[10px] font-medium text-white bg-red-500 px-1.5 py-0.5 rounded hover:bg-red-600 shrink-0">
+                        <Ban size={11} /> Bloquer les deux
+                      </button>
                     )}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{c.date_added}</td>
