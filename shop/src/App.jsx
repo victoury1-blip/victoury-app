@@ -57,15 +57,35 @@ function ScrollToTop() {
    doit jamais apparaître sur l'administration : elle a sa propre mise en
    page, et un visiteur n'y passe jamais. La route décide seule laquelle
    des deux applications elle sert. */
+// Les VRAIS réglages (couleur du bandeau, photo du hero…) mettent un
+// aller-retour Supabase à arriver — entre-temps, l'état initial ci-dessous
+// s'affichait tel quel : bandeau blanc, photo par défaut, pendant une
+// seconde à chaque rafraîchissement, avant que le bon réglage n'écrase tout
+// d'un coup. Une copie du dernier chargement réussi, gardée en localStorage
+// (même schéma que les autres réglages du site), permet au tout premier
+// rendu de déjà porter les bonnes couleurs — Supabase ne fait plus ensuite
+// que confirmer ou corriger, sans "flash" visible.
+const CACHE_REGLAGES = 'shop_reglages_cache';
+function reglagesInitiaux() {
+  const defaut = { ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT, clarity: CLARITY_DEFAUT };
+  try {
+    const brut = localStorage.getItem(CACHE_REGLAGES);
+    return brut ? { ...defaut, ...JSON.parse(brut) } : defaut;
+  } catch { return defaut; }
+}
+
 function Vitrine() {
   const [collections, setCollections] = useState([]);
-  const [reglages, setReglages] = useState({ ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT, clarity: CLARITY_DEFAUT });
+  const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
 
   useEffect(() => {
     chargerCollections().then(setCollections).catch(() => {});
-    chargerReglages().then(setReglages).catch(() => {});
+    chargerReglages().then(r => {
+      setReglages(r);
+      try { localStorage.setItem(CACHE_REGLAGES, JSON.stringify(r)); } catch {}
+    }).catch(() => {});
   }, []);
 
   // Toutes les photos (produits, hero) viennent du même serveur Supabase :
