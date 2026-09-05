@@ -59,7 +59,12 @@ export default function CommandesListe() {
     if (!tel || telsBloques.has(tel)) return;
     if (!window.confirm(`Bloquer le téléphone ${tel} ? Ses prochaines commandes seront ignorées en silence.`)) return;
     setTelsBloques(s => new Set(s).add(tel));
-    await supabase.from('shop_telephones_bloquees').insert({ telephone: tel }).catch(() => {});
+    // Le "builder" Supabase n'est thenable que via .then — lui chaîner un
+    // .catch() direct (sans .then avant) plante avec "catch is not a
+    // function" avant même que la requête parte : exactement le bug qui
+    // rendait "Bloquer" inactif en silence (voir bloquerIp ci-dessus).
+    const { error } = await supabase.from('shop_telephones_bloquees').insert({ telephone: tel });
+    if (error) { alert(`Échec du blocage téléphone : ${error.message}`); setTelsBloques(s => { const n = new Set(s); n.delete(tel); return n; }); }
   }
 
   // Une commande supprimée dans l'application (soft-delete : is_deleted)
