@@ -104,9 +104,10 @@ export default function Produit({ onAjouter, theme, remises }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-2 gap-10">
-      {/* Sur mobile, les photos défilent au doigt une par une (comme une story) —
-          empilées les unes sous les autres, il fallait scroller toute la page
-          juste pour voir la 2ᵉ photo. Le bureau garde l'empilement classique. */}
+      {/* Même carousel (une photo à la fois, flèches + vignettes) sur mobile
+          ET sur bureau — l'empilement vertical de toutes les photos sur
+          grand écran donnait une colonne bien plus haute que le reste de la
+          fiche, sans rien montrer de plus qu'un défilement. */}
       <div>
         <div className="relative">
           <div
@@ -115,20 +116,18 @@ export default function Produit({ onAjouter, theme, remises }) {
               const largeur = e.currentTarget.clientWidth;
               if (largeur > 0) setPhotoActive(Math.round(e.currentTarget.scrollLeft / largeur));
             }}
-            className="flex overflow-x-auto snap-x snap-mandatory lg:flex-col lg:overflow-visible lg:snap-none gap-2
+            className="flex overflow-x-auto snap-x snap-mandatory gap-2
                       [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {photos.map((img, i) => (
-              <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center lg:shrink">
+              <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center">
                 {img.url
                   ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
                   : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
               </div>
             ))}
           </div>
-          {/* Flèches visibles seulement là où le swipe est la seule interaction
-              (mobile) : sur bureau les photos sont déjà toutes empilées. */}
           {photos.length > 1 && (
-            <div className="lg:hidden">
+            <>
               {photoActive > 0 && (
                 <button onClick={() => irVersPhoto(photoActive - 1, photos.length)} aria-label="Photo précédente"
                   className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow grid place-items-center text-ink">
@@ -141,16 +140,14 @@ export default function Produit({ onAjouter, theme, remises }) {
                   <ChevronRight size={18} />
                 </button>
               )}
-            </div>
+            </>
           )}
         </div>
-        {/* Vignettes cliquables sous la photo, uniquement sur mobile où elle
-            défile au doigt une par une — sur bureau toutes les photos sont
-            déjà visibles empilées, une deuxième liste ferait doublon. Passé
-            quelques photos, des points ne disent plus laquelle est laquelle :
-            la vignette montre directement l'image visée. */}
+        {/* Vignettes cliquables sous la photo : passé quelques photos, des
+            points ne disent plus laquelle est laquelle, la vignette montre
+            directement l'image visée. */}
         {photos.length > 1 && (
-          <div className="flex lg:hidden gap-1.5 mt-2.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-1.5 mt-2.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {photos.map((img, i) => (
               <button key={i} onClick={() => irVersPhoto(i, photos.length)} aria-label={`Photo ${i + 1}`}
                 className={`shrink-0 w-12 h-12 bg-sand overflow-hidden border-2 transition-colors ${
