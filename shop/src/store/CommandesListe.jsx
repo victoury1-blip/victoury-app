@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Ban, X } from 'lucide-react';
+import { ExternalLink, Ban, X, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
 
@@ -97,6 +97,20 @@ export default function CommandesListe() {
     setTelsBloques(s => { const n = new Set(s); n.delete(tel); return n; });
     const { error } = await supabase.from('shop_telephones_bloquees').delete().eq('telephone', tel);
     if (error) { alert(`Échec du déblocage téléphone : ${error.message}`); setTelsBloques(s => new Set(s).add(tel)); }
+  }
+
+  // Suppression douce (is_deleted), jamais un vrai DELETE — même règle que
+  // le reste de l'application (voir CLAUDE.md) : la commande reste comme
+  // archive, disponible pour l'historique, mais sort du chiffre d'affaires
+  // et du compteur "En attente" (voir `stats` plus haut).
+  async function supprimerCommande(id) {
+    if (!window.confirm('Supprimer (archiver) cette commande ?')) return;
+    setCommandes(list => list.map(c => c.id === id ? { ...c, is_deleted: true } : c));
+    const { error } = await supabase.from('orders').update({ is_deleted: true }).eq('id', id);
+    if (error) {
+      alert(`Échec de la suppression : ${error.message}`);
+      setCommandes(list => list.map(c => c.id === id ? { ...c, is_deleted: false } : c));
+    }
   }
 
   // Une commande supprimée dans l'application (soft-delete : is_deleted)
@@ -252,10 +266,18 @@ export default function CommandesListe() {
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{c.date_added}</td>
                   <td className="px-4 py-3">
-                    <a href={`https://app.victoury-maroc.com/commandes/a-confirmer?q=${c.id}`} target="_blank" rel="noreferrer"
-                      title="Ouvrir dans l'application" className="text-gray-400 hover:text-ink">
-                      <ExternalLink size={15} />
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <a href={`https://app.victoury-maroc.com/commandes/a-confirmer?q=${c.id}`} target="_blank" rel="noreferrer"
+                        title="Ouvrir dans l'application" className="text-gray-400 hover:text-ink">
+                        <ExternalLink size={15} />
+                      </a>
+                      {!c.is_deleted && (
+                        <button onClick={() => supprimerCommande(c.id)} title="Supprimer (archiver)"
+                          className="text-gray-300 hover:text-red-500">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
