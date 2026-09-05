@@ -48,7 +48,11 @@ export default function CommandesListe() {
     if (!ip || ipsBloquees.has(ip)) return;
     if (!window.confirm(`Bloquer l'IP ${ip} ? Ses prochaines commandes seront ignorées en silence.`)) return;
     setIpsBloquees(s => new Set(s).add(ip));
-    await supabase.from('shop_ip_bloquees').insert({ ip }).catch(() => {});
+    const { error } = await supabase.from('shop_ip_bloquees').insert({ ip });
+    // Diagnostic temporaire : l'échec précédent était avalé en silence
+    // (.catch(() => {})), rendant le bouton "Bloquer" invisible-mais-inactif
+    // pour l'admin — impossible à distinguer d'un vrai succès sans ceci.
+    if (error) { alert(`Échec du blocage IP : ${error.message}`); setIpsBloquees(s => { const n = new Set(s); n.delete(ip); return n; }); }
   }
 
   async function bloquerTelephone(tel) {
