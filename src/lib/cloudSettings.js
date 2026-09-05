@@ -76,6 +76,11 @@ export async function cloudSet(key, value) {
     // supprime les anciennes lignes SEULEMENT si l'insertion a réussi.
     // (Avant : delete puis insert — si l'insert échouait, la donnée était perdue
     //  définitivement côté cloud. C'est ce qui pouvait effacer factures/produits.)
+    // `row` peut encore porter le user_id du bloc précédent (upsert échoué) : sans
+    // ce nettoyage, cette ligne de repli s'insère comme UN DOUBLON scopé à
+    // l'utilisateur au lieu d'une vraie ligne NULL, et cloudGet() casse ensuite
+    // (.maybeSingle() sur plus d'une ligne) sans que rien ne le nettoie jamais.
+    delete row.user_id;
     const { error: e2 } = await supabase.from('settings').insert(row);
     if (e2) throw e2;
     // Nettoyage des doublons antérieurs (jamais avant l'insertion).

@@ -108,7 +108,11 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
   // Un livreur choisi = une commande sur le point de partir : c'est le
   // dernier moment sûr pour forcer la vraie quantité de chaque produit,
   // avant qu'elle ne serve (fausse) au calcul du profit.
-  const qtyManquante = !!form.livreur && form.products.some(p => p.name && !(Number(p.qty) > 0));
+  // Vérifiée dès qu'un produit est choisi, pas seulement quand un livreur est
+  // affecté — une commande "À Confirmer" sans livreur peut tout aussi bien
+  // se sauvegarder avec une quantité vide, et rien ne la revalide ensuite :
+  // le coût dans Profit serait alors calculé comme 0 pour cette ligne.
+  const qtyManquante = form.products.some(p => p.name && !(Number(p.qty) > 0));
   // Somme visible en direct : 1 produit à 1 + un 2ᵉ à 1 → 2, pas besoin de
   // les additionner soi-même pour savoir ce que le Rapport de Profit verra.
   const qteTotale = form.products.reduce((s, p) => s + (Number(p.qty) || 0), 0);
@@ -218,7 +222,7 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
                     <input type="number" min={1} value={prod.qty} placeholder="Qté"
                       onChange={(e) => updateProduct(idx, 'qty', e.target.value === '' ? '' : Number(e.target.value))}
                       className={`border rounded-lg px-2 py-2 text-sm text-center text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-14 shrink-0 ${
-                        form.livreur && prod.name && !(Number(prod.qty) > 0) ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                        prod.name && !(Number(prod.qty) > 0) ? 'border-red-400 bg-red-50' : 'border-gray-200'
                       }`} />
                     <button onClick={() => removeProduct(idx)} aria-label="Supprimer"
                       className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 shrink-0 transition"><Trash2 size={13} /></button>

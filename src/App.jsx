@@ -58,7 +58,13 @@ import { now, fmtDate } from './lib/dateUtils';
 /** Parse une date applicative « JJ/MM/AAAA HH:mm(:ss) » -> timestamp (0 si invalide). */
 function parseAppDate(str) {
   const m = String(str || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : 0;
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime();
+  // Une valeur qui n'est pas au format "JJ/MM/AAAA" (ex. un created_at ISO
+  // venu d'ailleurs) ne veut pas dire "pas de date" : renvoyer 0 la faisait
+  // trier comme la plus ancienne, et — pire — désarmait le garde-fou
+  // anti-obsolescence de la file de synchro (0 n'est jamais "plus récent").
+  const iso = Date.parse(str);
+  return Number.isNaN(iso) ? 0 : iso;
 }
 
 function assignVictTracking(freshOrders, allOrders) {

@@ -80,7 +80,11 @@ export function mapperProduitWoo(wp, variations, collectionId) {
       details: nettoyerHtml(wp.description),
       price: prix,
       compare_at: compareAt > prix ? compareAt : null,
-      status: wp.status === 'publish' ? 'Actif' : 'Inactif',
+      // 'Inactif' n'existe pas dans les statuts que le reste de l'appli
+      // connaît (Actif/Archivé/Brouillon, voir ProduitForm.jsx) — un import
+      // qui tombait sur un produit non publié se retrouvait avec un statut
+      // que le filtre de /store/produits ne sait pas reconnaître.
+      status: wp.status === 'publish' ? 'Actif' : 'Brouillon',
       collection_id: collectionId,
     },
     images: (wp.images || []).map(img => ({ url: img.src, alt: img.alt || '' })),

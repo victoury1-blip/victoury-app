@@ -96,6 +96,18 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
     setPromo(p);
   }
 
+  // Un code appliqué avec un panier à 300 DH reste valable côté état même si
+  // le client retire ensuite un article et retombe sous le minimum requis —
+  // rien ne le revérifiait, et la remise restait affichée/appliquée à tort.
+  const apresQuantite = t.sousTotal - t.remiseQuantite;
+  useEffect(() => {
+    if (!promo) return;
+    verifierPromo(code, apresQuantite).then(p => {
+      if (!p) { setPromo(null); setCodeErreur('Code désormais invalide pour ce panier'); }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apresQuantite]);
+
   async function valider() {
     setErreur('');
     const m = champsManquants(form, lignes);
