@@ -156,12 +156,14 @@ export default function CommandesListe() {
                     {r.geoVille ? <>{r.geoVille}{r.geoPays ? `, ${r.geoPays}` : ''} <span className="text-gray-400">(approx.)</span></> : '—'}
                     {r.ip && (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-gray-300 font-mono">{r.ip}</span>
+                        <span className="text-[10px] text-gray-400 font-mono">{r.ip}</span>
                         {ipsBloquees.has(r.ip) ? (
-                          <span className="text-[10px] text-red-500">Bloquée</span>
+                          <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Bloquée</span>
                         ) : (
                           <button onClick={() => bloquerIp(r.ip)} title="Bloquer cette IP"
-                            className="text-gray-300 hover:text-red-500"><Ban size={12} /></button>
+                            className="flex items-center gap-1 text-[10px] font-medium text-red-500 border border-red-200 px-1.5 py-0.5 rounded hover:bg-red-50 shrink-0">
+                            <Ban size={11} /> Bloquer
+                          </button>
                         )}
                       </div>
                     )}
