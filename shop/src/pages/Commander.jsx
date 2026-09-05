@@ -109,6 +109,13 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
   }
 
   const enErreur = (k) => manque.includes(k) ? 'border-red-400' : '';
+  // La mise en page reste toujours LTR (voir i18n.jsx), mais un champ de
+  // saisie n'est pas une grille d'icônes : un label et un texte arabes qui
+  // démarrent collés à gauche se lisent à l'envers pour qui lit de droite à
+  // gauche. L'alignement du texte suit la langue, indépendamment du sens de
+  // la mise en page.
+  const alignTexte = lang === 'ar' ? 'text-right' : 'text-left';
+  const dirTexte = lang === 'ar' ? 'rtl' : 'ltr';
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
@@ -120,26 +127,26 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
         <div className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('nomComplet')} <span className="text-red-500">*</span></label>
-              <input value={form.nom} onChange={e => u('nom', e.target.value)} className={`${champ} ${enErreur('nom')}`} />
+              <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('nomComplet')} <span className="text-red-500">*</span></label>
+              <input value={form.nom} onChange={e => u('nom', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('nom')}`} />
             </div>
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('telephone')} <span className="text-red-500">*</span></label>
+              <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('telephone')} <span className="text-red-500">*</span></label>
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)} onBlur={noterPanierAbandonne}
-                inputMode="tel" placeholder="06 12 34 56 78" className={`${champ} ${enErreur('telephone')}`} />
+                inputMode="tel" placeholder="06 12 34 56 78" dir="ltr" className={`${champ} text-left ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
-                <p className="mt-1 text-[11px] text-red-500">{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
+                <p className={`mt-1 text-[11px] text-red-500 ${alignTexte}`}>{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
               )}
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('ville')} <span className="text-red-500">*</span></label>
-              <input value={form.ville} onChange={e => u('ville', e.target.value)} className={`${champ} ${enErreur('ville')}`} />
+              <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('ville')} <span className="text-red-500">*</span></label>
+              <input value={form.ville} onChange={e => u('ville', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('ville')}`} />
             </div>
             <div>
-              <label className="block text-sm text-ink font-medium mb-1.5">{tr('adresse')} <span className="text-red-500">*</span></label>
-              <input value={form.adresse} onChange={e => u('adresse', e.target.value)} className={`${champ} ${enErreur('adresse')}`} />
+              <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('adresse')} <span className="text-red-500">*</span></label>
+              <input value={form.adresse} onChange={e => u('adresse', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('adresse')}`} />
             </div>
           </div>
 
