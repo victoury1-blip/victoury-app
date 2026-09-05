@@ -41,6 +41,14 @@ export default function AdminLayout() {
   const sonRef = useRef('');
   useEffect(() => { chargerReglages().then(r => { sonRef.current = r.sonCommandeUrl || ''; }).catch(() => {}); }, []);
 
+  // Un chiffre dans le menu, comme "Commandes" ailleurs — sans lui, un
+  // panier laissé de côté ne se voit qu'en ouvrant la page par hasard.
+  const [nbPaniers, setNbPaniers] = useState(0);
+  useEffect(() => {
+    supabase.from('shop_paniers_abandonnes').select('id', { count: 'exact', head: true })
+      .then(({ count }) => setNbPaniers(count || 0)).catch(() => {});
+  }, []);
+
   // Le panneau de navigation était entièrement masqué sous sm (hidden sm:flex)
   // sans aucun moyen de l'ouvrir — sur téléphone, l'administration n'avait
   // tout simplement pas de menu. Un tiroir coulissant, comme sur la boutique.
@@ -107,6 +115,11 @@ export default function AdminLayout() {
                 ? 'text-white font-medium bg-white/10 border-l-white'
                 : 'text-gray-300 border-l-transparent hover:bg-white/5 hover:text-white'}`}>
             <Icon size={16} /> {label}
+            {to === '/store/paniers-abandonnes' && nbPaniers > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center">
+                {nbPaniers}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
