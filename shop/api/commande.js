@@ -7,7 +7,7 @@
 // validation (champs obligatoires, mise en forme) est le même code que
 // l'ancien chemin direct, partagé avec les tests.
 
-import { champsManquants, construireCommande } from '../src/lib/commande.js';
+import { champsManquants, construireCommande, normaliserTelephone } from '../src/lib/commande.js';
 
 const SOURCES_CONNUES = new Set(['Instagram', 'Facebook', 'TikTok', 'Google', 'WhatsApp', 'Direct']);
 
@@ -104,6 +104,15 @@ export default async function handler(req, res) {
     }).then(r => r.ok ? r.json() : false).catch(() => false);
     if (estBloquee) return res.status(200).json({ ok: true, id: 'VS-000000-000000' });
   }
+
+  // Complément de l'IP : un visiteur qui rebloque son numéro depuis un autre
+  // wifi/4G (donc une autre IP) reste bloqué via son téléphone.
+  const telBloque = await fetch(`${url}/rest/v1/rpc/shop_telephone_est_bloque`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ p_tel: normaliserTelephone(form.telephone) }),
+  }).then(r => r.ok ? r.json() : false).catch(() => false);
+  if (telBloque) return res.status(200).json({ ok: true, id: 'VS-000000-000000' });
 
   const [geo] = await Promise.all([localiser(ip)]);
   const commande = construireCommande(form, lignes, Number(total) || 0, new Date(), undefined, {

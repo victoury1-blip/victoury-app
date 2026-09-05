@@ -432,3 +432,32 @@ as $$
   select ip from shop_ip_bloquees;
 $$;
 grant execute on function shop_ips_bloquees_liste() to anon, authenticated;
+
+-- ============================================================
+--  TÉLÉPHONES BLOQUÉS
+--
+--  Complément du blocage par IP : un visiteur retapant sans cesse le même
+--  numéro (mais changeant de wifi/4G, donc d'IP) reste bloqué quand même.
+--  Même téléphone normalisé que orders.recipient.phone ("0XXXXXXXXX").
+-- ============================================================
+create table if not exists shop_telephones_bloquees (
+  telephone  text primary key,
+  raison     text,
+  created_at timestamptz not null default now()
+);
+alter table shop_telephones_bloquees enable row level security;
+create policy "lecture admin boutique" on shop_telephones_bloquees
+  for select to authenticated using (is_shop_admin());
+create policy "ecriture admin boutique" on shop_telephones_bloquees
+  for all to authenticated using (is_shop_admin()) with check (is_shop_admin());
+
+create or replace function shop_telephone_est_bloque(p_tel text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from shop_telephones_bloquees where telephone = p_tel);
+$$;
+grant execute on function shop_telephone_est_bloque(text) to anon, authenticated;

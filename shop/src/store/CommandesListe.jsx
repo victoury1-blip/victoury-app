@@ -33,10 +33,14 @@ export default function CommandesListe() {
   const [q, setQ] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
   const [ipsBloquees, setIpsBloquees] = useState(new Set());
+  const [telsBloques, setTelsBloques] = useState(new Set());
 
   useEffect(() => {
     supabase.from('shop_ip_bloquees').select('ip').then(({ data }) => {
       setIpsBloquees(new Set((data || []).map(r => r.ip)));
+    }).catch(() => {});
+    supabase.from('shop_telephones_bloquees').select('telephone').then(({ data }) => {
+      setTelsBloques(new Set((data || []).map(r => r.telephone)));
     }).catch(() => {});
   }, []);
 
@@ -45,6 +49,13 @@ export default function CommandesListe() {
     if (!window.confirm(`Bloquer l'IP ${ip} ? Ses prochaines commandes seront ignorées en silence.`)) return;
     setIpsBloquees(s => new Set(s).add(ip));
     await supabase.from('shop_ip_bloquees').insert({ ip }).catch(() => {});
+  }
+
+  async function bloquerTelephone(tel) {
+    if (!tel || telsBloques.has(tel)) return;
+    if (!window.confirm(`Bloquer le téléphone ${tel} ? Ses prochaines commandes seront ignorées en silence.`)) return;
+    setTelsBloques(s => new Set(s).add(tel));
+    await supabase.from('shop_telephones_bloquees').insert({ telephone: tel }).catch(() => {});
   }
 
   // Une commande supprimée dans l'application (soft-delete : is_deleted)
@@ -135,7 +146,19 @@ export default function CommandesListe() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-800">{r.name}</p>
-                    <p className="text-xs text-gray-400">{r.city} · {r.phone}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs text-gray-400">{r.city} · {r.phone}</p>
+                      {r.phone && (
+                        telsBloques.has(r.phone) ? (
+                          <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Bloqué</span>
+                        ) : (
+                          <button onClick={() => bloquerTelephone(r.phone)} title="Bloquer ce téléphone"
+                            className="flex items-center gap-1 text-[10px] font-medium text-red-500 border border-red-200 px-1.5 py-0.5 rounded hover:bg-red-50 shrink-0">
+                            <Ban size={11} /> Bloquer
+                          </button>
+                        )
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {produits.map((p, i) => (
