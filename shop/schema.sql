@@ -416,3 +416,19 @@ as $$
   select exists (select 1 from shop_ip_bloquees where ip = p_ip);
 $$;
 grant execute on function shop_ip_est_bloquee(text) to anon, authenticated;
+
+-- Le middleware (shop/middleware.js) bloque l'accès au SITE ENTIER pour une
+-- IP bannie, pas seulement l'envoi de commande — il a donc besoin de la
+-- liste complète pour la garder en cache et éviter un aller-retour Supabase
+-- à chaque page vue par chaque visiteur. Le contenu (des adresses IP, rien
+-- de plus sensible) n'a pas besoin d'être cadenassé comme les codes promo.
+create or replace function shop_ips_bloquees_liste()
+returns table (ip text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select ip from shop_ip_bloquees;
+$$;
+grant execute on function shop_ips_bloquees_liste() to anon, authenticated;
