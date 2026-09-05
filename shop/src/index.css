@@ -9,13 +9,14 @@
   --ink: #111111;
 }
 
-/* Bandeau d'annonce : défilement continu droite → gauche, jamais un saut —
+/* Bandeau d'annonce : défilement continu gauche → droite, jamais un saut —
    la piste contient le message deux fois de suite, et on la fait glisser
-   d'exactement une moitié ; la seconde moitié prend alors la place de la
-   première à l'identique, donc la boucle ne se voit pas. */
+   d'exactement une moitié en partant déjà décalée ; la seconde moitié prend
+   alors la place de la première à l'identique, donc la boucle ne se voit
+   pas. */
 @keyframes annonce-defile {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
 }
 
 @layer base {
