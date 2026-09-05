@@ -197,6 +197,7 @@ export const THEME_DEFAUT = {
     'استغلوا الفرصة! تخفيض حصري بنسبة 20% على القطعة الثانية',
   ],
   tailleAnnonce: 11,
+  epaisseurAnnonce: 'normal',
   couleurAnnonceFond: '#111111',
   couleurAnnonceTexte: '#ffffff',
 

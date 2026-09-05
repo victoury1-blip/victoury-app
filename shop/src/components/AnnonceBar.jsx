@@ -25,7 +25,10 @@ export default function AnnonceBar({ theme }) {
   return (
     <div
       className="text-center py-2 px-4 tracking-wide transition-colors"
-      style={{ background: theme.couleurAnnonceFond || '#111111', color: theme.couleurAnnonceTexte || '#ffffff', fontSize: `${theme.tailleAnnonce || 11}px` }}
+      style={{
+        background: theme.couleurAnnonceFond || '#111111', color: theme.couleurAnnonceTexte || '#ffffff',
+        fontSize: `${theme.tailleAnnonce || 11}px`, fontWeight: theme.epaisseurAnnonce || 'normal',
+      }}
     >
       {morceaux.map((m, j) => (m.gras ? <b key={j}>{m.texte}</b> : <span key={j}>{m.texte}</span>))}
     </div>

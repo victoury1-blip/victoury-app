@@ -142,6 +142,7 @@ export default function EditTheme() {
       annonces: t.annonces.filter(a => a.trim()),
       annoncesAr: t.annoncesAr.filter(a => a.trim()),
       tailleAnnonce: Number(t.tailleAnnonce) || 11,
+      epaisseurAnnonce: t.epaisseurAnnonce || 'normal',
       texteSousHero: { ...t.texteSousHero, taille: Number(t.texteSousHero.taille) || 14 },
       footer: {
         ...t.footer,
@@ -191,7 +192,7 @@ export default function EditTheme() {
             </div>
             {t.annonceActive && t.annonces.filter(Boolean).length > 0 && (
               <div className="text-center py-2 px-4 text-[11px] tracking-wide"
-                style={{ background: t.couleurAnnonceFond, color: t.couleurAnnonceTexte, fontSize: `${t.tailleAnnonce}px` }}>
+                style={{ background: t.couleurAnnonceFond, color: t.couleurAnnonceTexte, fontSize: `${t.tailleAnnonce}px`, fontWeight: t.epaisseurAnnonce || 'normal' }}>
                 {decouperGras(t.annonces.find(Boolean)).map((m, j) => (m.gras ? <b key={j}>{m.texte}</b> : <span key={j}>{m.texte}</span>))}
               </div>
             )}
@@ -284,6 +285,17 @@ export default function EditTheme() {
               </label>
               <input type="range" min={9} max={18} value={t.tailleAnnonce} onChange={e => u('tailleAnnonce', e.target.value)} className="w-full" />
               <div className="flex justify-between text-[10px] text-gray-300"><span>9px</span><span>18px</span></div>
+            </div>
+
+            <div className="mt-5">
+              <label className={label}>Épaisseur du texte</label>
+              <select value={t.epaisseurAnnonce || 'normal'} onChange={e => u('epaisseurAnnonce', e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="normal">Normal</option>
+                <option value="500">Moyen</option>
+                <option value="600">Semi-gras</option>
+                <option value="700">Gras</option>
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-5">
