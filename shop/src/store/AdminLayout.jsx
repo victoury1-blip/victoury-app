@@ -6,6 +6,7 @@ import { jouerSonCommande } from '../lib/sonCommande';
 import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifCommande';
 import { activerPushCommande, pushDisponible } from '../lib/pushNotif';
 import { chargerReglages } from '../lib/catalog';
+import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
 import Wordmark from '../components/Wordmark';
 
 const LIENS = [
@@ -42,11 +43,13 @@ export default function AdminLayout() {
   useEffect(() => { chargerReglages().then(r => { sonRef.current = r.sonCommandeUrl || ''; }).catch(() => {}); }, []);
 
   // Un chiffre dans le menu, comme "Commandes" ailleurs — sans lui, un
-  // panier laissé de côté ne se voit qu'en ouvrant la page par hasard.
+  // panier laissé de côté ne se voit qu'en ouvrant la page par hasard. Le
+  // même calcul que la page elle-même (déjà-convertis exclus) : un compte
+  // brut de la table affichait par exemple "5" quand la page, une fois les
+  // clients déjà revenus commander tout seuls exclus, n'en montrait aucun.
   const [nbPaniers, setNbPaniers] = useState(0);
   useEffect(() => {
-    supabase.from('shop_paniers_abandonnes').select('id', { count: 'exact', head: true })
-      .then(({ count }) => setNbPaniers(count || 0)).catch(() => {});
+    chargerPaniersActifs().then(l => setNbPaniers(l.length)).catch(() => {});
   }, []);
 
   // Le panneau de navigation était entièrement masqué sous sm (hidden sm:flex)

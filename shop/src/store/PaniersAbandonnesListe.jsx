@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MessageCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
+import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
 
 /* Un client qui a tapé son téléphone à la caisse (Commander.jsx, onBlur) mais
    n'a jamais validé — capturé côté client dans shop_paniers_abandonnes, à
@@ -9,15 +10,8 @@ import { fmtPrix } from '../lib/pricing';
    payante) : on ouvre juste le chat avec un message prêt, l'admin l'envoie
    lui-même d'un clic. */
 
-const chiffres = (s) => (s || '').replace(/\D/g, '');
-// Les 9 derniers chiffres seulement : les commandes stockent le téléphone
-// normalisé ("0612345678"), le panier abandonné garde ce que le client a
-// tapé tel quel ("+212612345678", avec espaces…) — une comparaison brute des
-// chiffres ne matchait jamais, laissant des clients déjà convertis dans la
-// liste de relance.
-const cleTel = (s) => chiffres(s).slice(-9);
-
 function numeroWhatsApp(tel) {
+  const chiffres = (s) => (s || '').replace(/\D/g, '');
   let d = chiffres(tel);
   if (d.startsWith('212')) return d;
   if (d.startsWith('0')) return '212' + d.slice(1);
@@ -32,37 +26,16 @@ function messageRelance(p) {
 }
 
 export default function PaniersAbandonnesListe() {
-  const [paniers, setPaniers] = useState(null);
-  const [telsConvertis, setTelsConvertis] = useState(new Set());
+  const [visibles, setVisibles] = useState(null);
 
-  useEffect(() => {
-    supabase.from('shop_paniers_abandonnes').select('*').order('created_at', { ascending: false }).limit(200)
-      .then(({ data }) => setPaniers(data || []));
-    // Une commande VS-… du même téléphone = le client est déjà revenu tout
-    // seul — inutile (et un peu gênant) de le relancer pour un panier qu'il
-    // a déjà payé. Pas de filtre sur `date_added` : la colonne est un texte
-    // "JJ/MM/AAAA HH:MM:SS", pas une vraie date — la comparer à un ISO ne
-    // filtrait jamais rien correctement (comparaison de texte, pas de date).
-    supabase.from('orders').select('recipient').like('id', 'VS-%').then(({ data }) => {
-      setTelsConvertis(new Set((data || []).map(o => cleTel(o.recipient?.phone)).filter(Boolean)));
-    }).catch(() => {});
-  }, []);
+  useEffect(() => { chargerPaniersActifs().then(setVisibles).catch(() => setVisibles([])); }, []);
 
   async function supprimer(id) {
-    setPaniers(list => list.filter(p => p.id !== id));
+    setVisibles(list => list.filter(p => p.id !== id));
     await supabase.from('shop_paniers_abandonnes').delete().eq('id', id);
   }
 
-  if (!paniers) return <p className="text-sm text-gray-400">Chargement…</p>;
-
-  // Un seul panier par téléphone (le plus récent) : retaper son numéro deux
-  // fois en hésitant sur l'adresse ne doit pas créer deux relances.
-  const parTel = new Map();
-  for (const p of paniers) {
-    const cle = cleTel(p.telephone);
-    if (!parTel.has(cle)) parTel.set(cle, p);
-  }
-  const visibles = [...parTel.values()].filter(p => !telsConvertis.has(cleTel(p.telephone)));
+  if (!visibles) return <p className="text-sm text-gray-400">Chargement…</p>;
 
   return (
     <div>
