@@ -330,11 +330,12 @@ create table if not exists shop_admins (
   created_at timestamptz not null default now()
 );
 alter table shop_admins enable row level security;
--- Un administrateur peut voir la liste (utile pour /store/reglages plus
--- tard) ; personne ne peut s'y ajouter tout seul depuis le client.
-create policy "lecture par un admin" on shop_admins
-  for select to authenticated using (exists (select 1 from shop_admins a where a.user_id = auth.uid()));
 
+-- Fonction SECURITY DEFINER : elle contourne RLS en interne, donc une
+-- policy qui l'appelle ne se relit jamais elle-même. Doit être créée AVANT
+-- la policy de lecture ci-dessous qui s'en sert (une policy qui vérifiait
+-- shop_admins par une sous-requête directe sur shop_admins plantait
+-- silencieusement).
 create or replace function is_shop_admin()
 returns boolean
 language sql
@@ -345,6 +346,11 @@ as $$
   select exists (select 1 from shop_admins where user_id = auth.uid());
 $$;
 grant execute on function is_shop_admin() to authenticated;
+
+-- Un administrateur peut voir la liste (utile pour /store/reglages plus
+-- tard) ; personne ne peut s'y ajouter tout seul depuis le client.
+create policy "lecture par un admin" on shop_admins
+  for select to authenticated using (is_shop_admin());
 
 -- Remplace "to authenticated using (true)" par une vraie vérification de
 -- rôle sur toutes les tables du catalogue/réglages + les abonnements push.
