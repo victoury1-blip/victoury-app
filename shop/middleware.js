@@ -19,17 +19,32 @@ async function ipsBloquees() {
   const url = process.env.VITE_SUPABASE_URL;
   const key = process.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return cache.ips;
+  // Un Supabase lent ou muet ne doit JAMAIS faire attendre chaque visiteur du
+  // site — un fetch sans limite de temps a déjà suffi à rendre tout le site
+  // inaccessible (ERR_CONNECTION_TIMED_OUT) le jour où la réponse a traîné.
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 1500);
   try {
     const r = await fetch(`${url}/rest/v1/rpc/shop_ips_bloquees_liste`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
       body: '{}',
+      signal: ac.signal,
     });
     if (r.ok) {
       const lignes = await r.json();
       cache = { ips: new Set((lignes || []).map(l => l.ip)), expire: Date.now() + 60_000 };
     }
-  } catch { /* liste précédente conservée plutôt qu'un site cassé pour tout le monde */ }
+    // Une réponse non-ok (erreur, quota, panne) ne doit jamais bloquer le
+    // site pour tout le monde : on retente juste plus tôt (pas de cache
+    // longue durée sur un échec) plutôt que de figer la liste précédente
+    // pour 60s de plus si Supabase reste indisponible.
+    else cache = { ...cache, expire: Date.now() + 5_000 };
+  } catch {
+    cache = { ...cache, expire: Date.now() + 5_000 };
+  } finally {
+    clearTimeout(to);
+  }
   return cache.ips;
 }
 
