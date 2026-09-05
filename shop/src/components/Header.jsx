@@ -46,17 +46,22 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
 
   // Bouton FR/AR : bascule manuelle uniquement, pas de détection automatique
   // du téléphone du client — juste le choix qu'il retient d'une visite à l'autre.
-  // Le drapeau seul ressemblait à un simple décor — un client ne devinait
-  // pas qu'il pouvait cliquer dessus pour changer de langue. Le court texte
-  // à côté (la langue vers laquelle on bascule) rend l'action visible d'un
-  // coup d'œil, sans avoir à survoler pour lire le title.
+  // Un seul drapeau (celui de la langue absente) laissait deviner qu'il se
+  // passe quelque chose au clic, sans dire clairement "il y a un choix de
+  // langue ici". Les deux drapeaux côte à côte, celui de la langue active
+  // visiblement enfoncé/coloré, se lisent comme un vrai sélecteur — pas un
+  // bouton mystère.
   const BoutonLangue = (
-    <button onClick={() => setLang(lang === 'fr' ? 'ar' : 'fr')}
-      className="flex items-center gap-1 px-2 py-1 text-sm leading-none hover:opacity-75 border border-gray-200 rounded"
-      aria-label="Changer de langue / تبديل اللغة" title={lang === 'fr' ? 'العربية' : 'Français'}>
-      <span className="text-base">{lang === 'fr' ? '🇲🇦' : '🇫🇷'}</span>
-      <span className="text-[11px] font-medium">{lang === 'fr' ? 'AR' : 'FR'}</span>
-    </button>
+    <div className="flex items-center gap-0.5 border border-gray-200 rounded overflow-hidden">
+      <button onClick={() => setLang('fr')} aria-label="Français" title="Français"
+        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'fr' ? 'bg-gray-100' : 'opacity-40 hover:opacity-75'}`}>
+        🇫🇷
+      </button>
+      <button onClick={() => setLang('ar')} aria-label="العربية" title="العربية"
+        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'ar' ? 'bg-gray-100' : 'opacity-40 hover:opacity-75'}`}>
+        🇲🇦
+      </button>
+    </div>
   );
 
   const Icones = (
