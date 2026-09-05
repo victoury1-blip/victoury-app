@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Ban } from 'lucide-react';
+import { ExternalLink, Ban, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
 
@@ -80,6 +80,23 @@ export default function CommandesListe() {
     if (!window.confirm(`Bloquer l'IP${ip ? ` ${ip}` : ''} ET le téléphone${tel ? ` ${tel}` : ''} ? Ses prochaines commandes seront ignorées en silence.`)) return;
     if (ip && !ipsBloquees.has(ip)) await bloquerIpSansConfirmation(ip);
     if (tel && !telsBloques.has(tel)) await bloquerTelephoneSansConfirmation(tel);
+  }
+
+  // Débloquer : un blocage posé par erreur (mauvaise IP, faux numéro
+  // retapé par un vrai client) doit pouvoir se défaire sans repasser par
+  // le SQL Editor.
+  async function debloquerIp(ip) {
+    if (!window.confirm(`Débloquer l'IP ${ip} ?`)) return;
+    setIpsBloquees(s => { const n = new Set(s); n.delete(ip); return n; });
+    const { error } = await supabase.from('shop_ip_bloquees').delete().eq('ip', ip);
+    if (error) { alert(`Échec du déblocage IP : ${error.message}`); setIpsBloquees(s => new Set(s).add(ip)); }
+  }
+
+  async function debloquerTelephone(tel) {
+    if (!window.confirm(`Débloquer le téléphone ${tel} ?`)) return;
+    setTelsBloques(s => { const n = new Set(s); n.delete(tel); return n; });
+    const { error } = await supabase.from('shop_telephones_bloquees').delete().eq('telephone', tel);
+    if (error) { alert(`Échec du déblocage téléphone : ${error.message}`); setTelsBloques(s => new Set(s).add(tel)); }
   }
 
   // Une commande supprimée dans l'application (soft-delete : is_deleted)
@@ -174,7 +191,12 @@ export default function CommandesListe() {
                       <p className="text-xs text-gray-400">{r.city} · {r.phone}</p>
                       {r.phone && (
                         telsBloques.has(r.phone) ? (
-                          <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Bloqué</span>
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                            Bloqué
+                            <button onClick={() => debloquerTelephone(r.phone)} title="Débloquer ce téléphone" className="hover:text-red-900">
+                              <X size={11} />
+                            </button>
+                          </span>
                         ) : (
                           <button onClick={() => bloquerTelephone(r.phone)} title="Bloquer ce téléphone"
                             className="flex items-center gap-1 text-[10px] font-medium text-red-500 border border-red-200 px-1.5 py-0.5 rounded hover:bg-red-50 shrink-0">
@@ -205,7 +227,12 @@ export default function CommandesListe() {
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-gray-400 font-mono">{r.ip}</span>
                         {ipsBloquees.has(r.ip) ? (
-                          <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Bloquée</span>
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                            Bloquée
+                            <button onClick={() => debloquerIp(r.ip)} title="Débloquer cette IP" className="hover:text-red-900">
+                              <X size={11} />
+                            </button>
+                          </span>
                         ) : (
                           <button onClick={() => bloquerIp(r.ip)} title="Bloquer cette IP"
                             className="flex items-center gap-1 text-[10px] font-medium text-red-500 border border-red-200 px-1.5 py-0.5 rounded hover:bg-red-50 shrink-0">
