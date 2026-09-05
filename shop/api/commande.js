@@ -92,17 +92,19 @@ export default async function handler(req, res) {
 
   const ip = clientIp(req);
 
-  // Bloquée depuis /store/commandes : on répond comme si tout s'était bien
-  // passé — dire "vous êtes bloqué" ne ferait que pousser à changer de
-  // wifi/4G et recommencer aussitôt. Une IP absente (rare, mais possible
-  // derrière certains proxys) ne doit jamais bloquer une vraie commande.
+  // Bloquée depuis /store/commandes : un message d'erreur plausible ("site
+  // indisponible"), jamais "vous êtes bloqué" — sinon le visiteur comprend
+  // qu'il est banni et change de wifi/4G pour recommencer aussitôt. Une IP
+  // absente (rare, mais possible derrière certains proxys) ne doit jamais
+  // bloquer une vraie commande.
+  const MESSAGE_PANNE = 'Ce service est temporairement indisponible. Merci de réessayer plus tard.';
   if (ip) {
     const estBloquee = await fetch(`${url}/rest/v1/rpc/shop_ip_est_bloquee`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
       body: JSON.stringify({ p_ip: ip }),
     }).then(r => r.ok ? r.json() : false).catch(() => false);
-    if (estBloquee) return res.status(200).json({ ok: true, id: 'VS-000000-000000' });
+    if (estBloquee) return res.status(200).json({ ok: false, error: MESSAGE_PANNE });
   }
 
   // Complément de l'IP : un visiteur qui rebloque son numéro depuis un autre
@@ -112,7 +114,7 @@ export default async function handler(req, res) {
     headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
     body: JSON.stringify({ p_tel: normaliserTelephone(form.telephone) }),
   }).then(r => r.ok ? r.json() : false).catch(() => false);
-  if (telBloque) return res.status(200).json({ ok: true, id: 'VS-000000-000000' });
+  if (telBloque) return res.status(200).json({ ok: false, error: MESSAGE_PANNE });
 
   const [geo] = await Promise.all([localiser(ip)]);
   const commande = construireCommande(form, lignes, Number(total) || 0, new Date(), undefined, {
