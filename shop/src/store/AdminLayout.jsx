@@ -7,6 +7,7 @@ import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifC
 import { activerPushCommande, pushDisponible } from '../lib/pushNotif';
 import { chargerReglages } from '../lib/catalog';
 import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
+import { compterCommandesEnAttente } from '../lib/commandesSite';
 import Wordmark from '../components/Wordmark';
 
 const LIENS = [
@@ -50,6 +51,14 @@ export default function AdminLayout() {
   const [nbPaniers, setNbPaniers] = useState(0);
   useEffect(() => {
     chargerPaniersActifs().then(l => setNbPaniers(l.length)).catch(() => {});
+  }, []);
+
+  // Même principe pour "Commandes" : le nombre de commandes du site encore
+  // "En attente", pas le total brut — sinon une commande déjà livrée ou
+  // annulée depuis longtemps continuerait à gonfler le badge pour toujours.
+  const [nbCommandes, setNbCommandes] = useState(0);
+  useEffect(() => {
+    compterCommandesEnAttente().then(setNbCommandes).catch(() => {});
   }, []);
 
   // Le panneau de navigation était entièrement masqué sous sm (hidden sm:flex)
@@ -121,6 +130,11 @@ export default function AdminLayout() {
             {to === '/store/paniers-abandonnes' && nbPaniers > 0 && (
               <span className="ml-auto bg-red-500 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center">
                 {nbPaniers}
+              </span>
+            )}
+            {to === '/store/commandes' && nbCommandes > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center">
+                {nbCommandes}
               </span>
             )}
           </NavLink>
