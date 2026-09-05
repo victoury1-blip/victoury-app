@@ -61,6 +61,20 @@ function Vitrine() {
     chargerReglages().then(setReglages).catch(() => {});
   }, []);
 
+  // Toutes les photos (produits, hero) viennent du même serveur Supabase :
+  // ouvrir la connexion HTTPS avant même que le premier <img> soit connu du
+  // navigateur fait gagner l'aller-retour DNS+TLS sur la toute première
+  // image affichée.
+  useEffect(() => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    if (!url) return;
+    const lien = document.createElement('link');
+    lien.rel = 'preconnect';
+    lien.href = url;
+    lien.crossOrigin = '';
+    document.head.appendChild(lien);
+  }, []);
+
   // Le pixel se charge une fois, dès que son réglage arrive — jamais avant,
   // pour ne jamais l'activer avec un identifiant vide ou périmé.
   useEffect(() => {

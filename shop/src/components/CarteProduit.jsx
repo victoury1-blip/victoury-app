@@ -21,7 +21,7 @@ export default function CarteProduit({ produit, remises, categorie }) {
     <Link to={`/product/${produit.slug}/`} className="group block">
       <div className="relative bg-sand aspect-[4/5] overflow-hidden rounded-xl">
         {image ? (
-          <img src={image} alt={produit.images[0].alt || produit.name} loading="lazy"
+          <img src={image} alt={produit.images[0].alt || produit.name} loading="lazy" decoding="async"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>

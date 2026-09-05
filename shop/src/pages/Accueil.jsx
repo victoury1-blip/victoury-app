@@ -48,7 +48,11 @@ export default function Accueil({ collections, reglages }) {
             // saut ni de rechargement d'image au changement.
             <picture key={i} className={`absolute inset-0 transition-opacity duration-700 ${i === indice ? 'opacity-100' : 'opacity-0'}`}>
               {d.imageMobile && <source media="(max-width: 640px)" srcSet={d.imageMobile} />}
-              <img src={d.imageDesktop || d.imageMobile} alt="" className="w-full h-full object-cover" />
+              {/* Première photo vue par chaque visiteur : priorité haute et jamais
+                  différée (contrairement aux grilles de produits plus bas), pour
+                  qu'elle n'attende pas derrière des ressources moins importantes. */}
+              <img src={d.imageDesktop || d.imageMobile} alt="" fetchpriority={i === 0 ? 'high' : undefined}
+                loading={i === 0 ? 'eager' : 'lazy'} className="w-full h-full object-cover" />
             </picture>
           )) : (
             <div className="w-full h-full bg-gradient-to-br from-sand to-gray-200" />
