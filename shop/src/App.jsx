@@ -35,6 +35,17 @@ import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel, chargerClarity } from './lib/pixel';
 import { LangProvider } from './lib/i18n';
 
+/* React Router ne remet PAS le défilement en haut tout seul en changeant de
+   page — la fiche produit s'en charge elle-même (window.scrollTo dans son
+   propre effet), mais les autres pages arrivaient avec le défilement du
+   trajet précédent : la caisse pouvait s'ouvrir au milieu du formulaire,
+   sans le titre ni le premier champ visibles. */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 /* L'habillage de la vitrine — bandeau, en-tête, panier, pied de page — ne
    doit jamais apparaître sur l'administration : elle a sa propre mise en
    page, et un visiteur n'y passe jamais. La route décide seule laquelle
@@ -107,6 +118,7 @@ function Vitrine() {
   return (
     <LangProvider>
     <div className="min-h-screen flex flex-col">
+      <ScrollToTop />
       <AnnonceBar theme={reglages.theme} />
       <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
         logoPosition={reglages.theme?.logoPosition} onOuvrirPanier={() => setPanierOuvert(true)} />
