@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Upload, Trash2, Copy, Check } from 'lucide-react';
-import { listerMedias, supprimerMedia, televerserPhoto } from '../lib/admin';
+import { Upload, Trash2, Copy, Check, Sparkles } from 'lucide-react';
+import { listerMedias, supprimerMedia, televerserPhoto, recompresserMedia } from '../lib/admin';
 
 const formatTaille = (o) => o > 1024 * 1024 ? `${(o / 1024 / 1024).toFixed(1)} Mo` : `${Math.round(o / 1024)} Ko`;
+// Sous ce poids, une photo est déjà légère — proposer de la "convertir pour
+// le web" n'apporterait rien et encombrerait l'écran pour rien.
+const SEUIL_LOURD = 300 * 1024;
 
 /* Toutes les photos déjà déposées (logo, hero, produits…) au même endroit —
    avant cette page, retrouver l'URL d'une photo utilisée ailleurs voulait
@@ -13,6 +16,8 @@ export default function MediaListe() {
   const [recherche, setRecherche] = useState('');
   const [envoi, setEnvoi] = useState(false);
   const [copie, setCopie] = useState('');
+  const [conversion, setConversion] = useState('');
+  const [conversionTout, setConversionTout] = useState(false);
 
   const recharger = () => listerMedias().then(setMedias).catch(() => {}).finally(() => setChargement(false));
   useEffect(() => { recharger(); }, []);
@@ -33,6 +38,29 @@ export default function MediaListe() {
     try { await supprimerMedia(nom); } catch (e) { alert(e.message || 'Suppression impossible'); recharger(); }
   }
 
+  async function convertirEnWeb(nom) {
+    setConversion(nom);
+    try {
+      await recompresserMedia(nom);
+      // Le nom (donc l'URL) ne change pas, mais le poids si : recharger
+      // pour afficher le nouveau chiffre plutôt qu'un poids resté figé.
+      await recharger();
+    } catch (e) { alert(e.message || 'Conversion impossible'); }
+    finally { setConversion(''); }
+  }
+
+  async function convertirToutEnWeb() {
+    const lourds = medias.filter(m => m.taille > SEUIL_LOURD);
+    if (!lourds.length) return;
+    if (!confirm(`Convertir ${lourds.length} photo(s) lourde(s) pour le web ?`)) return;
+    setConversionTout(true);
+    for (const m of lourds) {
+      try { await recompresserMedia(m.nom); } catch { /* une photo en échec ne doit pas arrêter les autres */ }
+    }
+    await recharger();
+    setConversionTout(false);
+  }
+
   function copierLien(url, nom) {
     navigator.clipboard?.writeText(url).then(() => {
       setCopie(nom);
@@ -44,16 +72,24 @@ export default function MediaListe() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Médiathèque</h1>
           <p className="text-sm text-gray-500 mt-0.5">{medias.length} fichier{medias.length > 1 ? 's' : ''}</p>
         </div>
-        <label className="inline-flex items-center gap-2 bg-ink text-white text-sm px-4 py-2.5 rounded-lg cursor-pointer hover:opacity-90">
-          <Upload size={15} /> {envoi ? 'Envoi…' : 'Ajouter des fichiers'}
-          <input type="file" accept="image/*" multiple hidden disabled={envoi}
-            onChange={e => { surDepot(Array.from(e.target.files || [])); e.target.value = ''; }} />
-        </label>
+        <div className="flex items-center gap-2">
+          {medias.some(m => m.taille > SEUIL_LOURD) && (
+            <button type="button" onClick={convertirToutEnWeb} disabled={conversionTout}
+              className="inline-flex items-center gap-2 border border-gray-200 text-sm px-4 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-60">
+              <Sparkles size={15} /> {conversionTout ? 'Conversion…' : 'Convertir les photos lourdes pour le web'}
+            </button>
+          )}
+          <label className="inline-flex items-center gap-2 bg-ink text-white text-sm px-4 py-2.5 rounded-lg cursor-pointer hover:opacity-90">
+            <Upload size={15} /> {envoi ? 'Envoi…' : 'Ajouter des fichiers'}
+            <input type="file" accept="image/*" multiple hidden disabled={envoi}
+              onChange={e => { surDepot(Array.from(e.target.files || [])); e.target.value = ''; }} />
+          </label>
+        </div>
       </div>
 
       <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Rechercher…"
@@ -88,6 +124,12 @@ export default function MediaListe() {
                 <p className="text-[10px] text-gray-400">{formatTaille(m.taille)}</p>
               </div>
               <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {m.taille > SEUIL_LOURD && (
+                  <button type="button" onClick={() => convertirEnWeb(m.nom)} disabled={conversion === m.nom} title="Convertir pour le web"
+                    className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink disabled:opacity-60">
+                    <Sparkles size={13} />
+                  </button>
+                )}
                 <button type="button" onClick={() => copierLien(m.url, m.nom)} title="Copier le lien"
                   className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink">
                   {copie === m.nom ? <Check size={13} /> : <Copy size={13} />}

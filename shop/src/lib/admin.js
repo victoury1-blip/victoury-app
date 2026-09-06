@@ -159,6 +159,23 @@ export async function televerserPhoto(fichierBrut) {
   return supabase.storage.from('boutique').getPublicUrl(nom).data.publicUrl;
 }
 
+// Photos déjà déposées AVANT la compression automatique — recompressées à
+// la demande depuis la médiathèque, sur place (même nom de fichier, donc
+// même URL publique) pour que rien de ce qui la référence déjà (fiche
+// produit, thème…) n'ait besoin d'être mis à jour.
+export async function recompresserMedia(nom) {
+  const { data: blob, error: e1 } = await supabase.storage.from('boutique').download(nom);
+  if (e1) throw new Error(e1.message);
+  const fichierOriginal = new File([blob], nom, { type: blob.type });
+  const compresse = await compresserImage(fichierOriginal);
+  if (compresse === fichierOriginal) return false; // déjà optimale, rien à réenvoyer
+  const { error: e2 } = await supabase.storage.from('boutique').upload(nom, compresse, {
+    cacheControl: '31536000', upsert: true, contentType: 'image/jpeg',
+  });
+  if (e2) throw new Error(e2.message);
+  return true;
+}
+
 /* ── Médiathèque : toutes les photos déjà déposées (logo, favicon, hero,
    produits…) au même endroit, pour les réutiliser sans re-uploader. Le bucket
    'boutique' est plat (pas de dossiers) — on liste tout ce qu'il contient. */
