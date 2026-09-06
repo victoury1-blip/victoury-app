@@ -115,7 +115,40 @@ export async function remplacerImages(produitId, images) {
 }
 
 /* ── Photos ── */
-export async function televerserPhoto(fichier) {
+
+// Une photo prise directement au téléphone pèse souvent plusieurs Mo — bien
+// au-delà de ce qu'un écran peut jamais afficher (une carte produit ne
+// montre jamais plus de quelques centaines de pixels de large). Redimensionnée
+// et recompressée ICI, à l'unique endroit par où passe tout dépôt de photo
+// (fiche produit, médiathèque, thème), l'admin n'a jamais à y penser lui-même.
+// Le SVG (vectoriel) et le GIF (animé — le canvas n'en garderait qu'une
+// image fixe) passent tels quels.
+const TAILLE_MAX = 1600; // px, plus grand côté — largement suffisant pour du plein écran
+async function compresserImage(fichier) {
+  if (!fichier.type?.startsWith('image/') || fichier.type === 'image/svg+xml' || fichier.type === 'image/gif') {
+    return fichier;
+  }
+  try {
+    const bitmap = await createImageBitmap(fichier);
+    const echelle = Math.min(1, TAILLE_MAX / Math.max(bitmap.width, bitmap.height));
+    // Une image déjà petite et déjà légère ne vaut pas la peine d'être
+    // ré-encodée — la recompresser pourrait même l'agrandir (JPEG mal
+    // optimisé au départ).
+    if (echelle === 1 && fichier.size < 300_000) return fichier;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * echelle);
+    canvas.height = Math.round(bitmap.height * echelle);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+    if (!blob || blob.size >= fichier.size) return fichier; // le résultat compressé n'aide pas, on garde l'original
+    return new File([blob], fichier.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+  } catch {
+    return fichier; // une image illisible par le navigateur (format exotique) part telle quelle
+  }
+}
+
+export async function televerserPhoto(fichierBrut) {
+  const fichier = await compresserImage(fichierBrut);
   const ext = (fichier.name.split('.').pop() || 'jpg').toLowerCase();
   // Nom aléatoire : deux photos du même nom déposées le même jour s'écraseraient.
   const nom = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
