@@ -208,8 +208,7 @@ export default function EditTheme() {
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-5">
-            <DeposeImage titre="Logo" aide='Laissez vide pour afficher le texte "Victoury".'
-              url={t.logoUrl} onChange={v => u('logoUrl', v)} className="w-32 h-16" />
+            <DeposeImage titre="Logo" url={t.logoUrl} onChange={v => u('logoUrl', v)} className="w-32 h-16" />
             {/* S'applique aussi au texte "Victoury" (pas seulement à une image
                 déposée) : sans logo importé, c'est ce texte qui tient lieu de
                 logo — le laisser hors de ce réglage aurait été surprenant. */}
