@@ -31,6 +31,8 @@ const DICT = {
     plusQue: 'Plus que', pourLivraisonGratuite: 'pour la livraison gratuite',
     quantiteMinus: 'Diminuer', quantitePlus: 'Augmenter', retirer: 'Retirer',
     profitezDuTarif: "Profitez-en pour ajouter :", voirProduit: 'Voir',
+    mesFavoris: 'Mes favoris', aucunFavori: "Vous n'avez encore aucun favori.",
+    voirLaBoutique: 'Voir la boutique',
   },
   ar: {
     accueil: 'الرئيسية', voirCollection: 'مشاهدة المجموعة',
@@ -56,6 +58,8 @@ const DICT = {
     plusQue: 'باقي', pourLivraisonGratuite: 'للحصول على توصيل مجاني',
     quantiteMinus: 'إنقاص', quantitePlus: 'زيادة', retirer: 'حذف',
     profitezDuTarif: 'اغتنم الفرصة وأضف:', voirProduit: 'عرض',
+    mesFavoris: 'مفضلتي', aucunFavori: 'ليس لديك أي منتج في المفضلة بعد.',
+    voirLaBoutique: 'مشاهدة المتجر',
   },
 };
 

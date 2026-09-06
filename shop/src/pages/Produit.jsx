@@ -6,6 +6,7 @@ import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/cat
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel } from '../lib/pixel';
 import CarteProduit from '../components/CarteProduit';
+import BoutonFavori from '../components/BoutonFavori';
 import { useLang } from '../lib/i18n';
 
 function Accordeon({ titre, children }) {
@@ -161,7 +162,10 @@ export default function Produit({ onAjouter, theme, remises }) {
       </div>
 
       <div className="lg:sticky lg:top-24 lg:self-start">
-        <h1 className="text-xl tracking-wide">{produit.name}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-xl tracking-wide">{produit.name}</h1>
+          <BoutonFavori slug={produit.slug} className="shrink-0 mt-1 text-gray-400 hover:text-red-500" />
+        </div>
         <p className="mt-2">
           <span className="text-lg">{fmtPrix(produit.price)}</span>
           {/* Le prix barré doit sauter aux yeux : c'est lui qui vend la

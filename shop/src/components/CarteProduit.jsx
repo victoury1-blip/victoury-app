@@ -5,6 +5,7 @@ import { fmtPrix } from '../lib/pricing';
 import { paliersEffectifs } from '../lib/remises';
 import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
+import BoutonFavori from './BoutonFavori';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
@@ -33,9 +34,11 @@ function CarteProduit({ produit, remises, categorie }) {
             −{Math.round((1 - produit.price / produit.compare_at) * 100)}%
           </span>
         )}
+        <BoutonFavori slug={produit.slug}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center hover:bg-white" />
         {/* Purement décoratif (toute la carte est déjà le lien) — un repère
             visuel "ouvrir la fiche", pas un second bouton à cliquer. */}
-        <span aria-hidden className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center
+        <span aria-hidden className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center
                                      text-ink transition-transform group-hover:translate-x-0.5">
           <ArrowRight size={15} />
         </span>

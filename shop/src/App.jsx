@@ -16,6 +16,7 @@ import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THE
    chargement. */
 const Collection = lazy(() => import('./pages/Collection'));
 const Produit = lazy(() => import('./pages/Produit'));
+const Favoris = lazy(() => import('./pages/Favoris'));
 const Commander = lazy(() => import('./pages/Commander'));
 const Merci = lazy(() => import('./pages/Merci'));
 const PageStatique = lazy(() => import('./pages/PageStatique'));
@@ -202,6 +203,7 @@ function Vitrine() {
             <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
+            <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
             <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/merci/:id" element={<Merci />} />
             <Route path="/:slug/" element={<PageStatique />} />

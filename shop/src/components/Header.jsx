@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Search, ShoppingBag, Menu, X } from 'lucide-react';
+import { Search, ShoppingBag, Heart, Menu, X } from 'lucide-react';
 import Wordmark from './Wordmark';
 import { useLang } from '../lib/i18n';
+import { lireFavoris } from '../lib/wishlist';
 
 /* Position du logo : réglable depuis /store/theme.
  *   gauche — logo et navigation côte à côte, icônes à droite (le plus courant).
@@ -13,6 +14,13 @@ import { useLang } from '../lib/i18n';
 function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, logoPosition = 'gauche' }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
   const { lang, setLang, t } = useLang();
+  const [nbFavoris, setNbFavoris] = useState(0);
+  useEffect(() => {
+    const relire = () => setNbFavoris(lireFavoris().length);
+    relire();
+    window.addEventListener('favoris:maj', relire);
+    return () => window.removeEventListener('favoris:maj', relire);
+  }, []);
   // Une collection « Soldes » se distingue en rouge, comme sur l'ancien site —
   // c'est le seul lien de la barre qui doit sauter aux yeux.
   const estSoldes = (c) => /soldes?/i.test(c.slug || c.name || '');
@@ -69,6 +77,13 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
       {BoutonLangue}
       <Link to="/recherche" className="p-2 text-gray-600 hover:text-ink" aria-label={t('rechercher')}>
         <Search size={19} />
+      </Link>
+      <Link to="/favoris" className="relative p-2 text-gray-600 hover:text-ink" aria-label={t('mesFavoris')}>
+        <Heart size={19} />
+        {nbFavoris > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 bg-ink text-white text-[10px] font-semibold
+                           w-4 h-4 rounded-full grid place-items-center">{nbFavoris}</span>
+        )}
       </Link>
       {/* Le compteur porte un libellé lisible : « 2 » seul ne dit rien à
           qui n'a pas l'icône sous les yeux. */}

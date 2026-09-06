@@ -109,6 +109,21 @@ export async function chargerProduitsLies(collectionId, produitIdAExclure, limit
   return unProduitParGroupe((data || []).map(trier)).slice(0, limite);
 }
 
+/* Page "Mes favoris" : les produits gardés en localStorage (lib/wishlist.js)
+   n'existent que par leur slug — il faut les recharger pour avoir un prix, un
+   stock et une photo à jour (un article ajouté aux favoris peut très bien
+   avoir changé de prix, ou disparu, depuis). */
+export async function chargerProduitsParSlugs(slugs) {
+  if (!slugs?.length) return [];
+  const { data, error } = await supabase
+    .from('shop_products').select(PRODUIT).eq('status', 'Actif').in('slug', slugs);
+  if (error) return [];
+  // L'ordre d'ajout aux favoris (le plus récent en premier) se perd dans la
+  // réponse Supabase — on le restitue depuis l'ordre du tableau reçu en entrée.
+  const parSlug = new Map((data || []).map(trier).map(p => [p.slug, p]));
+  return slugs.map(s => parSlug.get(s)).filter(Boolean);
+}
+
 export async function chargerNouveautes(limite = 8) {
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT).eq('status', 'Actif').order('created_at', { ascending: false }).limit(limite * 3);
