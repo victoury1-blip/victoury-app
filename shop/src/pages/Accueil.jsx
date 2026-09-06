@@ -7,7 +7,6 @@ import Reassurance from '../components/Reassurance';
 import CategoriesGrid from '../components/CategoriesGrid';
 import { chargerNouveautes, chargerAvis, chargerCollectionsAvecCompte } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
-import { miniature, surErreurMiniature } from '../lib/img';
 
 export default function Accueil({ collections, reglages }) {
   const { t } = useLang();
@@ -52,9 +51,7 @@ export default function Accueil({ collections, reglages }) {
               {/* Première photo vue par chaque visiteur : priorité haute et jamais
                   différée (contrairement aux grilles de produits plus bas), pour
                   qu'elle n'attende pas derrière des ressources moins importantes. */}
-              <img src={miniature(d.imageDesktop || d.imageMobile, 1200)}
-                onError={(e) => surErreurMiniature(e, d.imageDesktop || d.imageMobile)}
-                alt="" fetchpriority={i === 0 ? 'high' : undefined}
+              <img src={d.imageDesktop || d.imageMobile} alt="" fetchpriority={i === 0 ? 'high' : undefined}
                 loading={i === 0 ? 'eager' : 'lazy'} className="w-full h-full object-cover" />
             </picture>
           )) : (

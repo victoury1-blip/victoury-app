@@ -4,7 +4,6 @@ import { Star, ArrowRight } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { paliersEffectifs } from '../lib/remises';
 import { useLang } from '../lib/i18n';
-import { miniature, surErreurMiniature } from '../lib/img';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
@@ -22,8 +21,7 @@ export default function CarteProduit({ produit, remises, categorie }) {
     <Link to={`/product/${produit.slug}/`} className="group block">
       <div className="relative bg-sand aspect-[4/5] overflow-hidden rounded-xl">
         {image ? (
-          <img src={miniature(image, 500)} onError={(e) => surErreurMiniature(e, image)}
-            alt={produit.images[0].alt || produit.name} loading="lazy" decoding="async"
+          <img src={image} alt={produit.images[0].alt || produit.name} loading="lazy" decoding="async"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>
