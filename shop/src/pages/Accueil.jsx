@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import CarteProduit from '../components/CarteProduit';
 import AvisClients from '../components/AvisClients';
 import Reassurance from '../components/Reassurance';
 import CategoriesGrid from '../components/CategoriesGrid';
+import HeroCarrousel from '../components/HeroCarrousel';
 import { chargerNouveautes, chargerAvis, chargerCollectionsAvecCompte } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
 
@@ -35,43 +36,17 @@ export default function Accueil({ collections, reglages }) {
   // du Hero fait office de diapositive seule.
   const diapos = (hero.slides?.length ? hero.slides : [{ imageDesktop: hero.imageDesktop, imageMobile: hero.imageMobile }])
     .filter(d => d.imageDesktop || d.imageMobile);
-  const [indice, setIndice] = useState(0);
-  useEffect(() => {
-    setIndice(0);
-    if (diapos.length < 2) return;
-    const id = setInterval(() => setIndice(i => (i + 1) % diapos.length), 3000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diapos.length]);
   const aUneImage = diapos.length > 0;
+
+  // Retrouver la collection d'un produit par balayage de tableau à chaque
+  // rendu (une fois par carte) coûtait cher sur une grande liste — une Map
+  // ne se reconstruit que quand la liste de collections change vraiment.
+  const collectionsParId = useMemo(() => new Map(collections.map(c => [c.id, c])), [collections]);
 
   return (
     <>
       <section className="relative bg-sand">
-        <div className="aspect-[16/10] sm:aspect-[16/7] overflow-hidden relative">
-          {aUneImage ? diapos.map((d, i) => (
-            // Chaque diapositive reste montée et s'estompe en place : pas de
-            // saut ni de rechargement d'image au changement.
-            <picture key={i} className={`absolute inset-0 transition-opacity duration-700 ${i === indice ? 'opacity-100' : 'opacity-0'}`}>
-              {d.imageMobile && <source media="(max-width: 640px)" srcSet={d.imageMobile} />}
-              {/* Première photo vue par chaque visiteur : priorité haute et jamais
-                  différée (contrairement aux grilles de produits plus bas), pour
-                  qu'elle n'attende pas derrière des ressources moins importantes. */}
-              <img src={d.imageDesktop || d.imageMobile} alt="" fetchpriority={i === 0 ? 'high' : undefined}
-                loading={i === 0 ? 'eager' : 'lazy'} className="w-full h-full object-cover" />
-            </picture>
-          )) : (
-            <div className="w-full h-full bg-gradient-to-br from-sand to-gray-200" />
-          )}
-          {diapos.length > 1 && (
-            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
-              {diapos.map((_, i) => (
-                <button key={i} type="button" aria-label={`Diapositive ${i + 1}`} onClick={() => setIndice(i)}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${i === indice ? 'bg-white' : 'bg-white/40'}`} />
-              ))}
-            </div>
-          )}
-        </div>
+        <HeroCarrousel diapos={diapos} />
         {/* Un fond photo peut être chargé n'importe où : ce voile assombrit
             juste assez pour que le texte blanc reste lisible dessus. */}
         {aUneImage && <div className="absolute inset-0 bg-black/25" />}
@@ -134,7 +109,7 @@ export default function Accueil({ collections, reglages }) {
               {produits.map(p => (
                 <div key={p.id} className="w-[46%] sm:w-[31%] lg:w-[23%] shrink-0 snap-start">
                   <CarteProduit produit={p} remises={reglages?.remises}
-                    categorie={collections.find(c => c.id === p.collection_id)?.name} />
+                    categorie={collectionsParId.get(p.collection_id)?.name} />
                 </div>
               ))}
             </div>

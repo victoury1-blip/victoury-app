@@ -9,7 +9,7 @@ import { miniature, surErreurMiniature } from '../lib/img';
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
-export default function CarteProduit({ produit, remises, categorie }) {
+function CarteProduit({ produit, remises, categorie }) {
   const { t, remisePalier } = useLang();
   // Règles globales + celles ciblant justement la collection de CE produit —
   // une remise réglée pour une autre collection ne doit pas s'afficher ici.
@@ -78,3 +78,8 @@ export default function CarteProduit({ produit, remises, categorie }) {
     </Link>
   );
 }
+
+// Sans ce memo, l'intervalle du carrousel du Hero (toutes les 3s) re-rendait
+// chaque carte de chaque grille de la page d'accueil, même inchangée —
+// une des plus grosses causes du temps de blocage total (TBT).
+export default React.memo(CarteProduit);

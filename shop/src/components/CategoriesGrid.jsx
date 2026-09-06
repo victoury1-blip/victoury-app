@@ -5,7 +5,7 @@ import { miniature, surErreurMiniature } from '../lib/img';
 /* Une carte par collection, photo + nom + nombre de produits en incrustation —
    c'est la première question du client ("qu'est-ce que vous vendez ?"),
    avant même de lui montrer des produits individuels. */
-export default function CategoriesGrid({ collections }) {
+function CategoriesGrid({ collections }) {
   const visibles = (collections || []).filter(c => c.count > 0);
   if (!visibles.length) return null;
 
@@ -32,3 +32,7 @@ export default function CategoriesGrid({ collections }) {
     </section>
   );
 }
+
+// Sans ce memo, l'intervalle du carrousel du Hero (toutes les 3s) re-rendait
+// toute la page d'accueil, y compris cette grille inchangée.
+export default React.memo(CategoriesGrid);
