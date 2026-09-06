@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Minus, Plus, Tag } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
@@ -10,6 +10,11 @@ import { useLang } from '../lib/i18n';
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
   const { t, encoreEtRemise, etLivraisonGratuite } = useLang();
   const [suggestions, setSuggestions] = useState([]);
+  // Refermer puis rouvrir le tiroir sans avoir changé le panier entre-temps
+  // (le cas le plus courant : le client jette un œil, referme, en rajoute
+  // un, rouvre) relançait pourtant le même appel Supabase à chaque fois —
+  // la clé des collections déjà servies évite ce refetch identique.
+  const derniereClef = useRef(null);
 
   // Chargées à l'ouverture seulement : inutile de sonder Supabase à chaque
   // ajout/retrait d'article, la sélection n'a pas à changer pendant que le
@@ -17,6 +22,9 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
   useEffect(() => {
     if (!ouvert) return;
     const collectionIds = [...new Set(lignes.map(l => l.collectionId).filter(Boolean))];
+    const clef = collectionIds.slice().sort().join(',');
+    if (clef === derniereClef.current) return;
+    derniereClef.current = clef;
     // Une collection qui n'a qu'un seul article (le nôtre, déjà dans le
     // panier) renvoyait une liste vide une fois l'article du panier exclu —
     // le panier se retrouvait avec un grand vide à la place des suggestions.

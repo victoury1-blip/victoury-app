@@ -172,6 +172,12 @@ function Vitrine() {
   const onQuantite = useCallback((cle, qty) => setLignes(prev => { const s = changerQuantite(prev, cle, qty); ecrirePanier(s); return s; }), []);
   const onRetirer  = useCallback((cle) => setLignes(prev => { const s = retirer(prev, cle); ecrirePanier(s); return s; }), []);
   const onVider    = useCallback(() => { vider(); setLignes([]); }, []);
+  // Une fonction fléchée recréée à chaque rendu de Vitrine (le panier change
+  // à chaque ajout) invalidait la référence passée à Header — React.memo sur
+  // Header ne servirait alors à rien, une nouvelle prop "différente" à
+  // chaque fois annulant la mémoïsation.
+  const ouvrirPanier = useCallback(() => setPanierOuvert(true), []);
+  const fermerPanier = useCallback(() => setPanierOuvert(false), []);
 
   return (
     <LangProvider>
@@ -179,7 +185,7 @@ function Vitrine() {
       <ScrollToTop />
       <AnnonceBar theme={reglages.theme} />
       <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
-        logoPosition={reglages.theme?.logoPosition} onOuvrirPanier={() => setPanierOuvert(true)} />
+        logoPosition={reglages.theme?.logoPosition} onOuvrirPanier={ouvrirPanier} />
 
       <main className="flex-1">
         {/* Repli vide (pas de spinner) : ces pages sont déjà découpées en
@@ -210,7 +216,7 @@ function Vitrine() {
       <TiroirPanier
         ouvert={panierOuvert} lignes={lignes} paliers={reglages.paliers} remises={reglages.remises}
         livraison={reglages.livraison} seuilGratuit={reglages.seuilGratuit}
-        onFermer={() => setPanierOuvert(false)} onQuantite={onQuantite} onRetirer={onRetirer}
+        onFermer={fermerPanier} onQuantite={onQuantite} onRetirer={onRetirer}
       />
       <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} />
     </div>

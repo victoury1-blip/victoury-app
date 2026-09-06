@@ -10,7 +10,7 @@ import { useLang } from '../lib/i18n';
  *   droite — l'inverse de « gauche » : logo et navigation à droite, icônes à gauche.
  * Un seul composant plutôt que trois mises en page séparées : la logique de
  * recherche, panier et menu mobile ne doit exister qu'à un seul endroit. */
-export default function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, logoPosition = 'gauche' }) {
+function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, logoPosition = 'gauche' }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
   const { lang, setLang, t } = useLang();
   // Une collection « Soldes » se distingue en rouge, comme sur l'ancien site —
@@ -128,3 +128,8 @@ export default function Header({ collections = [], nbArticles = 0, onOuvrirPanie
     </header>
   );
 }
+
+// Sticky, monté une seule fois, mais l'ancêtre (Vitrine) se re-rend à chaque
+// ajout au panier — sans memo, tout son contenu (barre catégories, menu
+// mobile) recalculait pour rien à chaque clic "Ajouter au panier".
+export default React.memo(Header);
