@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { miniature } from '../lib/img';
 
 // Isolé d'Accueil.jsx : l'intervalle de défilement (toutes les 3s) ne doit
@@ -15,11 +15,26 @@ export default function HeroCarrousel({ diapos }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diapos.length]);
 
+  // Avec 5-6 diapositives réglées (/store/theme), toutes les monter dès le
+  // premier rendu téléchargeait leurs 6 photos d'un coup au chargement de la
+  // page — l'essentiel du poids d'images relevé par PageSpeed. Une diapo
+  // n'est montée (et donc téléchargée) qu'une fois "atteinte" par le
+  // défilement, puis reste montée pour ne pas la re-télécharger au prochain
+  // passage — l'intervalle de 3s laisse largement le temps à sa miniature
+  // de précharger avant qu'elle ne doive s'afficher.
+  // La suivante est montée un cran à l'avance (pas seulement la courante) :
+  // sinon, la toute première fois qu'elle doit s'afficher, elle serait
+  // encore en train de télécharger — un flash vide le temps qu'elle arrive.
+  const maxAtteintRef = useRef(0);
+  const prochaine = Math.min(indice + 1, diapos.length - 1);
+  maxAtteintRef.current = Math.max(maxAtteintRef.current, indice, prochaine);
+
   const aUneImage = diapos.length > 0;
 
   return (
     <div className="aspect-[16/10] sm:aspect-[16/7] overflow-hidden relative">
       {aUneImage ? diapos.map((d, i) => (
+        i > maxAtteintRef.current ? null :
         // Chaque diapositive reste montée et s'estompe en place : pas de
         // saut ni de rechargement d'image au changement.
         <picture key={i} className={`absolute inset-0 transition-opacity duration-700 ${i === indice ? 'opacity-100' : 'opacity-0'}`}>
