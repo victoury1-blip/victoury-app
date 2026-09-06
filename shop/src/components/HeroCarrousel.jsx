@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { miniature } from '../lib/img';
 
 // Isolé d'Accueil.jsx : l'intervalle de défilement (toutes les 3s) ne doit
 // re-rendre que ce carrousel, pas toute la page d'accueil (grilles de
@@ -22,7 +23,12 @@ export default function HeroCarrousel({ diapos }) {
         // Chaque diapositive reste montée et s'estompe en place : pas de
         // saut ni de rechargement d'image au changement.
         <picture key={i} className={`absolute inset-0 transition-opacity duration-700 ${i === indice ? 'opacity-100' : 'opacity-0'}`}>
-          {d.imageMobile && <source media="(max-width: 640px)" srcSet={d.imageMobile} />}
+          {/* Sans photo mobile réglée séparément (/store/theme), le mobile
+              recevait la pleine résolution desktop (jusqu'à 1600px) affichée
+              sur un écran de ~390px de large — l'écart de poids le plus
+              important relevé par PageSpeed. La miniature 500px déjà générée
+              à l'envoi (voir admin.js) est bien plus proche du besoin réel. */}
+          <source media="(max-width: 640px)" srcSet={d.imageMobile || miniature(d.imageDesktop)} />
           {/* Première photo vue par chaque visiteur : priorité haute et jamais
               différée (contrairement aux grilles de produits plus bas), pour
               qu'elle n'attende pas derrière des ressources moins importantes. */}
