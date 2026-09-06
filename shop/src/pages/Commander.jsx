@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, Banknote, RotateCcw, ShieldCheck } from 'lucide-react';
 import { fmtPrix, totalPanier } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
@@ -250,6 +250,29 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
             className="mt-5 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60">
             {envoi ? tr('envoiEnCours') : `${tr('validerCommande')} — ${fmtPrix(t.total)}`}
           </button>
+
+          {/* Rappel des garanties juste sous le bouton : c'est LA seconde
+              d'hésitation avant de valider — le doute ("et si le produit ne
+              me convient pas ?", "et si ça n'arrive jamais ?") se lève ici,
+              pas plus haut dans la page où personne n'y pense encore. */}
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="flex flex-col items-center gap-1">
+              <Banknote size={16} className="text-ink" />
+              <span className="text-[10px] text-gray-500 leading-tight">{tr('paiementLivraison')}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <RotateCcw size={16} className="text-ink" />
+              <span className="text-[10px] text-gray-500 leading-tight">
+                {lang === 'ar' ? 'إمكانية التبديل خلال 3 أيام' : 'Échange possible sous 3 jours'}
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <ShieldCheck size={16} className="text-ink" />
+              <span className="text-[10px] text-gray-500 leading-tight">
+                {lang === 'ar' ? 'التحقق قبل الدفع' : 'Vérifiez avant de payer'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
