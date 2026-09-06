@@ -11,7 +11,7 @@ import { lireFavoris } from '../lib/wishlist';
  *   droite — l'inverse de « gauche » : logo et navigation à droite, icônes à gauche.
  * Un seul composant plutôt que trois mises en page séparées : la logique de
  * recherche, panier et menu mobile ne doit exister qu'à un seul endroit. */
-function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, logoPosition = 'gauche' }) {
+function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, logoPosition = 'gauche', logoHauteur }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
   const { lang, setLang, t } = useLang();
   const [nbFavoris, setNbFavoris] = useState(0);
@@ -29,7 +29,9 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
     <Link to="/" className="shrink-0">
       {/* Un logo déposé remplace le texte ; sans lui, le nom en capitales
           reste net à toute taille — jamais de logo cassé ou flou. */}
-      {logoUrl ? <img src={logoUrl} alt="Victoury" className="h-8 sm:h-9 w-auto object-contain" /> : <Wordmark className="text-xl sm:text-2xl" />}
+      {logoUrl
+        ? <img src={logoUrl} alt="Victoury" className="w-auto object-contain" style={{ height: logoHauteur || 36 }} />
+        : <Wordmark className="text-xl sm:text-2xl" />}
     </Link>
   );
 

@@ -186,7 +186,7 @@ function Vitrine() {
       <ScrollToTop />
       <AnnonceBar theme={reglages.theme} />
       <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
-        logoPosition={reglages.theme?.logoPosition} onOuvrirPanier={ouvrirPanier} />
+        logoPosition={reglages.theme?.logoPosition} logoHauteur={reglages.theme?.logoHauteur} onOuvrirPanier={ouvrirPanier} />
 
       <main className="flex-1">
         {/* Repli vide (pas de spinner) : ces pages sont déjà découpées en

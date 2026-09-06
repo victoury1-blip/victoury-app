@@ -71,8 +71,8 @@ export default function Footer({ theme, collections }) {
               mode "screen" — sur un fond noir, cela revient à effacer le
               carré blanc et ne garder que le texte, sans image détourée. */}
           {theme?.logoUrl
-            ? <img src={theme.logoUrl} alt="Victoury" className="h-11 w-auto object-contain"
-                style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+            ? <img src={theme.logoUrl} alt="Victoury" className="w-auto object-contain"
+                style={{ height: (theme?.logoHauteur || 36) + 8, filter: 'invert(1)', mixBlendMode: 'screen' }} />
             : <Wordmark className="text-[32px]" style={{ color: '#fff' }} />}
           {f.description && <p className="mt-4 text-base opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           <div className="mt-7 flex gap-12 sm:gap-14">
