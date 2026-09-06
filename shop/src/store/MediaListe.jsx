@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Upload, Trash2, Copy, Check, Sparkles } from 'lucide-react';
+import { Upload, Trash2, Copy, Check, Sparkles, CheckSquare, X } from 'lucide-react';
 import { listerMedias, supprimerMedia, televerserPhoto, recompresserMedia } from '../lib/admin';
 
 const formatTaille = (o) => o > 1024 * 1024 ? `${(o / 1024 / 1024).toFixed(1)} Mo` : `${Math.round(o / 1024)} Ko`;
@@ -18,6 +18,8 @@ export default function MediaListe() {
   const [copie, setCopie] = useState('');
   const [conversion, setConversion] = useState('');
   const [conversionTout, setConversionTout] = useState(false);
+  const [modeSelection, setModeSelection] = useState(false);
+  const [selection, setSelection] = useState(new Set());
 
   const recharger = () => listerMedias().then(setMedias).catch(() => {}).finally(() => setChargement(false));
   useEffect(() => { recharger(); }, []);
@@ -61,6 +63,29 @@ export default function MediaListe() {
     setConversionTout(false);
   }
 
+  function basculerSelection(nom) {
+    setSelection(s => {
+      const n = new Set(s);
+      n.has(nom) ? n.delete(nom) : n.add(nom);
+      return n;
+    });
+  }
+
+  function annulerSelection() {
+    setModeSelection(false);
+    setSelection(new Set());
+  }
+
+  async function supprimerSelection() {
+    const noms = [...selection];
+    if (!noms.length) return;
+    if (!confirm(`Supprimer ${noms.length} photo(s) ? Les pages qui les utilisent encore afficheront une image cassée.`)) return;
+    setMedias(m => m.filter(x => !selection.has(x.nom)));
+    annulerSelection();
+    try { await Promise.all(noms.map(supprimerMedia)); }
+    catch (e) { alert(e.message || 'Suppression impossible'); recharger(); }
+  }
+
   function copierLien(url, nom) {
     navigator.clipboard?.writeText(url).then(() => {
       setCopie(nom);
@@ -78,17 +103,37 @@ export default function MediaListe() {
           <p className="text-sm text-gray-500 mt-0.5">{medias.length} fichier{medias.length > 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-2">
-          {medias.some(m => m.taille > SEUIL_LOURD) && (
-            <button type="button" onClick={convertirToutEnWeb} disabled={conversionTout}
-              className="inline-flex items-center gap-2 border border-gray-200 text-sm px-4 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-60">
-              <Sparkles size={15} /> {conversionTout ? 'Conversion…' : 'Convertir les photos lourdes pour le web'}
-            </button>
+          {modeSelection ? (
+            <>
+              <span className="text-sm text-gray-500">{selection.size} sélectionnée{selection.size > 1 ? 's' : ''}</span>
+              <button type="button" onClick={supprimerSelection} disabled={!selection.size}
+                className="inline-flex items-center gap-2 bg-red-500 text-white text-sm px-4 py-2.5 rounded-lg hover:bg-red-600 disabled:opacity-40">
+                <Trash2 size={15} /> Supprimer
+              </button>
+              <button type="button" onClick={annulerSelection}
+                className="inline-flex items-center gap-2 border border-gray-200 text-sm px-4 py-2.5 rounded-lg hover:bg-gray-50">
+                <X size={15} /> Annuler
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => setModeSelection(true)}
+                className="inline-flex items-center gap-2 border border-gray-200 text-sm px-4 py-2.5 rounded-lg hover:bg-gray-50">
+                <CheckSquare size={15} /> Sélectionner
+              </button>
+              {medias.some(m => m.taille > SEUIL_LOURD) && (
+                <button type="button" onClick={convertirToutEnWeb} disabled={conversionTout}
+                  className="inline-flex items-center gap-2 border border-gray-200 text-sm px-4 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-60">
+                  <Sparkles size={15} /> {conversionTout ? 'Conversion…' : 'Convertir les photos lourdes pour le web'}
+                </button>
+              )}
+              <label className="inline-flex items-center gap-2 bg-ink text-white text-sm px-4 py-2.5 rounded-lg cursor-pointer hover:opacity-90">
+                <Upload size={15} /> {envoi ? 'Envoi…' : 'Ajouter des fichiers'}
+                <input type="file" accept="image/*" multiple hidden disabled={envoi}
+                  onChange={e => { surDepot(Array.from(e.target.files || [])); e.target.value = ''; }} />
+              </label>
+            </>
           )}
-          <label className="inline-flex items-center gap-2 bg-ink text-white text-sm px-4 py-2.5 rounded-lg cursor-pointer hover:opacity-90">
-            <Upload size={15} /> {envoi ? 'Envoi…' : 'Ajouter des fichiers'}
-            <input type="file" accept="image/*" multiple hidden disabled={envoi}
-              onChange={e => { surDepot(Array.from(e.target.files || [])); e.target.value = ''; }} />
-          </label>
         </div>
       </div>
 
@@ -114,33 +159,46 @@ export default function MediaListe() {
         </p>
       ) : (
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-          {filtres.map(m => (
-            <div key={m.nom} className="group relative bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <div className="aspect-square bg-sand">
-                <img src={m.url} alt={m.nom} loading="lazy" className="w-full h-full object-cover" />
-              </div>
-              <div className="p-2">
-                <p className="text-[11px] text-gray-600 truncate" title={m.nom}>{m.nom}</p>
-                <p className="text-[10px] text-gray-400">{formatTaille(m.taille)}</p>
-              </div>
-              <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {m.taille > SEUIL_LOURD && (
-                  <button type="button" onClick={() => convertirEnWeb(m.nom)} disabled={conversion === m.nom} title="Convertir pour le web"
-                    className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink disabled:opacity-60">
-                    <Sparkles size={13} />
-                  </button>
+          {filtres.map(m => {
+            const cochee = selection.has(m.nom);
+            return (
+              <div key={m.nom}
+                onClick={modeSelection ? () => basculerSelection(m.nom) : undefined}
+                className={`group relative bg-white border rounded-lg overflow-hidden ${
+                  modeSelection ? 'cursor-pointer' : ''} ${cochee ? 'border-ink ring-2 ring-ink' : 'border-gray-200'}`}>
+                <div className="aspect-square bg-sand">
+                  <img src={m.url} alt={m.nom} loading="lazy" className="w-full h-full object-cover" />
+                </div>
+                <div className="p-2">
+                  <p className="text-[11px] text-gray-600 truncate" title={m.nom}>{m.nom}</p>
+                  <p className="text-[10px] text-gray-400">{formatTaille(m.taille)}</p>
+                </div>
+                {modeSelection ? (
+                  <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center ${
+                    cochee ? 'bg-ink border-ink' : 'bg-white/90 border-gray-300'}`}>
+                    {cochee && <Check size={13} className="text-white" />}
+                  </div>
+                ) : (
+                  <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {m.taille > SEUIL_LOURD && (
+                      <button type="button" onClick={() => convertirEnWeb(m.nom)} disabled={conversion === m.nom} title="Convertir pour le web"
+                        className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink disabled:opacity-60">
+                        <Sparkles size={13} />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => copierLien(m.url, m.nom)} title="Copier le lien"
+                      className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink">
+                      {copie === m.nom ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                    <button type="button" onClick={() => supprimer(m.nom)} title="Supprimer"
+                      className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-red-500">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 )}
-                <button type="button" onClick={() => copierLien(m.url, m.nom)} title="Copier le lien"
-                  className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink">
-                  {copie === m.nom ? <Check size={13} /> : <Copy size={13} />}
-                </button>
-                <button type="button" onClick={() => supprimer(m.nom)} title="Supprimer"
-                  className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-red-500">
-                  <Trash2 size={13} />
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
