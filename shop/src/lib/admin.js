@@ -139,19 +139,19 @@ async function redimensionner(fichier, tailleMax) {
   try {
     const bitmap = await createImageBitmap(fichier);
     const echelle = Math.min(1, tailleMax / Math.max(bitmap.width, bitmap.height));
-    // Une image déjà JPEG, déjà à la bonne taille et déjà légère ne vaut pas
-    // la peine d'être ré-encodée — la recompresser pourrait même l'agrandir
-    // (JPEG mal optimisé au départ). Un PNG (capture d'écran, souvent) reste
-    // converti même sous ce poids : le format PNG à lui seul, sans rapport
-    // avec les dimensions, pèse largement plus qu'un JPEG pour une photo.
-    if (echelle === 1 && fichier.type === 'image/jpeg' && fichier.size < 300_000) return fichier;
+    // Une image déjà WebP, déjà à la bonne taille et déjà légère ne vaut pas
+    // la peine d'être ré-encodée. Un JPEG ou (surtout) un PNG (capture
+    // d'écran, souvent) reste converti même sous ce poids : le format à lui
+    // seul, sans rapport avec les dimensions, pèse largement plus que le WebP
+    // — c'est justement le format "moderne" que PageSpeed réclame.
+    if (echelle === 1 && fichier.type === 'image/webp' && fichier.size < 300_000) return fichier;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * echelle);
     canvas.height = Math.round(bitmap.height * echelle);
     canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.8));
     if (!blob || blob.size >= fichier.size) return fichier; // le résultat compressé n'aide pas, on garde l'original
-    return new File([blob], fichier.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+    return new File([blob], fichier.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' });
   } catch {
     return fichier; // une image illisible par le navigateur (format exotique) part telle quelle
   }
@@ -159,7 +159,7 @@ async function redimensionner(fichier, tailleMax) {
 
 /** Nom du fichier miniature associé à une photo — même base, suffixe "-thumb". */
 export function nomMiniature(nom) {
-  return nom.replace(/\.[^.]+$/, '') + '-thumb.jpg';
+  return nom.replace(/\.[^.]+$/, '') + '-thumb.webp';
 }
 
 export async function televerserPhoto(fichierBrut) {
@@ -177,7 +177,7 @@ export async function televerserPhoto(fichierBrut) {
   try {
     const miniature = await redimensionner(fichierBrut, TAILLE_MINIATURE);
     await supabase.storage.from('boutique').upload(nomMiniature(nom), miniature, {
-      cacheControl: '31536000', upsert: false, contentType: 'image/jpeg',
+      cacheControl: '31536000', upsert: false, contentType: miniature.type || 'image/webp',
     });
   } catch { /* la photo pleine taille reste utilisable partout */ }
 
@@ -197,7 +197,7 @@ export async function recompresserMedia(nom) {
   const compresse = await redimensionner(fichierOriginal, TAILLE_MAX);
   if (compresse !== fichierOriginal) {
     const { error: e2 } = await supabase.storage.from('boutique').upload(nom, compresse, {
-      cacheControl: '31536000', upsert: true, contentType: 'image/jpeg',
+      cacheControl: '31536000', upsert: true, contentType: compresse.type || 'image/webp',
     });
     if (e2) throw new Error(e2.message);
   }
@@ -205,7 +205,7 @@ export async function recompresserMedia(nom) {
   try {
     const miniature = await redimensionner(fichierOriginal, TAILLE_MINIATURE);
     await supabase.storage.from('boutique').upload(nomMiniature(nom), miniature, {
-      cacheControl: '31536000', upsert: true, contentType: 'image/jpeg',
+      cacheControl: '31536000', upsert: true, contentType: miniature.type || 'image/webp',
     });
   } catch { /* la médiathèque affiche déjà la version pleine taille */ }
 
@@ -224,7 +224,9 @@ export async function listerMedias({ limite = 200, decalage = 0 } = {}) {
     // Les miniatures ("-thumb") sont un détail technique de livraison —
     // les montrer comme des photos à part encombrerait la médiathèque et
     // laisserait la supprimer sans supprimer l'originale qui va avec.
-    .filter(f => !f.name.endsWith('-thumb.jpg'))
+    // ".jpg" est l'ancien suffixe (avant le passage au format WebP) : des
+    // fichiers déposés plus tôt peuvent encore en avoir un qui traîne.
+    .filter(f => !f.name.endsWith('-thumb.webp') && !f.name.endsWith('-thumb.jpg'))
     .map(f => ({
       nom: f.name,
       taille: f.metadata?.size || 0,
@@ -233,7 +235,11 @@ export async function listerMedias({ limite = 200, decalage = 0 } = {}) {
 }
 
 export async function supprimerMedia(nom) {
-  const { error } = await supabase.storage.from('boutique').remove([nom, nomMiniature(nom)]);
+  // Le nom historique ("-thumb.jpg") peut encore exister pour une photo
+  // jamais reconvertie depuis le passage au WebP — le supprimer aussi évite
+  // de laisser un fichier orphelin dans le bucket.
+  const ancienneMiniature = nom.replace(/\.[^.]+$/, '') + '-thumb.jpg';
+  const { error } = await supabase.storage.from('boutique').remove([nom, nomMiniature(nom), ancienneMiniature]);
   if (error) throw new Error(error.message);
 }
 

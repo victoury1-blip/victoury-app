@@ -8,7 +8,7 @@
 // admin.js), stocké à côté de l'original avec le suffixe "-thumb".
 export function miniature(url) {
   if (!url || !url.includes('/storage/v1/object/public/boutique/')) return url;
-  return url.replace(/\.[^./]+$/, '-thumb.jpg');
+  return url.replace(/\.[^./]+$/, '-thumb.webp');
 }
 
 // Une photo déposée avant l'ajout de cette fonctionnalité n'a pas de
