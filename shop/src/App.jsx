@@ -74,14 +74,31 @@ function reglagesInitiaux() {
   } catch { return defaut; }
 }
 
+// Même principe pour les collections : sans cache, la barre de catégories de
+// l'en-tête (sticky, tout en haut) était absente au premier rendu puis
+// apparaissait d'un coup une fois Supabase répondu — poussant TOUT le reste
+// de la page (hero compris) vers le bas d'autant, la plus grande contribution
+// possible à un décalage de mise en page (CLS) puisqu'elle touche l'élément
+// le plus haut de la page.
+const CACHE_COLLECTIONS = 'shop_collections_cache';
+function collectionsInitiales() {
+  try {
+    const brut = localStorage.getItem(CACHE_COLLECTIONS);
+    return brut ? JSON.parse(brut) : [];
+  } catch { return []; }
+}
+
 function Vitrine() {
-  const [collections, setCollections] = useState([]);
+  const [collections, setCollections] = useState(collectionsInitiales);
   const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
 
   useEffect(() => {
-    chargerCollections().then(setCollections).catch(() => {});
+    chargerCollections().then(c => {
+      setCollections(c);
+      try { localStorage.setItem(CACHE_COLLECTIONS, JSON.stringify(c)); } catch {}
+    }).catch(() => {});
     chargerReglages().then(r => {
       setReglages(r);
       try { localStorage.setItem(CACHE_REGLAGES, JSON.stringify(r)); } catch {}

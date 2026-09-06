@@ -19,9 +19,15 @@ export default function Accueil({ collections, reglages }) {
   };
   const [avis, setAvis] = useState([]);
   const [collectionsCompte, setCollectionsCompte] = useState([]);
-  useEffect(() => { chargerNouveautes(8).then(setProduits).catch(() => {}); }, []);
+  // Sans ce drapeau, la section entière (titre + grille) restait absente
+  // (tableau vide) jusqu'à la réponse de Supabase, puis apparaissait d'un
+  // coup — poussant tout ce qui suit (avis, pied de page) d'un coup sec.
+  // Un squelette de la même hauteur pendant le chargement évite ce saut.
+  const [chargementCategories, setChargementCategories] = useState(true);
+  const [chargementNouveautes, setChargementNouveautes] = useState(true);
+  useEffect(() => { chargerNouveautes(8).then(setProduits).catch(() => {}).finally(() => setChargementNouveautes(false)); }, []);
   useEffect(() => { chargerAvis().then(setAvis).catch(() => {}); }, []);
-  useEffect(() => { chargerCollectionsAvecCompte().then(setCollectionsCompte).catch(() => {}); }, []);
+  useEffect(() => { chargerCollectionsAvecCompte().then(setCollectionsCompte).catch(() => {}).finally(() => setChargementCategories(false)); }, []);
   const hero = reglages?.theme?.hero || {};
   const sh = reglages?.theme?.texteSousHero || {};
 
@@ -92,9 +98,27 @@ export default function Accueil({ collections, reglages }) {
         </p>
       )}
 
-      <CategoriesGrid collections={collectionsCompte} />
+      {chargementCategories ? (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
+          <div className="h-4 w-32 bg-gray-100 rounded mx-auto animate-pulse" />
+          <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[3/4] bg-gray-100 rounded animate-pulse" />)}
+          </div>
+        </section>
+      ) : (
+        <CategoriesGrid collections={collectionsCompte} />
+      )}
 
-      {produits.length > 0 && (
+      {chargementNouveautes ? (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
+          <div className="h-7 w-56 bg-gray-100 rounded mx-auto animate-pulse" />
+          <div className="mt-8 flex gap-4 overflow-hidden">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="w-[46%] sm:w-[31%] lg:w-[23%] shrink-0 aspect-[4/5] bg-gray-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        </section>
+      ) : produits.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
           <h2 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight text-ink">{t('nosNouveautes')}</h2>
           <p className="mt-3 text-center text-sm text-gray-500 max-w-md mx-auto">{t('nosNouveautesTexte')}</p>
