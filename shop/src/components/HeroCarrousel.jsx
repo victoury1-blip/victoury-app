@@ -23,12 +23,12 @@ export default function HeroCarrousel({ diapos }) {
         // Chaque diapositive reste montée et s'estompe en place : pas de
         // saut ni de rechargement d'image au changement.
         <picture key={i} className={`absolute inset-0 transition-opacity duration-700 ${i === indice ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Sans photo mobile réglée séparément (/store/theme), le mobile
-              recevait la pleine résolution desktop (jusqu'à 1600px) affichée
-              sur un écran de ~390px de large — l'écart de poids le plus
-              important relevé par PageSpeed. La miniature 500px déjà générée
-              à l'envoi (voir admin.js) est bien plus proche du besoin réel. */}
-          <source media="(max-width: 640px)" srcSet={d.imageMobile || miniature(d.imageDesktop)} />
+          {/* Que l'admin ait réglé une photo mobile séparée ou non, le mobile
+              n'a jamais besoin de plus que la miniature 500px déjà générée à
+              l'envoi (voir admin.js) — une "Image Mobile" déposée sans y
+              penser reste souvent, en pratique, la même pleine résolution
+              que la version desktop (jusqu'à 1600px sur un écran ~390px). */}
+          <source media="(max-width: 640px)" srcSet={miniature(d.imageMobile || d.imageDesktop)} />
           {/* Première photo vue par chaque visiteur : priorité haute et jamais
               différée (contrairement aux grilles de produits plus bas), pour
               qu'elle n'attende pas derrière des ressources moins importantes. */}
