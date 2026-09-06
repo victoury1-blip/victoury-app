@@ -39,8 +39,13 @@ export default function CustomerHistoryModal({ phone, orders, onClose }) {
             <div className="text-xs text-gray-500">Taux livraison</div>
           </div>
         </div>
-        <div className="overflow-y-auto flex-1">
-          <table className="w-full text-sm">
+        {/* Le tableau (5 colonnes : ID, Date, Statut, Prix, Produit) dépasse
+            la largeur d'un écran de téléphone — sans défilement horizontal
+            dédié, les colonnes de droite (Prix, Produit) se retrouvaient
+            simplement invisibles au-delà du bord de la fenêtre plutôt que
+            tronquées proprement. */}
+        <div className="overflow-y-auto overflow-x-auto flex-1">
+          <table className="w-full min-w-[480px] text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="border-b border-gray-100">
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">ID</th>
