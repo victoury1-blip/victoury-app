@@ -124,16 +124,24 @@ export async function remplacerImages(produitId, images) {
 // Le SVG (vectoriel) et le GIF (animé — le canvas n'en garderait qu'une
 // image fixe) passent tels quels.
 const TAILLE_MAX = 1600; // px, plus grand côté — largement suffisant pour du plein écran
-async function compresserImage(fichier) {
+// Une grille (carte produit, catégorie) n'affiche jamais plus de quelques
+// centaines de pixels de large — pas besoin de la photo pleine résolution.
+// Une vraie miniature, générée une fois au dépôt et stockée à côté de
+// l'originale (suffixe "-thumb"), coûte un aller-retour réseau normal —
+// contrairement à une transformation "à la volée" côté serveur, qui s'est
+// montrée indisponible/trop lente sur ce projet Supabase.
+const TAILLE_MINIATURE = 500;
+
+async function redimensionner(fichier, tailleMax) {
   if (!fichier.type?.startsWith('image/') || fichier.type === 'image/svg+xml' || fichier.type === 'image/gif') {
     return fichier;
   }
   try {
     const bitmap = await createImageBitmap(fichier);
-    const echelle = Math.min(1, TAILLE_MAX / Math.max(bitmap.width, bitmap.height));
-    // Une image déjà petite et déjà légère ne vaut pas la peine d'être
-    // ré-encodée — la recompresser pourrait même l'agrandir (JPEG mal
-    // optimisé au départ).
+    const echelle = Math.min(1, tailleMax / Math.max(bitmap.width, bitmap.height));
+    // Une image déjà plus petite que la cible et déjà légère ne vaut pas la
+    // peine d'être ré-encodée — la recompresser pourrait même l'agrandir
+    // (JPEG mal optimisé au départ).
     if (echelle === 1 && fichier.size < 300_000) return fichier;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * echelle);
@@ -147,8 +155,13 @@ async function compresserImage(fichier) {
   }
 }
 
+/** Nom du fichier miniature associé à une photo — même base, suffixe "-thumb". */
+export function nomMiniature(nom) {
+  return nom.replace(/\.[^.]+$/, '') + '-thumb.jpg';
+}
+
 export async function televerserPhoto(fichierBrut) {
-  const fichier = await compresserImage(fichierBrut);
+  const fichier = await redimensionner(fichierBrut, TAILLE_MAX);
   const ext = (fichier.name.split('.').pop() || 'jpg').toLowerCase();
   // Nom aléatoire : deux photos du même nom déposées le même jour s'écraseraient.
   const nom = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -156,24 +169,45 @@ export async function televerserPhoto(fichierBrut) {
     cacheControl: '31536000', upsert: false,
   });
   if (error) throw new Error(error.message);
+
+  // Best-effort : une miniature manquante retombe sur l'originale (voir
+  // lib/img.js), jamais sur un dépôt bloqué si la génération échoue.
+  try {
+    const miniature = await redimensionner(fichierBrut, TAILLE_MINIATURE);
+    await supabase.storage.from('boutique').upload(nomMiniature(nom), miniature, {
+      cacheControl: '31536000', upsert: false, contentType: 'image/jpeg',
+    });
+  } catch { /* la photo pleine taille reste utilisable partout */ }
+
   return supabase.storage.from('boutique').getPublicUrl(nom).data.publicUrl;
 }
 
 // Photos déjà déposées AVANT la compression automatique — recompressées à
 // la demande depuis la médiathèque, sur place (même nom de fichier, donc
 // même URL publique) pour que rien de ce qui la référence déjà (fiche
-// produit, thème…) n'ait besoin d'être mis à jour.
+// produit, thème…) n'ait besoin d'être mis à jour. Génère aussi la
+// miniature manquante au passage.
 export async function recompresserMedia(nom) {
   const { data: blob, error: e1 } = await supabase.storage.from('boutique').download(nom);
   if (e1) throw new Error(e1.message);
   const fichierOriginal = new File([blob], nom, { type: blob.type });
-  const compresse = await compresserImage(fichierOriginal);
-  if (compresse === fichierOriginal) return false; // déjà optimale, rien à réenvoyer
-  const { error: e2 } = await supabase.storage.from('boutique').upload(nom, compresse, {
-    cacheControl: '31536000', upsert: true, contentType: 'image/jpeg',
-  });
-  if (e2) throw new Error(e2.message);
-  return true;
+
+  const compresse = await redimensionner(fichierOriginal, TAILLE_MAX);
+  if (compresse !== fichierOriginal) {
+    const { error: e2 } = await supabase.storage.from('boutique').upload(nom, compresse, {
+      cacheControl: '31536000', upsert: true, contentType: 'image/jpeg',
+    });
+    if (e2) throw new Error(e2.message);
+  }
+
+  try {
+    const miniature = await redimensionner(fichierOriginal, TAILLE_MINIATURE);
+    await supabase.storage.from('boutique').upload(nomMiniature(nom), miniature, {
+      cacheControl: '31536000', upsert: true, contentType: 'image/jpeg',
+    });
+  } catch { /* la médiathèque affiche déjà la version pleine taille */ }
+
+  return compresse !== fichierOriginal;
 }
 
 /* ── Médiathèque : toutes les photos déjà déposées (logo, favicon, hero,
@@ -185,6 +219,10 @@ export async function listerMedias({ limite = 200, decalage = 0 } = {}) {
   if (error) throw new Error(error.message);
   return (data || [])
     .filter(f => f.id) // les dossiers renvoyés par l'API n'ont pas d'id
+    // Les miniatures ("-thumb") sont un détail technique de livraison —
+    // les montrer comme des photos à part encombrerait la médiathèque et
+    // laisserait la supprimer sans supprimer l'originale qui va avec.
+    .filter(f => !f.name.endsWith('-thumb.jpg'))
     .map(f => ({
       nom: f.name,
       taille: f.metadata?.size || 0,
@@ -193,7 +231,7 @@ export async function listerMedias({ limite = 200, decalage = 0 } = {}) {
 }
 
 export async function supprimerMedia(nom) {
-  const { error } = await supabase.storage.from('boutique').remove([nom]);
+  const { error } = await supabase.storage.from('boutique').remove([nom, nomMiniature(nom)]);
   if (error) throw new Error(error.message);
 }
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { miniature, surErreurMiniature } from '../lib/img';
 
 /* Une carte par collection, photo + nom + nombre de produits en incrustation —
    c'est la première question du client ("qu'est-ce que vous vendez ?"),
@@ -15,7 +16,9 @@ export default function CategoriesGrid({ collections }) {
         {visibles.map(c => (
           <Link key={c.id} to={`/product-category/${c.slug}/`} className="group relative aspect-[3/4] overflow-hidden bg-sand block">
             {c.image_url ? (
-              <img src={c.image_url} alt={c.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <img src={miniature(c.image_url)} onError={(e) => surErreurMiniature(e, c.image_url)}
+                alt={c.name} loading="lazy" decoding="async"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
             ) : (
               <div className="w-full h-full grid place-items-center text-gray-300 text-xs">Photo à venir</div>
             )}
