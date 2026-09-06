@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import { miniature, surErreurMiniature } from '../lib/img';
 
 /* Rien ne s'affiche tant que l'admin n'a déposé aucune capture — pas de
    galerie vide qui donnerait un mauvais signal de confiance. */
@@ -46,7 +47,11 @@ export default function AvisClients({ avis }) {
       <div ref={pisteRef} className="mt-8 flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {avis.map(a => (
           <button key={a.id} type="button" onClick={() => setOuvert(a.url)} className="shrink-0">
-            <img src={a.url} alt="Avis client"
+            {/* Captures WhatsApp jamais redimensionnées : à pleine résolution
+                (souvent ~900x1150) affichées dans une vignette de ~250px,
+                elles pesaient à elles seules plus d'1 Mio de la page d'accueil. */}
+            <img src={miniature(a.url)} onError={(e) => surErreurMiniature(e, a.url)} alt="Avis client"
+              loading="lazy" decoding="async"
               className="w-52 sm:w-64 aspect-[3/4] object-cover rounded-lg border border-gray-100 cursor-zoom-in hover:opacity-90 transition-opacity" />
           </button>
         ))}

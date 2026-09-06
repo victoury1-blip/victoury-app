@@ -3,9 +3,6 @@ import { Upload, Trash2, Copy, Check, Sparkles, CheckSquare, X } from 'lucide-re
 import { listerMedias, supprimerMedia, televerserPhoto, recompresserMedia } from '../lib/admin';
 
 const formatTaille = (o) => o > 1024 * 1024 ? `${(o / 1024 / 1024).toFixed(1)} Mo` : `${Math.round(o / 1024)} Ko`;
-// Sous ce poids, une photo est déjà légère — proposer de la "convertir pour
-// le web" n'apporterait rien et encombrerait l'écran pour rien.
-const SEUIL_LOURD = 300 * 1024;
 
 /* Toutes les photos déjà déposées (logo, hero, produits…) au même endroit —
    avant cette page, retrouver l'URL d'une photo utilisée ailleurs voulait
@@ -52,11 +49,16 @@ export default function MediaListe() {
   }
 
   async function convertirToutEnWeb() {
-    const lourds = medias.filter(m => m.taille > SEUIL_LOURD);
-    if (!lourds.length) return;
-    if (!confirm(`Convertir ${lourds.length} photo(s) lourde(s) pour le web ?`)) return;
+    // Le poids en octets ne dit rien de la présence d'une miniature : une
+    // photo déposée avant cette fonctionnalité peut peser peu (déjà
+    // compressée par le téléphone) tout en restant à sa pleine résolution
+    // (ex. 900x1150 affichée dans une vignette de 250px) faute de fichier
+    // "-thumb" associé. On régénère donc systématiquement tout le monde,
+    // pas seulement les fichiers au-dessus du seuil "lourd".
+    if (!medias.length) return;
+    if (!confirm(`Régénérer les miniatures de ${medias.length} photo(s) ?`)) return;
     setConversionTout(true);
-    for (const m of lourds) {
+    for (const m of medias) {
       try { await recompresserMedia(m.nom); } catch { /* une photo en échec ne doit pas arrêter les autres */ }
     }
     await recharger();
@@ -121,10 +123,10 @@ export default function MediaListe() {
                 className="inline-flex items-center gap-2 border border-gray-200 text-sm px-4 py-2.5 rounded-lg hover:bg-gray-50">
                 <CheckSquare size={15} /> Sélectionner
               </button>
-              {medias.some(m => m.taille > SEUIL_LOURD) && (
+              {medias.length > 0 && (
                 <button type="button" onClick={convertirToutEnWeb} disabled={conversionTout}
                   className="inline-flex items-center gap-2 border border-gray-200 text-sm px-4 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-60">
-                  <Sparkles size={15} /> {conversionTout ? 'Conversion…' : 'Convertir les photos lourdes pour le web'}
+                  <Sparkles size={15} /> {conversionTout ? 'Conversion…' : 'Régénérer les miniatures pour le web'}
                 </button>
               )}
               <label className="inline-flex items-center gap-2 bg-ink text-white text-sm px-4 py-2.5 rounded-lg cursor-pointer hover:opacity-90">
@@ -180,12 +182,10 @@ export default function MediaListe() {
                   </div>
                 ) : (
                   <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {m.taille > SEUIL_LOURD && (
-                      <button type="button" onClick={() => convertirEnWeb(m.nom)} disabled={conversion === m.nom} title="Convertir pour le web"
-                        className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink disabled:opacity-60">
-                        <Sparkles size={13} />
-                      </button>
-                    )}
+                    <button type="button" onClick={() => convertirEnWeb(m.nom)} disabled={conversion === m.nom} title="Régénérer la miniature"
+                      className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink disabled:opacity-60">
+                      <Sparkles size={13} />
+                    </button>
                     <button type="button" onClick={() => copierLien(m.url, m.nom)} title="Copier le lien"
                       className="bg-white rounded-full p-1.5 shadow text-gray-500 hover:text-ink">
                       {copie === m.nom ? <Check size={13} /> : <Copy size={13} />}
