@@ -31,7 +31,7 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
           reste net à toute taille — jamais de logo cassé ou flou. */}
       {logoUrl
         ? <img src={logoUrl} alt="Victoury" className="w-auto object-contain" style={{ height: logoHauteur || 36 }} />
-        : <Wordmark className="text-xl sm:text-2xl" />}
+        : <Wordmark style={{ fontSize: (logoHauteur || 36) * 0.55 }} />}
     </Link>
   );
 

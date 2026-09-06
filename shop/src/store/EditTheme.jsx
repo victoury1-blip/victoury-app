@@ -200,7 +200,9 @@ export default function EditTheme() {
                 pas seulement une étiquette : c'est ce qu'on verra sur le site. */}
             <div className={`flex items-center px-4 py-3 ${
               t.logoPosition === 'centre' ? 'justify-center' : t.logoPosition === 'droite' ? 'flex-row-reverse' : ''}`}>
-              {t.logoUrl ? <img src={t.logoUrl} alt="" className="object-contain" style={{ height: Math.min(t.logoHauteur || 36, 28) }} /> : <span className="wordmark text-sm" style={{ color: t.couleurTexte }}>Victoury</span>}
+              {t.logoUrl
+                ? <img src={t.logoUrl} alt="" className="object-contain" style={{ height: Math.min(t.logoHauteur || 36, 28) }} />
+                : <span className="wordmark" style={{ color: t.couleurTexte, fontSize: Math.min((t.logoHauteur || 36) * 0.5, 20) }}>Victoury</span>}
               {t.logoPosition !== 'centre' && <span className={`text-[10px] text-gray-300 ${t.logoPosition === 'droite' ? 'mr-auto' : 'ml-auto'}`}>search · panier</span>}
             </div>
           </section>
@@ -208,16 +210,17 @@ export default function EditTheme() {
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <DeposeImage titre="Logo" aide='Laissez vide pour afficher le texte "Victoury".'
               url={t.logoUrl} onChange={v => u('logoUrl', v)} className="w-32 h-16" />
-            {t.logoUrl && (
-              <div className="mt-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm">Taille du logo</p>
-                  <span className="text-xs text-gray-400">{t.logoHauteur || 36}px</span>
-                </div>
-                <input type="range" min="20" max="80" value={t.logoHauteur || 36}
-                  onChange={e => u('logoHauteur', Number(e.target.value))} className="mt-2 w-full max-w-xs" />
+            {/* S'applique aussi au texte "Victoury" (pas seulement à une image
+                déposée) : sans logo importé, c'est ce texte qui tient lieu de
+                logo — le laisser hors de ce réglage aurait été surprenant. */}
+            <div className="mt-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm">Taille du logo</p>
+                <span className="text-xs text-gray-400">{t.logoHauteur || 36}px</span>
               </div>
-            )}
+              <input type="range" min="20" max="80" value={t.logoHauteur || 36}
+                onChange={e => u('logoHauteur', Number(e.target.value))} className="mt-2 w-full max-w-xs" />
+            </div>
             <div className="mt-5">
               <p className="text-sm mb-2">Position du logo</p>
               <div className="grid grid-cols-3 gap-3 max-w-sm">
