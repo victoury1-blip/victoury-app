@@ -135,10 +135,27 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
 
   function autoMatchCity(list) {
     if (!list.length) return;
-    const orderCity = (order.recipient.city || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const orderCity = norm(order.recipient.city || '');
+    // "sale" (Sal\u00e9 sans accent) est un sous-mot de "Fquih Ben Saleh" \u2014 un
+    // simple includes() prenait le premier nom de la liste qui CONTIENT la
+    // ville, pas celui qui la NOMME. On essaie d'abord l'\u00e9galit\u00e9 exacte,
+    // puis une comparaison mot \u00e0 mot (chaque mot de la ville tap\u00e9e doit
+    // exister tel quel parmi les mots du nom candidat), et seulement en
+    // dernier recours le sous-texte brut d'avant.
+    const exact = list.find((c) => norm(c.name) === orderCity);
+    if (exact) { setForm((p) => ({ ...p, cityId: exact.id })); return; }
+
+    const motsVille = orderCity.split(/\s+/).filter(Boolean);
+    const parMots = list.find((c) => {
+      const motsCandidat = norm(c.name).split(/\s+/).filter(Boolean);
+      return motsVille.every((m) => motsCandidat.includes(m));
+    });
+    if (parMots) { setForm((p) => ({ ...p, cityId: parMots.id })); return; }
+
     const match = list.find((c) => {
-      const cn = c.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return cn === orderCity || cn.includes(orderCity) || orderCity.includes(cn);
+      const cn = norm(c.name);
+      return cn.includes(orderCity) || orderCity.includes(cn);
     });
     if (match) setForm((p) => ({ ...p, cityId: match.id }));
   }
