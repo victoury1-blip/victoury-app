@@ -461,3 +461,18 @@ as $$
   select exists (select 1 from shop_telephones_bloquees where telephone = p_tel);
 $$;
 grant execute on function shop_telephone_est_bloque(text) to anon, authenticated;
+
+-- ============================================================
+--  MÉDIATHÈQUE (bucket de stockage "boutique")
+--
+--  L'upload (televerserPhoto) marchait déjà — une policy INSERT existe donc
+--  forcément. Mais rien ne garantissait la SUPPRESSION ni la MISE À JOUR
+--  (upsert, utilisé par recompresserMedia pour remplacer une photo sur
+--  place) : sans policy DELETE/UPDATE sur storage.objects, ces appels
+--  échouent silencieusement côté Supabase — la photo réapparaît après un
+--  rechargement alors que l'admin l'a bien "supprimée" à l'écran.
+-- ============================================================
+create policy "suppression admin boutique media" on storage.objects
+  for delete to authenticated using (bucket_id = 'boutique' and is_shop_admin());
+create policy "maj admin boutique media" on storage.objects
+  for update to authenticated using (bucket_id = 'boutique' and is_shop_admin());
