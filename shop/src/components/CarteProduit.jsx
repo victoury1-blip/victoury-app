@@ -60,11 +60,19 @@ export default function CarteProduit({ produit, remises, categorie }) {
         {promo && <span className="mr-2 text-xs text-gray-400 line-through">{fmtPrix(produit.compare_at)}</span>}
         <span className="font-semibold">{fmtPrix(produit.price)}</span>
       </p>
-      {paliers?.length > 0 && (
-        <p className="mt-1 inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
-          {remisePalier(paliers[0].pourcent, paliers[0].rang)}
-        </p>
-      )}
+      {/* Hauteur réservée même sans palier : les remises arrivent après le
+          premier rendu (chargées depuis Supabase), et ce badge qui apparaît
+          d'un coup sous CHAQUE carte de la grille décalait tout ce qui suit
+          (avis, pied de page) d'autant de fois qu'il y a de cartes — la
+          plus grosse cause de décalage de mise en page (CLS) de la page
+          d'accueil. */}
+      <div className="mt-1 min-h-[20px]">
+        {paliers?.length > 0 && (
+          <p className="inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
+            {remisePalier(paliers[0].pourcent, paliers[0].rang)}
+          </p>
+        )}
+      </div>
     </Link>
   );
 }
