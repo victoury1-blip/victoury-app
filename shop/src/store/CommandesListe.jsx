@@ -142,6 +142,11 @@ export default function CommandesListe() {
     const s = q.trim().toLowerCase();
     return (commandes || []).filter(c => {
       if (filtreStatut === 'archivee') return c.is_deleted;
+      // Une commande "supprimée" reste en base (archive), mais ne doit plus
+      // apparaître dans la liste par défaut — sinon "Supprimer" ne change
+      // rien à ce qu'on voit. Le filtre "Archivées" reste le seul endroit
+      // pour la retrouver.
+      if (c.is_deleted) return false;
       if (filtreStatut && filtreStatut !== 'archivee' && c.status !== filtreStatut) return false;
       if (!s) return true;
       const r = c.recipient || {};
