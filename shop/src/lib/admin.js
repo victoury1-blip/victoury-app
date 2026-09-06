@@ -139,10 +139,12 @@ async function redimensionner(fichier, tailleMax) {
   try {
     const bitmap = await createImageBitmap(fichier);
     const echelle = Math.min(1, tailleMax / Math.max(bitmap.width, bitmap.height));
-    // Une image déjà plus petite que la cible et déjà légère ne vaut pas la
-    // peine d'être ré-encodée — la recompresser pourrait même l'agrandir
-    // (JPEG mal optimisé au départ).
-    if (echelle === 1 && fichier.size < 300_000) return fichier;
+    // Une image déjà JPEG, déjà à la bonne taille et déjà légère ne vaut pas
+    // la peine d'être ré-encodée — la recompresser pourrait même l'agrandir
+    // (JPEG mal optimisé au départ). Un PNG (capture d'écran, souvent) reste
+    // converti même sous ce poids : le format PNG à lui seul, sans rapport
+    // avec les dimensions, pèse largement plus qu'un JPEG pour une photo.
+    if (echelle === 1 && fichier.type === 'image/jpeg' && fichier.size < 300_000) return fichier;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * echelle);
     canvas.height = Math.round(bitmap.height * echelle);
