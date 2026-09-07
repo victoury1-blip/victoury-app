@@ -130,6 +130,7 @@ export default function EditTheme() {
       ...defaut, ...sauve,
       hero: { ...defaut.hero, ...(sauve.hero || {}) },
       texteSousHero: { ...defaut.texteSousHero, ...(sauve.texteSousHero || {}) },
+      sectionVedette: { ...defaut.sectionVedette, ...(sauve.sectionVedette || {}) },
       footer: { ...defaut.footer, ...(sauve.footer || {}) },
     };
   }
@@ -137,6 +138,7 @@ export default function EditTheme() {
   const u = (k, v) => setT(x => ({ ...x, [k]: v }));
   const uHero = (k, v) => setT(x => ({ ...x, hero: { ...x.hero, [k]: v } }));
   const uSousHero = (k, v) => setT(x => ({ ...x, texteSousHero: { ...x.texteSousHero, [k]: v } }));
+  const uVedette = (k, v) => setT(x => ({ ...x, sectionVedette: { ...x.sectionVedette, [k]: v } }));
   const uFooter = (k, v) => setT(x => ({ ...x, footer: { ...x.footer, [k]: v } }));
 
   const majAnnonce = (i, v) => setT(x => ({ ...x, annonces: x.annonces.map((a, j) => (j === i ? v : a)) }));
@@ -427,6 +429,44 @@ export default function EditTheme() {
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div><label className={label}>Couleur du texte</label><ChampCouleur valeur={t.texteSousHero.couleurTexte} onChange={v => uSousHero('couleurTexte', v)} /></div>
               <div><label className={label}>Couleur du fond</label><ChampCouleur valeur={t.texteSousHero.couleurFond} onChange={v => uSousHero('couleurFond', v)} /></div>
+            </div>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">Section vedette</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Une collection mise en avant à mi-page — grande photo, texte et quelques produits</p>
+              </div>
+              <Bascule actif={t.sectionVedette.active} onChange={() => uVedette('active', !t.sectionVedette.active)} />
+            </div>
+            <div className="mt-4">
+              <DeposeImage titre="Photo" url={t.sectionVedette.image} onChange={v => uVedette('image', v)} className="w-full h-32" />
+            </div>
+            <div className="mt-4">
+              <label className={label}>Adresse de la collection (slug)</label>
+              <input value={t.sectionVedette.collectionSlug} onChange={e => uVedette('collectionSlug', e.target.value)}
+                placeholder="ensemble-sport" className={champ} />
+              <p className="mt-1 text-[11px] text-gray-400">Visible dans /store/collections, sous chaque collection.</p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              <div><label className={label}>Titre</label><input value={t.sectionVedette.titre} onChange={e => uVedette('titre', e.target.value)} className={champ} /></div>
+              <div><label className={label}>Texte bouton</label><input value={t.sectionVedette.boutonTexte} onChange={e => uVedette('boutonTexte', e.target.value)} className={champ} /></div>
+            </div>
+            <div className="mt-4">
+              <label className={label}>Texte</label>
+              <textarea value={t.sectionVedette.texte} onChange={e => uVedette('texte', e.target.value)} rows={2} className={champ} />
+            </div>
+            <div className="mt-4">
+              <p className={label}>Position de la photo</p>
+              <div className="grid grid-cols-2 gap-3 max-w-xs">
+                {[['gauche', 'Gauche'], ['droite', 'Droite']].map(([val, txt]) => (
+                  <button key={val} type="button" onClick={() => uVedette('imagePosition', val)}
+                    className={`px-3 py-2.5 border text-sm ${t.sectionVedette.imagePosition === val ? 'border-ink bg-sand font-medium' : 'border-gray-200 text-gray-500'}`}>
+                    {txt}
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
         </div>

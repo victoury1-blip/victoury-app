@@ -6,6 +6,7 @@ import AvisClients from '../components/AvisClients';
 import Reassurance from '../components/Reassurance';
 import CategoriesGrid from '../components/CategoriesGrid';
 import HeroCarrousel from '../components/HeroCarrousel';
+import SectionVedette from '../components/SectionVedette';
 import { chargerNouveautes, chargerAvis, chargerCollectionsAvecCompte } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
 
@@ -133,6 +134,8 @@ export default function Accueil({ collections, reglages }) {
           </div>
         </section>
       )}
+
+      <SectionVedette config={reglages?.theme?.sectionVedette} remises={reglages?.remises} />
 
       <Reassurance items={reglages?.theme?.reassurance} active={reglages?.theme?.reassuranceActive} />
 

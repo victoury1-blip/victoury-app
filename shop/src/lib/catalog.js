@@ -226,6 +226,16 @@ export const THEME_DEFAUT = {
   },
   texteSousHero: { texte: '', taille: 14, couleurTexte: '#000000', couleurFond: '#f9f6f0' },
 
+  // Section "vedette" : une collection mise en avant à mi-page (grande photo
+  // + texte + quelques produits), comme le fait un site de mode pour son
+  // lancement du moment — plus marquant qu'une simple carte dans la grille
+  // "Nos catégories". Désactivée par défaut : rien à afficher tant qu'aucune
+  // collection n'a été choisie dans /store/edit-theme.
+  sectionVedette: {
+    active: false, image: '', imagePosition: 'gauche',
+    titre: '', texte: '', boutonTexte: 'Voir la collection', collectionSlug: '',
+  },
+
   // Trois arguments de réassurance sous le Hero — livraison, contact, paiement
   // à la livraison : ce qui rassure le plus un premier achat en ligne au Maroc.
   reassuranceActive: true,
@@ -283,6 +293,7 @@ export async function chargerReglages() {
       ...THEME_DEFAUT, ...themeSauve,
       hero: { ...THEME_DEFAUT.hero, ...(themeSauve.hero || {}) },
       texteSousHero: { ...THEME_DEFAUT.texteSousHero, ...(themeSauve.texteSousHero || {}) },
+      sectionVedette: { ...THEME_DEFAUT.sectionVedette, ...(themeSauve.sectionVedette || {}) },
       footer: {
         ...THEME_DEFAUT.footer, ...(themeSauve.footer || {}),
         paiement: { ...THEME_DEFAUT.footer.paiement, ...(themeSauve.footer?.paiement || {}) },
