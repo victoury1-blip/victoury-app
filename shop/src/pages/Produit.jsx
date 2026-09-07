@@ -307,7 +307,7 @@ export default function Produit({ onAjouter, theme, remises }) {
               className="mt-3 w-full border border-ink text-ink py-3 text-xs tracking-widest uppercase
                          disabled:border-gray-200 disabled:text-gray-400 transition-colors">
               {t('ajouterLaSelection')} —{' '}
-              {remiseBundle > 0 && <span className="line-through opacity-60 mr-1.5">{fmtPrix(totalBrutBundle)}</span>}
+              {remiseBundle > 0 && <span className="line-through text-red-500 mr-1.5">{fmtPrix(totalBrutBundle)}</span>}
               {fmtPrix(totalBundle)}
             </button>
           </div>
