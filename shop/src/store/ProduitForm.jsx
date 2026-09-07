@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Trash2, Upload, Plus, X } from 'lucide-react';
+import { Trash2, Upload, Plus, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { slugifier } from '../lib/slug';
 import {
   listerProduits, enregistrerProduit, listerCollections, listerGroupes,
   enregistrerGroupe, remplacerTailles, remplacerImages, televerserPhoto,
 } from '../lib/admin';
+import MediaPicker from './MediaPicker';
 
 const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
 const label = 'block text-xs font-medium text-gray-500 mb-1.5';
@@ -40,6 +41,9 @@ export default function ProduitForm() {
   const [form, setForm] = useState(VIDE);
   const [tailles, setTailles] = useState([{ size: '', stock: '' }]);
   const [images, setImages] = useState([{ url: '', alt: '' }]);
+  // Index de la photo dont on ouvre la médiathèque, ou null si fermée —
+  // une seule à la fois, comme un input de fichier normal.
+  const [bibliotheque, setBibliotheque] = useState(null);
   const [collections, setCollections] = useState([]);
   const [groupes, setGroupes] = useState([]);
   const [nouveauGroupe, setNouveauGroupe] = useState('');
@@ -274,6 +278,13 @@ export default function ProduitForm() {
                   <Upload size={13} /> Choisir
                   <input type="file" accept="image/*" hidden onChange={e => surFichier(i, e.target.files?.[0])} />
                 </label>
+                {/* Réutiliser une photo déjà déposée (une autre couleur du
+                    même modèle, par exemple) sans avoir à la re-télécharger
+                    depuis l'ordinateur puis la re-déposer en double. */}
+                <button type="button" onClick={() => setBibliotheque(i)}
+                  className="px-3 py-2.5 border border-gray-200 text-xs flex items-center gap-1.5 shrink-0 hover:bg-gray-50">
+                  <ImageIcon size={13} /> Médiathèque
+                </button>
                 <button type="button" onClick={() => retirerImage(i)} className="text-gray-300 hover:text-red-500 shrink-0"><Trash2 size={16} /></button>
               </div>
             ))}
@@ -284,6 +295,11 @@ export default function ProduitForm() {
           {televerse && <p className="mt-2 text-xs text-gray-400">Envoi de la photo…</p>}
         </div>
       </div>
+
+      {bibliotheque !== null && (
+        <MediaPicker onFermer={() => setBibliotheque(null)}
+          onChoisir={(u) => { majImage(bibliotheque, u); setBibliotheque(null); }} />
+      )}
 
       {erreur && <p className="mt-4 text-sm text-red-600 bg-red-50 p-3">{erreur}</p>}
 
