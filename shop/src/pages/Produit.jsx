@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { fmtPrix } from '../lib/pricing';
+import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel } from '../lib/pixel';
@@ -110,6 +110,20 @@ export default function Produit({ onAjouter, theme, remises }) {
   // Règles globales + celles ciblant justement la collection de ce produit.
   const paliers = paliersEffectifs(remises, produit.collection_id);
   const stockTaille = tailles.find(s => s.size === taille)?.stock;
+  // Le prix affiché pour la sélection "achetés ensemble" doit tenir compte
+  // de la même remise par quantité que le panier lui appliquerait (ex.
+  // "-20% dès le 2ᵉ article") — annoncer la somme brute des deux prix
+  // promettrait un total plus élevé que ce que le client paiera vraiment.
+  const partenaireBundle = produitsLies[0];
+  const remiseBundle = (inclurePartenaire && partenaireBundle)
+    ? remiseQuantiteGroupee(
+        [{ price: produit.price, qty: 1, collectionId: produit.collection_id },
+         { price: partenaireBundle.price, qty: 1, collectionId: partenaireBundle.collection_id }],
+        remises,
+      )
+    : 0;
+  const totalBrutBundle = produit.price + (inclurePartenaire && partenaireBundle ? partenaireBundle.price : 0);
+  const totalBundle = totalBrutBundle - remiseBundle;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-2 gap-10">
@@ -292,7 +306,9 @@ export default function Produit({ onAjouter, theme, remises }) {
               }}
               className="mt-3 w-full border border-ink text-ink py-3 text-xs tracking-widest uppercase
                          disabled:border-gray-200 disabled:text-gray-400 transition-colors">
-              {t('ajouterLaSelection')} — {fmtPrix(produit.price + (inclurePartenaire ? produitsLies[0].price : 0))}
+              {t('ajouterLaSelection')} —{' '}
+              {remiseBundle > 0 && <span className="line-through opacity-60 mr-1.5">{fmtPrix(totalBrutBundle)}</span>}
+              {fmtPrix(totalBundle)}
             </button>
           </div>
         )}
