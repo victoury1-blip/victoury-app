@@ -487,3 +487,12 @@ create policy "maj admin boutique media" on storage.objects
 -- ============================================================
 alter table shop_pages add column if not exists title_ar text;
 alter table shop_pages add column if not exists body_ar  text;
+
+-- ============================================================
+--  PRODUITS — badge "Meilleure vente"
+--
+--  Réglé à la main depuis la fiche produit (pas de calcul automatique sur
+--  les ventes) : plus simple et sous le contrôle direct de l'admin, qui
+--  sait déjà quels modèles se vendent le mieux.
+-- ============================================================
+alter table shop_products add column if not exists is_bestseller boolean not null default false;

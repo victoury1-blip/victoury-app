@@ -32,6 +32,11 @@ export default function Produit({ onAjouter, theme, remises }) {
   const [taille, setTaille] = useState('');
   const [chargement, setChargement] = useState(true);
   const [produitsLies, setProduitsLies] = useState([]);
+  // Suggestion "achetés ensemble" : coché par défaut, le client n'a qu'à
+  // décocher s'il ne veut que l'article courant — plus rapide que de devoir
+  // ouvrir une seconde fiche et refaire tout le parcours d'ajout au panier.
+  const [inclurePartenaire, setInclurePartenaire] = useState(true);
+  const [tailleBundle, setTailleBundle] = useState('');
   const [photoActive, setPhotoActive] = useState(0);
   const carouselRef = useRef(null);
 
@@ -57,7 +62,10 @@ export default function Produit({ onAjouter, theme, remises }) {
         setPhotoActive(0);
         const cs = p?.group_id ? await chargerCouleurs(p.group_id) : [];
         setCouleurs(cs);
-        setProduitsLies(p ? await chargerProduitsLies(p.collection_id, p.id) : []);
+        const lies = p ? await chargerProduitsLies(p.collection_id, p.id) : [];
+        setProduitsLies(lies);
+        setInclurePartenaire(true);
+        setTailleBundle(lies[0]?.sizes?.find(s => s.stock > 0)?.size || '');
         if (p) trackPixel('ViewContent', {
           content_name: p.name, content_ids: [p.slug], content_type: 'product',
           value: p.price, currency: 'MAD',
@@ -166,6 +174,11 @@ export default function Produit({ onAjouter, theme, remises }) {
           <h1 className="text-xl tracking-wide">{produit.name}</h1>
           <BoutonFavori slug={produit.slug} className="shrink-0 mt-1 text-gray-400 hover:text-red-500" />
         </div>
+        {produit.is_bestseller && (
+          <p className="mt-2 inline-flex items-center bg-ink text-white text-xs font-medium px-2.5 py-1 rounded-full">
+            {t('meilleureVente')}
+          </p>
+        )}
         <p className="mt-2">
           <span className="text-lg">{fmtPrix(produit.price)}</span>
           {/* Le prix barré doit sauter aux yeux : c'est lui qui vend la
@@ -236,6 +249,52 @@ export default function Produit({ onAjouter, theme, remises }) {
                      disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
           {taille ? t('ajouterPanier') : t('choisirTaille')}
         </button>
+
+        {/* Suggestion "achetés ensemble" : un seul autre article de la même
+            collection, pas une liste — l'objectif est un ajout rapide, pas
+            un second parcours de choix. Si la remise par quantité (paliers)
+            s'applique à cette collection, le total tient déjà compte du prix
+            réduit du 2e article, pour ne pas annoncer un total inexact. */}
+        {produit.sizes?.some(s => s.stock > 0) && produitsLies[0] && (
+          <div className="mt-7 border border-gray-200 rounded-xl p-4">
+            <p className="text-[11px] tracking-widest uppercase text-gray-500">{t('achetezEnsemble')}</p>
+            <div className="mt-3 flex items-center gap-3">
+              <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                <input type="checkbox" checked={inclurePartenaire}
+                  onChange={e => setInclurePartenaire(e.target.checked)} className="w-4 h-4 shrink-0" />
+                <div className="w-12 h-14 bg-sand shrink-0 overflow-hidden rounded">
+                  {produitsLies[0].images?.[0]?.url && (
+                    <img src={produitsLies[0].images[0].url} alt="" className="w-full h-full object-cover" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-gray-800 truncate">{produitsLies[0].name}</p>
+                  <p className="text-xs text-gray-500">{fmtPrix(produitsLies[0].price)}</p>
+                </div>
+              </label>
+            </div>
+            <button type="button" disabled={!taille || (inclurePartenaire && !tailleBundle)}
+              onClick={() => {
+                onAjouter({
+                  slug: produit.slug, name: produit.name, price: produit.price,
+                  size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
+                  stock: stockTaille, collectionId: produit.collection_id,
+                });
+                if (inclurePartenaire) {
+                  const partenaire = produitsLies[0];
+                  onAjouter({
+                    slug: partenaire.slug, name: partenaire.name, price: partenaire.price,
+                    size: tailleBundle, color: partenaire.color_name, image: partenaire.images?.[0]?.url,
+                    stock: partenaire.sizes?.find(s => s.size === tailleBundle)?.stock, collectionId: partenaire.collection_id,
+                  });
+                }
+              }}
+              className="mt-3 w-full border border-ink text-ink py-3 text-xs tracking-widest uppercase
+                         disabled:border-gray-200 disabled:text-gray-400 transition-colors">
+              {t('ajouterLaSelection')} — {fmtPrix(produit.price + (inclurePartenaire ? produitsLies[0].price : 0))}
+            </button>
+          </div>
+        )}
 
         {produit.description && <p className="mt-6 text-sm text-gray-600 leading-relaxed">{produit.description}</p>}
         <div className="mt-8">

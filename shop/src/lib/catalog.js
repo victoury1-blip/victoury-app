@@ -10,7 +10,7 @@ import { paliersEffectifs } from './remises';
 
 const PRODUIT = `
   id, slug, name, description, details, price, compare_at, gender, status,
-  color_name, color_hex, position, group_id, collection_id,
+  color_name, color_hex, position, group_id, collection_id, is_bestseller,
   images:shop_product_images(url, alt, position),
   sizes:shop_product_sizes(size, stock, position)
 `;

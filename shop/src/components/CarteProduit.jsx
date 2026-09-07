@@ -29,11 +29,18 @@ function CarteProduit({ produit, remises, categorie }) {
         ) : (
           <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>
         )}
-        {promo && (
-          <span className="absolute top-3 left-3 bg-red-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
-            −{Math.round((1 - produit.price / produit.compare_at) * 100)}%
-          </span>
-        )}
+        <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+          {produit.is_bestseller && (
+            <span className="bg-ink text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+              {t('meilleureVente')}
+            </span>
+          )}
+          {promo && (
+            <span className="bg-red-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+              −{Math.round((1 - produit.price / produit.compare_at) * 100)}%
+            </span>
+          )}
+        </div>
         <BoutonFavori slug={produit.slug}
           className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center hover:bg-white" />
       </div>

@@ -32,7 +32,8 @@ const DICT = {
     quantiteMinus: 'Diminuer', quantitePlus: 'Augmenter', retirer: 'Retirer',
     profitezDuTarif: "Profitez-en pour ajouter :", voirProduit: 'Voir',
     mesFavoris: 'Mes favoris', aucunFavori: "Vous n'avez encore aucun favori.",
-    voirLaBoutique: 'Voir la boutique',
+    voirLaBoutique: 'Voir la boutique', meilleureVente: 'Meilleure vente',
+    achetezEnsemble: 'Souvent achetés ensemble', ajouterLaSelection: 'Ajouter la sélection au panier',
   },
   ar: {
     accueil: 'الرئيسية', voirCollection: 'مشاهدة المجموعة',
@@ -59,7 +60,8 @@ const DICT = {
     quantiteMinus: 'إنقاص', quantitePlus: 'زيادة', retirer: 'حذف',
     profitezDuTarif: 'اغتنم الفرصة وأضف:', voirProduit: 'عرض',
     mesFavoris: 'مفضلتي', aucunFavori: 'ليس لديك أي منتج في المفضلة بعد.',
-    voirLaBoutique: 'مشاهدة المتجر',
+    voirLaBoutique: 'مشاهدة المتجر', meilleureVente: 'الأكثر مبيعًا',
+    achetezEnsemble: 'غالبًا ما يُشترى مع', ajouterLaSelection: 'أضف الاختيار إلى السلة',
   },
 };
 

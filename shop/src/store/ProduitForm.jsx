@@ -30,7 +30,7 @@ const COULEURS_COURANTES = [
 const VIDE = {
   name: '', slug: '', description: '', details: '', price: '', compare_at: '',
   gender: 'Unisexe', status: 'Actif', collection_id: '', group_id: '',
-  color_name: '', color_hex: '#000000',
+  color_name: '', color_hex: '#000000', is_bestseller: false,
 };
 
 export default function ProduitForm() {
@@ -64,6 +64,7 @@ export default function ProduitForm() {
         price: p.price ?? '', compare_at: p.compare_at ?? '', gender: p.gender, status: p.status,
         collection_id: p.collection_id || '', group_id: p.group_id || '',
         color_name: p.color_name || '', color_hex: p.color_hex || '#000000',
+        is_bestseller: p.is_bestseller || false,
       });
       setTailles(p.sizes?.length ? p.sizes.map(s => ({ size: s.size, stock: s.stock })) : [{ size: '', stock: '' }]);
       setImages(p.images?.length ? p.images.map(i => ({ url: i.url, alt: i.alt || '' })) : [{ url: '', alt: '' }]);
@@ -119,6 +120,7 @@ export default function ProduitForm() {
         gender: form.gender, status: form.status,
         collection_id: form.collection_id || null, group_id: form.group_id || null,
         color_name: form.color_name || null, color_hex: form.group_id ? form.color_hex : null,
+        is_bestseller: !!form.is_bestseller,
       };
       const p = await enregistrerProduit(payload);
       await remplacerTailles(p.id, tailles);
@@ -167,6 +169,15 @@ export default function ProduitForm() {
             </select>
           </div>
         </div>
+
+        {/* Réglé à la main : l'admin sait déjà quels modèles se vendent le
+            mieux, pas besoin d'un calcul automatique sur l'historique des
+            ventes. Affiché en badge sur la carte grille et la fiche produit. */}
+        <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
+          <input type="checkbox" checked={!!form.is_bestseller} onChange={e => u('is_bestseller', e.target.checked)}
+            className="w-4 h-4" />
+          Meilleure vente <span className="text-gray-400 text-xs">(affiche un badge sur la boutique)</span>
+        </label>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>

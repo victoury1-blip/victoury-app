@@ -33,7 +33,7 @@ export const enregistrerGroupe = (g) =>
 /* ── Produits ── */
 const CHAMPS = `
   id, slug, name, description, details, price, compare_at, gender, status,
-  color_name, color_hex, position, group_id, collection_id, created_at,
+  color_name, color_hex, position, group_id, collection_id, created_at, is_bestseller,
   images:shop_product_images(id, url, alt, position),
   sizes:shop_product_sizes(id, size, stock, position)
 `;
