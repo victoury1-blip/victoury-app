@@ -131,6 +131,11 @@ const TAILLE_MAX = 1600; // px, plus grand côté — largement suffisant pour d
 // contrairement à une transformation "à la volée" côté serveur, qui s'est
 // montrée indisponible/trop lente sur ce projet Supabase.
 const TAILLE_MINIATURE = 500;
+// Le Hero (bannière plein écran) affiche une photo bien plus large qu'une
+// vignette de grille — la miniature 500px, prévue pour une carte produit,
+// suffisait en poids mais rendait flou tout texte fin incrusté dans l'image
+// (légendes d'un visuel Canva, par exemple) une fois agrandie à l'écran.
+const TAILLE_HERO = 960;
 
 async function redimensionner(fichier, tailleMax) {
   if (!fichier.type?.startsWith('image/') || fichier.type === 'image/svg+xml' || fichier.type === 'image/gif') {
@@ -162,6 +167,11 @@ export function nomMiniature(nom) {
   return nom.replace(/\.[^.]+$/, '') + '-thumb.webp';
 }
 
+/** Nom du fichier miniature "Hero" — même base, suffixe "-hero". */
+export function nomMiniatureHero(nom) {
+  return nom.replace(/\.[^.]+$/, '') + '-hero.webp';
+}
+
 export async function televerserPhoto(fichierBrut) {
   const fichier = await redimensionner(fichierBrut, TAILLE_MAX);
   const ext = (fichier.name.split('.').pop() || 'jpg').toLowerCase();
@@ -180,6 +190,12 @@ export async function televerserPhoto(fichierBrut) {
       cacheControl: '31536000', upsert: false, contentType: miniature.type || 'image/webp',
     });
   } catch { /* la photo pleine taille reste utilisable partout */ }
+  try {
+    const miniatureHero = await redimensionner(fichierBrut, TAILLE_HERO);
+    await supabase.storage.from('boutique').upload(nomMiniatureHero(nom), miniatureHero, {
+      cacheControl: '31536000', upsert: false, contentType: miniatureHero.type || 'image/webp',
+    });
+  } catch { /* le Hero retombe alors sur l'originale */ }
 
   return supabase.storage.from('boutique').getPublicUrl(nom).data.publicUrl;
 }
@@ -208,6 +224,12 @@ export async function recompresserMedia(nom) {
       cacheControl: '31536000', upsert: true, contentType: miniature.type || 'image/webp',
     });
   } catch { /* la médiathèque affiche déjà la version pleine taille */ }
+  try {
+    const miniatureHero = await redimensionner(fichierOriginal, TAILLE_HERO);
+    await supabase.storage.from('boutique').upload(nomMiniatureHero(nom), miniatureHero, {
+      cacheControl: '31536000', upsert: true, contentType: miniatureHero.type || 'image/webp',
+    });
+  } catch { /* le Hero retombe alors sur la version pleine taille */ }
 
   return compresse !== fichierOriginal;
 }
@@ -226,7 +248,7 @@ export async function listerMedias({ limite = 200, decalage = 0 } = {}) {
     // laisserait la supprimer sans supprimer l'originale qui va avec.
     // ".jpg" est l'ancien suffixe (avant le passage au format WebP) : des
     // fichiers déposés plus tôt peuvent encore en avoir un qui traîne.
-    .filter(f => !f.name.endsWith('-thumb.webp') && !f.name.endsWith('-thumb.jpg'))
+    .filter(f => !f.name.endsWith('-thumb.webp') && !f.name.endsWith('-thumb.jpg') && !f.name.endsWith('-hero.webp'))
     .map(f => ({
       nom: f.name,
       taille: f.metadata?.size || 0,
@@ -239,7 +261,8 @@ export async function supprimerMedia(nom) {
   // jamais reconvertie depuis le passage au WebP — le supprimer aussi évite
   // de laisser un fichier orphelin dans le bucket.
   const ancienneMiniature = nom.replace(/\.[^.]+$/, '') + '-thumb.jpg';
-  const { error } = await supabase.storage.from('boutique').remove([nom, nomMiniature(nom), ancienneMiniature]);
+  const { error } = await supabase.storage.from('boutique')
+    .remove([nom, nomMiniature(nom), nomMiniatureHero(nom), ancienneMiniature]);
   if (error) throw new Error(error.message);
 }
 

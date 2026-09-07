@@ -11,6 +11,16 @@ export function miniature(url) {
   return url.replace(/\.[^./]+$/, '-thumb.webp');
 }
 
+// Le Hero (bannière plein écran) a besoin de bien plus que les quelques
+// centaines de pixels d'une vignette de grille — la miniature 500px y
+// rendait flou tout texte fin incrusté dans la photo (légende d'un visuel
+// Canva, par exemple). Une miniature 960px dédiée (voir admin.js) reste
+// plus légère que l'originale (jusqu'à 1600px) tout en gardant ce texte net.
+export function miniatureHero(url) {
+  if (!url || !url.includes('/storage/v1/object/public/boutique/')) return url;
+  return url.replace(/\.[^./]+$/, '-hero.webp');
+}
+
 // Une photo déposée avant l'ajout de cette fonctionnalité n'a pas de
 // miniature associée — l'appel 404 alors une seule fois, et on retombe sur
 // l'originale plutôt que de laisser une image cassée.

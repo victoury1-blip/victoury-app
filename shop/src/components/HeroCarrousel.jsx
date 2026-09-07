@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { miniature, surErreurMiniature } from '../lib/img';
+import { miniatureHero, surErreurMiniature } from '../lib/img';
 
 // Isolé d'Accueil.jsx : l'intervalle de défilement (toutes les 3s) ne doit
 // re-rendre que ce carrousel, pas toute la page d'accueil (grilles de
@@ -38,15 +38,15 @@ export default function HeroCarrousel({ diapos }) {
         // Chaque diapositive reste montée et s'estompe en place : pas de
         // saut ni de rechargement d'image au changement.
         <picture key={i} className={`absolute inset-0 transition-opacity duration-700 ${i === indice ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Que l'admin ait réglé une photo mobile séparée ou non, le mobile
-              n'a jamais besoin de plus que la miniature 500px déjà générée à
-              l'envoi (voir admin.js) — une "Image Mobile" déposée sans y
-              penser reste souvent, en pratique, la même pleine résolution
-              que la version desktop (jusqu'à 1600px sur un écran ~390px). */}
-          <source media="(max-width: 640px)" srcSet={miniature(d.imageMobile || d.imageDesktop)} />
+          {/* Que l'admin ait réglé une photo mobile séparée ou non, elle est
+              souvent, en pratique, la même pleine résolution que la version
+              desktop (jusqu'à 1600px) — bien plus que nécessaire sur un
+              écran ~390px. La miniature "Hero" 960px (voir admin.js) reste
+              nette (texte incrusté compris) tout en pesant moins. */}
+          <source media="(max-width: 640px)" srcSet={miniatureHero(d.imageMobile || d.imageDesktop)} />
           {/* Une diapositive tout juste déposée (pas encore passée par
               "Régénérer les miniatures pour le web") n'a pas encore de
-              fichier "-thumb" — sans ce filet, l'image choisie via <source>
+              fichier "-hero" — sans ce filet, l'image choisie via <source>
               échouait tout simplement (une <picture> ne retente jamais
               d'elle-même le src de secours de l'<img>) et n'affichait rien
               du tout plutôt que l'originale en pleine résolution. */}
