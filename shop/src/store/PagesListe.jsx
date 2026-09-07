@@ -18,6 +18,7 @@ export default function PagesListe() {
       ...(edite.id ? { id: edite.id } : {}),
       slug: edite.slug || slugifier(edite.title),
       title: edite.title.trim(), body: edite.body || '', published: true,
+      title_ar: edite.title_ar || '', body_ar: edite.body_ar || '',
     });
     setEdite(null);
     recharger();
@@ -41,8 +42,17 @@ export default function PagesListe() {
 
       {edite && (
         <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-          <input value={edite.title} onChange={e => setEdite(x => ({ ...x, title: e.target.value }))} placeholder="Titre" className={champ} />
-          <textarea value={edite.body} onChange={e => setEdite(x => ({ ...x, body: e.target.value }))} rows={6} placeholder="Contenu" className={champ} />
+          <input value={edite.title} onChange={e => setEdite(x => ({ ...x, title: e.target.value }))} placeholder="Titre (français)" className={champ} />
+          <textarea value={edite.body} onChange={e => setEdite(x => ({ ...x, body: e.target.value }))} rows={6} placeholder="Contenu (français)" className={champ} />
+          {/* Facultatif : une page non traduite retombe simplement sur son
+              contenu français quand le client bascule le site en arabe. */}
+          <div className="pt-2 border-t border-gray-100">
+            <p className="text-xs text-gray-400 mb-2">Traduction arabe (facultative)</p>
+            <input value={edite.title_ar || ''} onChange={e => setEdite(x => ({ ...x, title_ar: e.target.value }))}
+              placeholder="العنوان (بالعربية)" dir="rtl" className={champ} />
+            <textarea value={edite.body_ar || ''} onChange={e => setEdite(x => ({ ...x, body_ar: e.target.value }))}
+              rows={6} placeholder="المحتوى (بالعربية)" dir="rtl" className={`mt-3 ${champ}`} />
+          </div>
           <div className="flex gap-2">
             <button onClick={enregistrer} className="bg-ink text-white px-4 py-2 text-xs tracking-widest uppercase">Enregistrer</button>
             <button onClick={() => setEdite(null)} className="px-4 py-2 text-xs tracking-widest uppercase text-gray-500">Annuler</button>

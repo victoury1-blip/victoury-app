@@ -476,3 +476,14 @@ create policy "suppression admin boutique media" on storage.objects
   for delete to authenticated using (bucket_id = 'boutique' and is_shop_admin());
 create policy "maj admin boutique media" on storage.objects
   for update to authenticated using (bucket_id = 'boutique' and is_shop_admin());
+
+-- ============================================================
+--  PAGES STATIQUES — traduction arabe
+--
+--  title/body n'existaient qu'en une seule langue : une page "Mentions
+--  légales" restait en français même quand le client bascule le site en
+--  arabe (drapeau du header). Colonnes nullable — une page non traduite
+--  retombe simplement sur son contenu français (voir PageStatique.jsx).
+-- ============================================================
+alter table shop_pages add column if not exists title_ar text;
+alter table shop_pages add column if not exists body_ar  text;
