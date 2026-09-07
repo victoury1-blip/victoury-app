@@ -110,10 +110,17 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {logoPosition === 'centre' ? (
-          <div className="flex items-center h-16">
-            {MenuMobile}
-            <div className="flex-1 flex justify-center">{Logo}</div>
-            {Icones}
+          // Une grille à 3 colonnes égales (pas flex-1 + justify-center) :
+          // le menu à gauche (icône seule) et les icônes à droite (drapeaux +
+          // recherche + favoris + panier) n'ont jamais la même largeur —
+          // centrer "l'espace qui reste" les décalait d'un logo qui semblait
+          // bouger d'un téléphone à l'autre selon combien d'icônes tenaient
+          // à droite. Une grille garde le logo au centre EXACT de l'en-tête,
+          // quoi qu'il y ait de part et d'autre.
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center h-16">
+            <div className="justify-self-start">{MenuMobile}</div>
+            <div className="justify-self-center">{Logo}</div>
+            <div className="justify-self-end">{Icones}</div>
           </div>
         ) : logoPosition === 'droite' ? (
           <div className="flex items-center gap-4 h-16">
