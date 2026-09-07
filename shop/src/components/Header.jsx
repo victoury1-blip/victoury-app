@@ -110,17 +110,20 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {logoPosition === 'centre' ? (
-          // Une grille à 3 colonnes égales (pas flex-1 + justify-center) :
-          // le menu à gauche (icône seule) et les icônes à droite (drapeaux +
-          // recherche + favoris + panier) n'ont jamais la même largeur —
-          // centrer "l'espace qui reste" les décalait d'un logo qui semblait
-          // bouger d'un téléphone à l'autre selon combien d'icônes tenaient
-          // à droite. Une grille garde le logo au centre EXACT de l'en-tête,
-          // quoi qu'il y ait de part et d'autre.
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center h-16">
-            <div className="justify-self-start">{MenuMobile}</div>
-            <div className="justify-self-center">{Logo}</div>
-            <div className="justify-self-end">{Icones}</div>
+          // Deux espaceurs flex-1 de largeur ÉGALE entre eux, placés juste
+          // avant et après le logo : l'espace vide immédiatement autour du
+          // logo reste symétrique, quoi que le menu (une icône) ou les
+          // icônes (drapeaux + recherche + favoris + panier, bien plus
+          // large) pèsent chacun de leur côté. Centrer sur la largeur totale
+          // de l'en-tête (comme une grille à 3 colonnes égales) donnait un
+          // résultat mathématiquement "au milieu" mais visuellement collé
+          // au bloc le plus large.
+          <div className="flex items-center h-16">
+            {MenuMobile}
+            <div className="flex-1" />
+            {Logo}
+            <div className="flex-1" />
+            {Icones}
           </div>
         ) : logoPosition === 'droite' ? (
           <div className="flex items-center gap-4 h-16">
