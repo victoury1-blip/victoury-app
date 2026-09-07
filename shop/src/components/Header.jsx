@@ -64,11 +64,11 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
   const BoutonLangue = (
     <div className="flex items-center gap-0.5 border border-gray-200 rounded overflow-hidden">
       <button onClick={() => setLang('fr')} aria-label="Français" title="Français"
-        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'fr' ? 'bg-gray-100' : 'opacity-40 hover:opacity-75'}`}>
+        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'fr' ? 'bg-ink' : 'opacity-40 hover:opacity-75'}`}>
         🇫🇷
       </button>
       <button onClick={() => setLang('ar')} aria-label="العربية" title="العربية"
-        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'ar' ? 'bg-gray-100' : 'opacity-40 hover:opacity-75'}`}>
+        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'ar' ? 'bg-ink' : 'opacity-40 hover:opacity-75'}`}>
         🇲🇦
       </button>
     </div>
