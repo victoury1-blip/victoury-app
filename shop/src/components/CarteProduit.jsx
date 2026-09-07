@@ -29,9 +29,13 @@ function CarteProduit({ produit, remises, categorie }) {
         ) : (
           <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>
         )}
-        <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+        {/* Étiquette plate et discrète (pas une pastille pleine largeur comme
+            la réduction) — le style "tag" le plus courant pour ce genre de
+            badge, plutôt qu'un second gros pill qui alourdissait le coin de
+            la carte. */}
+        <div className="absolute top-3 left-3 flex flex-col items-start gap-1">
           {produit.is_bestseller && (
-            <span className="bg-ink text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+            <span className="bg-ink text-white text-[10px] font-semibold tracking-wide uppercase px-2 py-1 rounded-sm">
               {t('meilleureVente')}
             </span>
           )}

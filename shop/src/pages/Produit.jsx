@@ -175,7 +175,7 @@ export default function Produit({ onAjouter, theme, remises }) {
           <BoutonFavori slug={produit.slug} className="shrink-0 mt-1 text-gray-400 hover:text-red-500" />
         </div>
         {produit.is_bestseller && (
-          <p className="mt-2 inline-flex items-center bg-ink text-white text-xs font-medium px-2.5 py-1 rounded-full">
+          <p className="mt-2 inline-flex items-center bg-ink text-white text-[10px] font-semibold tracking-wide uppercase px-2 py-1 rounded-sm">
             {t('meilleureVente')}
           </p>
         )}
