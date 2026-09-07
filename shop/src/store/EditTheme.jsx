@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Upload, Trash2, Plus, GripVertical } from 'lucide-react';
+import { Upload, Trash2, Plus, GripVertical, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { televerserPhoto } from '../lib/admin';
 import { THEME_DEFAUT } from '../lib/catalog';
 import { decouperGras } from '../lib/texteEnrichi';
+import MediaPicker from './MediaPicker';
 
 const ONGLETS = ['Header', 'Home Page', 'Footer', 'Collection', 'Produit'];
 const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
@@ -14,6 +15,7 @@ const label = 'block text-xs text-gray-500 mb-1.5';
    propres dimensions conseillées. */
 function DeposeImage({ titre, aide, url, onChange, className }) {
   const [envoi, setEnvoi] = useState(false);
+  const [bibliotheque, setBibliotheque] = useState(false);
   async function surFichier(f) {
     if (!f) return;
     setEnvoi(true);
@@ -40,12 +42,25 @@ function DeposeImage({ titre, aide, url, onChange, className }) {
       </div>
       <div>
         {titre && <p className="text-xs text-gray-500">{titre}</p>}
-        <label className="mt-1 inline-flex px-3 py-2 border border-gray-200 text-xs tracking-wide uppercase cursor-pointer items-center gap-2">
-          <Upload size={13} /> {envoi ? 'Envoi…' : url ? 'Changer' : 'Choisir un fichier'}
-          <input type="file" accept="image/*" hidden onChange={e => surFichier(e.target.files?.[0])} />
-        </label>
+        <div className="mt-1 flex flex-wrap gap-2">
+          <label className="inline-flex px-3 py-2 border border-gray-200 text-xs tracking-wide uppercase cursor-pointer items-center gap-2">
+            <Upload size={13} /> {envoi ? 'Envoi…' : url ? 'Changer' : 'Choisir un fichier'}
+            <input type="file" accept="image/*" hidden onChange={e => surFichier(e.target.files?.[0])} />
+          </label>
+          {/* Réutiliser une photo déjà déposée ailleurs (le même logo pour
+              une diapositive du Hero, par exemple) sans avoir à la
+              re-téléverser en double depuis l'ordinateur. */}
+          <button type="button" onClick={() => setBibliotheque(true)}
+            className="inline-flex px-3 py-2 border border-gray-200 text-xs tracking-wide uppercase items-center gap-2 hover:bg-gray-50">
+            <ImageIcon size={13} /> Médiathèque
+          </button>
+        </div>
         {aide && <p className="mt-1 text-[11px] text-gray-400 max-w-[16rem]">{aide}</p>}
       </div>
+      {bibliotheque && (
+        <MediaPicker onFermer={() => setBibliotheque(false)}
+          onChoisir={(u) => { onChange(u); setBibliotheque(false); }} />
+      )}
     </div>
   );
 }
