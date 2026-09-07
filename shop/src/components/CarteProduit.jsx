@@ -29,22 +29,21 @@ function CarteProduit({ produit, remises, categorie }) {
         ) : (
           <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>
         )}
-        {/* Étiquette plate et discrète (pas une pastille pleine largeur comme
-            la réduction) — le style "tag" le plus courant pour ce genre de
-            badge, plutôt qu'un second gros pill qui alourdissait le coin de
-            la carte. */}
-        <div className="absolute top-3 left-3 flex flex-col items-start gap-1">
-          {produit.is_bestseller && (
-            <span className="bg-ink text-white text-[10px] font-semibold tracking-wide uppercase px-2 py-1 rounded-sm">
-              {t('meilleureVente')}
-            </span>
-          )}
-          {promo && (
-            <span className="bg-red-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
-              −{Math.round((1 - produit.price / produit.compare_at) * 100)}%
-            </span>
-          )}
-        </div>
+        {/* Fanion collé au coin (pas un pill flottant à distance) et dégradé
+            orange/rouge — le style "ruban" qu'on voit sur Temu/AliExpress
+            pour ce genre de badge, plus voyant qu'une étiquette plate grise. */}
+        {produit.is_bestseller && (
+          <span className="absolute top-0 left-0 bg-gradient-to-r from-amber-500 to-red-500 text-white
+                           text-[10px] font-bold tracking-wide uppercase px-3 py-1.5 shadow-sm"
+            style={{ clipPath: 'polygon(0 0, 100% 0, 86% 100%, 0 100%)' }}>
+            {t('meilleureVente')}
+          </span>
+        )}
+        {promo && (
+          <span className={`absolute left-3 bg-red-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full ${produit.is_bestseller ? 'top-10' : 'top-3'}`}>
+            −{Math.round((1 - produit.price / produit.compare_at) * 100)}%
+          </span>
+        )}
         <BoutonFavori slug={produit.slug}
           className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center hover:bg-white" />
       </div>
