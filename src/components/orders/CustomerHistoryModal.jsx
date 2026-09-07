@@ -39,45 +39,37 @@ export default function CustomerHistoryModal({ phone, orders, onClose }) {
             <div className="text-xs text-gray-500">Taux livraison</div>
           </div>
         </div>
-        {/* Le tableau (5 colonnes : ID, Date, Statut, Prix, Produit) dépasse
-            la largeur d'un écran de téléphone — sans défilement horizontal
-            dédié, les colonnes de droite (Prix, Produit) se retrouvaient
-            simplement invisibles au-delà du bord de la fenêtre plutôt que
-            tronquées proprement. */}
-        <div className="overflow-y-auto overflow-x-auto flex-1">
-          <table className="w-full min-w-[480px] text-sm">
-            <thead className="sticky top-0 bg-white">
-              <tr className="border-b border-gray-100">
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">ID</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Date</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Statut</th>
-                <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Prix</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Produit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-xs">Aucune commande</td></tr>
-              )}
-              {sorted.map(o => {
-                const live = getLive(o.status);
-                const color = live.color || '#6B7280';
-                return (
-                  <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="px-4 py-2.5 text-xs font-mono font-bold text-orange-600">{o.id}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-600">{o.dateAdded || '—'}</td>
-                    <td className="px-4 py-2.5">
-                      <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: color, color: '#fff' }}>
-                        {live.label || o.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-700 text-right font-medium">{o.price || '—'} DH</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[120px] truncate">{o.products?.[0]?.name || o.product?.name || '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Un tableau à 5 colonnes (ID, Date, Statut, Prix, Produit) ne tient
+            jamais sur un écran de téléphone — même avec un défilement
+            horizontal, les colonnes de droite restaient hors de vue par
+            défaut et personne ne pensait à glisser pour les révéler. Une
+            carte empilée par commande montre tout d'un coup, sans geste
+            supplémentaire. */}
+        <div className="overflow-y-auto flex-1 divide-y divide-gray-50">
+          {sorted.length === 0 && (
+            <p className="px-6 py-6 text-center text-gray-400 text-xs">Aucune commande</p>
+          )}
+          {sorted.map(o => {
+            const live = getLive(o.status);
+            const color = live.color || '#6B7280';
+            return (
+              <div key={o.id} className="px-6 py-3 hover:bg-gray-50">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-mono font-bold text-orange-600">{o.id}</span>
+                  <span className="px-2 py-0.5 rounded text-xs font-semibold shrink-0" style={{ backgroundColor: color, color: '#fff' }}>
+                    {live.label || o.status}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex items-end justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-600 truncate">{o.products?.[0]?.name || o.product?.name || '—'}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{o.dateAdded || '—'}</p>
+                  </div>
+                  <span className="text-sm text-gray-800 font-medium shrink-0">{o.price || '—'} DH</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
         <div className="px-6 py-3 border-t border-gray-100 flex justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Fermer</button>
