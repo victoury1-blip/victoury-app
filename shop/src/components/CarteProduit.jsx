@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ArrowRight } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { paliersEffectifs } from '../lib/remises';
 import { useLang } from '../lib/i18n';
@@ -36,12 +36,6 @@ function CarteProduit({ produit, remises, categorie }) {
         )}
         <BoutonFavori slug={produit.slug}
           className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center hover:bg-white" />
-        {/* Purement décoratif (toute la carte est déjà le lien) — un repère
-            visuel "ouvrir la fiche", pas un second bouton à cliquer. */}
-        <span aria-hidden className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center
-                                     text-ink transition-transform group-hover:translate-x-0.5">
-          <ArrowRight size={15} />
-        </span>
       </div>
       {/* Toujours visibles (pas seulement au survol) : au doigt, sur mobile,
           il n'y a pas de survol — les cacher derrière un hover les rendait
