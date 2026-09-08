@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Search, ShoppingBag, Heart, Menu, X } from 'lucide-react';
+import { Search, ShoppingBag, Heart, Menu, X, Languages } from 'lucide-react';
 import Wordmark from './Wordmark';
 import { useLang } from '../lib/i18n';
 import { lireFavoris } from '../lib/wishlist';
@@ -62,7 +62,11 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
   // visiblement enfoncé/coloré, se lisent comme un vrai sélecteur — pas un
   // bouton mystère.
   const BoutonLangue = (
-    <div className="flex items-center gap-0.5 border border-gray-200 rounded overflow-hidden">
+    <div className="flex items-center gap-1 border border-gray-200 rounded overflow-hidden pl-1.5">
+      {/* Une icône universellement lue comme "changer de langue" — les
+          drapeaux seuls, si reconnaissables, ne suffisaient pas à eux-mêmes
+          à dire "il y a un choix ici" à un premier coup d'œil. */}
+      <Languages size={13} className="text-gray-400 shrink-0" aria-hidden />
       <button onClick={() => setLang('fr')} aria-label="Français" title="Français"
         className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'fr' ? 'bg-ink' : 'opacity-40 hover:opacity-75'}`}>
         🇫🇷
