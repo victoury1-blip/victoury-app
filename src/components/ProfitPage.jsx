@@ -343,8 +343,14 @@ export default function ProfitPage({ orders = [], setOrders }) {
   }
 
   // Calculations
-  const ca = livresColis.reduce((s, c) => s + (c.prix || 0), 0);
-  const coutAchat = livresColis.reduce((s, c) => s + getProductCost(c), 0);
+  // Un échange peut très bien encaisser un montant réel (différence de
+  // taille/couleur facturée au client) — l'exclure du chiffre d'affaires
+  // (comme un refus, qui lui n'encaisse jamais rien) sous-estimait le total
+  // du montant exact qu'il avait fait payer. Son coût d'achat, en revanche,
+  // reste à 0 : getProductCost() le sait déjà (marchandise d'origine payée).
+  const caColis = livresColis.concat(changeColis);
+  const ca = caColis.reduce((s, c) => s + (c.prix || 0), 0);
+  const coutAchat = caColis.reduce((s, c) => s + getProductCost(c), 0);
   /* Nombre de pièces réellement livrées. Un même article commandé deux fois
      s'écrit en DEUX lignes de commande, pas en quantité 2 : c'est la somme des
      lignes qui fait foi, et ce compte permet de vérifier qu'elles sont bien
@@ -507,15 +513,18 @@ export default function ProfitPage({ orders = [], setOrders }) {
             const rows = [['Facture','ID Colis','Client','Ville','Statut','Prix Vente','Coût Achat','Frais Liv.','Marge'].join(',')];
             const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
             tableColis.forEach(c => {
-              // Même logique que le tableau affiché : refusé ET échange n'ont
-              // ni CA ni coût d'achat — seule la marge = -frais de livraison.
+              // Même logique que le tableau affiché : un refus n'encaisse rien (ni
+              // CA ni coût). Un échange, lui, peut très bien encaisser un montant
+              // réel (différence facturée au client) — seul son coût d'achat est
+              // nul (marchandise d'origine déjà payée), pas son chiffre d'affaires.
               const isR = c.status === 'refuse';
               const isC = c.status === 'change';
               const noCost = isR || isC;
+              const pv = isR ? 0 : (c.prix || 0);
               const pa = noCost ? 0 : getProductCost(c); const fl = c.fraisLivraison||0;
-              const m = noCost ? -fl : (c.prix||0) - pa - fl;
+              const m = pv - pa - fl;
               const statut = isR ? 'Refusé' : isC ? 'Échange' : isEchange(c) ? 'Livré (échange)' : 'Livré';
-              rows.push([esc(c.factureRef), esc(c.orderId), esc(c.recipient||''), esc(c.city||''), statut, noCost?0:c.prix||0, pa.toFixed(2), fl, m.toFixed(2)].join(','));
+              rows.push([esc(c.factureRef), esc(c.orderId), esc(c.recipient||''), esc(c.city||''), statut, pv, pa.toFixed(2), fl, m.toFixed(2)].join(','));
             });
             rows.push('');
             EXPENSE_CATS.forEach(cat => {
@@ -763,14 +772,20 @@ export default function ProfitPage({ orders = [], setOrders }) {
                 {tableColis.map((c, i) => {
                   const isRefuse = c.status === 'refuse';
                   const isChange = c.status === 'change';
-                  const noCost = isRefuse || isChange; // échange : pas de coût d'achat, pas de CA
+                  // Un refus n'encaisse jamais rien : ni chiffre d'affaires, ni coût
+                  // (le produit repart avec le livreur). Un échange, lui, PEUT très
+                  // bien encaisser un montant réel (différence de taille/couleur
+                  // facturée au client) — l'ignorer comptait -35 DH de "perte" sur
+                  // une commande échange qui avait pourtant encaissé 30 DH, soit une
+                  // vraie perte de -5 DH, pas -35.
+                  const noCost = isRefuse || isChange; // pas de coût d'achat : la marchandise d'origine est déjà payée
                   // Commande marquée échange mais livrée : l'encaissement est réel,
                   // seul le coût d'achat disparaît (marchandise déjà payée).
-                  const echangeLivre = !noCost && isEchange(c);
-                  const pv = c.prix || 0;
+                  const echangeLivre = !isRefuse && !isChange && isEchange(c);
+                  const pv = isRefuse ? 0 : (c.prix || 0);
                   const pa = noCost ? 0 : getProductCost(c);
                   const fl = c.fraisLivraison || 0;
-                  const marge = noCost ? -(fl) : pv - pa - fl;
+                  const marge = pv - pa - fl;
                   const order = orderMap.get(c.orderId);
                   const prodName = c.product || order?.product?.name || '—';
                   // Un 0 n'est anormal que sur un colis réellement livré ou échangé.
@@ -790,7 +805,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
                         {prodName}
                         {order?.products?.length > 1 && <span className="text-[10px] text-gray-400 ml-1">(+{order.products.length - 1})</span>}
                       </td>
-                      <td className="px-4 py-2.5 font-semibold text-gray-800">{noCost ? '—' : fmt(pv)}</td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-800">{isRefuse ? '—' : fmt(pv)}</td>
                       <td className="px-4 py-2.5 text-red-500 text-xs font-semibold">{noCost || echangeLivre ? '—' : fmt(pa)}</td>
                       {/* Un 0 de frais est une donnée manquante, pas une livraison
                           gratuite : il doit se voir dans la colonne. */}
