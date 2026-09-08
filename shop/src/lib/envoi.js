@@ -9,7 +9,12 @@ import { detecterSource } from './source';
  *
  * La validation reste ici, avant le réseau : un panier ou des champs
  * incomplets ne doivent jamais partir en requête. */
-export async function envoyerCommande(form, lignes, total) {
+// Le prix payé n'est jamais celui-ci : le serveur reconstruit sa propre
+// version du panier (produit par produit, avec le prix et le stock actuels
+// en base) et ignore ce total, envoyé pour information seulement — voir
+// api/commande.js. `code` (le code promo éventuellement saisi) part avec la
+// commande pour que le serveur, pas le navigateur, en calcule la remise.
+export async function envoyerCommande(form, lignes, total, code) {
   const manque = champsManquants(form, lignes);
   if (manque.length) return { ok: false, manque };
 
@@ -19,7 +24,7 @@ export async function envoyerCommande(form, lignes, total) {
     const res = await fetch('/api/commande', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ form, lignes, total, source }),
+      body: JSON.stringify({ form, lignes, total, source, code: code || undefined }),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || !d.ok) return { ok: false, error: d.error, manque: d.manque };

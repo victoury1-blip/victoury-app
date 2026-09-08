@@ -4,7 +4,7 @@
  * code promo, puis la livraison. Les intervertir donnerait un total différent
  * de celui annoncé sur la fiche produit — et une réclamation à la livraison.
  */
-import { paliersEffectifs } from './remises';
+import { paliersEffectifs } from './remises.js';
 
 /** Nombre d'articles dans le panier, quantités comprises. */
 export const nbArticles = (lignes) => lignes.reduce((n, l) => n + (l.qty || 0), 0);

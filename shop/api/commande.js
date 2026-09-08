@@ -8,10 +8,79 @@
 // l'ancien chemin direct, partagé avec les tests.
 
 import { champsManquants, construireCommande, normaliserTelephone } from '../src/lib/commande.js';
+import { totalPanier } from '../src/lib/pricing.js';
+import { rateLimited } from './_rateLimit.js';
 
 const SOURCES_CONNUES = new Set(['Instagram', 'Facebook', 'TikTok', 'Google', 'WhatsApp', 'Direct']);
 
 const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || null;
+
+/* Le prix envoyé par le navigateur (lignes.price, total) n'a jamais été fiable
+   côté serveur : c'est un simple champ de localStorage, modifiable via les
+   outils de développement ou en rejouant la requête réseau avec un total
+   différent — sur un site en paiement à la livraison, ça revient à composer
+   soi-même le montant que le livreur encaissera. Cette fonction reconstruit
+   la commande à partir des SEULES données dignes de confiance : les prix et
+   stocks actuels des produits en base, jamais ceux fournis par le client. */
+async function recalculerLignes(url, key, lignes) {
+  const slugs = [...new Set((lignes || []).map(l => l.slug).filter(Boolean))];
+  if (!slugs.length) return { erreur: 'Panier vide.' };
+
+  const r = await fetch(
+    `${url}/rest/v1/shop_products?select=slug,name,price,collection_id,images:shop_product_images(url,position),sizes:shop_product_sizes(size,stock)&slug=in.(${slugs.map(s => `"${s}"`).join(',')})&status=eq.Actif`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+  );
+  if (!r.ok) return { erreur: 'Vérification du panier impossible. Réessayez.' };
+  const produits = await r.json();
+  const parSlug = new Map(produits.map(p => [p.slug, p]));
+
+  const serverLignes = [];
+  for (const l of lignes) {
+    const p = parSlug.get(l.slug);
+    // Produit introuvable ou retiré de la vente depuis que le client l'a
+    // ajouté à son panier : jamais de repli sur le prix envoyé par le
+    // navigateur, la commande est refusée plutôt qu'acceptée à un montant
+    // inventé.
+    if (!p) return { erreur: 'Un article de votre panier n\'est plus disponible. Rechargez la page.' };
+    const taille = p.sizes?.find(s => s.size === (l.size || ''));
+    const stock = taille?.stock ?? 0;
+    const qty = Math.max(1, Math.floor(Number(l.qty) || 1));
+    if (stock < qty) return { erreur: `Stock insuffisant pour "${p.name}"${l.size ? ` (${l.size})` : ''}. Ajustez la quantité.` };
+    serverLignes.push({
+      slug: p.slug, name: p.name, price: p.price, qty, size: l.size || '',
+      color: l.color, image: p.images?.slice().sort((a, b) => a.position - b.position)[0]?.url,
+      collectionId: p.collection_id,
+    });
+  }
+  return { lignes: serverLignes };
+}
+
+/* Réglages et remises actifs, mêmes règles que celles affichées côté
+   client — recalculées ici pour ne jamais dépendre du total que le
+   navigateur prétend avoir obtenu avec ces mêmes règles. */
+async function chargerReglagesPrix(url, key) {
+  const r = await fetch(`${url}/rest/v1/shop_settings?select=key,value&key=in.(boutique,remises)`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!r.ok) return { livraison: 0, seuilGratuit: null, remises: [] };
+  const rows = await r.json();
+  const map = Object.fromEntries(rows.map(x => [x.key, x.value]));
+  return {
+    livraison: map.boutique?.livraison || 0,
+    seuilGratuit: map.boutique?.seuilGratuit ?? null,
+    remises: Array.isArray(map.remises) ? map.remises : [],
+  };
+}
+
+async function verifierPromoServeur(url, key, code, apresQuantite) {
+  if (!code) return null;
+  const r = await fetch(`${url}/rest/v1/rpc/shop_check_promo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ p_code: code, p_total: apresQuantite }),
+  }).then(r => r.ok ? r.json() : null).catch(() => null);
+  return r?.[0] || null;
+}
 
 /* Localisation à partir de l'IP — au mieux : une IP mobile ou un VPN donne
    souvent une ville approximative, parfois rien du tout. Une géolocalisation
@@ -84,13 +153,20 @@ export default async function handler(req, res) {
   const key = process.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return res.status(503).json({ error: 'Configuration serveur manquante' });
 
-  const { form, lignes, total, source } = req.body || {};
+  const { form, lignes, source, code } = req.body || {};
   if (!form || !Array.isArray(lignes)) return res.status(400).json({ error: 'Requête invalide' });
 
   const manque = champsManquants(form, lignes);
   if (manque.length) return res.status(400).json({ ok: false, manque });
 
   const ip = clientIp(req);
+
+  // Un abus grossier (bot, ou la faille de prix ci-dessous scriptée en boucle)
+  // n'a plus aucun frein sans ceci : quelques commandes par minute suffisent
+  // largement à un vrai client, jamais à un script.
+  if (rateLimited(`commande:${ip || 'inconnu'}`, 8, 60_000)) {
+    return res.status(200).json({ ok: false, error: 'Trop de tentatives. Merci de patienter une minute.' });
+  }
 
   // Bloquée depuis /store/commandes : un message d'erreur plausible ("site
   // indisponible"), jamais "vous êtes bloqué" — sinon le visiteur comprend
@@ -116,8 +192,20 @@ export default async function handler(req, res) {
   }).then(r => r.ok ? r.json() : false).catch(() => false);
   if (telBloque) return res.status(200).json({ ok: false, error: MESSAGE_PANNE });
 
+  const { lignes: serverLignes, erreur } = await recalculerLignes(url, key, lignes);
+  if (erreur) return res.status(200).json({ ok: false, error: erreur });
+
+  const { livraison, seuilGratuit, remises } = await chargerReglagesPrix(url, key);
+  // Premier passage sans code promo pour connaître le montant après remise
+  // par quantité — c'est CE montant, jamais celui envoyé par le client, que
+  // la remise du code promo doit ensuite porter (même règle que côté client,
+  // voir Commander.jsx).
+  const avantPromo = totalPanier(serverLignes, { remises, livraison, seuilGratuit });
+  const promo = await verifierPromoServeur(url, key, code, avantPromo.sousTotal - avantPromo.remiseQuantite);
+  const totalVerifie = totalPanier(serverLignes, { remises, promo, livraison, seuilGratuit }).total;
+
   const [geo] = await Promise.all([localiser(ip)]);
-  const commande = construireCommande(form, lignes, Number(total) || 0, new Date(), undefined, {
+  const commande = construireCommande(form, serverLignes, totalVerifie, new Date(), undefined, {
     source: SOURCES_CONNUES.has(source) ? source : 'Direct',
   });
   commande.recipient.ip = ip || undefined;
@@ -145,7 +233,7 @@ export default async function handler(req, res) {
   // sans que ni l'une ni l'autre ne le voie. Un échec ici ne doit jamais faire
   // échouer la commande elle-même — le pire cas est un stock à corriger à la
   // main, pas une vente perdue.
-  await Promise.all(lignes.map(l =>
+  await Promise.all(serverLignes.map(l =>
     fetch(`${url}/rest/v1/rpc/shop_decrement_stock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },

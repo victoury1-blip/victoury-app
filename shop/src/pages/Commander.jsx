@@ -113,7 +113,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
     const m = champsManquants(form, lignes);
     if (m.length) { setManque(m); return; }
     setEnvoi(true);
-    const r = await envoyerCommande(form, lignes, t.total);
+    const r = await envoyerCommande(form, lignes, t.total, promo ? code : undefined);
     setEnvoi(false);
     if (!r.ok) { setErreur(r.error || 'Envoi impossible. Réessayez.'); return; }
     /* Un même identifiant des deux côtés : le pixel du navigateur (rapide, mais
