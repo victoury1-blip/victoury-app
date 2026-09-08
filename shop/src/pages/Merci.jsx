@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { Check, MessageCircle } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { useLang } from '../lib/i18n';
 
@@ -41,15 +41,6 @@ export default function Merci() {
         <div className="w-14 h-14 rounded-full bg-ink text-white grid place-items-center mx-auto"><Check size={26} /></div>
         <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{ar ? 'تم تأكيد الطلب' : 'Commande confirmée'}</h1>
         {id && <p className="mt-1 text-xs text-gray-400 font-mono">{ar ? 'رقم' : 'Numéro'} #{id}</p>}
-      </div>
-
-      <div className="mt-6 flex items-start gap-2.5 bg-green-50 text-green-800 text-sm px-4 py-3 rounded-lg">
-        <MessageCircle size={18} className="shrink-0 mt-0.5" />
-        <p>
-          {ar
-            ? 'ستتوصلون قريبًا برسالة واتساب لتأكيد تفاصيل التوصيل.'
-            : <>Vous recevrez prochainement un message <b>WhatsApp</b> de confirmation avec les détails de votre livraison.</>}
-        </p>
       </div>
 
       <div className="mt-8 border-t border-gray-100 pt-5">
