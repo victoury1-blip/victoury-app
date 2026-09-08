@@ -5,15 +5,21 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
 import WhatsAppBulle from './components/WhatsAppBulle';
-import Accueil from './pages/Accueil';
-import { chargerCollections, chargerReglages, REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT } from './lib/catalog';
+import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT } from './lib/catalogDefaults';
 
 /* Un visiteur qui atterrit sur l'accueil (le cas des clics publicitaires)
    n'a jamais besoin du code de la caisse, des fiches produit ou — surtout —
    des 15 pages de l'administration : tout ça partait pourtant dans le même
    fichier JS que la page d'accueil doit télécharger et parser avant même de
    s'afficher. Chargées à la demande, elles ne pèsent plus sur ce premier
-   chargement. */
+   chargement.
+   Accueil elle-même est désormais du lot : elle importe catalog.js, qui
+   importe le client Supabase (~220 Ko) — un import statique ici forçait ce
+   client entier à être téléchargé, parsé ET EXÉCUTÉ avant le tout premier
+   rendu React, même pour un visiteur qui n'ouvre jamais /store. Les
+   constantes par défaut ci-dessus viennent de catalogDefaults.js, qui lui
+   n'importe PAS Supabase, pour que ce fichier-ci reste léger. */
+const Accueil = lazy(() => import('./pages/Accueil'));
 const Collection = lazy(() => import('./pages/Collection'));
 const Produit = lazy(() => import('./pages/Produit'));
 const Favoris = lazy(() => import('./pages/Favoris'));
@@ -96,14 +102,21 @@ function Vitrine() {
   const [panierOuvert, setPanierOuvert] = useState(false);
 
   useEffect(() => {
-    chargerCollections().then(c => {
-      setCollections(c);
-      try { localStorage.setItem(CACHE_COLLECTIONS, JSON.stringify(c)); } catch {}
-    }).catch(() => {});
-    chargerReglages().then(r => {
-      setReglages(r);
-      try { localStorage.setItem(CACHE_REGLAGES, JSON.stringify(r)); } catch {}
-    }).catch(() => {});
+    // Import dynamique : charge catalog.js (et le client Supabase qu'il tire
+    // avec lui) dans son propre chunk, téléchargé et exécuté APRÈS ce
+    // premier rendu plutôt que bloquant avant lui — un import statique en
+    // haut de ce fichier aurait eu le même effet qu'importer Accueil
+    // statiquement, l'un des deux suffisant à retarder le tout premier rendu.
+    import('./lib/catalog').then(({ chargerCollections, chargerReglages }) => {
+      chargerCollections().then(c => {
+        setCollections(c);
+        try { localStorage.setItem(CACHE_COLLECTIONS, JSON.stringify(c)); } catch {}
+      }).catch(() => {});
+      chargerReglages().then(r => {
+        setReglages(r);
+        try { localStorage.setItem(CACHE_REGLAGES, JSON.stringify(r)); } catch {}
+      }).catch(() => {});
+    });
   }, []);
 
   // Le preconnect vers Supabase est maintenant dans index.html (voir
