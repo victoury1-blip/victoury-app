@@ -217,7 +217,12 @@ export const THEME_DEFAUT = {
   couleurAnnonceTexte: '#ffffff',
 
   hero: {
-    imageDesktop: '/hero-victoury.jpg', imageMobile: '/hero-victoury.jpg',
+    // Vide tant que Supabase n'a pas répondu : le premier rendu (avant que
+    // les vraies diapositives réglées dans /store/theme n'arrivent) montrait
+    // sinon une photo fournisseur de secours (hero-victoury.jpg, jamais
+    // choisie par l'admin) — HeroCarrousel affiche un simple dégradé neutre
+    // en attendant, jamais une photo qu'on n'a pas voulue.
+    imageDesktop: '', imageMobile: '',
     // Plusieurs diapositives possibles (2-3 photos qui défilent). Une boutique
     // qui n'en a réglé aucune retombe sur la photo unique ci-dessus.
     slides: [],
