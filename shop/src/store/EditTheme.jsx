@@ -457,6 +457,20 @@ export default function EditTheme() {
               <label className={label}>Texte</label>
               <textarea value={t.sectionVedette.texte} onChange={e => uVedette('texte', e.target.value)} rows={2} className={champ} />
             </div>
+            {/* Facultatif : sans traduction, la section retombe simplement
+                sur son texte français quand le client bascule le site en
+                arabe (voir SectionVedette.jsx). */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-400 mb-2">Traduction arabe (facultative)</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div><label className={label}>العنوان</label><input value={t.sectionVedette.titreAr} onChange={e => uVedette('titreAr', e.target.value)} dir="rtl" className={champ} /></div>
+                <div><label className={label}>نص الزر</label><input value={t.sectionVedette.boutonTexteAr} onChange={e => uVedette('boutonTexteAr', e.target.value)} dir="rtl" className={champ} /></div>
+              </div>
+              <div className="mt-4">
+                <label className={label}>النص</label>
+                <textarea value={t.sectionVedette.texteAr} onChange={e => uVedette('texteAr', e.target.value)} rows={2} dir="rtl" className={champ} />
+              </div>
+            </div>
             <div className="mt-4">
               <p className={label}>Position de la photo</p>
               <div className="grid grid-cols-2 gap-3 max-w-xs">

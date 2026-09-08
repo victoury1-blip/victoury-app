@@ -4,13 +4,21 @@ import { ArrowRight } from 'lucide-react';
 import { chargerProduitsDeCollection } from '../lib/catalog';
 import CarteProduit from './CarteProduit';
 import { miniatureHero, surErreurMiniature } from '../lib/img';
+import { useLang } from '../lib/i18n';
 
 /* Une collection mise en avant à mi-page — grande photo + quelques produits —
    plutôt qu'une simple carte parmi d'autres dans "Nos catégories" : le genre
    de mise en avant qu'un site de mode réserve à son lancement du moment. */
 export default function SectionVedette({ config, remises }) {
   const [produits, setProduits] = useState([]);
+  const { lang } = useLang();
   const droite = config?.imagePosition === 'droite';
+  // Une traduction absente (titreAr/texteAr/boutonTexteAr vides) retombe sur
+  // le texte français plutôt que d'afficher un bloc vide en arabe.
+  const ar = lang === 'ar';
+  const titre = (ar && config?.titreAr) || config?.titre;
+  const texte = (ar && config?.texteAr) || config?.texte;
+  const boutonTexte = (ar && config?.boutonTexteAr) || config?.boutonTexte;
 
   useEffect(() => {
     if (!config?.collectionSlug) { setProduits([]); return; }
@@ -32,11 +40,11 @@ export default function SectionVedette({ config, remises }) {
             alt="" loading="lazy" className="w-full h-full object-cover" />
         </div>
         <div className="w-2/3 sm:w-1/2 flex flex-col justify-center px-4 py-6 sm:px-10 lg:px-16 text-left overflow-hidden">
-          {config.titre && <h2 className="text-lg sm:text-2xl lg:text-3xl font-semibold tracking-tight text-ink">{config.titre}</h2>}
-          {config.texte && <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500 max-w-md">{config.texte}</p>}
+          {titre && <h2 className="text-lg sm:text-2xl lg:text-3xl font-semibold tracking-tight text-ink">{titre}</h2>}
+          {texte && <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500 max-w-md">{texte}</p>}
           <Link to={`/product-category/${config.collectionSlug}/`}
             className="mt-3 sm:mt-5 inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-ink hover:underline">
-            {config.boutonTexte || 'Voir la collection'} <ArrowRight size={15} />
+            {boutonTexte || 'Voir la collection'} <ArrowRight size={15} />
           </Link>
 
           {/* Défilement horizontal (pas une grille figée) : le dernier

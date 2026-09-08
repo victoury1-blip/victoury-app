@@ -234,6 +234,9 @@ export const THEME_DEFAUT = {
   sectionVedette: {
     active: false, image: '', imagePosition: 'gauche',
     titre: '', texte: '', boutonTexte: 'Voir la collection', collectionSlug: '',
+    // Une traduction absente retombe sur le texte français (voir
+    // SectionVedette.jsx) plutôt que d'afficher un texte vide en arabe.
+    titreAr: '', texteAr: '', boutonTexteAr: '',
   },
 
   // Trois arguments de réassurance sous le Hero — livraison, contact, paiement
