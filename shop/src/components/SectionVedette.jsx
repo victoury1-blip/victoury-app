@@ -15,7 +15,7 @@ export default function SectionVedette({ config, remises }) {
   useEffect(() => {
     if (!config?.collectionSlug) { setProduits([]); return; }
     chargerProduitsDeCollection(config.collectionSlug)
-      .then(({ produits }) => setProduits(produits.slice(0, 3)))
+      .then(({ produits }) => setProduits(produits.slice(0, 6)))
       .catch(() => setProduits([]));
   }, [config?.collectionSlug]);
 
@@ -27,11 +27,11 @@ export default function SectionVedette({ config, remises }) {
           photo empilée au-dessus du texte, sur un petit écran, la reléguait
           bien plus bas que le reste de la page d'accueil. */}
       <div className={`flex ${droite ? 'flex-row-reverse' : 'flex-row'} lg:min-h-[560px]`}>
-        <div className="w-2/5 sm:w-1/2 aspect-[3/4] sm:aspect-auto bg-sand overflow-hidden shrink-0">
+        <div className="w-1/3 sm:w-1/2 aspect-[3/4] sm:aspect-auto bg-sand overflow-hidden shrink-0">
           <img src={miniatureHero(config.image)} onError={(e) => surErreurMiniature(e, config.image)}
             alt="" loading="lazy" className="w-full h-full object-cover" />
         </div>
-        <div className="w-3/5 sm:w-1/2 flex flex-col justify-center px-4 py-6 sm:px-10 lg:px-16 text-left">
+        <div className="w-2/3 sm:w-1/2 flex flex-col justify-center px-4 py-6 sm:px-10 lg:px-16 text-left overflow-hidden">
           {config.titre && <h2 className="text-lg sm:text-2xl lg:text-3xl font-semibold tracking-tight text-ink">{config.titre}</h2>}
           {config.texte && <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500 max-w-md">{config.texte}</p>}
           <Link to={`/product-category/${config.collectionSlug}/`}
@@ -39,9 +39,18 @@ export default function SectionVedette({ config, remises }) {
             {config.boutonTexte || 'Voir la collection'} <ArrowRight size={15} />
           </Link>
 
+          {/* Défilement horizontal (pas une grille figée) : le dernier
+              produit visible est volontairement coupé à mi-largeur — ce
+              cadrage lui-même invite à glisser pour voir la suite, sans
+              avoir besoin d'une flèche. */}
           {produits.length > 0 && (
-            <div className="mt-5 sm:mt-8 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-w-md">
-              {produits.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
+            <div className="mt-5 sm:mt-8 -mr-4 sm:-mr-10 lg:-mr-16 flex gap-2.5 sm:gap-3 overflow-x-auto snap-x snap-mandatory pb-1
+                            [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {produits.map(p => (
+                <div key={p.id} className="w-[38%] sm:w-[30%] shrink-0 snap-start">
+                  <CarteProduit produit={p} remises={remises} />
+                </div>
+              ))}
             </div>
           )}
         </div>
