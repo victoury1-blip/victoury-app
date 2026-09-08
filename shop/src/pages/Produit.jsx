@@ -25,7 +25,7 @@ function Accordeon({ titre, children }) {
 }
 
 export default function Produit({ onAjouter, theme, remises }) {
-  const { t, remisePalier } = useLang();
+  const { t, remisePalier, lang } = useLang();
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
@@ -307,8 +307,16 @@ export default function Produit({ onAjouter, theme, remises }) {
               className="mt-3 w-full border border-ink text-ink py-3 text-xs tracking-widest uppercase
                          disabled:border-gray-200 disabled:text-gray-400 transition-colors">
               {t('ajouterLaSelection')} —{' '}
-              {remiseBundle > 0 && <span className="line-through text-red-500 mr-1.5">{fmtPrix(totalBrutBundle)}</span>}
-              {fmtPrix(totalBundle)}
+              {/* bdi : isole le prix (chiffres + devise, toujours affichés de
+                  gauche à droite) du sens de lecture du reste du bouton — sans
+                  lui, l'algorithme bidi mélangeait l'ordre "DH" / tiret /
+                  montant barré au milieu d'une phrase arabe. La devise en
+                  toutes lettres ("درهم") évite en plus le sigle latin "DH"
+                  qui, lui, se lit dans l'autre sens au milieu d'un mot arabe. */}
+              <bdi>
+                {remiseBundle > 0 && <span className="line-through text-red-500 mr-1.5">{fmtPrix(totalBrutBundle, lang)}</span>}
+                {fmtPrix(totalBundle, lang)}
+              </bdi>
             </button>
           </div>
         )}

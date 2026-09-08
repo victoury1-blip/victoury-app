@@ -149,11 +149,13 @@ export function totalPanier(lignes, { paliers = [], remises = null, promo = null
 
 /** Prix affiché sur une fiche, formaté comme le reste du site. Toujours deux
     décimales (199.00 DH) — même un prix rond, pour un affichage uniforme
-    partout, comme sur la plupart des sites marchands. */
-export const fmtPrix = (n) => `${Number(n || 0).toLocaleString('fr-MA', {
+    partout, comme sur la plupart des sites marchands. `lang` ('ar') passe la
+    devise en toutes lettres ("درهم") — le sigle latin "DH" mélangé au milieu
+    d'une phrase arabe se lisait dans le mauvais sens (algorithme bidi). */
+export const fmtPrix = (n, lang) => `${Number(n || 0).toLocaleString('fr-MA', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
-})} DH`;
+})} ${lang === 'ar' ? 'درهم' : 'DH'}`;
 
 // 2 → "2ème", 3 → "3ème"… le seul cas particulier du français (1er) ne
 // concerne jamais un palier de remise, qui commence toujours au 2ᵉ article.
