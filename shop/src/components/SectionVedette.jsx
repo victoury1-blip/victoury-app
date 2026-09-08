@@ -56,7 +56,7 @@ export default function SectionVedette({ config, remises }) {
                             [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {produits.map(p => (
                 <div key={p.id} className="w-[38%] sm:w-[30%] shrink-0 snap-start">
-                  <CarteProduit produit={p} remises={remises} />
+                  <CarteProduit produit={p} remises={remises} compact />
                 </div>
               ))}
             </div>

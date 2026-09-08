@@ -10,7 +10,7 @@ import BoutonFavori from './BoutonFavori';
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
-function CarteProduit({ produit, remises, categorie }) {
+function CarteProduit({ produit, remises, categorie, compact }) {
   const { t, remisePalier } = useLang();
   // Règles globales + celles ciblant justement la collection de CE produit —
   // une remise réglée pour une autre collection ne doit pas s'afficher ici.
@@ -33,24 +33,29 @@ function CarteProduit({ produit, remises, categorie }) {
             orange/rouge — le style "ruban" qu'on voit sur Temu/AliExpress
             pour ce genre de badge, plus voyant qu'une étiquette plate grise. */}
         {produit.is_bestseller && (
-          <span className="absolute top-0 left-0 bg-gradient-to-r from-amber-500 to-red-500 text-white
-                           text-[10px] font-bold tracking-wide uppercase px-3 py-1.5 shadow-sm"
+          <span className={`absolute top-0 left-0 bg-gradient-to-r from-amber-500 to-red-500 text-white
+                           font-bold tracking-wide uppercase shadow-sm ${compact ? 'text-[7px] px-1.5 py-1' : 'text-[10px] px-3 py-1.5'}`}
             style={{ clipPath: 'polygon(0 0, 100% 0, 86% 100%, 0 100%)' }}>
             {t('meilleureVente')}
           </span>
         )}
         {promo && (
-          <span className={`absolute left-3 bg-red-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full ${produit.is_bestseller ? 'top-10' : 'top-3'}`}>
+          <span className={`absolute bg-red-600 text-white font-semibold rounded-full
+                            ${compact ? 'left-1.5 text-[9px] px-1.5 py-0.5' : 'left-3 text-xs px-2.5 py-1'}
+                            ${produit.is_bestseller ? (compact ? 'top-6' : 'top-10') : (compact ? 'top-1.5' : 'top-3')}`}>
             −{Math.round((1 - produit.price / produit.compare_at) * 100)}%
           </span>
         )}
         <BoutonFavori slug={produit.slug}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 grid place-items-center hover:bg-white" />
+          className={`absolute rounded-full bg-white/90 grid place-items-center hover:bg-white ${compact ? 'top-1.5 right-1.5 w-6 h-6 [&_svg]:w-3 [&_svg]:h-3' : 'top-3 right-3 w-8 h-8'}`} />
       </div>
       {/* Toujours visibles (pas seulement au survol) : au doigt, sur mobile,
           il n'y a pas de survol — les cacher derrière un hover les rendait
-          invisibles pour la majorité des visiteurs. */}
-      {tailles.length > 0 && (
+          invisibles pour la majorité des visiteurs. Masquées en mode compact
+          (carrousel étroit de la section vedette) : une carte deux fois plus
+          petite qu'une carte de grille normale n'a pas la place pour tout
+          montrer sans devenir illisible. */}
+      {!compact && tailles.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {tailles.map(s => (
             <span key={s.size} className="text-[10px] text-gray-500 border border-gray-200 px-1.5 py-0.5">{s.size}</span>
@@ -58,13 +63,15 @@ function CarteProduit({ produit, remises, categorie }) {
         </div>
       )}
       {categorie && <p className="mt-2 text-[10px] tracking-widest uppercase text-gray-400">{categorie}</p>}
-      <h3 className="mt-1 text-sm text-gray-800">{produit.name}</h3>
+      <h3 className="mt-1 text-sm text-gray-800 truncate">{produit.name}</h3>
       {/* Pas encore de vraies notes clients (les avis sont des captures
           WhatsApp, pas un système de notation) — étoiles vides plutôt
           qu'inventer une note, en attendant un vrai système d'avis. */}
-      <div className="mt-1 flex gap-0.5 text-gray-200">
-        {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" strokeWidth={0} />)}
-      </div>
+      {!compact && (
+        <div className="mt-1 flex gap-0.5 text-gray-200">
+          {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" strokeWidth={0} />)}
+        </div>
+      )}
       <p className="mt-1 text-sm">
         {promo && <span className="mr-2 text-xs text-gray-400 line-through">{fmtPrix(produit.compare_at)}</span>}
         <span className="font-semibold">{fmtPrix(produit.price)}</span>
@@ -74,14 +81,18 @@ function CarteProduit({ produit, remises, categorie }) {
           d'un coup sous CHAQUE carte de la grille décalait tout ce qui suit
           (avis, pied de page) d'autant de fois qu'il y a de cartes — la
           plus grosse cause de décalage de mise en page (CLS) de la page
-          d'accueil. */}
-      <div className="mt-1 min-h-[20px]">
-        {paliers?.length > 0 && (
-          <p className="inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
-            {remisePalier(paliers[0].pourcent, paliers[0].rang)}
-          </p>
-        )}
-      </div>
+          d'accueil. Pas de hauteur réservée en mode compact : la section
+          vedette n'a que 3-4 lignes de texte à côté, pas une grille entière
+          à protéger d'un saut. */}
+      {!compact && (
+        <div className="mt-1 min-h-[20px]">
+          {paliers?.length > 0 && (
+            <p className="inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
+              {remisePalier(paliers[0].pourcent, paliers[0].rang)}
+            </p>
+          )}
+        </div>
+      )}
     </Link>
   );
 }
