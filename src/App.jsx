@@ -15,6 +15,7 @@ const ListeColisPage = React.lazy(() => import('./components/ListeColisPage'));
 const GoogleSheetsPage = React.lazy(() => import('./components/GoogleSheetsPage'));
 const StockPage = React.lazy(() => import('./components/StockPage'));
 const FournisseurPage = React.lazy(() => import('./components/FournisseurPage'));
+const VoiturePage = React.lazy(() => import('./components/VoiturePage'));
 const ChicAffiliatePage = React.lazy(() => import('./components/ChicAffiliatePage'));
 const FacturesPage = React.lazy(() => import('./components/FacturesPage'));
 const ProfitPage = React.lazy(() => import('./components/ProfitPage'));
@@ -1291,6 +1292,7 @@ export default function App() {
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/fournisseur" element={<PermGate perm="stock"><FournisseurPage /></PermGate>} />
+          <Route path="/voiture" element={<PermGate perm="stock"><VoiturePage /></PermGate>} />
           {/* Une route par plateforme d'affiliation : la page est la même, seule
               la plateforme change. Les déclarer à la main revenait à en oublier
               une à chaque ajout. */}

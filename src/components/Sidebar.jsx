@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Archive, Store,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown, Activity,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
-  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet,
+  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet, Car,
 } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
 import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
@@ -36,6 +36,7 @@ const NAV_ITEMS = [
   { path: '/factures',    label: 'Factures',        icon: FileText, perm: 'factures' },
   { path: '/profit',      label: 'Profit',          icon: TrendingUp, perm: 'profit' },
   { path: '/fournisseur', label: 'Fournisseur',     icon: Truck, perm: 'stock' },
+  { path: '/voiture',     label: 'Voiture',         icon: Car, perm: 'stock' },
   {
     path: '/ramassage',
     label: 'Ramassage',
