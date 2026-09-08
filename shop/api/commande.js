@@ -129,20 +129,33 @@ async function copierVersSheet(url, key, commande) {
     if (!webhook) return;
 
     const produits = (commande.products || []).map(p => `${p.name}${p.size ? ` (${p.size})` : ''} ×${p.qty}`).join(', ');
-    await fetch(webhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: commande.id,
-        date: commande.date_added,
-        nom: commande.recipient.name,
-        telephone: commande.recipient.phone,
-        ville: commande.recipient.city,
-        adresse: commande.recipient.address,
-        produits,
-        total: commande.price,
-      }),
-    });
+    // Sans délai propre, un Apps Script lent ou en sommeil (cas fréquent :
+    // Google le met en veille après une période d'inactivité, le premier
+    // appel qui le réveille peut prendre plusieurs dizaines de secondes)
+    // bloquait TOUTE la réponse de la commande — le client restait sur
+    // "Envoi en cours…" indéfiniment alors que la commande, elle, était déjà
+    // enregistrée avec succès.
+    const acWebhook = new AbortController();
+    const toWebhook = setTimeout(() => acWebhook.abort(), 4000);
+    try {
+      await fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: acWebhook.signal,
+        body: JSON.stringify({
+          id: commande.id,
+          date: commande.date_added,
+          nom: commande.recipient.name,
+          telephone: commande.recipient.phone,
+          ville: commande.recipient.city,
+          adresse: commande.recipient.address,
+          produits,
+          total: commande.price,
+        }),
+      });
+    } finally {
+      clearTimeout(toWebhook);
+    }
   } catch { /* le pire cas est une ligne manquante dans la feuille, jamais une vente perdue */ }
 }
 
