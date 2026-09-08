@@ -23,21 +23,24 @@ export default function SectionVedette({ config, remises }) {
 
   return (
     <section className="mt-16">
-      <div className={`flex flex-col ${droite ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
-        <div className="lg:w-1/2 aspect-[4/3] lg:aspect-auto bg-sand overflow-hidden">
+      {/* Côte à côte dès le mobile (pas seulement à partir de "lg") — une
+          photo empilée au-dessus du texte, sur un petit écran, la reléguait
+          bien plus bas que le reste de la page d'accueil. */}
+      <div className={`flex ${droite ? 'flex-row-reverse' : 'flex-row'} lg:min-h-[560px]`}>
+        <div className="w-2/5 sm:w-1/2 aspect-[3/4] sm:aspect-auto bg-sand overflow-hidden shrink-0">
           <img src={miniatureHero(config.image)} onError={(e) => surErreurMiniature(e, config.image)}
             alt="" loading="lazy" className="w-full h-full object-cover" />
         </div>
-        <div className="lg:w-1/2 flex flex-col justify-center px-6 py-10 lg:px-16 text-center lg:text-left">
-          {config.titre && <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink">{config.titre}</h2>}
-          {config.texte && <p className="mt-3 text-sm text-gray-500 max-w-md mx-auto lg:mx-0">{config.texte}</p>}
+        <div className="w-3/5 sm:w-1/2 flex flex-col justify-center px-4 py-6 sm:px-10 lg:px-16 text-left">
+          {config.titre && <h2 className="text-lg sm:text-2xl lg:text-3xl font-semibold tracking-tight text-ink">{config.titre}</h2>}
+          {config.texte && <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500 max-w-md">{config.texte}</p>}
           <Link to={`/product-category/${config.collectionSlug}/`}
-            className="mt-5 inline-flex items-center justify-center lg:justify-start gap-1.5 text-sm font-medium text-ink hover:underline">
+            className="mt-3 sm:mt-5 inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-ink hover:underline">
             {config.boutonTexte || 'Voir la collection'} <ArrowRight size={15} />
           </Link>
 
           {produits.length > 0 && (
-            <div className="mt-8 grid grid-cols-3 gap-3 max-w-md mx-auto lg:mx-0">
+            <div className="mt-5 sm:mt-8 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-w-md">
               {produits.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
             </div>
           )}
