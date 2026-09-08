@@ -18,6 +18,16 @@
          page en haut de l'écran — un bleu marine tranchait avec le noir
          juste en dessous, créant une ligne visible entre les deux. -->
     <meta name="theme-color" content="#000000" />
+    <!-- Photos (produits, hero) et réglages (thème, prix) viennent tous du
+         même projet Supabase. Ouvrir la connexion HTTPS ici, avant même le
+         chargement du bundle JS, gagne l'aller-retour DNS+TLS complet sur la
+         toute première requête (réglages) — le faire depuis un useEffect
+         React arrivait après coup, une fois le bundle déjà téléchargé et
+         exécuté. %VITE_SUPABASE_URL% est substitué par Vite au build à
+         partir de la variable d'environnement du même nom (non secrète :
+         déjà présente en clair dans le bundle JS livré au navigateur). -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
+    <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Chargée en non-bloquant : un <link rel="stylesheet"> classique retarde
