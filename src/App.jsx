@@ -1292,7 +1292,7 @@ export default function App() {
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/fournisseur" element={<PermGate perm="stock"><FournisseurPage /></PermGate>} />
-          <Route path="/voiture" element={<PermGate perm="stock"><VoiturePage /></PermGate>} />
+          <Route path="/voiture" element={<PermGate perm="voiture"><VoiturePage /></PermGate>} />
           {/* Une route par plateforme d'affiliation : la page est la même, seule
               la plateforme change. Les déclarer à la main revenait à en oublier
               une à chaque ajout. */}

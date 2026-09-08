@@ -11,6 +11,7 @@ const ALL_PERMISSIONS = [
   { key: 'factures',         label: 'Factures' },
   { key: 'reglages',         label: 'Réglages' },
   { key: 'stock',            label: 'Stock' },
+  { key: 'voiture',          label: 'Voiture' },
   { key: 'ramassage',        label: 'Ramassage' },
   { key: 'retour',           label: 'Retour' },
   { key: 'profit',           label: 'Profit' },

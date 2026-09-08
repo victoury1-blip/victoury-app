@@ -36,7 +36,7 @@ const NAV_ITEMS = [
   { path: '/factures',    label: 'Factures',        icon: FileText, perm: 'factures' },
   { path: '/profit',      label: 'Profit',          icon: TrendingUp, perm: 'profit' },
   { path: '/fournisseur', label: 'Fournisseur',     icon: Truck, perm: 'stock' },
-  { path: '/voiture',     label: 'Voiture',         icon: Car, perm: 'stock' },
+  { path: '/voiture',     label: 'Voiture',         icon: Car, perm: 'voiture' },
   {
     path: '/ramassage',
     label: 'Ramassage',
