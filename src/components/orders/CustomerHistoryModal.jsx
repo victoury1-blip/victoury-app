@@ -52,6 +52,7 @@ export default function CustomerHistoryModal({ phone, orders, onClose }) {
           {sorted.map(o => {
             const live = getLive(o.status);
             const color = live.color || '#6B7280';
+            const taille = o.products?.[0]?.size || o.product?.size || '';
             return (
               <div key={o.id} className="px-6 py-3 hover:bg-gray-50">
                 <div className="flex items-center justify-between gap-2">
@@ -62,11 +63,21 @@ export default function CustomerHistoryModal({ phone, orders, onClose }) {
                 </div>
                 <div className="mt-1.5 flex items-end justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-xs text-gray-600 truncate">{o.products?.[0]?.name || o.product?.name || '—'}</p>
+                    <p className="text-xs text-gray-600 truncate">
+                      {o.products?.[0]?.name || o.product?.name || '—'}
+                      {taille && <span className="text-gray-400"> · {taille}</span>}
+                    </p>
                     <p className="text-[11px] text-gray-400 mt-0.5">{o.dateAdded || '—'}</p>
                   </div>
                   <span className="text-sm text-gray-800 font-medium shrink-0">{o.price || '—'} DH</span>
                 </div>
+                {(o.note || o.noteLivraison) && (
+                  <p className="mt-1.5 text-[11px] text-gray-500 bg-gray-50 rounded px-2 py-1 whitespace-pre-line">
+                    {o.note}
+                    {o.note && o.noteLivraison && <br />}
+                    {o.noteLivraison && <span className="text-red-600 font-medium">{o.noteLivraison}</span>}
+                  </p>
+                )}
               </div>
             );
           })}
