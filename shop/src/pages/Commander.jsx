@@ -133,7 +133,12 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
         }], reglages.pixel.testCode)).catch(() => {});
     }
     onVider();
-    navigate(`/merci/${r.id}`);
+    // Le panier est vidé juste avant (onVider) : sans les transmettre ici,
+    // la page de remerciement n'aurait plus aucun moyen de savoir ce qui a
+    // été commandé pour l'afficher — re-questionner Supabase par id public
+    // exposerait la commande de n'importe quel client à qui devine/partage
+    // son numéro.
+    navigate(`/merci/${r.id}`, { state: { form, lignes, total: t.total } });
   }
 
   if (!lignes.length) {
