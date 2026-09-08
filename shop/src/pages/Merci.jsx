@@ -38,7 +38,7 @@ export default function Merci() {
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
       <div className="text-center">
-        <div className="w-14 h-14 rounded-full bg-ink text-white grid place-items-center mx-auto"><Check size={26} /></div>
+        <div className="w-14 h-14 rounded-full bg-green-600 text-white grid place-items-center mx-auto"><Check size={26} /></div>
         <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{ar ? 'تم تأكيد الطلب' : 'Commande confirmée'}</h1>
         {id && <p className="mt-1 text-xs text-gray-400 font-mono">{ar ? 'رقم' : 'Numéro'} #{id}</p>}
       </div>
@@ -47,7 +47,11 @@ export default function Merci() {
         <h2 className="text-[11px] tracking-widest uppercase text-gray-400">
           {ar ? 'معلومات التوصيل' : 'Coordonnées de livraison'}
         </h2>
-        <dl className="mt-3 space-y-2 text-sm">
+        {/* dir="rtl" en arabe : sans lui, le libellé arabe (première case du
+            flex) restait affiché à gauche par défaut du navigateur, alors
+            que la lecture arabe attend le libellé à droite et la valeur
+            (souvent un nom saisi en alphabet latin) à gauche. */}
+        <dl className="mt-3 space-y-2 text-sm" dir={ar ? 'rtl' : 'ltr'}>
           {[
             [ar ? 'الاسم' : 'Nom', form.nom],
             [ar ? 'الهاتف' : 'Téléphone', form.telephone],
@@ -55,8 +59,8 @@ export default function Merci() {
             [ar ? 'العنوان' : 'Adresse', form.adresse],
           ].filter(([, v]) => v).map(([k, v]) => (
             <div key={k} className="flex justify-between gap-4">
-              <dt className="text-gray-400">{k}</dt>
-              <dd className="text-gray-800 text-right">{v}</dd>
+              <dt className="text-gray-400 shrink-0">{k}</dt>
+              <dd className="text-gray-800 text-left" dir="auto">{v}</dd>
             </div>
           ))}
         </dl>
