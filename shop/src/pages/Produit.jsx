@@ -128,7 +128,7 @@ export default function Produit({ onAjouter, theme, remises }) {
   const totalBundle = totalBrutBundle - remiseBundle;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-2 gap-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
       {/* Même carousel (une photo à la fois, flèches + vignettes) sur mobile
           ET sur bureau — l'empilement vertical de toutes les photos sur
           grand écran donnait une colonne bien plus haute que le reste de la
