@@ -496,3 +496,94 @@ alter table shop_pages add column if not exists body_ar  text;
 --  sait déjà quels modèles se vendent le mieux.
 -- ============================================================
 alter table shop_products add column if not exists is_bestseller boolean not null default false;
+
+-- ============================================================
+--  AVIS PRODUITS — notes en étoiles
+--
+--  Différent de "avis" (shop_settings.avis, des captures d'écran choisies à
+--  la main par l'admin) : ici un VRAI client note et commente un produit
+--  précis. Modéré avant publication (status), comme n'importe quelle
+--  boutique sérieuse — sans quoi le premier commentaire injurieux ou
+--  publicitaire s'affiche instantanément sur la fiche produit.
+-- ============================================================
+create table if not exists shop_reviews (
+  id                 uuid primary key default gen_random_uuid(),
+  product_id         uuid not null references shop_products(id) on delete cascade,
+  rating             smallint not null check (rating between 1 and 5),
+  author_name        text not null,
+  comment            text not null default '',
+  -- Vraie commande retrouvée (même téléphone) au moment du dépôt de l'avis —
+  -- affiché "Achat vérifié" côté client, jamais réglable par le client
+  -- lui-même (calculé côté fonction, pas un champ qu'il envoie).
+  verified_purchase  boolean not null default false,
+  status             text not null default 'en_attente' check (status in ('en_attente', 'approuve', 'rejete')),
+  created_at         timestamptz not null default now()
+);
+create index if not exists shop_reviews_product_idx on shop_reviews(product_id, status);
+alter table shop_reviews enable row level security;
+
+-- Lecture publique : uniquement les avis déjà approuvés, jamais ceux en
+-- attente ou rejetés — un avis en attente pourrait être n'importe quoi
+-- (spam, coordonnées, insulte) avant qu'un admin ne l'ait relu.
+create policy "lecture publique avis approuves" on shop_reviews
+  for select using (status = 'approuve');
+-- Modération : la même policy générique "ecriture admin boutique" que les
+-- autres tables (voir la boucle plus haut) ne couvre que les tables qui
+-- existaient déjà à ce moment — shop_reviews est créée après, donc répétée
+-- ici à l'identique.
+create policy "lecture admin avis" on shop_reviews
+  for select to authenticated using (is_shop_admin());
+create policy "ecriture admin avis" on shop_reviews
+  for all to authenticated using (is_shop_admin()) with check (is_shop_admin());
+
+-- Dépôt d'un avis : une fonction plutôt qu'un INSERT direct, pour forcer
+-- status='en_attente' et calculer verified_purchase côté serveur — un
+-- client écrivant directement dans la table aurait pu s'auto-approuver ou
+-- s'auto-certifier "achat vérifié".
+create or replace function shop_submit_review(p_product_id uuid, p_rating int, p_author text, p_comment text, p_telephone text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_verifie boolean;
+begin
+  if p_rating < 1 or p_rating > 5 then
+    raise exception 'Note invalide';
+  end if;
+  if coalesce(trim(p_author), '') = '' then
+    raise exception 'Nom requis';
+  end if;
+
+  -- "Achat vérifié" : au moins une commande de ce téléphone contenant ce
+  -- produit existe dans `orders` (recipient.phone, products[].name — la
+  -- table de l'application, pas shop_products). Absence de correspondance
+  -- (téléphone non fourni, produit renommé depuis) laisse juste l'avis sans
+  -- badge, jamais un rejet.
+  select exists (
+    select 1 from orders o, shop_products sp
+    where sp.id = p_product_id
+      and o.recipient->>'phone' = p_telephone
+      and o.products @> jsonb_build_array(jsonb_build_object('name', sp.name))
+  ) into v_verifie;
+
+  insert into shop_reviews (product_id, rating, author_name, comment, verified_purchase, status)
+  values (p_product_id, p_rating, trim(p_author), coalesce(trim(p_comment), ''), coalesce(v_verifie, false), 'en_attente');
+end;
+$$;
+grant execute on function shop_submit_review(uuid, int, text, text, text) to anon, authenticated;
+
+-- Résumé public (moyenne + nombre) d'un produit — évite de rapatrier tous
+-- les avis juste pour afficher "4.6 ★ (23 avis)" sur une carte produit.
+create or replace function shop_reviews_resume(p_product_id uuid)
+returns table (moyenne numeric, total bigint)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(avg(rating), 0)::numeric(10,2), count(*)
+  from shop_reviews
+  where product_id = p_product_id and status = 'approuve';
+$$;
+grant execute on function shop_reviews_resume(uuid) to anon, authenticated;

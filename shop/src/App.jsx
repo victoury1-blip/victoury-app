@@ -36,6 +36,7 @@ const CollectionsListe = lazy(() => import('./store/CollectionsListe'));
 const MediaListe = lazy(() => import('./store/MediaListe'));
 const ImportWoo = lazy(() => import('./store/ImportWoo'));
 const AvisListe = lazy(() => import('./store/AvisListe'));
+const AvisProduitsListe = lazy(() => import('./store/AvisProduitsListe'));
 const PagesListe = lazy(() => import('./store/PagesListe'));
 const CodesPromo = lazy(() => import('./store/CodesPromo'));
 const MetaPixel = lazy(() => import('./store/MetaPixel'));
@@ -246,6 +247,7 @@ function Administration() {
             <Route path="import-woo" element={<ImportWoo />} />
             <Route path="pages" element={<PagesListe />} />
             <Route path="avis" element={<AvisListe />} />
+            <Route path="avis-produits" element={<AvisProduitsListe />} />
             <Route path="codes-promo" element={<CodesPromo />} />
             <Route path="meta-pixel" element={<MetaPixel />} />
             <Route path="theme" element={<EditTheme />} />

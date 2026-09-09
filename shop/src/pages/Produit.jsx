@@ -7,6 +7,7 @@ import { paliersEffectifs } from '../lib/remises';
 import { trackPixel } from '../lib/pixel';
 import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
+import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
 import { useLang } from '../lib/i18n';
 
 function Accordeon({ titre, children }) {
@@ -189,6 +190,7 @@ export default function Produit({ onAjouter, theme, remises }) {
           <h1 className="text-xl tracking-wide">{produit.name}</h1>
           <BoutonFavori slug={produit.slug} className="shrink-0 mt-1 text-gray-400 hover:text-red-500" />
         </div>
+        <ResumeAvis productId={produit.id} />
         {produit.is_bestseller && (
           <p className="mt-2 inline-flex items-center bg-gradient-to-r from-amber-500 to-red-500 text-white
                         text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-sm">
@@ -339,6 +341,8 @@ export default function Produit({ onAjouter, theme, remises }) {
           <Accordeon titre={t('livraisonTitre')}>{t('livraisonTexte')}</Accordeon>
         </div>
       </div>
+
+      <AvisProduit productId={produit.id} />
 
       {produitsLies.length > 0 && (
         <div className="col-span-full mt-6 border-t border-gray-100 pt-10">
