@@ -8,12 +8,18 @@ const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
 export default function PagesListe() {
   const [pages, setPages] = useState([]);
   const [edite, setEdite] = useState(null);
+  // Le titre français sert à générer le slug (l'adresse de la page) — sans
+  // lui il n'y a pas d'URL possible. Une page pensée pour n'exister qu'en
+  // arabe garde quand même besoin d'un titre français, même minimal (il ne
+  // s'affiche qu'aux visiteurs qui n'ont pas basculé en arabe).
+  const [erreur, setErreur] = useState('');
 
   const recharger = () => listerPages().then(setPages).catch(() => {});
   useEffect(() => { recharger(); }, []);
 
   async function enregistrer() {
-    if (!edite.title.trim()) return;
+    if (!edite.title.trim()) { setErreur('Le titre (français) est obligatoire — il sert à générer l\'adresse de la page.'); return; }
+    setErreur('');
     await enregistrerPage({
       ...(edite.id ? { id: edite.id } : {}),
       slug: edite.slug || slugifier(edite.title),
@@ -34,7 +40,7 @@ export default function PagesListe() {
     <div className="max-w-2xl">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-medium">Pages</h1>
-        <button onClick={() => setEdite({ title: '', slug: '', body: '' })}
+        <button onClick={() => { setEdite({ title: '', slug: '', body: '' }); setErreur(''); }}
           className="flex items-center gap-1.5 bg-ink text-white px-4 py-2.5 text-xs tracking-widest uppercase">
           <Plus size={14} /> Nouvelle page
         </button>
@@ -53,9 +59,10 @@ export default function PagesListe() {
             <textarea value={edite.body_ar || ''} onChange={e => setEdite(x => ({ ...x, body_ar: e.target.value }))}
               rows={6} placeholder="المحتوى (بالعربية)" dir="rtl" className={`mt-3 ${champ}`} />
           </div>
+          {erreur && <p className="text-xs text-red-600">{erreur}</p>}
           <div className="flex gap-2">
             <button onClick={enregistrer} className="bg-ink text-white px-4 py-2 text-xs tracking-widest uppercase">Enregistrer</button>
-            <button onClick={() => setEdite(null)} className="px-4 py-2 text-xs tracking-widest uppercase text-gray-500">Annuler</button>
+            <button onClick={() => { setEdite(null); setErreur(''); }} className="px-4 py-2 text-xs tracking-widest uppercase text-gray-500">Annuler</button>
           </div>
         </div>
       )}
