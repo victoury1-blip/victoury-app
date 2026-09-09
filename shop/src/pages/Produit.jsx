@@ -206,10 +206,13 @@ export default function Produit({ onAjouter, theme, remises }) {
           </p>
         )}
         <p className="mt-2">
-          <span className="text-lg">{fmtPrix(produit.price)}</span>
+          {/* bdi + marge logique (ms-3, "début de ligne" — pas ml-3) : sans
+              ça, en arabe (RTL), le prix barré se collait au nouveau prix,
+              la marge physique tombant du mauvais côté visuel. */}
+          <bdi><span className="text-lg">{fmtPrix(produit.price, lang)}</span></bdi>
           {/* Le prix barré doit sauter aux yeux : c'est lui qui vend la
               réduction, un gris discret le rendait presque invisible. */}
-          {promo && <span className="ml-3 text-sm text-red-500 line-through">{fmtPrix(produit.compare_at)}</span>}
+          {promo && <bdi><span className="ms-3 text-sm text-red-500 line-through">{fmtPrix(produit.compare_at, lang)}</span></bdi>}
         </p>
         {paliers?.length > 0 && (
           <p className="mt-2 inline-flex items-center gap-1.5 bg-red-50 text-red-600 text-xs font-medium px-2.5 py-1 rounded-full">
@@ -336,7 +339,12 @@ export default function Produit({ onAjouter, theme, remises }) {
                   toutes lettres ("درهم") évite en plus le sigle latin "DH"
                   qui, lui, se lit dans l'autre sens au milieu d'un mot arabe. */}
               <bdi>
-                {remiseBundle > 0 && <span className="line-through text-red-500 mr-1.5">{fmtPrix(totalBrutBundle, lang)}</span>}
+                {/* me-1.5 (marge logique "fin de ligne") plutôt que mr-1.5 :
+                    en arabe (RTL), une marge "droite" physique tombait du
+                    mauvais côté — les deux prix se touchaient sans espace,
+                    au lieu de l'espace qui devait séparer le prix barré du
+                    nouveau prix. */}
+                {remiseBundle > 0 && <span className="line-through text-red-500 me-1.5">{fmtPrix(totalBrutBundle, lang)}</span>}
                 {fmtPrix(totalBundle, lang)}
               </bdi>
             </button>

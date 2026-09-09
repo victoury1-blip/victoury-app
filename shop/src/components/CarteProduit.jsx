@@ -11,7 +11,7 @@ import { ResumeAvis } from './AvisProduit';
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
 function CarteProduit({ produit, remises, categorie, compact }) {
-  const { t, remisePalier } = useLang();
+  const { t, remisePalier, lang } = useLang();
   // Règles globales + celles ciblant justement la collection de CE produit —
   // une remise réglée pour une autre collection ne doit pas s'afficher ici.
   const paliers = paliersEffectifs(remises, produit.collection_id);
@@ -71,9 +71,11 @@ function CarteProduit({ produit, remises, categorie, compact }) {
           carte de la grille dès qu'elle apparaît — même cause de CLS que
           le badge de remise juste en dessous. */}
       {!compact && <div className="mt-1 min-h-[15px]"><ResumeAvis productId={produit.id} taille={12} className="" /></div>}
+      {/* me-2 (marge logique) + bdi : mr-2 tombait du mauvais côté visuel en
+          arabe (RTL), collant le prix barré au nouveau prix sans espace. */}
       <p className="mt-1 text-sm">
-        {promo && <span className="mr-2 text-xs text-gray-400 line-through">{fmtPrix(produit.compare_at)}</span>}
-        <span className="font-semibold">{fmtPrix(produit.price)}</span>
+        {promo && <bdi><span className="me-2 text-xs text-gray-400 line-through">{fmtPrix(produit.compare_at, lang)}</span></bdi>}
+        <bdi><span className="font-semibold">{fmtPrix(produit.price, lang)}</span></bdi>
       </p>
       {/* Hauteur réservée même sans palier : les remises arrivent après le
           premier rendu (chargées depuis Supabase), et ce badge qui apparaît
