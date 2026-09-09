@@ -38,6 +38,7 @@ export default function Produit({ onAjouter, theme, remises }) {
   const [inclurePartenaire, setInclurePartenaire] = useState(true);
   const [tailleBundle, setTailleBundle] = useState('');
   const [photoActive, setPhotoActive] = useState(0);
+  const [guideOuvert, setGuideOuvert] = useState(false);
   const carouselRef = useRef(null);
 
   // Rien n'indiquait qu'il y avait d'autres photos à côté du swipe au doigt —
@@ -223,7 +224,18 @@ export default function Produit({ onAjouter, theme, remises }) {
         )}
 
         <div className="mt-6">
-          <p className="text-[13px] tracking-normal text-ink font-medium">{t('tailleLabel')}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] tracking-normal text-ink font-medium">{t('tailleLabel')}</p>
+            {/* Réglé (photo + activation) depuis /store/edit-theme — absent
+                tant que l'admin n'a rien déposé, pour ne jamais afficher un
+                lien mort. */}
+            {theme?.guideTailles?.active && theme?.guideTailles?.image && (
+              <button type="button" onClick={() => setGuideOuvert(true)}
+                className="text-[12px] underline text-gray-500 hover:text-ink">
+                {t('guideTailles')}
+              </button>
+            )}
+          </div>
           {/* Réglable depuis /store/theme : la grille convient à un choix
               court (S…XL), la liste à un choix long comme des pointures. */}
           <div className={theme?.produitAffichageTailles === 'liste' ? 'flex flex-col gap-2 mt-3 max-w-xs' : 'flex flex-wrap gap-2 mt-3'}>
@@ -333,6 +345,20 @@ export default function Produit({ onAjouter, theme, remises }) {
           <h2 className="text-sm tracking-[0.2em] uppercase text-gray-500">{t('produitsSimilaires')}</h2>
           <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
             {produitsLies.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
+          </div>
+        </div>
+      )}
+
+      {guideOuvert && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setGuideOuvert(false)}>
+          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-medium">{t('guideTailles')}</h2>
+              <button onClick={() => setGuideOuvert(false)} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100">
+                <X size={16} className="text-gray-400" />
+              </button>
+            </div>
+            <img src={theme.guideTailles.image} alt={t('guideTailles')} className="w-full h-auto" />
           </div>
         </div>
       )}

@@ -77,6 +77,12 @@ export const THEME_DEFAUT = {
   },
   texteSousHero: { texte: '', taille: 14, couleurTexte: '#000000', couleurFond: '#f9f6f0' },
 
+  // Guide des tailles : une seule image (tableau de mesures) valable pour
+  // toute la boutique — plus simple à tenir à jour qu'un tableau par
+  // produit, et suffisant pour une boutique mono-catégorie de vêtements.
+  // Désactivé par défaut : rien à montrer tant que l'admin n'a rien déposé.
+  guideTailles: { active: false, image: '' },
+
   // Section "vedette" : une collection mise en avant à mi-page (grande photo
   // + texte + quelques produits), comme le fait un site de mode pour son
   // lancement du moment — plus marquant qu'une simple carte dans la grille

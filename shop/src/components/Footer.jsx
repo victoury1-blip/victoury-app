@@ -87,7 +87,11 @@ export default function Footer({ theme, collections }) {
           </div>
         </div>
         {liens(t('collections'), categories)}
-        {liens(t('mentionsLegales'), f.mentions)}
+        {/* "Suivre ma commande" en tête de cette colonne : c'est là qu'un
+            client cherche un lien utilitaire comme celui-ci, à côté des
+            mentions légales — pas une colonne à part qui casserait la
+            grille à 3 colonnes du pied de page. */}
+        {liens(t('mentionsLegales'), [{ label: t('suivreCommande'), url: '/suivi' }, ...(f.mentions || [])])}
       </div>
       <div className="border-t border-gray-200">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">

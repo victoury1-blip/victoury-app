@@ -188,6 +188,7 @@ export async function chargerReglages() {
       ...THEME_DEFAUT, ...themeSauve,
       hero: { ...THEME_DEFAUT.hero, ...(themeSauve.hero || {}) },
       texteSousHero: { ...THEME_DEFAUT.texteSousHero, ...(themeSauve.texteSousHero || {}) },
+      guideTailles: { ...THEME_DEFAUT.guideTailles, ...(themeSauve.guideTailles || {}) },
       sectionVedette: { ...THEME_DEFAUT.sectionVedette, ...(themeSauve.sectionVedette || {}) },
       footer: {
         ...THEME_DEFAUT.footer, ...(themeSauve.footer || {}),

@@ -139,6 +139,7 @@ export default function EditTheme() {
   const uHero = (k, v) => setT(x => ({ ...x, hero: { ...x.hero, [k]: v } }));
   const uSousHero = (k, v) => setT(x => ({ ...x, texteSousHero: { ...x.texteSousHero, [k]: v } }));
   const uVedette = (k, v) => setT(x => ({ ...x, sectionVedette: { ...x.sectionVedette, [k]: v } }));
+  const uGuide = (k, v) => setT(x => ({ ...x, guideTailles: { ...x.guideTailles, [k]: v } }));
   const uFooter = (k, v) => setT(x => ({ ...x, footer: { ...x.footer, [k]: v } }));
 
   const majAnnonce = (i, v) => setT(x => ({ ...x, annonces: x.annonces.map((a, j) => (j === i ? v : a)) }));
@@ -412,6 +413,19 @@ export default function EditTheme() {
                   <textarea value={r.texte} onChange={e => u('reassurance', t.reassurance.map((x, j) => j === i ? { ...x, texte: e.target.value } : x))} rows={2} className={champ} />
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">Guide des tailles</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Une seule photo (tableau de mesures), valable pour toute la boutique — affichée en pop-up sur chaque fiche produit</p>
+              </div>
+              <Bascule actif={t.guideTailles.active} onChange={() => uGuide('active', !t.guideTailles.active)} />
+            </div>
+            <div className="mt-4">
+              <DeposeImage titre="Photo du tableau" url={t.guideTailles.image} onChange={v => uGuide('image', v)} className="w-full h-40" />
             </div>
           </section>
 
