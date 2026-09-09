@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Search, ShoppingBag, Heart, Menu, X, Languages } from 'lucide-react';
+import { ShoppingBag, Heart, Menu, X, Languages } from 'lucide-react';
 import Wordmark from './Wordmark';
 import { DrapeauFrance, DrapeauMaroc } from './icons';
 import { useLang } from '../lib/i18n';
@@ -82,9 +82,6 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
   const Icones = (
     <div className="flex items-center gap-1">
       {BoutonLangue}
-      <Link to="/recherche" className="p-2 text-gray-600 hover:text-ink" aria-label={t('rechercher')}>
-        <Search size={19} />
-      </Link>
       <Link to="/favoris" className="relative p-2 text-gray-600 hover:text-ink" aria-label={t('mesFavoris')}>
         <Heart size={19} />
         {nbFavoris > 0 && (
