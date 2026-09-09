@@ -34,6 +34,7 @@ const DICT = {
     mesFavoris: 'Mes favoris', aucunFavori: "Vous n'avez encore aucun favori.",
     voirLaBoutique: 'Voir la boutique', meilleureVente: 'Meilleure vente',
     achetezEnsemble: 'Souvent achetés ensemble', ajouterLaSelection: 'Ajouter la sélection au panier',
+    pourSeulement: 'pour', seulement: 'seulement', auLieuDe: 'au lieu de',
     guideTailles: 'Guide des tailles',
   },
   ar: {
@@ -63,6 +64,7 @@ const DICT = {
     mesFavoris: 'مفضلتي', aucunFavori: 'ليس لديك أي منتج في المفضلة بعد.',
     voirLaBoutique: 'مشاهدة المتجر', meilleureVente: 'الأكثر مبيعًا',
     achetezEnsemble: 'غالبًا ما يُشترى مع', ajouterLaSelection: 'أضف الاختيار إلى السلة',
+    pourSeulement: 'ب', seulement: 'فقط', auLieuDe: 'عوض',
     guideTailles: 'دليل المقاسات',
   },
 };

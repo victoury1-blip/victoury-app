@@ -331,22 +331,23 @@ export default function Produit({ onAjouter, theme, remises }) {
               }}
               className="mt-3 w-full border border-ink text-ink py-3 text-xs tracking-widest uppercase
                          disabled:border-gray-200 disabled:text-gray-400 transition-colors">
-              {t('ajouterLaSelection')} —{' '}
-              {/* bdi : isole le prix (chiffres + devise, toujours affichés de
-                  gauche à droite) du sens de lecture du reste du bouton — sans
-                  lui, l'algorithme bidi mélangeait l'ordre "DH" / tiret /
-                  montant barré au milieu d'une phrase arabe. La devise en
-                  toutes lettres ("درهم") évite en plus le sigle latin "DH"
-                  qui, lui, se lit dans l'autre sens au milieu d'un mot arabe. */}
-              <bdi>
-                {/* me-1.5 (marge logique "fin de ligne") plutôt que mr-1.5 :
-                    en arabe (RTL), une marge "droite" physique tombait du
-                    mauvais côté — les deux prix se touchaient sans espace,
-                    au lieu de l'espace qui devait séparer le prix barré du
-                    nouveau prix. */}
-                {remiseBundle > 0 && <span className="line-through text-red-500 me-1.5">{fmtPrix(totalBrutBundle, lang)}</span>}
-                {fmtPrix(totalBundle, lang)}
-              </bdi>
+              {/* "Ajouter... pour X seulement au lieu de Y" plutôt que
+                  "Ajouter... — Y X" (prix barré puis nouveau prix) : la
+                  phrase dit explicitement l'économie, plus vendeur qu'un
+                  simple rapprochement de deux prix. bdi isole chaque prix
+                  (chiffres + devise, toujours de gauche à droite) du sens
+                  de lecture de la phrase — sans lui, l'algorithme bidi
+                  mélangeait l'ordre des mots en arabe. La devise en toutes
+                  lettres ("درهم") évite en plus le sigle latin "DH", qui se
+                  lit dans l'autre sens au milieu d'un mot arabe. */}
+              {t('ajouterLaSelection')} {t('pourSeulement')}{' '}
+              <bdi>{fmtPrix(totalBundle, lang)}</bdi>{' '}
+              {remiseBundle > 0 ? (
+                <>
+                  {t('seulement')} {t('auLieuDe')}{' '}
+                  <bdi><span className="line-through text-red-500">{fmtPrix(totalBrutBundle, lang)}</span></bdi>
+                </>
+              ) : t('seulement')}
             </button>
           </div>
         )}
