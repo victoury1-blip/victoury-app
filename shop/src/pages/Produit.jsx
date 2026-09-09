@@ -336,13 +336,18 @@ export default function Produit({ onAjouter, theme, remises }) {
         )}
 
         {produit.description && <p className="mt-6 text-sm text-gray-600 leading-relaxed">{produit.description}</p>}
-        <div className="mt-8">
-          <Accordeon titre={t('detailsProduit')}>{produit.details}</Accordeon>
-          <Accordeon titre={t('livraisonTitre')}>{t('livraisonTexte')}</Accordeon>
-        </div>
       </div>
 
+      {/* Avis avant les accordéons "Détails / Livraison" : sur mobile (une
+          seule colonne), l'ordre visuel suit l'ordre du code — les avis,
+          preuve sociale qui aide à décider, passent avant des informations
+          qu'on consulte seulement une fois déjà convaincu. */}
       <AvisProduit productId={produit.id} />
+
+      <div className="col-span-full">
+        <Accordeon titre={t('detailsProduit')}>{produit.details}</Accordeon>
+        <Accordeon titre={t('livraisonTitre')}>{t('livraisonTexte')}</Accordeon>
+      </div>
 
       {produitsLies.length > 0 && (
         <div className="col-span-full mt-6 border-t border-gray-100 pt-10">
