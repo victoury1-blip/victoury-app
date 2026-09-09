@@ -59,7 +59,7 @@ export default function AvisProduit({ productId }) {
   }
 
   return (
-    <div className="col-span-full mt-10 border-t border-gray-100 pt-10" dir={ar ? 'rtl' : 'ltr'}>
+    <div className="mt-10 border-t border-gray-100 pt-10" dir={ar ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-sm tracking-[0.2em] uppercase text-gray-500">
           {ar ? 'آراء العملاء' : 'Avis clients'} {avis?.length > 0 && `(${avis.length})`}

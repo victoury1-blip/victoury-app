@@ -128,7 +128,15 @@ export default function Produit({ onAjouter, theme, remises }) {
   const totalBundle = totalBrutBundle - remiseBundle;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Grid à deux colonnes ISOLÉ dans son propre conteneur : les avis et
+          les produits similaires (ci-dessous) n'y sont plus des enfants
+          "col-span-full" — les mélanger aux mêmes pistes de grille que la
+          colonne prix (lg:sticky) la laissait rester épinglée à l'écran,
+          à mi-largeur, pendant que ces sections pleine largeur défilaient
+          "derrière" elle — un effet de superposition, pas un vrai bug de
+          positionnement, mais qui rendait la page illisible. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
       {/* Même carousel (une photo à la fois, flèches + vignettes) sur mobile
           ET sur bureau — l'empilement vertical de toutes les photos sur
           grand écran donnait une colonne bien plus haute que le reste de la
@@ -341,11 +349,12 @@ export default function Produit({ onAjouter, theme, remises }) {
           <Accordeon titre={t('livraisonTitre')}>{t('livraisonTexte')}</Accordeon>
         </div>
       </div>
+      </div>
 
       <AvisProduit productId={produit.id} />
 
       {produitsLies.length > 0 && (
-        <div className="col-span-full mt-6 border-t border-gray-100 pt-10">
+        <div className="mt-6 border-t border-gray-100 pt-10">
           <h2 className="text-sm tracking-[0.2em] uppercase text-gray-500">{t('produitsSimilaires')}</h2>
           <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
             {produitsLies.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
