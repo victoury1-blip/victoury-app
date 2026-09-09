@@ -36,5 +36,8 @@
         { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/relance-paniers", "schedule": "*/15 * * * *" }
   ]
 }

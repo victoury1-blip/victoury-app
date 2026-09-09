@@ -587,3 +587,16 @@ as $$
   where product_id = p_product_id and status = 'approuve';
 $$;
 grant execute on function shop_reviews_resume(uuid) to anon, authenticated;
+
+-- ============================================================
+--  PANIERS ABANDONNÉS — relance WhatsApp automatique
+--
+--  Un panier ne doit recevoir qu'UNE SEULE relance : sans ce drapeau, un
+--  cron qui tourne toutes les 15 min renverrait le même message à la même
+--  cliente encore et encore tant que le panier reste "abandonné".
+-- ============================================================
+alter table shop_paniers_abandonnes add column if not exists relance_envoyee boolean not null default false;
+alter table shop_paniers_abandonnes add column if not exists relance_envoyee_at timestamptz;
+create index if not exists shop_paniers_abandonnes_relance_idx on shop_paniers_abandonnes(relance_envoyee, created_at);
+-- Le cron (api/relance-paniers.js) écrit avec la clé de service (contourne
+-- RLS) — pas de nouvelle policy nécessaire pour l'UPDATE de ces deux colonnes.

@@ -21,6 +21,13 @@ export const REGLAGES_DEFAUT = {
   // src/lib/sonCommande.js) — un extrait audio en base64, ou vide pour
   // garder le carillon synthétisé par défaut.
   sonCommandeUrl: '',
+
+  // Relance automatique des paniers abandonnés par WhatsApp (voir
+  // api/relance-paniers.js, déclenché par un cron Vercel). Désactivée par
+  // défaut : sans nom de modèle WhatsApp APPROUVÉ par Meta, la relance
+  // échouerait silencieusement — à l'admin de coller ici le nom exact du
+  // modèle qu'il a fait valider dans son compte WhatsApp Business.
+  relanceWhatsapp: { active: false, delaiMinutes: 60, templateNom: '', templateLangue: 'fr' },
 };
 
 // Le Meta Pixel vit dans sa propre clé : ni son activation ni son identifiant

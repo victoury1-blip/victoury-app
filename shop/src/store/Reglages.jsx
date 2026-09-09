@@ -49,6 +49,7 @@ export default function Reglages() {
   }, []);
 
   const u = (k, v) => setR(x => ({ ...x, [k]: v }));
+  const uRelance = (k, v) => setR(x => ({ ...x, relanceWhatsapp: { ...x.relanceWhatsapp, [k]: v } }));
 
   async function enregistrer() {
     setEnregistrement(true);
@@ -110,6 +111,42 @@ export default function Reglages() {
             l'équipe, Déployer → Nouveau déploiement → Application Web (accès : Tout le monde), puis
             collez l'URL obtenue ici. Laissez vide pour désactiver.
           </p>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-1">Relance panier abandonné (WhatsApp)</h2>
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={r.relanceWhatsapp?.active || false}
+                onChange={e => uRelance('active', e.target.checked)} className="w-4 h-4" />
+              <span className="text-xs text-gray-500">Active</span>
+            </label>
+          </div>
+          <p className="text-xs text-gray-400 mb-3">
+            Envoie automatiquement un message WhatsApp aux clientes qui ont laissé un panier sans commander —
+            un cron vérifie toutes les 15 min. Nécessite un modèle de message déjà{' '}
+            <strong>approuvé par Meta</strong> (WhatsApp Manager → Modèles de message, un modèle avec une seule
+            variable dans le corps, ex. « Bonjour {'{{1}}'}, il vous reste un article dans votre panier chez
+            Victoury… »), et les clés WHATSAPP_TOKEN / WHATSAPP_PHONE_ID / SUPABASE_SERVICE_ROLE_KEY /
+            CRON_SECRET réglées dans Vercel (jamais ici, elles ne doivent jamais transiter par le navigateur).
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={label}>Nom du modèle WhatsApp</label>
+              <input value={r.relanceWhatsapp?.templateNom || ''} onChange={e => uRelance('templateNom', e.target.value)}
+                placeholder="panier_abandonne_fr" className={champ} />
+            </div>
+            <div>
+              <label className={label}>Langue du modèle</label>
+              <input value={r.relanceWhatsapp?.templateLangue || 'fr'} onChange={e => uRelance('templateLangue', e.target.value)}
+                placeholder="fr" className={champ} />
+            </div>
+            <div>
+              <label className={label}>Délai avant relance (minutes)</label>
+              <input value={r.relanceWhatsapp?.delaiMinutes ?? 60} onChange={e => uRelance('delaiMinutes', parseInt(e.target.value, 10) || 60)}
+                type="number" min="15" className={champ} />
+            </div>
+          </div>
         </section>
 
         <section className="bg-white border border-gray-200 rounded-xl p-5">
