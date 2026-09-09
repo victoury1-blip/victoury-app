@@ -57,6 +57,21 @@ export default function PagesListe() {
       {edite && (
         <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5 space-y-3">
           <input value={edite.title} onChange={e => setEdite(x => ({ ...x, title: e.target.value }))} placeholder="Titre (français)" className={champ} />
+          <div>
+            {/* Visible et modifiable : le pied de page (mentions légales)
+                pointe vers des adresses fixes ("/politique-dechange") — le
+                slug déduit automatiquement du titre ne tombe pas toujours
+                exactement dessus (accents, apostrophes), sans ce champ
+                impossible de corriger et de faire correspondre les deux. */}
+            <div className="flex items-center gap-1 text-xs text-gray-400">
+              <span>/</span>
+              <input value={edite.slug || slugifier(edite.title)} onChange={e => setEdite(x => ({ ...x, slug: slugifier(e.target.value) }))}
+                placeholder="adresse-de-la-page" className="flex-1 border border-gray-200 px-2 py-1.5 text-xs bg-white font-mono" />
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Doit correspondre exactement au lien réglé dans le pied de page (/store/theme) pour que le lien mène bien ici.
+            </p>
+          </div>
           <textarea value={edite.body} onChange={e => setEdite(x => ({ ...x, body: e.target.value }))} rows={6} placeholder="Contenu (français)" className={champ} />
           {/* Facultatif : une page non traduite retombe simplement sur son
               contenu français quand le client bascule le site en arabe. */}
