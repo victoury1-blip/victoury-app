@@ -26,14 +26,9 @@ export default function Merci() {
           {ar ? 'شكرًا لكم! سنتصل بكم قريبًا لتأكيد طلبكم.' : 'Merci ! Nous vous appelons très vite pour confirmer votre commande.'}
         </p>
         {id && <p className="mt-4 text-xs text-gray-400">{t('numeroCommande')} : <span className="font-mono">{id}</span></p>}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/" className="inline-block border border-ink px-8 py-3 text-[11px] tracking-widest uppercase">
-            {t('retourBoutique')}
-          </Link>
-          <Link to="/suivi" className="inline-block bg-ink text-white px-8 py-3 text-[11px] tracking-widest uppercase">
-            {t('suivreCommande')}
-          </Link>
-        </div>
+        <Link to="/" className="inline-block mt-8 border border-ink px-8 py-3 text-[11px] tracking-widest uppercase">
+          {t('retourBoutique')}
+        </Link>
       </div>
     );
   }
@@ -97,10 +92,7 @@ export default function Merci() {
         </div>
       </div>
 
-      <Link to="/suivi" className="mt-10 block w-full text-center border border-ink py-4 text-xs tracking-widest uppercase">
-        {t('suivreCommande')}
-      </Link>
-      <Link to="/" className="mt-3 block w-full text-center bg-ink text-white py-4 text-xs tracking-widest uppercase">
+      <Link to="/" className="mt-10 block w-full text-center bg-ink text-white py-4 text-xs tracking-widest uppercase">
         {ar ? 'متابعة التسوق' : 'Continuer mes achats'}
       </Link>
     </div>
