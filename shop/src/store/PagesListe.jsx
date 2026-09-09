@@ -20,14 +20,22 @@ export default function PagesListe() {
   async function enregistrer() {
     if (!edite.title.trim()) { setErreur('Le titre (français) est obligatoire — il sert à générer l\'adresse de la page.'); return; }
     setErreur('');
-    await enregistrerPage({
-      ...(edite.id ? { id: edite.id } : {}),
-      slug: edite.slug || slugifier(edite.title),
-      title: edite.title.trim(), body: edite.body || '', published: true,
-      title_ar: edite.title_ar || '', body_ar: edite.body_ar || '',
-    });
-    setEdite(null);
-    recharger();
+    // Sans ce try/catch, une erreur Supabase (ex. RLS, slug déjà pris) était
+    // une exception non attrapée : le formulaire restait ouvert, la liste
+    // ne se rafraîchissait jamais, et rien n'indiquait pourquoi — un échec
+    // strictement identique, à l'écran, à un clic qui n'aurait rien fait.
+    try {
+      await enregistrerPage({
+        ...(edite.id ? { id: edite.id } : {}),
+        slug: edite.slug || slugifier(edite.title),
+        title: edite.title.trim(), body: edite.body || '', published: true,
+        title_ar: edite.title_ar || '', body_ar: edite.body_ar || '',
+      });
+      setEdite(null);
+      recharger();
+    } catch (e) {
+      setErreur(e.message || "L'enregistrement a échoué.");
+    }
   }
 
   async function retirer(p) {
