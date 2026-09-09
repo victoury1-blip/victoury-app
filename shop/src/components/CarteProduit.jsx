@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { paliersEffectifs } from '../lib/remises';
 import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
 import BoutonFavori from './BoutonFavori';
+import { ResumeAvis } from './AvisProduit';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
@@ -64,14 +64,13 @@ function CarteProduit({ produit, remises, categorie, compact }) {
       )}
       {categorie && <p className="mt-2 text-[10px] tracking-widest uppercase text-gray-400">{categorie}</p>}
       <h3 className="mt-1 text-sm text-gray-800 truncate">{produit.name}</h3>
-      {/* Pas encore de vraies notes clients (les avis sont des captures
-          WhatsApp, pas un système de notation) — étoiles vides plutôt
-          qu'inventer une note, en attendant un vrai système d'avis. */}
-      {!compact && (
-        <div className="mt-1 flex gap-0.5 text-gray-200">
-          {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" strokeWidth={0} />)}
-        </div>
-      )}
+      {/* Vraie moyenne (shop_reviews) — absente tant qu'aucun avis n'est
+          approuvé pour ce produit, jamais une note inventée. Hauteur
+          réservée : la moyenne arrive après coup (requête Supabase), sans
+          cette réserve elle décale tout ce qui suit d'un cran à chaque
+          carte de la grille dès qu'elle apparaît — même cause de CLS que
+          le badge de remise juste en dessous. */}
+      {!compact && <div className="mt-1 min-h-[15px]"><ResumeAvis productId={produit.id} taille={12} className="" /></div>}
       <p className="mt-1 text-sm">
         {promo && <span className="mr-2 text-xs text-gray-400 line-through">{fmtPrix(produit.compare_at)}</span>}
         <span className="font-semibold">{fmtPrix(produit.price)}</span>

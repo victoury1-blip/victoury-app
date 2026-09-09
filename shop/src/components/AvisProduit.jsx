@@ -17,15 +17,16 @@ function Etoiles({ valeur, taille = 14, onChange }) {
   );
 }
 
-/** Résumé "4.6 ★ (23 avis)" — utilisable seul (fiche produit) sans charger
-    la liste complète des avis. */
-export function ResumeAvis({ productId }) {
+/** Résumé "4.6 ★ (23 avis)" — utilisable seul (fiche produit, carte de
+    grille) sans charger la liste complète des avis. `taille`/`className`
+    réglables pour tenir dans une carte plus petite que la fiche produit. */
+export function ResumeAvis({ productId, taille = 14, className = 'mt-2' }) {
   const [resume, setResume] = useState(null);
   useEffect(() => { let vif = true; chargerResumeAvis(productId).then(r => { if (vif) setResume(r); }); return () => { vif = false; }; }, [productId]);
   if (!resume || resume.total === 0) return null;
   return (
-    <div className="flex items-center gap-1.5 mt-2">
-      <Etoiles valeur={resume.moyenne} />
+    <div className={`flex items-center gap-1.5 ${className}`}>
+      <Etoiles valeur={resume.moyenne} taille={taille} />
       <span className="text-xs text-gray-500">{resume.moyenne.toFixed(1)} ({resume.total})</span>
     </div>
   );
