@@ -27,6 +27,7 @@ function Accordeon({ titre, children }) {
 
 export default function Produit({ onAjouter, theme, remises }) {
   const { t, remisePalier, lang } = useLang();
+  const ar = lang === 'ar';
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
@@ -340,14 +341,22 @@ export default function Produit({ onAjouter, theme, remises }) {
                   mélangeait l'ordre des mots en arabe. La devise en toutes
                   lettres ("درهم") évite en plus le sigle latin "DH", qui se
                   lit dans l'autre sens au milieu d'un mot arabe. */}
-              {t('ajouterLaSelection')} {t('pourSeulement')}{' '}
-              <bdi>{fmtPrix(totalBundle, lang)}</bdi>{' '}
-              {remiseBundle > 0 ? (
-                <>
-                  {t('seulement')} {t('auLieuDe')}{' '}
-                  <bdi><span className="line-through text-red-500">{fmtPrix(totalBrutBundle, lang)}</span></bdi>
-                </>
-              ) : t('seulement')}
+              {/* dir explicite sur toute la phrase : sans lui, un retour à la
+                  ligne (bouton étroit) pouvait faire remonter le DERNIER
+                  morceau logique (le prix barré) sur la PREMIÈRE ligne
+                  visuelle en arabe — l'algorithme bidi appliqué ligne par
+                  ligne, pas à la phrase entière. Prix remisé en gras : c'est
+                  lui qui doit sauter aux yeux, pas le prix barré. */}
+              <span dir={ar ? 'rtl' : 'ltr'}>
+                {t('ajouterLaSelection')} {t('pourSeulement')}{' '}
+                <bdi className="font-bold">{fmtPrix(totalBundle, lang)}</bdi>{' '}
+                {remiseBundle > 0 ? (
+                  <>
+                    {t('seulement')} {t('auLieuDe')}{' '}
+                    <bdi><span className="line-through text-red-500 font-normal">{fmtPrix(totalBrutBundle, lang)}</span></bdi>
+                  </>
+                ) : t('seulement')}
+              </span>
             </button>
           </div>
         )}
