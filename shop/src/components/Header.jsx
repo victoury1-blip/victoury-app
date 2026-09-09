@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Search, ShoppingBag, Heart, Menu, X, Languages } from 'lucide-react';
 import Wordmark from './Wordmark';
+import { DrapeauFrance, DrapeauMaroc } from './icons';
 import { useLang } from '../lib/i18n';
 import { lireFavoris } from '../lib/wishlist';
 
@@ -68,12 +69,12 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
           à dire "il y a un choix ici" à un premier coup d'œil. */}
       <Languages size={13} className="text-gray-400 shrink-0" aria-hidden />
       <button onClick={() => setLang('fr')} aria-label="Français" title="Français"
-        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'fr' ? 'bg-ink' : 'opacity-40 hover:opacity-75'}`}>
-        🇫🇷
+        className={`px-1.5 py-1 leading-none transition-colors ${lang === 'fr' ? 'bg-ink' : 'opacity-40 hover:opacity-75'}`}>
+        <DrapeauFrance size={11} />
       </button>
       <button onClick={() => setLang('ar')} aria-label="العربية" title="العربية"
-        className={`px-1.5 py-1 text-base leading-none transition-colors ${lang === 'ar' ? 'bg-ink' : 'opacity-40 hover:opacity-75'}`}>
-        🇲🇦
+        className={`px-1.5 py-1 leading-none transition-colors ${lang === 'ar' ? 'bg-ink' : 'opacity-40 hover:opacity-75'}`}>
+        <DrapeauMaroc size={11} />
       </button>
     </div>
   );

@@ -45,3 +45,27 @@ export function IconePayPal({ size = 16, ...props }) {
     </svg>
   );
 }
+
+/* Drapeaux du sélecteur de langue (Header) — en SVG plutôt qu'en émoji
+   "flag" (🇫🇷🇲🇦) : ces émojis reposent sur une police système qui les
+   affiche correctement sur Mac/iPhone, mais Windows n'en a longtemps
+   affiché que les deux lettres du pays dans un rectangle noir — un
+   drapeau dessiné à la main s'affiche pareil sur tous les systèmes. */
+export function DrapeauFrance({ size = 16, ...props }) {
+  return (
+    <svg viewBox="0 0 3 2" width={size * 1.5} height={size} {...props}>
+      <rect width="1" height="2" fill="#002395" />
+      <rect x="1" width="1" height="2" fill="#fff" />
+      <rect x="2" width="1" height="2" fill="#ED2939" />
+    </svg>
+  );
+}
+export function DrapeauMaroc({ size = 16, ...props }) {
+  return (
+    <svg viewBox="0 0 3 2" width={size * 1.5} height={size} {...props}>
+      <rect width="3" height="2" fill="#C1272D" />
+      <path fill="none" stroke="#006233" strokeWidth="0.07"
+        d="M1.5.5 1.618.838 1.976.846 1.69 1.062 1.794 1.405 1.5 1.2 1.206 1.405 1.31 1.062 1.024.846 1.382.838Z" />
+    </svg>
+  );
+}
