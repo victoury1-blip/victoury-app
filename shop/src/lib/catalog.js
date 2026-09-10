@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { paliersEffectifs } from './remises';
-import { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, stockTaille } from './catalogDefaults';
+import { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, TIKTOK_DEFAUT, stockTaille } from './catalogDefaults';
 
 // Réexportés pour que les fichiers qui les importaient déjà depuis ici (la
 // majorité du code) n'aient rien à changer — seuls App.jsx et Accueil.jsx,
@@ -181,7 +181,7 @@ export async function chargerPage(slug) {
 
 export async function chargerReglages() {
   const { data, error } = await supabase.from('shop_settings').select('key, value');
-  if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT } };
+  if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT }, tiktok: { ...TIKTOK_DEFAUT } };
   const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
   const themeSauve = map.theme || {};
   const remises = Array.isArray(map.remises) ? map.remises : [];
@@ -197,6 +197,7 @@ export async function chargerReglages() {
     remises,
     pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
     clarity: { ...CLARITY_DEFAUT, ...(map.microsoft_clarity || {}) },
+    tiktok: { ...TIKTOK_DEFAUT, ...(map.tiktok_pixel || {}) },
     theme: {
       ...THEME_DEFAUT, ...themeSauve,
       hero: { ...THEME_DEFAUT.hero, ...(themeSauve.hero || {}) },
