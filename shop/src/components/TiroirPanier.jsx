@@ -8,7 +8,8 @@ import { chargerNouveautes, chargerProduitsParCollections } from '../lib/catalog
 import { useLang } from '../lib/i18n';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
-  const { t, encoreEtRemise, etLivraisonGratuite } = useLang();
+  const { t, lang, encoreEtRemise, etLivraisonGratuite } = useLang();
+  const ar = lang === 'ar';
   const [suggestions, setSuggestions] = useState([]);
   // Refermer puis rouvrir le tiroir sans avoir changé le panier entre-temps
   // (le cas le plus courant : le client jette un œil, referme, en rajoute
@@ -65,7 +66,13 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/30" onClick={onFermer} />
-      <aside className="relative bg-white w-full max-w-md h-full flex flex-col shadow-2xl">
+      {/* dir explicite : sans lui, le contenu du tiroir (titre, articles,
+          "Profitez-en pour ajouter", sous-total) restait toujours orienté
+          de gauche à droite même en arabe — seul le texte changeait de
+          langue, pas le sens de lecture. Le tiroir reste ouvert depuis la
+          droite de l'écran dans les deux langues, c'est son contenu qui
+          bascule. */}
+      <aside className="relative bg-white w-full max-w-md h-full flex flex-col shadow-2xl" dir={ar ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="text-sm tracking-widest uppercase">{t('votrePanier')}</h2>
           <button onClick={onFermer} className="p-1.5 text-gray-400 hover:text-ink" aria-label="Fermer"><X size={18} /></button>
@@ -96,7 +103,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                       pris par le texte et les boutons, le rouge reste le signal promo. */}
                   {l.remiseDh > 0 && (
                     <span className="inline-block mt-1.5 bg-red-600 text-white text-[10px] font-medium px-2 py-1 rounded">
-                      RÉDUCTION {l.remisePourcent}% (−{fmtPrix(l.remiseDh)})
+                      RÉDUCTION {l.remisePourcent}% (−{fmtPrix(l.remiseDh, lang)})
                     </span>
                   )}
                   <div className="flex items-center gap-2 mt-2">
@@ -114,11 +121,11 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                 <div className="text-right">
                   {l.remiseDh > 0 ? (
                     <>
-                      <p className="text-sm font-medium text-red-600">{fmtPrix(l.price * l.qty - l.remiseDh)}</p>
-                      <p className="text-xs text-gray-400 line-through">{fmtPrix(l.price * l.qty)}</p>
+                      <p className="text-sm font-medium text-red-600">{fmtPrix(l.price * l.qty - l.remiseDh, lang)}</p>
+                      <p className="text-xs text-gray-400 line-through">{fmtPrix(l.price * l.qty, lang)}</p>
                     </>
                   ) : (
-                    <p className="text-sm font-medium">{fmtPrix(l.price * l.qty)}</p>
+                    <p className="text-sm font-medium">{fmtPrix(l.price * l.qty, lang)}</p>
                   )}
                   <button onClick={() => onRetirer(cleLigne(l))}
                     className="mt-2 text-gray-300 hover:text-red-500" aria-label={t('retirer')}><X size={14} /></button>
@@ -139,7 +146,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                         )}
                       </div>
                       <p className="mt-1.5 text-[11px] text-gray-600 line-clamp-2">{s.name}</p>
-                      <p className="text-[11px] font-medium">{fmtPrix(s.price)}</p>
+                      <p className="text-[11px] font-medium">{fmtPrix(s.price, lang)}</p>
                     </Link>
                   ))}
                 </div>
@@ -153,22 +160,22 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
             {seuilGratuit > 0 && (
               <p className="text-xs text-gray-500 mb-1">
                 {manqueLivraison > 0
-                  ? <>{t('plusQue')} <b className="text-ink">{fmtPrix(manqueLivraison)}</b> {t('pourLivraisonGratuite')}</>
+                  ? <>{t('plusQue')} <b className="text-ink">{fmtPrix(manqueLivraison, lang)}</b> {t('pourLivraisonGratuite')}</>
                   : <span className="text-green-700">{t('livraisonGratuite')}</span>}
               </p>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">{t('sousTotal')}</span><span>{fmtPrix(tot.sousTotal)}</span>
+              <span className="text-gray-500">{t('sousTotal')}</span><span>{fmtPrix(tot.sousTotal, lang)}</span>
             </div>
             {tot.remiseQuantite > 0 && (
               <div className="flex justify-between text-sm text-green-700">
                 <span className="flex items-center gap-1.5"><Tag size={13} /> {t('remise')}</span>
-                <span className="font-medium">−{fmtPrix(tot.remiseQuantite)}</span>
+                <span className="font-medium">−{fmtPrix(tot.remiseQuantite, lang)}</span>
               </div>
             )}
             <Link to="/commander" onClick={onFermer}
               className="mt-3 block bg-ink text-white text-center py-3.5 text-xs tracking-widest uppercase">
-              {t('commander')} — {fmtPrix(tot.total)}
+              {t('commander')} — {fmtPrix(tot.total, lang)}
               <span className="block text-[10px] text-gray-300 mt-0.5 normal-case tracking-normal">
                 {t('paiementLivraison')}
               </span>

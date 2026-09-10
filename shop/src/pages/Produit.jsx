@@ -237,7 +237,11 @@ export default function Produit({ onAjouter, theme, remises }) {
           </div>
         )}
 
-        <div className="mt-6">
+        {/* dir explicite : sans lui la rangée de tailles (et tout le bloc
+            "achetés ensemble" plus bas) restait toujours de gauche à droite
+            même en arabe — S en tête à gauche au lieu de démarrer à droite
+            comme le reste de la page en RTL. */}
+        <div className="mt-6" dir={ar ? 'rtl' : 'ltr'}>
           <div className="flex items-center justify-between">
             <p className="text-[13px] tracking-normal text-ink font-medium">{t('tailleLabel')}</p>
             {/* Réglé (photo + activation) depuis /store/edit-theme — absent
@@ -297,7 +301,7 @@ export default function Produit({ onAjouter, theme, remises }) {
             s'applique à cette collection, le total tient déjà compte du prix
             réduit du 2e article, pour ne pas annoncer un total inexact. */}
         {produit.sizes?.some(s => s.stock > 0) && produitsLies[0] && (
-          <div className="mt-7 border border-gray-200 rounded-xl p-4">
+          <div className="mt-7 border border-gray-200 rounded-xl p-4" dir={ar ? 'rtl' : 'ltr'}>
             <p className="text-[11px] tracking-widest uppercase text-gray-500">{t('achetezEnsemble')}</p>
             <div className="mt-3 flex items-center gap-3">
               <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
