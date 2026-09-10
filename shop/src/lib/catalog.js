@@ -70,12 +70,25 @@ export async function chargerCollection(slug) {
 }
 
 export async function chargerProduitsDeCollection(slug) {
-  const col = await chargerCollection(slug);
-  if (!col) return { collection: null, produits: [] };
+  // Un seul aller-retour réseau (jointure) plutôt que deux requêtes
+  // séquentielles (collection, puis produits) — sur un réseau mobile lent
+  // ça divise par deux le temps avant que la grille n'apparaisse.
   const { data, error } = await supabase
-    .from('shop_products').select(PRODUIT).eq('collection_id', col.id).eq('status', 'Actif').order('position');
+    .from('shop_products')
+    .select(`${PRODUIT}, collection:shop_collections!inner(id, slug, name, description)`)
+    .eq('collection.slug', slug)
+    .eq('status', 'Actif')
+    .order('position');
   if (error) throw error;
-  return { collection: col, produits: unProduitParGroupe((data || []).map(trier)) };
+  if (!data || data.length === 0) {
+    // Une collection vide donne le même résultat vide qu'un slug inexistant
+    // avec la jointure ci-dessus — on ne retombe sur une requête séparée
+    // que dans ce cas rare, pour savoir laquelle des deux c'est.
+    const col = await chargerCollection(slug);
+    return { collection: col, produits: [] };
+  }
+  const { collection } = data[0];
+  return { collection, produits: unProduitParGroupe(data.map(trier)) };
 }
 
 // Un produit archivé (vendu au moins une fois, retiré de la vente) reste en
