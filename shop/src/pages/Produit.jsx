@@ -4,7 +4,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
-import { trackPixel } from '../lib/pixel';
+import { trackPixel, trackTikTok } from '../lib/pixel';
 import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
 import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
@@ -69,10 +69,16 @@ export default function Produit({ onAjouter, theme, remises }) {
         setProduitsLies(lies);
         setInclurePartenaire(true);
         setTailleBundle(lies[0]?.sizes?.find(s => s.stock > 0)?.size || '');
-        if (p) trackPixel('ViewContent', {
-          content_name: p.name, content_ids: [p.slug], content_type: 'product',
-          value: p.price, currency: 'MAD',
-        });
+        if (p) {
+          trackPixel('ViewContent', {
+            content_name: p.name, content_ids: [p.slug], content_type: 'product',
+            value: p.price, currency: 'MAD',
+          });
+          trackTikTok('ViewContent', {
+            contents: [{ content_id: p.slug, content_name: p.name, price: p.price, quantity: 1 }],
+            value: p.price, currency: 'MAD',
+          });
+        }
       })
       .catch(() => setProduit(null))
       .finally(() => setChargement(false));

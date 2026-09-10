@@ -5,7 +5,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
 import WhatsAppBulle from './components/WhatsAppBulle';
-import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT } from './lib/catalogDefaults';
+import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEFAUT } from './lib/catalogDefaults';
 
 /* Un visiteur qui atterrit sur l'accueil (le cas des clics publicitaires)
    n'a jamais besoin du code de la caisse, des fiches produit ou — surtout —
@@ -43,11 +43,12 @@ const EditTheme = lazy(() => import('./store/EditTheme'));
 const CommandesListe = lazy(() => import('./store/CommandesListe'));
 const PaniersAbandonnesListe = lazy(() => import('./store/PaniersAbandonnesListe'));
 const MicrosoftClarity = lazy(() => import('./store/MicrosoftClarity'));
+const TikTokPixel = lazy(() => import('./store/TikTokPixel'));
 const RemisesListe = lazy(() => import('./store/RemisesListe'));
 const Reglages = lazy(() => import('./store/Reglages'));
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
-import { chargerPixel, trackPixel, chargerClarity } from './lib/pixel';
+import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok } from './lib/pixel';
 import { LangProvider } from './lib/i18n';
 
 /* React Router ne remet PAS le défilement en haut tout seul en changeant de
@@ -75,7 +76,7 @@ function ScrollToTop() {
 // que confirmer ou corriger, sans "flash" visible.
 const CACHE_REGLAGES = 'shop_reglages_cache';
 function reglagesInitiaux() {
-  const defaut = { ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT, clarity: CLARITY_DEFAUT };
+  const defaut = { ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT, clarity: CLARITY_DEFAUT, tiktok: TIKTOK_DEFAUT };
   try {
     const brut = localStorage.getItem(CACHE_REGLAGES);
     return brut ? { ...defaut, ...JSON.parse(brut) } : defaut;
@@ -135,6 +136,10 @@ function Vitrine() {
     if (reglages.clarity?.enabled && reglages.clarity?.projectId) chargerClarity(reglages.clarity.projectId);
   }, [reglages.clarity?.enabled, reglages.clarity?.projectId]);
 
+  useEffect(() => {
+    if (reglages.tiktok?.enabled && reglages.tiktok?.pixelId) chargerTikTokPixel(reglages.tiktok.pixelId);
+  }, [reglages.tiktok?.enabled, reglages.tiktok?.pixelId]);
+
   // La couleur principale (texte, boutons, bordures actives) est une variable
   // CSS : la changer ici touche tout le site d'un coup, sans recompiler.
   useEffect(() => {
@@ -171,6 +176,10 @@ function Vitrine() {
     setPanierOuvert(true);
     trackPixel('AddToCart', {
       content_name: ligne.name, content_ids: [ligne.slug], content_type: 'product',
+      value: ligne.price, currency: 'MAD',
+    });
+    trackTikTok('AddToCart', {
+      contents: [{ content_id: ligne.slug, content_name: ligne.name, price: ligne.price, quantity: 1 }],
       value: ligne.price, currency: 'MAD',
     });
   }, []);
@@ -253,6 +262,7 @@ function Administration() {
             <Route path="commandes" element={<CommandesListe />} />
             <Route path="paniers-abandonnes" element={<PaniersAbandonnesListe />} />
             <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
+            <Route path="tiktok-pixel" element={<TikTokPixel />} />
             <Route path="reglages" element={<Reglages />} />
           </Route>
         </Routes>

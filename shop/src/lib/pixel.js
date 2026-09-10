@@ -69,6 +69,29 @@ export async function envoyerCAPI(pixelId, evenements, testCode) {
   } catch { /* la publicité continue d'apprendre par le seul pixel navigateur */ }
 }
 
+/* TikTok Pixel — même logique que Meta : chargé une seule fois avec le
+   boilerplate officiel TikTok, un `ttq.track` par évènement standard
+   (ViewContent, AddToCart, InitiateCheckout, CompletePayment). Aucune API
+   de conversions serveur ici — le pixel navigateur seul, comme Clarity. */
+let ttqCharge = false;
+export function chargerTikTokPixel(pixelId) {
+  if (ttqCharge || !pixelId || typeof window === 'undefined') return;
+  ttqCharge = true;
+  /* eslint-disable */
+  !function (w, d, t) {
+    w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.methods.length;n++)ttq.setAndDefer(e,e.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=i+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+    ttq.load(pixelId);
+    ttq.page();
+  }(window, document, 'ttq');
+  /* eslint-enable */
+}
+
+/** Émet un évènement navigateur TikTok, sans effet si le pixel n'est pas chargé. */
+export function trackTikTok(nom, donnees) {
+  if (typeof window === 'undefined' || !window.ttq) return;
+  window.ttq.track(nom, donnees || {});
+}
+
 /* Microsoft Clarity — chargé une seule fois, avec le boilerplate officiel.
    Contrairement à Meta, aucun jeton n'est jamais impliqué côté navigateur :
    l'identifiant de projet n'a rien d'un secret. */

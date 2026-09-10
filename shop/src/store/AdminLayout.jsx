@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
 import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifCommande';
@@ -26,6 +26,7 @@ const LIENS = [
   { to: '/store/codes-promo', label: 'Codes promo', icon: Ticket },
   { to: '/store/meta-pixel', label: 'Meta Pixel', icon: Radio },
   { to: '/store/microsoft-clarity', label: 'Microsoft Clarity', icon: Activity },
+  { to: '/store/tiktok-pixel', label: 'TikTok Pixel', icon: Music2 },
   { to: '/store/reglages', label: 'Réglages', icon: Settings },
 ];
 

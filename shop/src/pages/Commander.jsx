@@ -6,7 +6,7 @@ import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { verifierPromo } from '../lib/catalog';
-import { trackPixel, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from '../lib/pixel';
+import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 
@@ -50,6 +50,10 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
     trackPixel('InitiateCheckout', {
       value: t.total, currency: 'MAD', num_items: t.articles,
       content_ids: lignes.map(l => l.slug), content_type: 'product',
+    });
+    trackTikTok('InitiateCheckout', {
+      contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+      value: t.total, currency: 'MAD',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -121,6 +125,10 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
        envoient le MÊME achat, et Meta déduplique au lieu de le compter deux fois. */
     const eventID = idEvenement(r.id);
     trackPixel('Purchase', { value: t.total, currency: 'MAD', content_ids: lignes.map(l => l.slug), content_type: 'product' }, eventID);
+    trackTikTok('CompletePayment', {
+      contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+      value: t.total, currency: 'MAD',
+    });
     if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
       // Sans e-mail collecté, le téléphone (haché) reste le seul signal
       // d'identification envoyé à l'API de Conversions.
