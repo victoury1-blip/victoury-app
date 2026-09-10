@@ -80,7 +80,12 @@ export function chargerTikTokPixel(pixelId) {
   /* eslint-disable */
   !function (w, d, t) {
     w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.methods.length;n++)ttq.setAndDefer(e,e.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=i+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
-    ttq.load(pixelId);
+    // autoConfig:false — sans ça, TikTok scanne la page tout seul pour
+    // deviner les données produit (Automatic Advanced Matching) et plante
+    // (TypeError sur une page qu'il ne sait pas lire, comme /commander).
+    // On envoie déjà chaque évènement à la main (trackTikTok), ce scan
+    // automatique ne sert à rien ici.
+    ttq.load(pixelId, { autoConfig: false });
     ttq.page();
   }(window, document, 'ttq');
   /* eslint-enable */
