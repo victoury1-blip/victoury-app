@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { X, Banknote, RotateCcw, ShieldCheck } from 'lucide-react';
-import { fmtPrix, totalPanier } from '../lib/pricing';
+import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck } from 'lucide-react';
+import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase';
 // emprunter la couleur d'un autre geste.
 const champ = 'w-full border-2 border-ink px-3 py-3 text-sm focus:outline-none transition-colors';
 
-export default function Commander({ lignes, reglages, onRetirer, onVider }) {
+export default function Commander({ lignes, reglages, onQuantite, onRetirer, onVider }) {
   const { t: tr, lang } = useLang();
   const navigate = useNavigate();
   const [form, setForm] = useState({ nom: '', telephone: '', ville: '', adresse: '' });
@@ -171,6 +171,12 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
     );
   }
 
+  // Même donnée que le tiroir panier : la remise de chaque article, pas
+  // seulement le total en bas — utile ici puisque la caisse a sa propre
+  // vue du panier, indépendante du tiroir.
+  const remisesEffectives = reglages?.remises?.length ? reglages.remises : (reglages?.paliers?.length ? [{ active: true, paliers: reglages.paliers }] : []);
+  const lignesRemisees = lignesAvecRemise(lignes, remisesEffectives);
+
   const enErreur = (k) => manque.includes(k) ? 'border-red-400' : '';
   // La mise en page reste toujours LTR (voir i18n.jsx), mais un champ de
   // saisie n'est pas une grille d'icônes : un label et un texte arabes qui
@@ -221,7 +227,7 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
 
         <div className="bg-sand p-5">
           <div className="space-y-4">
-            {lignes.map(l => (
+            {lignesRemisees.map(l => (
               <div key={cleLigne(l)} className="flex gap-3">
                 <div className="w-16 h-20 bg-white shrink-0">
                   {l.image && <img src={l.image} alt="" className="w-full h-full object-cover" />}
@@ -229,11 +235,38 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{l.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {[l.color, l.size, `×${l.qty}`].filter(Boolean).join(' · ')}
+                    {[l.color, l.size].filter(Boolean).join(' · ')}
                   </p>
+                  {/* Même signal que le tiroir panier : rouge, quand une remise
+                      par quantité s'applique à cette ligne précise. */}
+                  {l.remiseDh > 0 && (
+                    <span className="inline-block mt-1.5 bg-red-600 text-white text-[10px] font-medium px-2 py-1 rounded">
+                      RÉDUCTION {l.remisePourcent}% (−{fmtPrix(l.remiseDh)})
+                    </span>
+                  )}
+                  {onQuantite && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <button onClick={() => onQuantite(cleLigne(l), l.qty - 1)}
+                        className="w-7 h-7 border border-gray-200 bg-white grid place-items-center" aria-label={tr('quantiteMinus')}>
+                        <Minus size={12} />
+                      </button>
+                      <span className="text-sm w-6 text-center">{l.qty}</span>
+                      <button onClick={() => onQuantite(cleLigne(l), l.qty + 1)}
+                        className="w-7 h-7 border border-gray-200 bg-white grid place-items-center" aria-label={tr('quantitePlus')}>
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm">{fmtPrix(l.price * l.qty)}</p>
+                  {l.remiseDh > 0 ? (
+                    <>
+                      <p className="text-sm font-medium text-red-600">{fmtPrix(l.price * l.qty - l.remiseDh)}</p>
+                      <p className="text-xs text-gray-400 line-through">{fmtPrix(l.price * l.qty)}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm">{fmtPrix(l.price * l.qty)}</p>
+                  )}
                   <button onClick={() => onRetirer(cleLigne(l))} className="mt-1 text-gray-300 hover:text-red-500" aria-label={tr('retirer')}>
                     <X size={13} />
                   </button>

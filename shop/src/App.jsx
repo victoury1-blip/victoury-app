@@ -218,7 +218,7 @@ function Vitrine() {
             <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
-            <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onRetirer={onRetirer} onVider={onVider} />} />
+            <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/merci/:id" element={<Merci />} />
             <Route path="/:slug/" element={<PageStatique />} />
             <Route path="/:slug" element={<PageStatique />} />
