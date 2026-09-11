@@ -6,7 +6,7 @@ import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { verifierPromo } from '../lib/catalog';
-import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, idEvenement } from '../lib/pixel';
+import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 
@@ -139,6 +139,17 @@ export default function Commander({ lignes, reglages, onRetirer, onVider }) {
           user_data: { ph: [ph] },
           custom_data: { value: t.total, currency: 'MAD', order_id: r.id },
         }], reglages.pixel.testCode)).catch(() => {});
+    }
+    if (reglages?.tiktok?.enabled && reglages?.tiktok?.pixelId) {
+      sha256(telephonePourMeta(form.telephone))
+        .then(ph => envoyerTikTokCAPI(reglages.tiktok.pixelId, [{
+          event: 'CompletePayment', event_time: Math.floor(Date.now() / 1000), event_id: eventID,
+          user: { phone: ph },
+          properties: {
+            contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+            value: t.total, currency: 'MAD',
+          },
+        }], reglages.tiktok.testCode)).catch(() => {});
     }
     onVider();
     // Le panier est vidé juste avant (onVider) : sans les transmettre ici,

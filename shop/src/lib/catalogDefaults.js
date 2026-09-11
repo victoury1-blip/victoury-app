@@ -37,7 +37,7 @@ export const CLARITY_DEFAUT = { enabled: false, projectId: '' };
 
 /* TikTok Pixel : comme Meta, un identifiant de pixel navigateur — pas un
    secret, aucun jeton d'API côté serveur ici (voir MetaPixel pour ce cas). */
-export const TIKTOK_DEFAUT = { enabled: false, pixelId: '' };
+export const TIKTOK_DEFAUT = { enabled: false, pixelId: '', testCode: '' };
 
 /* L'apparence de la boutique — logo, favicon, bandeau d'annonce — vit elle
    aussi à part : ce sont des réglages visuels, réglés depuis /store/theme,

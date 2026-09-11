@@ -97,6 +97,20 @@ export function trackTikTok(nom, donnees) {
   window.ttq.track(nom, donnees || {});
 }
 
+/* Relais serveur (Events API) — même principe que envoyerCAPI pour Meta : le
+ * jeton reste côté serveur (TIKTOK_ACCESS_TOKEN sur Vercel), voir
+ * api/tiktok-capi.js. Le pixel navigateur peut planter à l'initialisation
+ * selon la page (constaté sur /commander) sans que ça n'affecte ce relais. */
+export async function envoyerTikTokCAPI(pixelId, evenements, testCode) {
+  try {
+    await fetch('/api/tiktok-capi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pixelId, events: evenements, testCode: testCode || undefined }),
+    });
+  } catch { /* la publicité continue d'apprendre par le seul pixel navigateur, s'il a pu se charger */ }
+}
+
 /* Microsoft Clarity — chargé une seule fois, avec le boilerplate officiel.
    Contrairement à Meta, aucun jeton n'est jamais impliqué côté navigateur :
    l'identifiant de projet n'a rien d'un secret. */
