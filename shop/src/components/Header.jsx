@@ -27,11 +27,17 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
   const estSoldes = (c) => /soldes?/i.test(c.slug || c.name || '');
 
   const Logo = (
-    <Link to="/" className="shrink-0">
+    <Link to="/" className="shrink-0 flex items-center justify-center overflow-hidden"
+      style={{ height: logoHauteur || 36, width: 160 }}>
       {/* Un logo déposé remplace le texte ; sans lui, le nom en capitales
-          reste net à toute taille — jamais de logo cassé ou flou. */}
+          reste net à toute taille — jamais de logo cassé ou flou. Boîte de
+          taille FIXE (hauteur et largeur) dans les deux cas : sinon, le
+          passage du texte de secours à l'image (une fois /store/theme
+          arrivé) change la largeur réservée et décale toute l'en-tête —
+          la même cause de décalage de mise en page (CLS) repérée dans le
+          pied de page. */}
       {logoUrl
-        ? <img src={logoUrl} alt="Victoury" className="w-auto object-contain" style={{ height: logoHauteur || 36 }} />
+        ? <img src={logoUrl} alt="Victoury" width={160} height={logoHauteur || 36} className="w-full h-full object-contain" />
         : <Wordmark style={{ fontSize: (logoHauteur || 36) * 0.55 }} />}
     </Link>
   );
