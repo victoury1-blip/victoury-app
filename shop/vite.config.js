@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [react()],
   test: { environment: 'jsdom' },
   build: {
+    // 'esnext' plutôt que la cible par défaut de Vite (déjà moderne, mais
+    // pensée pour couvrir jusqu'à Safari un peu ancien) : sans polyfills ni
+    // transformations de compatibilité inutiles pour l'immense majorité des
+    // visiteurs (navigateurs à jour), ce que PageSpeed signalait comme
+    // "JavaScript ancien" envoyé pour rien.
+    target: 'esnext',
     rollupOptions: {
       output: {
         // Le code des librairies change bien moins souvent que le code du
