@@ -70,10 +70,19 @@ export default function Footer({ theme, collections }) {
               blanc devient noir, le texte noir devient blanc) puis fondu en
               mode "screen" — sur un fond noir, cela revient à effacer le
               carré blanc et ne garder que le texte, sans image détourée. */}
-          {theme?.logoUrl
-            ? <img src={theme.logoUrl} alt="Victoury" className="w-auto object-contain -mt-3"
-                style={{ height: (theme?.logoHauteur || 36) + 8, filter: 'invert(1)', mixBlendMode: 'screen' }} />
-            : <Wordmark className="-mt-3" style={{ color: '#fff', fontSize: ((theme?.logoHauteur || 36) + 8) * 0.7 }} />}
+          {/* Boîte de hauteur FIXE, dans tous les cas (texte de secours avant
+              que /store/theme n'ait répondu, puis logo une fois arrivé) :
+              sans elle, le passage du texte de secours à l'image change la
+              hauteur réservée et pousse tout le pied de page d'un coup — la
+              plus grosse cause de décalage de mise en page (CLS) relevée par
+              PageSpeed sur cette page. La largeur reste plafonnée plutôt que
+              fixe pour ne jamais rogner un logo plus large que haut. */}
+          <div className="-mt-3 flex items-center justify-center" style={{ height: (theme?.logoHauteur || 36) + 8, maxWidth: 160 }}>
+            {theme?.logoUrl
+              ? <img src={theme.logoUrl} alt="Victoury" className="w-auto h-full max-w-full object-contain"
+                  style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
+              : <Wordmark style={{ color: '#fff', fontSize: ((theme?.logoHauteur || 36) + 8) * 0.7 }} />}
+          </div>
           {f.description && <p className="mt-4 text-base opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           <div className="mt-7 flex gap-12 sm:gap-14">
             <div>
