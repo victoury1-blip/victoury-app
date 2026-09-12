@@ -6,6 +6,7 @@ import { prochainPalier } from '../lib/remises';
 import { cleLigne } from '../lib/panier';
 import { chargerNouveautes, chargerProduitsParCollections } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
+import { miniature, surErreurMiniature } from '../lib/img';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
   const { t, lang, encoreEtRemise, etLivraisonGratuite } = useLang();
@@ -92,7 +93,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
             {lignesRemisees.map(l => (
               <div key={cleLigne(l)} className="flex gap-3 p-4">
                 <div className="w-20 h-24 bg-sand shrink-0">
-                  {l.image && <img src={l.image} alt="" className="w-full h-full object-cover" />}
+                  {l.image && <img src={miniature(l.image)} onError={(e) => surErreurMiniature(e, l.image)} alt="" loading="lazy" className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-800">{l.name}</p>
@@ -142,7 +143,8 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                       className="shrink-0 w-24 group">
                       <div className="w-24 h-28 bg-sand overflow-hidden">
                         {s.images?.[0]?.url && (
-                          <img src={s.images[0].url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <img src={miniature(s.images[0].url)} onError={(e) => surErreurMiniature(e, s.images[0].url)} alt="" loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                         )}
                       </div>
                       <p className="mt-1.5 text-[11px] text-gray-600 line-clamp-2">{s.name}</p>

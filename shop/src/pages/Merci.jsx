@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { useLang } from '../lib/i18n';
+import { miniature, surErreurMiniature } from '../lib/img';
 
 /* Reçu de commande complet (coordonnées + articles + total), transmis
    depuis Commander.jsx au moment de la validation — la commande n'existe
@@ -74,7 +75,7 @@ export default function Merci() {
           {lignes.map(l => (
             <div key={`${l.slug}::${l.size || ''}`} className="flex items-center gap-3 py-3">
               <div className="w-14 h-16 bg-sand shrink-0 overflow-hidden rounded">
-                {l.image && <img src={l.image} alt="" className="w-full h-full object-cover" />}
+                {l.image && <img src={miniature(l.image)} onError={(e) => surErreurMiniature(e, l.image)} alt="" loading="lazy" className="w-full h-full object-cover" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-800 truncate">{l.name}</p>

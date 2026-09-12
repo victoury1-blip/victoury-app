@@ -9,6 +9,7 @@ import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
 import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
 import { useLang } from '../lib/i18n';
+import { miniature, surErreurMiniature } from '../lib/img';
 
 function Accordeon({ titre, children }) {
   const [ouvert, setOuvert] = useState(false);
@@ -161,7 +162,13 @@ export default function Produit({ onAjouter, theme, remises }) {
             {photos.map((img, i) => (
               <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center">
                 {img.url
-                  ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover" />
+                  // Seule la 1ère photo (déjà visible à l'ouverture de la fiche) charge
+                  // tout de suite en pleine résolution — les suivantes ne se
+                  // téléchargent qu'une fois atteintes par le défilement horizontal :
+                  // sans ce lazy, toutes les photos de la fiche (parfois 5-6) partaient
+                  // d'un coup au chargement, même celles jamais vues.
+                  ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover"
+                      loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
                   : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
               </div>
             ))}
@@ -193,7 +200,9 @@ export default function Produit({ onAjouter, theme, remises }) {
                 className={`shrink-0 w-12 h-12 bg-sand overflow-hidden border-2 transition-colors ${
                   i === photoActive ? 'border-ink' : 'border-transparent'
                 }`}>
-                {img.url && <img src={img.url} alt="" className="w-full h-full object-cover" />}
+                {/* Vignette 48px : la miniature (500px) suffit largement, pas la photo
+                    pleine résolution (jusqu'à 1600px) juste pour ce petit carré. */}
+                {img.url && <img src={miniature(img.url)} onError={(e) => surErreurMiniature(e, img.url)} alt="" loading="lazy" className="w-full h-full object-cover" />}
               </button>
             ))}
           </div>
@@ -315,7 +324,8 @@ export default function Produit({ onAjouter, theme, remises }) {
                   onChange={e => setInclurePartenaire(e.target.checked)} className="w-4 h-4 shrink-0" />
                 <div className="w-12 h-14 bg-sand shrink-0 overflow-hidden rounded">
                   {produitsLies[0].images?.[0]?.url && (
-                    <img src={produitsLies[0].images[0].url} alt="" className="w-full h-full object-cover" />
+                    <img src={miniature(produitsLies[0].images[0].url)} onError={(e) => surErreurMiniature(e, produitsLies[0].images[0].url)}
+                      alt="" loading="lazy" className="w-full h-full object-cover" />
                   )}
                 </div>
                 <div className="min-w-0">

@@ -10,6 +10,7 @@ import { verifierPromo } from '../lib/catalog';
 import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
+import { miniature, surErreurMiniature } from '../lib/img';
 
 // La couleur du thème (--ink, réglable dans /store/theme), pas le vert de la
 // sélection de taille — un champ de saisie n'est pas un choix, il ne doit pas
@@ -239,7 +240,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             {lignesRemisees.map(l => (
               <div key={cleLigne(l)} className="flex gap-3">
                 <div className="w-16 h-20 bg-white shrink-0">
-                  {l.image && <img src={l.image} alt="" className="w-full h-full object-cover" />}
+                  {l.image && <img src={miniature(l.image)} onError={(e) => surErreurMiniature(e, l.image)} alt="" loading="lazy" className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{l.name}</p>
