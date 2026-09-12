@@ -166,7 +166,7 @@ export default async function handler(req, res) {
   const key = process.env.VITE_SUPABASE_ANON_KEY;
   if (!url || !key) return res.status(503).json({ error: 'Configuration serveur manquante' });
 
-  const { form, lignes, source, code } = req.body || {};
+  const { form, lignes, source, code, geoGPS } = req.body || {};
   if (!form || !Array.isArray(lignes)) return res.status(400).json({ error: 'Requête invalide' });
 
   const manque = champsManquants(form, lignes);
@@ -217,13 +217,21 @@ export default async function handler(req, res) {
   const promo = await verifierPromoServeur(url, key, code, avantPromo.sousTotal - avantPromo.remiseQuantite);
   const totalVerifie = totalPanier(serverLignes, { remises, promo, livraison, seuilGratuit }).total;
 
-  const [geo] = await Promise.all([localiser(ip)]);
+  // Le GPS du navigateur (si le client l'a accepté) est bien plus fiable que
+  // l'IP — les opérateurs mobiles marocains sortent souvent par des passerelles
+  // enregistrées en Europe, ce qui fait dire "Marseille" ou "Londres" à toute
+  // géolocalisation par IP pour un client réellement au Maroc. On ne le fait
+  // JAMAIS attendre : s'il n'est pas déjà là, on retombe sur l'IP.
+  const villeGPS = typeof geoGPS?.ville === 'string' ? geoGPS.ville.slice(0, 100) : null;
+  const paysGPS = typeof geoGPS?.pays === 'string' ? geoGPS.pays.slice(0, 100) : null;
+  const geo = villeGPS ? { ville: villeGPS, pays: paysGPS } : await localiser(ip);
   const commande = construireCommande(form, serverLignes, totalVerifie, new Date(), undefined, {
     source: SOURCES_CONNUES.has(source) ? source : 'Direct',
   });
   commande.recipient.ip = ip || undefined;
   commande.recipient.geoVille = geo?.ville || undefined;
   commande.recipient.geoPays = geo?.pays || undefined;
+  commande.recipient.geoPrecise = !!villeGPS || undefined;
 
   const r = await fetch(`${url}/rest/v1/orders`, {
     method: 'POST',

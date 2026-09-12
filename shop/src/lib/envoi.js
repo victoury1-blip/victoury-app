@@ -14,7 +14,7 @@ import { detecterSource } from './source';
 // en base) et ignore ce total, envoyé pour information seulement — voir
 // api/commande.js. `code` (le code promo éventuellement saisi) part avec la
 // commande pour que le serveur, pas le navigateur, en calcule la remise.
-export async function envoyerCommande(form, lignes, total, code) {
+export async function envoyerCommande(form, lignes, total, code, geoGPS) {
   const manque = champsManquants(form, lignes);
   if (manque.length) return { ok: false, manque };
 
@@ -24,7 +24,7 @@ export async function envoyerCommande(form, lignes, total, code) {
     const res = await fetch('/api/commande', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ form, lignes, total, source, code: code || undefined }),
+      body: JSON.stringify({ form, lignes, total, source, code: code || undefined, geoGPS: geoGPS || undefined }),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || !d.ok) return { ok: false, error: d.error, manque: d.manque };

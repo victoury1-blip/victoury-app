@@ -5,6 +5,7 @@ import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
+import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
 import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
@@ -38,6 +39,14 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // l'écouteur a été posé.
   const etatActuel = useRef({ form, lignes });
   useEffect(() => { etatActuel.current = { form, lignes }; });
+
+  // Demandée dès l'arrivée sur la page, pas au clic sur "Valider" : elle a
+  // ainsi le temps d'aboutir (permission + reverse-geocoding) avant que le
+  // client ne finisse de remplir le formulaire. Un refus ou un échec ne
+  // bloque jamais rien — geoGPS.current reste simplement null, et le
+  // serveur retombe sur la géolocalisation par IP (voir api/commande.js).
+  const geoGPS = useRef(null);
+  useEffect(() => { localiserClient().then(g => { geoGPS.current = g; }); }, []);
 
   const t = totalPanier(lignes, {
     paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
@@ -117,7 +126,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     const m = champsManquants(form, lignes);
     if (m.length) { setManque(m); return; }
     setEnvoi(true);
-    const r = await envoyerCommande(form, lignes, t.total, promo ? code : undefined);
+    const r = await envoyerCommande(form, lignes, t.total, promo ? code : undefined, geoGPS.current);
     setEnvoi(false);
     if (!r.ok) { setErreur(r.error || 'Envoi impossible. Réessayez.'); return; }
     /* Un même identifiant des deux côtés : le pixel du navigateur (rapide, mais
