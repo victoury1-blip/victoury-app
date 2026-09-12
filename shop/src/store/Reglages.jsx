@@ -97,6 +97,24 @@ export default function Reglages() {
         </section>
 
         <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xs tracking-widest uppercase text-gray-500">Localisation GPS</h2>
+              <p className="mt-1 text-[11px] text-gray-400 leading-relaxed max-w-md">
+                À l'arrivée sur la page de commande, demande au client sa position GPS (avec sa permission,
+                jamais bloquant) pour une ville plus précise que la simple IP dans la liste des commandes.
+                Désactivez si la demande d'autorisation du navigateur gêne des clients — la localisation
+                par IP (approximative) reste alors utilisée pour tout le monde.
+              </p>
+            </div>
+            <button type="button" onClick={() => u('geoGPSActif', !r.geoGPSActif)}
+              className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${r.geoGPSActif ? 'bg-blue-600' : 'bg-gray-200'}`}>
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${r.geoGPSActif ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Sauvegarde Google Sheets</h2>
           <p className="text-xs text-gray-400 mb-3">
             Chaque commande est aussi envoyée vers une feuille Google Sheets dès qu'elle est enregistrée —

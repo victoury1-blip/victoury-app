@@ -21,6 +21,11 @@ export const REGLAGES_DEFAUT = {
   // src/lib/sonCommande.js) — un extrait audio en base64, ou vide pour
   // garder le carillon synthétisé par défaut.
   sonCommandeUrl: '',
+  // Demande la position GPS du navigateur à l'arrivée sur /commander (voir
+  // src/lib/geoloc.js) pour une localisation plus précise que la simple IP
+  // dans la liste des commandes — activée par défaut, désactivable ici si
+  // jamais la demande d'autorisation gêne des clients.
+  geoGPSActif: true,
 };
 
 // Le Meta Pixel vit dans sa propre clé : ni son activation ni son identifiant

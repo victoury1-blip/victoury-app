@@ -47,7 +47,12 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // bloque jamais rien — geoGPS.current reste simplement null, et le
   // serveur retombe sur la géolocalisation par IP (voir api/commande.js).
   const geoGPS = useRef(null);
-  useEffect(() => { localiserClient().then(g => { geoGPS.current = g; }); }, []);
+  useEffect(() => {
+    // Réglable dans /store/reglages ("Localisation GPS") : coupé, la
+    // demande d'autorisation du navigateur ne part jamais.
+    if (reglages?.geoGPSActif === false) return;
+    localiserClient().then(g => { geoGPS.current = g; });
+  }, [reglages?.geoGPSActif]);
 
   const t = totalPanier(lignes, {
     paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
