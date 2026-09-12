@@ -27,8 +27,9 @@ export default function Accueil({ collections, reglages }) {
   // Un squelette de la même hauteur pendant le chargement évite ce saut.
   const [chargementCategories, setChargementCategories] = useState(true);
   const [chargementNouveautes, setChargementNouveautes] = useState(true);
+  const [chargementAvis, setChargementAvis] = useState(true);
   useEffect(() => { chargerNouveautes(8).then(setProduits).catch(() => {}).finally(() => setChargementNouveautes(false)); }, []);
-  useEffect(() => { chargerAvis().then(setAvis).catch(() => {}); }, []);
+  useEffect(() => { chargerAvis().then(setAvis).catch(() => {}).finally(() => setChargementAvis(false)); }, []);
   useEffect(() => { chargerCollectionsAvecCompte().then(setCollectionsCompte).catch(() => {}).finally(() => setChargementCategories(false)); }, []);
   const hero = reglages?.theme?.hero || {};
   const sh = reglages?.theme?.texteSousHero || {};
@@ -139,7 +140,7 @@ export default function Accueil({ collections, reglages }) {
 
       <Reassurance items={reglages?.theme?.reassurance} active={reglages?.theme?.reassuranceActive} />
 
-      <AvisClients avis={avis} />
+      <AvisClients avis={avis} chargement={chargementAvis} />
     </>
   );
 }

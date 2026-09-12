@@ -4,7 +4,7 @@ import { miniature, surErreurMiniature } from '../lib/img';
 
 /* Rien ne s'affiche tant que l'admin n'a déposé aucune capture — pas de
    galerie vide qui donnerait un mauvais signal de confiance. */
-export default function AvisClients({ avis }) {
+export default function AvisClients({ avis, chargement }) {
   const [ouvert, setOuvert] = useState(null);
   const pisteRef = useRef(null);
 
@@ -38,6 +38,27 @@ export default function AvisClients({ avis }) {
       piste.removeEventListener('mouseleave', surReprise);
     };
   }, [avis?.length]);
+
+  // Pendant le chargement (requête Supabase), un squelette de la même
+  // hauteur que la vraie section — sans lui, la section entière (titre +
+  // rangée de vignettes) apparaissait d'un coup une fois les avis arrivés,
+  // poussant tout ce qui suit (dont le pied de page) d'un coup sec : la
+  // plus grosse cause de décalage de mise en page (CLS) restante sur la
+  // page d'accueil, une fois cause écartée. Une fois chargé, sans avis
+  // déposé, rien ne s'affiche (pas de galerie vide) — cet espace n'est
+  // alors jamais réservé.
+  if (chargement) {
+    return (
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
+        <div className="h-4 w-32 bg-gray-100 rounded mx-auto animate-pulse" />
+        <div className="mt-8 flex gap-4 overflow-hidden">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="w-52 sm:w-64 aspect-[3/4] bg-gray-100 rounded-lg shrink-0 animate-pulse" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (!avis?.length) return null;
 
