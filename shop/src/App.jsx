@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
 import WhatsAppBulle from './components/WhatsAppBulle';
+import ErrorBoundary from './components/ErrorBoundary';
 import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEFAUT } from './lib/catalogDefaults';
 
 /* Un visiteur qui atterrit sur l'accueil (le cas des clics publicitaires)
@@ -275,10 +276,16 @@ export default function App() {
   const { pathname } = useLocation();
   if (pathname === '/store' || pathname.startsWith('/store/')) {
     return (
-      <Routes>
-        <Route path="/store/*" element={<Administration />} />
-      </Routes>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/store/*" element={<Administration />} />
+        </Routes>
+      </ErrorBoundary>
     );
   }
-  return <Vitrine />;
+  return (
+    <ErrorBoundary>
+      <Vitrine />
+    </ErrorBoundary>
+  );
 }
