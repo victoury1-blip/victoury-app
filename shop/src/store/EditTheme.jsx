@@ -85,7 +85,10 @@ function ListeDeLiens({ titre, aide, items, onChange, placeholderUrl = '/page' }
       <div className="mt-4 space-y-2">
         {items.map((it, i) => (
           <div key={i} className="flex items-center gap-2">
-            <input value={it.label} onChange={e => maj(i, 'label', e.target.value)} placeholder="Libellé" className={`${champ} flex-1`} />
+            <input value={it.label} onChange={e => maj(i, 'label', e.target.value)} placeholder="Libellé (FR)" className={`${champ} flex-1`} />
+            {/* Facultatif : sans lui, le site affiché en arabe retombe sur ce
+                libellé français plutôt que de laisser un lien vide. */}
+            <input value={it.labelAr || ''} onChange={e => maj(i, 'labelAr', e.target.value)} placeholder="Libellé (AR, optionnel)" dir="rtl" className={`${champ} flex-1`} />
             <input value={it.url} onChange={e => maj(i, 'url', e.target.value)} placeholder={placeholderUrl} className={`${champ} flex-1`} />
             <button type="button" onClick={() => retirer(i)} className="text-gray-300 hover:text-red-500 shrink-0"><Trash2 size={16} /></button>
           </div>

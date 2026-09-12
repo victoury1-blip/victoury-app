@@ -10,8 +10,12 @@ import { useLang } from '../lib/i18n';
    Les listes sont vides par défaut plutôt que pré-remplies d'une marque qui
    n'est pas la vôtre : rien n'apparaît tant que l'administration n'a rien réglé. */
 export default function Footer({ theme, collections }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const f = theme?.footer || {};
+  // Libellé arabe optionnel (labelAr) réglé à côté du français dans
+  // /store/theme : sans lui (lien pas encore traduit), on retombe sur le
+  // français plutôt que de laisser un lien vide.
+  const libelle = (it) => (lang === 'ar' && it.labelAr) ? it.labelAr : it.label;
   const liens = (titre, items) => items?.length > 0 && (
     <div className="text-center">
       <h3 className="text-base uppercase tracking-widest opacity-60 mb-3.5 font-medium">{titre}</h3>
@@ -19,8 +23,8 @@ export default function Footer({ theme, collections }) {
         {items.map((it, i) => (
           <li key={i}>
             {/^https?:\/\//.test(it.url)
-              ? <a href={it.url} target="_blank" rel="noreferrer" className="text-lg opacity-90 hover:opacity-100">{it.label}</a>
-              : <Link to={it.url} className="text-lg opacity-90 hover:opacity-100">{it.label}</Link>}
+              ? <a href={it.url} target="_blank" rel="noreferrer" className="text-lg opacity-90 hover:opacity-100">{libelle(it)}</a>
+              : <Link to={it.url} className="text-lg opacity-90 hover:opacity-100">{libelle(it)}</Link>}
           </li>
         ))}
       </ul>
