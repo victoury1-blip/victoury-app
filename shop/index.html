@@ -30,15 +30,18 @@
     <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
     <!-- Jost est maintenant hébergée sur ce site (public/fonts, voir
          index.css) plutôt que chez Google Fonts : plus de connexion à un
-         domaine tiers à établir avant de pouvoir l'afficher. Précharger le
-         poids "400" (le plus utilisé, le texte courant) la rend disponible
-         dès que possible — le but est qu'elle soit déjà là au moment où le
-         texte se peint pour la première fois, pour ne jamais avoir à
-         "sauter" de la police de secours vers Jost (la cause du plus gros
-         décalage de mise en page relevé par PageSpeed sur ce site). Les
-         autres poids (300/500/600, plus rares) restent en chargement normal
-         via la règle @font-face — pas besoin de tous les précharger. -->
+         domaine tiers à établir avant de pouvoir l'afficher. Les 4 poids
+         utilisés par le site (300/400/500/600) sont préchargés — PageSpeed a
+         fini par montrer que précharger seulement le 400 ne suffisait pas :
+         le titre du pied de page (font-medium, poids 500) et d'autres textes
+         en gras (font-semibold, poids 600) arrivaient quand même en retard
+         et provoquaient le même décalage de mise en page une fois arrivés.
+         Chaque fichier ne pèse qu'environ 10 Kio (40 Kio les 4) — largement
+         moins coûteux que le décalage qu'ils évitent. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-300-normal.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-400-normal.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-500-normal.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-600-normal.woff2" crossorigin />
     <!-- Court exprès : un titre long ("VICTOURY — Ensembles sport...") se
          voit tronqué dans un onglet étroit et affiche alors l'URL à la
          place, ce que le client lit comme "le site ne s'appelle pas
