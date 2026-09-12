@@ -28,16 +28,17 @@
          déjà présente en clair dans le bundle JS livré au navigateur). -->
     <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Chargée en non-bloquant : un <link rel="stylesheet"> classique retarde
-         le premier rendu de toute la page le temps d'aller chercher cette
-         feuille chez Google Fonts. Le texte s'affiche tout de suite dans la
-         police de repli, puis bascule sur Jost dès qu'elle arrive (bascule
-         couverte par le "swap" déjà demandé dans l'URL). -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" media="print" onload="this.media='all'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&display=swap" /></noscript>
+    <!-- Jost est maintenant hébergée sur ce site (public/fonts, voir
+         index.css) plutôt que chez Google Fonts : plus de connexion à un
+         domaine tiers à établir avant de pouvoir l'afficher. Précharger le
+         poids "400" (le plus utilisé, le texte courant) la rend disponible
+         dès que possible — le but est qu'elle soit déjà là au moment où le
+         texte se peint pour la première fois, pour ne jamais avoir à
+         "sauter" de la police de secours vers Jost (la cause du plus gros
+         décalage de mise en page relevé par PageSpeed sur ce site). Les
+         autres poids (300/500/600, plus rares) restent en chargement normal
+         via la règle @font-face — pas besoin de tous les précharger. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-400-normal.woff2" crossorigin />
     <!-- Court exprès : un titre long ("VICTOURY — Ensembles sport...") se
          voit tronqué dans un onglet étroit et affiche alors l'URL à la
          place, ce que le client lit comme "le site ne s'appelle pas

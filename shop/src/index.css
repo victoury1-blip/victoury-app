@@ -2,6 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Police "Jost" hébergée ici (public/fonts) plutôt que chargée chez Google
+   Fonts : ça évite la connexion à un domaine tiers (fonts.googleapis.com +
+   fonts.gstatic.com) et surtout permet de la précharger (voir index.html)
+   pour qu'elle soit déjà là au moment où le texte se peint — sans ça, le
+   texte s'affiche d'abord dans la police de secours puis "saute" en Jost
+   une fois celle-ci arrivée, avec des largeurs de caractères différentes :
+   la cause du plus gros décalage de mise en page (CLS) mesuré sur le site,
+   plus visible en bas de page (pied de page) puisqu'il cumule le
+   changement de largeur de tous les blocs de texte au-dessus. */
+@font-face {
+  font-family: 'Jost';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/jost-latin-300-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Jost';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/jost-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Jost';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/jost-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Jost';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/jost-latin-600-normal.woff2') format('woff2');
+}
+
 :root {
   /* Couleur principale du site — texte, boutons, bordures actives.
      Réglable depuis /store/theme, sans recompiler le site : la page y écrit
