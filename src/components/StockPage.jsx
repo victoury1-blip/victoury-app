@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
 import { importProductsFromWooCommerce, updateWooStock, pushProductToWoo, deleteWooProduct, fetchWooProductIds } from '../lib/woocommerce';
+import { chargerStockManuel, lireStockManuelCache, definirStockManuel } from '../lib/stockManuel';
 
 /* ─── helpers ─── */
 function stockColor(n) {
@@ -238,6 +239,32 @@ export default function StockPage() {
   const [editProduct, setEditProduct] = useState(null);
   const [syncStatus, setSyncStatus] = useState(null);
   const [syncing, setSyncing] = useState(false);
+
+  // Total de stock physique, réglé à la main (compté au local) — sans rapport
+  // avec la somme des variations produits ci-dessous. Descend tout seul
+  // uniquement quand une commande passe à "Confirmé" (voir lib/stockManuel).
+  const [stockManuel, setStockManuel] = useState(lireStockManuelCache);
+  const [editStockManuel, setEditStockManuel] = useState(false);
+  const [stockManuelSaisi, setStockManuelSaisi] = useState('');
+  useEffect(() => { chargerStockManuel().then(setStockManuel); }, []);
+  // Se met à jour toute seule si une commande est confirmée pendant que
+  // cette page est ouverte (stockManuel.js écrit dans le même localStorage).
+  useEffect(() => {
+    const id = setInterval(() => setStockManuel(v => {
+      const frais = lireStockManuelCache();
+      return frais === v ? v : frais;
+    }), 2000);
+    return () => clearInterval(id);
+  }, []);
+  function ouvrirEditStockManuel() {
+    setStockManuelSaisi(String(stockManuel));
+    setEditStockManuel(true);
+  }
+  function enregistrerStockManuel() {
+    const nouveau = definirStockManuel(parseInt(stockManuelSaisi, 10) || 0);
+    setStockManuel(nouveau);
+    setEditStockManuel(false);
+  }
 
   async function handleSynchroniser() {
     setSyncing(true);
@@ -495,8 +522,30 @@ export default function StockPage() {
           />
         </div>
 
+        {/* Compté à la main au local (pas la somme des variations ci-dessous,
+            affichée juste à côté) — descend tout seul quand une commande
+            passe à "Confirmé". Cliquer le nombre l'ouvre en édition. */}
         <div className="ml-auto flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-700">
-          <span>📦</span> Total Stock: {totalStock} unité(s)
+          <span>📦</span>
+          {editStockManuel ? (
+            <>
+              <input type="number" min="0" autoFocus value={stockManuelSaisi}
+                onChange={e => setStockManuelSaisi(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') enregistrerStockManuel(); if (e.key === 'Escape') setEditStockManuel(false); }}
+                className="w-20 border border-blue-300 rounded px-1.5 py-0.5 text-sm" />
+              <span>unité(s)</span>
+              <button onClick={enregistrerStockManuel} className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700"><Check size={12} /></button>
+              <button onClick={() => setEditStockManuel(false)} className="p-1 rounded bg-white border border-blue-200 text-blue-600 hover:bg-blue-100"><X size={12} /></button>
+            </>
+          ) : (
+            <button onClick={ouvrirEditStockManuel} className="flex items-center gap-1.5 hover:underline" title="Régler le total compté au local">
+              Total Stock : {stockManuel} unité(s)
+              <Pencil size={11} />
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-gray-400" title="Somme des variations produits ci-dessous, pour comparaison">
+          (variations : {totalStock})
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, E
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
+import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
 
 const STORAGE_KEY = 'victoury_fournisseur_factures';
 const LEGACY_KEY = 'victoury_fournisseur'; // ancienne liste plate d'articles
@@ -278,6 +279,20 @@ export default function FournisseurPage() {
   const searchRef = useRef(null);
   useSearchShortcut(searchRef);
 
+  // Stock physique restant, compté et réglé à la main dans /store/stock —
+  // affiché ici en LECTURE SEULE, pour comparer d'un coup d'œil avec ce qui
+  // a été pris chez le fournisseur. Descend tout seul quand une commande
+  // passe à "Confirmé" (voir lib/stockManuel).
+  const [stockManuel, setStockManuel] = useState(lireStockManuelCache);
+  useEffect(() => { chargerStockManuel().then(setStockManuel); }, []);
+  useEffect(() => {
+    const id = setInterval(() => setStockManuel(v => {
+      const frais = lireStockManuelCache();
+      return frais === v ? v : frais;
+    }), 2000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     cloudGet(STORAGE_KEY).then(remote => {
       if (Array.isArray(remote) && remote.length) setFactures(remote);
@@ -410,7 +425,7 @@ export default function FournisseurPage() {
       </div>
 
       {/* Résumé global */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-5">
         <SummaryCard label="Coût total" value={`${totals.cout.toLocaleString('fr-FR')} DH`} color="text-gray-800" />
         <SummaryCard label="Qté prise" value={totals.qte} color="text-blue-600" />
         <SummaryCard label="Payé" value={`${totals.paye.toLocaleString('fr-FR')} DH`} color="text-emerald-600" />
@@ -419,6 +434,8 @@ export default function FournisseurPage() {
         <SummaryCard label="Pièces non payées" value={totals.piecesDues}
           color={totals.piecesDues > 0 ? 'text-amber-600' : 'text-emerald-700'}
           hint={totals.prixPiece > 0 ? `à ${Math.round(totals.prixPiece).toLocaleString('fr-FR')} DH la pièce` : undefined} />
+        <SummaryCard label="Stock au local" value={stockManuel} color="text-indigo-600"
+          hint="Réglable dans Stock — descend à chaque commande confirmée" />
       </div>
 
       <div className="relative mb-4 max-w-xs">

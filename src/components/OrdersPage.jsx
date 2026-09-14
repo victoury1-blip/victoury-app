@@ -47,6 +47,7 @@ import { generateVictId, isVictCode } from '../lib/victId';
 import { COLIS_PIPELINE_SET } from '../data/colisPipeline';
 import { ORDER_TABS } from '../data/orderTabs';
 import { recordHistory } from '../lib/orderHistory';
+import { decrementerStockManuel } from '../lib/stockManuel';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
 import CustomerHistoryModal from './orders/CustomerHistoryModal';
@@ -162,6 +163,14 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
   function bulkChangeStatus(newStatus) {
     const ts = now();
     selected.forEach(id => recordHistory(id, newStatus, currentUser));
+    // Stock manuel (/store/stock) : ne descend qu'au moment où une commande
+    // ENTRE dans "Confirmé" — jamais si elle y était déjà (re-sauvegarde
+    // sans changement réel de statut).
+    if (newStatus === 'confirme') {
+      for (const o of selectedOrders) {
+        if (o.status !== 'confirme') decrementerStockManuel(o);
+      }
+    }
     // Les VICTxxxx sont générés AVANT setOrders : l'updater doit rester pur
     // (StrictMode le ré-exécute et brûlerait/dupliquerait des ids).
     const newIds = new Map();
@@ -727,6 +736,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     const prev = orders.find(o => o.id === updated.id);
     if (prev && prev.status !== updated.status) {
       recordHistory(updated.id, updated.status, currentUser, prev.status);
+      // Stock manuel (/store/stock) : décrémenté uniquement à l'entrée dans "Confirmé".
+      if (updated.status === 'confirme') decrementerStockManuel(updated);
     }
     // `delivery` est une CHAÎNE (nom du livreur), pas un objet : comparer `.nom`
     // renvoyait toujours undefined === undefined, donc aucun changement n'était tracé.
@@ -1365,6 +1376,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             const ts = now();
             recordHistory(orderId, newStatus, currentUser);
             setModifiedIds(prev => new Set([...prev, orderId]));
+            // Stock manuel (/store/stock) : décrémenté uniquement à l'entrée dans "Confirmé".
+            const orderAvant = orders.find(o => o.id === orderId);
+            if (newStatus === 'confirme' && orderAvant?.status !== 'confirme') decrementerStockManuel(orderAvant);
             // Code VICT attribué UNIQUEMENT quand la commande est confirmée / part en
             // livraison (VICT_ON_STATUS) et qu'elle n'en a pas déjà un — ni dans
             // trackingNumber ni dans l'id. Généré AVANT setOrders pour garder l'updater pur.
