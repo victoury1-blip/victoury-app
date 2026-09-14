@@ -167,7 +167,11 @@ export default function Produit({ onAjouter, theme, remises }) {
                   // téléchargent qu'une fois atteintes par le défilement horizontal :
                   // sans ce lazy, toutes les photos de la fiche (parfois 5-6) partaient
                   // d'un coup au chargement, même celles jamais vues.
-                  ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-cover"
+                  // object-contain (pas object-cover) : une photo qui n'est pas déjà
+                  // carrée montrait ses bords rognés pour remplir le carré — la photo
+                  // entière reste visible ici, quitte à laisser une bande de fond
+                  // (bg-sand) au-dessus/dessous ou de chaque côté.
+                  ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-contain"
                       loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
                   : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
               </div>
