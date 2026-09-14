@@ -38,3 +38,15 @@ export function decrementerStockManuel(order) {
   if (!qte) return;
   return definirStockManuel(lireStockManuelCache() - qte);
 }
+
+/* Une commande DÉJÀ confirmée peut ensuite être modifiée (le client rajoute
+ * une pièce, par exemple) sans jamais changer de statut — un simple "encore
+ * confirmée avant/après" ne suffit donc pas à savoir si le stock a bougé.
+ * On compare le nombre de pièces avant/après : le stock ne descend (ou ne
+ * remonte, si des pièces sont retirées) QUE de la différence. */
+export function ajusterStockManuelSiConfirmeeModifiee(avant, apres) {
+  if (avant?.status !== 'confirme' || apres?.status !== 'confirme') return;
+  const delta = nbPieces(apres) - nbPieces(avant);
+  if (!delta) return;
+  return definirStockManuel(lireStockManuelCache() - delta);
+}

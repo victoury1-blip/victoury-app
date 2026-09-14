@@ -47,7 +47,7 @@ import { generateVictId, isVictCode } from '../lib/victId';
 import { COLIS_PIPELINE_SET } from '../data/colisPipeline';
 import { ORDER_TABS } from '../data/orderTabs';
 import { recordHistory } from '../lib/orderHistory';
-import { decrementerStockManuel } from '../lib/stockManuel';
+import { decrementerStockManuel, ajusterStockManuelSiConfirmeeModifiee } from '../lib/stockManuel';
 import StatusBadge from './orders/StatusBadge';
 import HistoryModal from './orders/HistoryModal';
 import CustomerHistoryModal from './orders/CustomerHistoryModal';
@@ -738,6 +738,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       recordHistory(updated.id, updated.status, currentUser, prev.status);
       // Stock manuel (/store/stock) : décrémenté uniquement à l'entrée dans "Confirmé".
       if (updated.status === 'confirme') decrementerStockManuel(updated);
+    } else if (prev) {
+      // Statut inchangé (déjà "Confirmé") mais les produits/quantités ont pu
+      // changer dans ce même formulaire (le client rajoute une pièce, par
+      // exemple) : ajuste alors le stock manuel de la différence de pièces.
+      ajusterStockManuelSiConfirmeeModifiee(prev, updated);
     }
     // `delivery` est une CHAÎNE (nom du livreur), pas un objet : comparer `.nom`
     // renvoyait toujours undefined === undefined, donc aucun changement n'était tracé.
