@@ -18,6 +18,9 @@ function CarteProduit({ produit, remises, categorie, compact }) {
   const image = produit.images?.[0]?.url;
   const tailles = (produit.sizes || []).filter(s => s.stock > 0);
   const promo = produit.compare_at > produit.price;
+  // Épuisé = des tailles sont réglées mais AUCUNE n'a de stock — un produit
+  // qui n'a jamais eu de tailles réglées n'est pas considéré comme épuisé.
+  const epuise = (produit.sizes || []).length > 0 && tailles.length === 0;
 
   return (
     <Link to={`/product/${produit.slug}/`} className="group block">
@@ -48,6 +51,17 @@ function CarteProduit({ produit, remises, categorie, compact }) {
         )}
         <BoutonFavori slug={produit.slug}
           className={`absolute rounded-full bg-white/90 grid place-items-center hover:bg-white ${compact ? 'top-1.5 right-1.5 w-6 h-6 [&_svg]:w-3 [&_svg]:h-3' : 'top-3 right-3 w-8 h-8'}`} />
+        {/* Tampon façon "SOLD OUT" — un peu plus voyant qu'un simple badge
+            gris, sans avoir à ouvrir la fiche pour découvrir que rien n'est
+            en stock. Assombrit légèrement la photo pour se détacher dessus. */}
+        {epuise && (
+          <div className="absolute inset-0 bg-black/10 grid place-items-center pointer-events-none">
+            <span className={`border-2 border-red-600 text-red-600 font-extrabold uppercase tracking-wider bg-white/80
+                              -rotate-[18deg] ${compact ? 'text-[9px] px-2 py-1' : 'text-sm px-4 py-1.5'}`}>
+              {t('epuiseTampon')}
+            </span>
+          </div>
+        )}
       </div>
       {/* Toujours visibles (pas seulement au survol) : au doigt, sur mobile,
           il n'y a pas de survol — les cacher derrière un hover les rendait

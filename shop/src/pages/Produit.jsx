@@ -117,6 +117,9 @@ export default function Produit({ onAjouter, theme, remises }) {
   const tailles = produit.sizes || [];
   const photos = produit.images?.length ? produit.images : [{ url: '' }];
   const promo = produit.compare_at > produit.price;
+  // Même règle que CarteProduit.jsx : épuisé seulement si des tailles sont
+  // réglées et qu'aucune n'a de stock.
+  const epuise = tailles.length > 0 && !tailles.some(s => s.stock > 0);
   // Règles globales + celles ciblant justement la collection de ce produit.
   const paliers = paliersEffectifs(remises, produit.collection_id);
   const stockTaille = tailles.find(s => s.size === taille)?.stock;
@@ -151,6 +154,15 @@ export default function Produit({ onAjouter, theme, remises }) {
           fiche, sans rien montrer de plus qu'un défilement. */}
       <div>
         <div className="relative">
+          {/* Fixe par-dessus le carrousel entier (pas remis dans chaque
+              diapositive) : reste en place quel que soit la photo affichée. */}
+          {epuise && (
+            <div className="absolute inset-0 z-10 bg-black/10 grid place-items-center pointer-events-none">
+              <span className="border-2 border-red-600 text-red-600 font-extrabold uppercase tracking-wider bg-white/80 -rotate-[18deg] text-lg px-6 py-2">
+                {t('epuiseTampon')}
+              </span>
+            </div>
+          )}
           <div
             ref={carouselRef}
             onScroll={(e) => {
