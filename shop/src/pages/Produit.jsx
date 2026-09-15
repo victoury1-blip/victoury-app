@@ -160,7 +160,7 @@ export default function Produit({ onAjouter, theme, remises }) {
             className="flex overflow-x-auto snap-x snap-mandatory gap-2
                       [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {photos.map((img, i) => (
-              <div key={i} className="bg-sand aspect-square overflow-hidden shrink-0 w-full snap-center">
+              <div key={i} className="aspect-square overflow-hidden shrink-0 w-full snap-center" style={{ background: '#D8D8D5' }}>
                 {img.url
                   // Seule la 1ère photo (déjà visible à l'ouverture de la fiche) charge
                   // tout de suite en pleine résolution — les suivantes ne se
@@ -170,7 +170,9 @@ export default function Produit({ onAjouter, theme, remises }) {
                   // object-contain (pas object-cover) : une photo qui n'est pas déjà
                   // carrée montrait ses bords rognés pour remplir le carré — la photo
                   // entière reste visible ici, quitte à laisser une bande de fond
-                  // (bg-sand) au-dessus/dessous ou de chaque côté.
+                  // au-dessus/dessous ou de chaque côté. Ce fond est le même gris que
+                  // le studio des photos produits (plutôt que bg-sand, crème) : la
+                  // bande se fond dans la photo au lieu de trancher avec elle.
                   ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-contain"
                       loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
                   : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
