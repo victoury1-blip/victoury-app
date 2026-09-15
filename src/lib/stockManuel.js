@@ -7,9 +7,17 @@ import { cloudGet, cloudSet, localGet } from './cloudSettings';
  * façon : automatiquement, quand une commande passe au statut "Confirmé". */
 const CLE = 'stock_manuel_total';
 
-export async function chargerStockManuel() {
+/* `parDefaut` : première fois que ce total est lu (jamais réglé à la main
+ * avant), il vaut mieux repartir de la somme des variations produits que
+ * de 0 — 0 se lisait comme "tout le stock a disparu" alors que ce total
+ * manuel n'avait simplement jamais encore été saisi. Le seed n'a lieu
+ * qu'une fois : dès qu'une vraie valeur existe (même 0, explicitement
+ * réglée), elle est respectée. */
+export async function chargerStockManuel(parDefaut) {
   const v = await cloudGet(CLE);
-  return typeof v === 'number' ? v : 0;
+  if (typeof v === 'number') return v;
+  if (typeof parDefaut === 'number') { definirStockManuel(parDefaut); return parDefaut; }
+  return 0;
 }
 
 /** Lecture synchrone (cache local) — pour un premier affichage sans attendre le réseau. */

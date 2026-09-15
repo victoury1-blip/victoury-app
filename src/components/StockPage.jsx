@@ -246,7 +246,15 @@ export default function StockPage() {
   const [stockManuel, setStockManuel] = useState(lireStockManuelCache);
   const [editStockManuel, setEditStockManuel] = useState(false);
   const [stockManuelSaisi, setStockManuelSaisi] = useState('');
-  useEffect(() => { chargerStockManuel().then(setStockManuel); }, []);
+  // Attend que les produits soient chargés : la toute première lecture (si
+  // ce total n'a jamais été réglé à la main) se raccroche à la somme des
+  // variations produits plutôt qu'à 0 — voir lib/stockManuel.js.
+  useEffect(() => {
+    if (loadingProducts) return;
+    const seed = products.reduce((s, p) => s + getTotalStock(p), 0);
+    chargerStockManuel(seed).then(setStockManuel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingProducts]);
   // Se met à jour toute seule si une commande est confirmée pendant que
   // cette page est ouverte (stockManuel.js écrit dans le même localStorage).
   useEffect(() => {
