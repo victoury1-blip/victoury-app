@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { miniature, surErreurMiniature } from '../lib/img';
 
 /* Une carte par collection, photo + nom + nombre de produits en incrustation —
@@ -7,6 +8,12 @@ import { miniature, surErreurMiniature } from '../lib/img';
    avant même de lui montrer des produits individuels. */
 function CategoriesGrid({ collections }) {
   const visibles = (collections || []).filter(c => c.count > 0);
+  const pisteRef = useRef(null);
+  const defiler = (sens) => {
+    const piste = pisteRef.current;
+    if (!piste) return;
+    piste.scrollBy({ left: sens * piste.clientWidth * 0.9, behavior: 'smooth' });
+  };
   if (!visibles.length) return null;
 
   return (
@@ -16,9 +23,13 @@ function CategoriesGrid({ collections }) {
           même schéma que "Nos nouveautés" juste en dessous : avec un nombre
           de catégories qui ne tombe pas juste (3, 5...), une grille en
           grid-cols-2 laissait la dernière carte seule sur sa ligne, mal
-          alignée sous les deux du dessus. */}
-      <div className="mt-8 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2
-                      [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          alignée sous les deux du dessus. Rien, au premier coup d'œil, ne
+          disait qu'il y avait plus à voir sur le côté — des flèches
+          visibles à toutes les tailles (pas seulement au clavier/souris)
+          rendent ce défilement évident, en plus du glissement au doigt. */}
+      <div className="relative mt-8">
+        <div ref={pisteRef} className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2
+                        [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visibles.map(c => {
           // Une collection "Soldes"/promo n'a en général pas de vraie photo à
           // elle (ce n'est pas un produit) — un visuel générique "clipart"
@@ -29,7 +40,7 @@ function CategoriesGrid({ collections }) {
           const estSolde = /solde/i.test(c.slug || c.name || '');
           return (
             <Link key={c.id} to={`/product-category/${c.slug}/`}
-              className="group relative aspect-[3/4] overflow-hidden bg-sand block w-[46%] sm:w-[31%] lg:w-[23%] shrink-0 snap-start">
+              className="group relative aspect-[3/4] overflow-hidden bg-sand block w-[42%] sm:w-[31%] lg:w-[23%] shrink-0 snap-start">
               {/* Le nom + nombre de produits restent affichés en bas (bande
                   commune à toutes les cartes, juste en dessous) — pas
                   répétés ici. */}
@@ -70,6 +81,21 @@ function CategoriesGrid({ collections }) {
             </Link>
           );
         })}
+        </div>
+        {visibles.length > 2 && (
+          <>
+            <button type="button" onClick={() => defiler(-1)} aria-label="Précédent"
+              className="absolute -left-2 sm:-left-4 top-[38%] -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full
+                        bg-white shadow-md border border-gray-100 grid place-items-center text-ink hover:bg-gray-50">
+              <ChevronLeft size={16} />
+            </button>
+            <button type="button" onClick={() => defiler(1)} aria-label="Suivant"
+              className="absolute -right-2 sm:-right-4 top-[38%] -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full
+                        bg-white shadow-md border border-gray-100 grid place-items-center text-ink hover:bg-gray-50">
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
       </div>
     </section>
   );
