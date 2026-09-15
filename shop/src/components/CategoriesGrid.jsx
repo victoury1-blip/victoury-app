@@ -12,7 +12,13 @@ function CategoriesGrid({ collections }) {
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 mt-16">
       <h2 className="text-center text-sm tracking-[0.2em] uppercase text-gray-500">Nos catégories</h2>
-      <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Défilement horizontal (pas une grille qui retombe à la ligne) —
+          même schéma que "Nos nouveautés" juste en dessous : avec un nombre
+          de catégories qui ne tombe pas juste (3, 5...), une grille en
+          grid-cols-2 laissait la dernière carte seule sur sa ligne, mal
+          alignée sous les deux du dessus. */}
+      <div className="mt-8 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2
+                      [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visibles.map(c => {
           // Une collection "Soldes"/promo n'a en général pas de vraie photo à
           // elle (ce n'est pas un produit) — un visuel générique "clipart"
@@ -22,7 +28,8 @@ function CategoriesGrid({ collections }) {
           // reste élégante quelle que soit l'image (ou son absence).
           const estSolde = /solde/i.test(c.slug || c.name || '');
           return (
-            <Link key={c.id} to={`/product-category/${c.slug}/`} className="group relative aspect-[3/4] overflow-hidden bg-sand block">
+            <Link key={c.id} to={`/product-category/${c.slug}/`}
+              className="group relative aspect-[3/4] overflow-hidden bg-sand block w-[46%] sm:w-[31%] lg:w-[23%] shrink-0 snap-start">
               {/* Le nom + nombre de produits restent affichés en bas (bande
                   commune à toutes les cartes, juste en dessous) — pas
                   répétés ici. */}
