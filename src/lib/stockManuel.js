@@ -26,9 +26,15 @@ export function lireStockManuelCache() {
   return typeof v === 'number' ? v : 0;
 }
 
-export function definirStockManuel(total) {
+/* `await`-able exprès : `cloudSet` écrit le localStorage tout de suite, mais
+ * son écriture Supabase part en arrière-plan — un rafraîchissement de page
+ * juste après annule cette requête réseau en vol, et la valeur fraîchement
+ * saisie n'atteint jamais la base. L'appelant (le bouton ✓ de Stock) attend
+ * donc cette promesse avant de considérer l'enregistrement terminé, pour
+ * pouvoir prévenir l'admin plutôt que de la laisser rafraîchir trop tôt. */
+export async function definirStockManuel(total) {
   const propre = Math.max(0, Math.round(total) || 0);
-  cloudSet(CLE, propre);
+  await cloudSet(CLE, propre);
   return propre;
 }
 

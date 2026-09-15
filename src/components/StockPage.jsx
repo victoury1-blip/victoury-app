@@ -264,13 +264,20 @@ export default function StockPage() {
     }), 2000);
     return () => clearInterval(id);
   }, []);
+  const [enregistrementStockManuel, setEnregistrementStockManuel] = useState(false);
   function ouvrirEditStockManuel() {
     setStockManuelSaisi(String(stockManuel));
     setEditStockManuel(true);
   }
-  function enregistrerStockManuel() {
-    const nouveau = definirStockManuel(parseInt(stockManuelSaisi, 10) || 0);
+  // Attend la fin de l'écriture Supabase avant de refermer le champ : sans
+  // ça, un rafraîchissement de page fait trop tôt (juste après le clic ✓)
+  // annulait la requête réseau en vol — la valeur saisie revenait alors à
+  // l'ancienne au rechargement, comme si rien n'avait été enregistré.
+  async function enregistrerStockManuel() {
+    setEnregistrementStockManuel(true);
+    const nouveau = await definirStockManuel(parseInt(stockManuelSaisi, 10) || 0);
     setStockManuel(nouveau);
+    setEnregistrementStockManuel(false);
     setEditStockManuel(false);
   }
 
@@ -537,13 +544,19 @@ export default function StockPage() {
           <span>📦</span>
           {editStockManuel ? (
             <>
-              <input type="number" min="0" autoFocus value={stockManuelSaisi}
+              <input type="number" min="0" autoFocus value={stockManuelSaisi} disabled={enregistrementStockManuel}
                 onChange={e => setStockManuelSaisi(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') enregistrerStockManuel(); if (e.key === 'Escape') setEditStockManuel(false); }}
-                className="w-20 border border-blue-300 rounded px-1.5 py-0.5 text-sm" />
-              <span>unité(s)</span>
-              <button onClick={enregistrerStockManuel} className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700"><Check size={12} /></button>
-              <button onClick={() => setEditStockManuel(false)} className="p-1 rounded bg-white border border-blue-200 text-blue-600 hover:bg-blue-100"><X size={12} /></button>
+                className="w-20 border border-blue-300 rounded px-1.5 py-0.5 text-sm disabled:opacity-60" />
+              {enregistrementStockManuel ? (
+                <span className="text-xs italic">Enregistrement…</span>
+              ) : (
+                <>
+                  <span>unité(s)</span>
+                  <button onClick={enregistrerStockManuel} className="p-1 rounded bg-blue-600 text-white hover:bg-blue-700"><Check size={12} /></button>
+                  <button onClick={() => setEditStockManuel(false)} className="p-1 rounded bg-white border border-blue-200 text-blue-600 hover:bg-blue-100"><X size={12} /></button>
+                </>
+              )}
             </>
           ) : (
             <button onClick={ouvrirEditStockManuel} className="flex items-center gap-1.5 hover:underline" title="Régler le total compté au local">
