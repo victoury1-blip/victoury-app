@@ -52,6 +52,25 @@ export const AFFILIATE_PLATFORMS = {
     statusPrefix: 'bouait',
     path: '/bouait-affiliate',
   },
+  azome: {
+    key: 'azome',
+    label: 'Azome Affiliate',
+    host: 'azomeaffiliate.com',
+    origin: 'https://azomeaffiliate.com',
+    hosts: ['azomeaffiliate.com', 'www.azomeaffiliate.com', 'api.azomeaffiliate.com'],
+    configKey: 'azome_config',
+    keyPrefix: 'AZOM_',
+    // Nom exact du cookie de session pas encore confirmé (voir le commentaire
+    // plus haut sur le domaine deviné à tort pour Bouait) — plusieurs noms
+    // plausibles envoyés ensemble ; un nom inconnu est ignoré par le serveur,
+    // donc sans risque s'il s'avère faux une fois la vraie valeur repérée
+    // (Ouvrir azomeaffiliate.com → F12 → Application → Cookies).
+    sessionCookies: ['azomeaffiliate_session', 'azome_session', 'laravel_session'],
+    refPrefix: 'AZOM',
+    source: 'azome-affiliate',
+    statusPrefix: 'azome',
+    path: '/azome-affiliate',
+  },
   alphacod: {
     key: 'alphacod',
     label: 'AlphaCod Affiliate',
