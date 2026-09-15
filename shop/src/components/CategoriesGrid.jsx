@@ -27,11 +27,26 @@ function CategoriesGrid({ collections }) {
                   commune à toutes les cartes, juste en dessous) — pas
                   répétés ici. */}
               {estSolde ? (
-                <div className="w-full h-full bg-gradient-to-br from-ink to-black grid place-items-center text-center px-4">
-                  <div>
-                    <p className="text-red-500 text-3xl sm:text-4xl font-bold tracking-wide">−50%</p>
-                    <div className="mx-auto mt-2.5 w-8 h-px bg-white/30" />
-                    <p className="mt-2.5 text-white/70 text-[11px] sm:text-xs tracking-widest uppercase">Jusqu'à</p>
+                <div className="relative w-full h-full bg-gradient-to-br from-ink to-black grid place-items-center text-center px-4 border border-white/10">
+                  {/* Lueur douce derrière le pourcentage — évite le "carré tout
+                      plat" et rappelle le rouge déjà utilisé pour les remises
+                      partout ailleurs sur le site (badge %, prix barré...). */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-40 h-40 rounded-full bg-red-600/20 blur-3xl" />
+                  </div>
+                  {/* Même style de ruban que "Meilleure vente" sur les fiches
+                      produit (coin haut-gauche, dégradé ambre/rouge) — le même
+                      langage visuel qu'ailleurs sur le site, pas un élément
+                      inventé pour cette seule carte. */}
+                  <span className="absolute top-0 left-0 bg-gradient-to-r from-amber-500 to-red-500 text-white
+                                   font-bold tracking-wide uppercase shadow-sm text-[10px] px-3 py-1.5"
+                    style={{ clipPath: 'polygon(0 0, 100% 0, 86% 100%, 0 100%)' }}>
+                    Promo
+                  </span>
+                  <div className="relative">
+                    <p className="text-red-500 text-4xl sm:text-5xl font-bold tracking-wide">−50%</p>
+                    <div className="mx-auto mt-3 w-10 h-px bg-white/30" />
+                    <p className="mt-3 text-white/70 text-xs sm:text-sm tracking-widest uppercase">Jusqu'à</p>
                   </div>
                 </div>
               ) : c.image_url ? (
