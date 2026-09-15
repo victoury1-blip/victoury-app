@@ -57,7 +57,7 @@ function CarteProduit({ produit, remises, categorie, compact }) {
         {epuise && (
           <div className="absolute inset-0 bg-black/10 grid place-items-center pointer-events-none">
             <span className={`border-2 border-red-600 text-red-600 font-extrabold uppercase tracking-wider bg-white/80
-                              -rotate-[18deg] ${compact ? 'text-[9px] px-2 py-1' : 'text-sm px-4 py-1.5'}`}>
+                              -rotate-[18deg] whitespace-nowrap ${compact ? 'text-[7px] px-1.5 py-0.5' : 'text-xs px-3 py-1'}`}>
               {t('epuiseTampon')}
             </span>
           </div>

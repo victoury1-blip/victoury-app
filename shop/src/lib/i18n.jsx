@@ -32,7 +32,7 @@ const DICT = {
     quantiteMinus: 'Diminuer', quantitePlus: 'Augmenter', retirer: 'Retirer',
     profitezDuTarif: "Profitez-en pour ajouter :", voirProduit: 'Voir',
     mesFavoris: 'Mes favoris', aucunFavori: "Vous n'avez encore aucun favori.",
-    voirLaBoutique: 'Voir la boutique', meilleureVente: '🔥 Meilleure vente', epuiseTampon: 'Épuisé',
+    voirLaBoutique: 'Voir la boutique', meilleureVente: '🔥 Meilleure vente', epuiseTampon: 'Rupture de stock',
     achetezEnsemble: 'Souvent achetés ensemble', ajouterLaSelection: 'Obtenez les 2 articles',
     pourSeulement: 'pour', seulement: 'seulement', auLieuDe: 'au lieu de',
     guideTailles: 'Guide des tailles',

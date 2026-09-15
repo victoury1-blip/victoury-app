@@ -158,7 +158,7 @@ export default function Produit({ onAjouter, theme, remises }) {
               diapositive) : reste en place quel que soit la photo affichée. */}
           {epuise && (
             <div className="absolute inset-0 z-10 bg-black/10 grid place-items-center pointer-events-none">
-              <span className="border-2 border-red-600 text-red-600 font-extrabold uppercase tracking-wider bg-white/80 -rotate-[18deg] text-lg px-6 py-2">
+              <span className="border-2 border-red-600 text-red-600 font-extrabold uppercase tracking-wider bg-white/80 -rotate-[18deg] whitespace-nowrap text-base px-5 py-1.5">
                 {t('epuiseTampon')}
               </span>
             </div>
