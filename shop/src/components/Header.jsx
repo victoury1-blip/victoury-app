@@ -47,8 +47,16 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
   const BarreCategories = collections.length > 0 && (
     <div className="bg-gray-100 border-b border-gray-200">
       {/* Sur mobile la ligne défile plutôt que de passer à la ligne : un
-          bandeau sur deux rangs mangerait trop de hauteur d'écran. */}
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-center gap-6 sm:gap-10 py-2.5 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          bandeau sur deux rangs mangerait trop de hauteur d'écran.
+          justify-start (pas -center) : avec overflow-x-auto, centrer un
+          contenu qui dépasse pousse le débordement des DEUX côtés à la fois
+          — le début devient inatteignable en faisant défiler, et la
+          dernière catégorie reste tronquée contre le bord, pile ce qui
+          coupait "Survêtements" ici. Centré seulement à partir de "sm" (plus
+          de place, débordement bien moins probable). */}
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-start sm:justify-center
+                      overflow-x-auto gap-6 sm:gap-10 py-2.5 whitespace-nowrap
+                      [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {collections.map(c => (
           <NavLink key={c.slug} to={`/product-category/${c.slug}/`}
             className={({ isActive }) => `shrink-0 text-[12px] font-semibold tracking-widest uppercase transition-colors ${
