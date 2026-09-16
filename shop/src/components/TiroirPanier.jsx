@@ -166,8 +166,12 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                   : <span className="text-green-700">{t('livraisonGratuite')}</span>}
               </p>
             )}
+            {/* Même vert que le total de la page de commande : le dernier
+                montant lu avant de cliquer "Commander" doit se lire comme
+                un bon prix, pas comme une grosse somme intimidante. */}
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">{t('sousTotal')}</span><span>{fmtPrix(tot.sousTotal, lang)}</span>
+              <span className="text-gray-500">{t('sousTotal')}</span>
+              <span className="text-green-600 font-bold">{fmtPrix(tot.sousTotal, lang)}</span>
             </div>
             {tot.remiseQuantite > 0 && (
               <div className="flex justify-between text-sm text-green-700">
@@ -177,7 +181,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
             )}
             <Link to="/commander" onClick={onFermer}
               className="mt-3 block bg-ink text-white text-center py-3.5 text-xs tracking-widest uppercase">
-              {t('commander')} — {fmtPrix(tot.total, lang)}
+              {t('commander')} — <span className="text-green-400 font-bold">{fmtPrix(tot.total, lang)}</span>
               <span className="block text-[10px] text-gray-300 mt-0.5 normal-case tracking-normal">
                 {t('paiementLivraison')}
               </span>
