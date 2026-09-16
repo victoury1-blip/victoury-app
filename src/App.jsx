@@ -1107,9 +1107,26 @@ export default function App() {
       for (const o of newOrders) await queueSync('update', o);
       return;
     }
-    // ignoreDuplicates protège une éventuelle commande active existante (statuts, etc.).
-    const { error } = await supabase.from('orders').upsert(newOrders.map(toRow), { onConflict: 'id', ignoreDuplicates: true });
+    // ignoreDuplicates protège une éventuelle commande active existante (statuts, etc.) —
+    // mais silencieusement : si l'id généré (VIxxxxx) entre en collision avec une
+    // commande déjà en base (ailleurs, pas encore visible dans `orders` local), la
+    // ligne est purement et simplement ignorée, sans erreur. La commande semblait
+    // enregistrée (le toast de succès part avant même que cette requête ne parte),
+    // puis disparaissait au rechargement suivant, sans aucune trace. `select('id')`
+    // dit quelles lignes ont RÉELLEMENT été insérées ou mises à jour : celles qui
+    // manquent à l'appel sont celles qu'ignoreDuplicates a passées sous silence.
+    const { data, error } = await supabase.from('orders')
+      .upsert(newOrders.map(toRow), { onConflict: 'id', ignoreDuplicates: true }).select('id');
     if (error) throw new Error(error.message);
+    const revenues = new Set((data || []).map(r => r.id));
+    const ignorees = newOrders.filter(o => !revenues.has(o.id));
+    if (ignorees.length) {
+      const err = new Error(
+        `Numéro(s) déjà utilisé(s) en base, commande(s) NON enregistrée(s) : ${ignorees.map(o => o.id).join(', ')}`
+      );
+      err.failedIds = ignorees.map(o => o.id);
+      throw err;
+    }
   }
 
   async function deleteOrderFromSupabase(orderId) {
@@ -1231,7 +1248,27 @@ export default function App() {
           || o.reportDate !== old.reportDate || o.noteLivraison !== old.noteLivraison
           || o.recu !== old.recu || o.ozoneLastStatus !== old.ozoneLastStatus;
       });
-      if (brandNew.length) saveOrdersToSupabase(brandNew).catch(e => console.error('save new orders:', e));
+      if (brandNew.length) saveOrdersToSupabase(brandNew).catch(e => {
+        // Visible, pas juste dans la console : un échec silencieux ici (ex. collision
+        // de numéro VIxxxxx avec une commande déjà en base) faisait paraître une
+        // commande enregistrée — un toast de succès était déjà parti — alors qu'elle
+        // n'existait nulle part et disparaissait au rechargement suivant, sans que
+        // personne ne le sache. Réutilise la même bannière rouge que les autres
+        // erreurs base de données de l'appli, ET retire la commande fantôme de la
+        // liste locale tout de suite plutôt que d'attendre qu'un rechargement le
+        // fasse à sa place.
+        console.error('save new orders:', e);
+        setDbError(`Échec de l'enregistrement — ${e.message}`);
+        // `failedIds` ne couvre que les commandes réellement ignorées par
+        // Supabase (collision d'id) — un échec réseau/générique n'a pas cette
+        // liste : dans ce cas on retire tout le lot par sécurité, faute de
+        // savoir laquelle a échoué. Mais sur une collision partielle (lot créé
+        // via le champ "quantité" du formulaire), ne retirer QUE les id en
+        // échec évite d'effacer localement des commandes qui, elles, ont bien
+        // été enregistrées.
+        const idsToRemove = new Set(e.failedIds && e.failedIds.length ? e.failedIds : brandNew.map(o => o.id));
+        setOrders(cur => cur.filter(o => !idsToRemove.has(o.id)));
+      });
       const editTs = Date.now();
       brandNew.forEach(o => recentEditsRef.current.set(o.id, editTs));
       changed.forEach((o) => {
