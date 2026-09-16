@@ -91,6 +91,12 @@ export default function ProduitsListe() {
   const [genreFiltre, setGenreFiltre] = useState('');
   const [selection, setSelection] = useState(new Set());
   const [enCours, setEnCours] = useState(false);
+  // Groupes de couleurs dépliés — déclaré ICI (avec les autres useState, avant
+  // le "return" plus bas si `produits` n'a pas encore chargé) : un Hook
+  // appelé après un retour anticipé change le nombre de Hooks exécutés d'un
+  // rendu à l'autre, ce que React refuse (crash reproductible à coup sûr,
+  // dès que `produits` passe de null à sa vraie valeur).
+  const [groupesOuverts, setGroupesOuverts] = useState({});
 
   const recharger = () => listerProduits().then(setProduits).catch(() => setProduits([]));
   useEffect(() => { recharger(); }, []);
@@ -164,7 +170,6 @@ export default function ProduitsListe() {
      seul et même produit. Regroupées par group_id : une ligne résumée
      (couleurs cumulées, stock total), dépliable pour voir/gérer chaque
      couleur individuellement — même schéma que les variations dans Stock. */
-  const [groupesOuverts, setGroupesOuverts] = useState({});
   const basculerGroupe = (id) => setGroupesOuverts(g => ({ ...g, [id]: !g[id] }));
   const lignes = [];
   const groupesVus = new Set();
