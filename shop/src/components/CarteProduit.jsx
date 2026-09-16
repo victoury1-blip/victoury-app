@@ -10,7 +10,7 @@ import { ResumeAvis } from './AvisProduit';
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
-function CarteProduit({ produit, remises, categorie, compact }) {
+function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
   const { t, remisePalier, lang } = useLang();
   // Règles globales + celles ciblant justement la collection de CE produit —
   // une remise réglée pour une autre collection ne doit pas s'afficher ici.
@@ -26,8 +26,15 @@ function CarteProduit({ produit, remises, categorie, compact }) {
     <Link to={`/product/${produit.slug}/`} className="group block">
       <div className="relative bg-sand aspect-[4/5] overflow-hidden rounded-xl">
         {image ? (
+          // `prioritaire` : les toutes premières cartes d'une grille (page
+          // catégorie, souvent la page d'atterrissage d'une pub) sont déjà
+          // visibles au premier écran — le lazy-loading par défaut les
+          // retardait pourtant comme n'importe quelle image plus bas, alors
+          // que l'une d'elles est justement l'élément LCP de la page.
           <img src={miniature(image)} onError={(e) => surErreurMiniature(e, image)}
-            alt={produit.images[0].alt || produit.name} loading="lazy" decoding="async"
+            alt={produit.images[0].alt || produit.name}
+            loading={prioritaire ? 'eager' : 'lazy'} decoding="async"
+            fetchpriority={prioritaire ? 'high' : undefined}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>

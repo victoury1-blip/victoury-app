@@ -16,6 +16,7 @@ export default function Collection({ theme, remises }) {
   const [etat, setEtat] = useState({ chargement: true, collection: null, produits: [] });
   const [taille, setTaille] = useState('');
   const [avis, setAvis] = useState([]);
+  const [chargementAvis, setChargementAvis] = useState(true);
   const [nbAffiches, setNbAffiches] = useState(LOT);
   const sentinelleRef = useRef(null);
 
@@ -42,7 +43,7 @@ export default function Collection({ theme, remises }) {
     return () => observateur.disconnect();
   }, [etat.produits, taille]);
 
-  useEffect(() => { chargerAvis().then(setAvis).catch(() => {}); }, []);
+  useEffect(() => { chargerAvis().then(setAvis).catch(() => {}).finally(() => setChargementAvis(false)); }, []);
 
   // Réglable depuis /store/theme : superflu quand la collection ne mélange
   // pas de tailles disparates.
@@ -90,7 +91,7 @@ export default function Collection({ theme, remises }) {
       ) : (
         <>
           <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
-            {visibles.slice(0, nbAffiches).map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
+            {visibles.slice(0, nbAffiches).map((p, i) => <CarteProduit key={p.id} produit={p} remises={remises} prioritaire={i < 4} />)}
           </div>
           {/* Invisible : sert juste à détecter qu'on approche du bas pour
               afficher le lot suivant, sans bouton "voir plus" à cliquer. */}
@@ -98,7 +99,7 @@ export default function Collection({ theme, remises }) {
         </>
       )}
 
-      <AvisClients avis={avis} />
+      <AvisClients avis={avis} chargement={chargementAvis} />
     </div>
   );
 }
