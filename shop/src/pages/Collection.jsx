@@ -58,8 +58,21 @@ export default function Collection({ theme, remises }) {
   if (etat.chargement) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
+        {/* Suit d'assez près la hauteur d'une vraie CarteProduit (nom, avis,
+            prix, badge remise — chacun avec sa propre marge/hauteur réservée
+            en dessous) : un squelette qui ne mockait que l'image et une ligne
+            de nom, bien plus bas qu'une carte réelle, faisait gonfler toute
+            la grille d'un coup une fois les vraies fiches arrivées — la plus
+            grosse cause de décalage de mise en page (CLS) relevée par
+            PageSpeed sur cette page. */}
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="animate-pulse"><div className="bg-gray-100 aspect-[4/5]" /><div className="h-3 bg-gray-100 mt-3 w-2/3" /></div>
+          <div key={i} className="animate-pulse">
+            <div className="bg-gray-100 aspect-[4/5] rounded-xl" />
+            <div className="mt-1 h-[18px] bg-gray-100 w-2/3" />
+            <div className="mt-1 h-[15px]" />
+            <div className="mt-1 h-[20px] bg-gray-100 w-1/3" />
+            <div className="mt-1 h-[20px]" />
+          </div>
         ))}
       </div>
     );
