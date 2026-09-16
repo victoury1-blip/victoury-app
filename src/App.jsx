@@ -48,7 +48,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IOSInstallPrompt from './components/IOSInstallPrompt';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
 import { ToastProvider } from './components/Toast';
-import { generateVictId, isVictCode } from './lib/victId';
+import { generateVictId, isVictCode, formatVictId, setNextNumber } from './lib/victId';
 import { now, fmtDate } from './lib/dateUtils';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
@@ -1119,14 +1119,39 @@ export default function App() {
       .upsert(newOrders.map(toRow), { onConflict: 'id', ignoreDuplicates: true }).select('id');
     if (error) throw new Error(error.message);
     const revenues = new Set((data || []).map(r => r.id));
-    const ignorees = newOrders.filter(o => !revenues.has(o.id));
-    if (ignorees.length) {
+    let ignorees = newOrders.filter(o => !revenues.has(o.id));
+    if (!ignorees.length) return [];
+    // Collision détectée : plutôt que de perdre la commande, on lui attribue un
+    // nouveau numéro VIxxxxx à partir de l'état RÉEL de la base (pas la copie
+    // locale, potentiellement en retard) et on retente une seule fois. `renumerotees`
+    // dit à setOrdersWithSync comment remplacer l'id local par le nouveau.
+    const { data: existants } = await supabase.from('orders').select('id').ilike('id', 'VI%');
+    let maxVu = 0;
+    for (const r of existants || []) {
+      const m = /^VI(\d+)$/i.exec(r.id || '');
+      if (m) maxVu = Math.max(maxVu, parseInt(m[1], 10));
+    }
+    const renumerotees = [];
+    const retryRows = ignorees.map(o => {
+      maxVu += 1;
+      const newId = formatVictId(maxVu);
+      renumerotees.push({ oldId: o.id, newId });
+      return { ...toRow(o), id: newId };
+    });
+    const { data: dataRetry, error: errorRetry } = await supabase.from('orders')
+      .upsert(retryRows, { onConflict: 'id', ignoreDuplicates: true }).select('id');
+    if (errorRetry) throw new Error(errorRetry.message);
+    const revenuesRetry = new Set((dataRetry || []).map(r => r.id));
+    const toujoursEchouees = renumerotees.filter(r => !revenuesRetry.has(r.newId));
+    if (toujoursEchouees.length) {
       const err = new Error(
-        `Numéro(s) déjà utilisé(s) en base, commande(s) NON enregistrée(s) : ${ignorees.map(o => o.id).join(', ')}`
+        `Numéro(s) déjà utilisé(s) en base, commande(s) NON enregistrée(s) : ${toujoursEchouees.map(r => r.oldId).join(', ')}`
       );
-      err.failedIds = ignorees.map(o => o.id);
+      err.failedIds = toujoursEchouees.map(r => r.oldId);
       throw err;
     }
+    setNextNumber(maxVu + 1);
+    return renumerotees;
   }
 
   async function deleteOrderFromSupabase(orderId) {
@@ -1248,7 +1273,15 @@ export default function App() {
           || o.reportDate !== old.reportDate || o.noteLivraison !== old.noteLivraison
           || o.recu !== old.recu || o.ozoneLastStatus !== old.ozoneLastStatus;
       });
-      if (brandNew.length) saveOrdersToSupabase(brandNew).catch(e => {
+      if (brandNew.length) saveOrdersToSupabase(brandNew).then(renumerotees => {
+        // Collision auto-corrigée côté serveur (nouveau numéro attribué) : la
+        // commande n'a pas été perdue, mais l'id local doit suivre le nouvel id
+        // réellement enregistré, sinon les deux se désynchronisent.
+        if (renumerotees && renumerotees.length) {
+          const map = new Map(renumerotees.map(r => [r.oldId, r.newId]));
+          setOrders(cur => cur.map(o => map.has(o.id) ? { ...o, id: map.get(o.id) } : o));
+        }
+      }).catch(e => {
         // Visible, pas juste dans la console : un échec silencieux ici (ex. collision
         // de numéro VIxxxxx avec une commande déjà en base) faisait paraître une
         // commande enregistrée — un toast de succès était déjà parti — alors qu'elle
