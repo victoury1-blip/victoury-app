@@ -302,8 +302,13 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
               <span className="text-gray-500">{lang === 'ar' ? 'التوصيل' : 'Livraison'}</span>
               <span>{t.livraison > 0 ? fmtPrix(t.livraison) : (lang === 'ar' ? 'مجاني' : 'Gratuite')}</span>
             </div>
+            {/* Le total en vert (pas juste en noir comme le reste) : la
+                dernière chose que le client lit avant de valider, et un
+                montant qui tranche visuellement se lit comme "un bon prix"
+                plutôt que comme une grosse somme intimidante. */}
             <div className="flex justify-between pt-2 border-t border-gray-200 font-medium">
-              <span>{lang === 'ar' ? 'المجموع الكلي' : 'Total'}</span><span>{fmtPrix(t.total)}</span>
+              <span>{lang === 'ar' ? 'المجموع الكلي' : 'Total'}</span>
+              <span className="text-green-600 font-bold text-base">{fmtPrix(t.total)}</span>
             </div>
           </div>
 
@@ -320,7 +325,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
 
           <button onClick={valider} disabled={envoi}
             className="mt-5 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60">
-            {envoi ? tr('envoiEnCours') : `${tr('validerCommande')} — ${fmtPrix(t.total)}`}
+            {envoi
+              ? tr('envoiEnCours')
+              : <>{tr('validerCommande')} — <span className="text-green-400 font-bold">{fmtPrix(t.total)}</span></>}
           </button>
 
           {/* Rappel des garanties juste sous le bouton : c'est LA seconde
