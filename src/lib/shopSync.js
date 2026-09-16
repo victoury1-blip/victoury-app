@@ -3,11 +3,12 @@ import { colorNameFromCss } from './chicAffiliate';
 
 /* Publie un produit du Stock (souvent importé d'une plateforme d'affiliation
    comme Bouait) vers le catalogue du site (shop_products, base Supabase
-   PARTAGÉE avec la boutique) — sous la collection « Soldes ». Republier le
-   même produit (même `ref`) met à jour la fiche existante au lieu d'en créer
-   une deuxième : le slug est dérivé de la référence, stable d'un envoi à l'autre. */
+   PARTAGÉE avec la boutique) — dans la collection choisie par l'admin (avant,
+   toujours « Soldes », sans autre choix). Republier le même produit (même
+   `ref`) met à jour la fiche existante au lieu d'en créer une deuxième : le
+   slug est dérivé de la référence, stable d'un envoi à l'autre. */
 
-const SLUG_COLLECTION = 'soldes';
+const SLUG_COLLECTION_DEFAUT = 'soldes';
 
 function slugify(s) {
   return String(s || '')
@@ -18,12 +19,19 @@ function slugify(s) {
     .slice(0, 80);
 }
 
-async function getOrCreateSoldesCollection() {
+/** Collections existantes du site (pour choisir où publier) — id, slug, name. */
+export async function chargerCollectionsBoutique() {
+  const { data, error } = await supabase.from('shop_collections').select('id, slug, name').order('name');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function getOrCreateCollection(slug, name) {
   const { data: existing } = await supabase.from('shop_collections')
-    .select('id').eq('slug', SLUG_COLLECTION).maybeSingle();
+    .select('id').eq('slug', slug).maybeSingle();
   if (existing) return existing.id;
   const { data: created, error } = await supabase.from('shop_collections')
-    .insert({ slug: SLUG_COLLECTION, name: 'Soldes' }).select('id').single();
+    .insert({ slug, name }).select('id').single();
   if (error) throw new Error(error.message);
   return created.id;
 }
@@ -98,9 +106,11 @@ async function publierUneFiche({ slug, name, description, price, compareAt, coll
   return { productId, slug, imagesEnvoyees: urlsHebergees.length };
 }
 
-export async function publierVersBoutique(product) {
+/** `collection` : { slug, name } visée — Soldes par défaut si omise (rétrocompatible). */
+export async function publierVersBoutique(product, collection) {
   if (!product?.ref) throw new Error('Produit sans référence');
-  const collectionId = await getOrCreateSoldesCollection();
+  const cible = collection?.slug ? collection : { slug: SLUG_COLLECTION_DEFAUT, name: 'Soldes' };
+  const collectionId = await getOrCreateCollection(cible.slug, cible.name || cible.slug);
   const baseSlug = slugify(product.ref) || slugify(product.name) || slugify(String(product.id));
   const images = product.images?.length ? product.images : (product.image ? [product.image] : []);
   const tailles = (product.variations || []).filter(v => v.taille);

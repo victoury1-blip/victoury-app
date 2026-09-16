@@ -27,7 +27,7 @@ import { cloudSet, cloudGet } from '../lib/cloudSettings';
 import { now, fmtDate } from '../lib/dateUtils';
 import { platformOf, st, platKey } from '../lib/affiliatePlatforms';
 import { getCityFraisMap, rememberCityFrais, recallCityFrais, setCityFraisValue, cityKey } from '../lib/affiliateFrais';
-import { publierVersBoutique } from '../lib/shopSync';
+import { publierVersBoutique, chargerCollectionsBoutique } from '../lib/shopSync';
 
 /* Plateforme courante (Chic, Bouait…). Elle traverse toute la page par un
    contexte plutôt que d'être passée de composant en composant : une trentaine
@@ -533,19 +533,47 @@ function ProductsTab() {
     localStorage.setItem(platKey(plat, 'published_boutique'), JSON.stringify([...next]));
     setPublished(next);
   }
-  async function publierProduit(p) {
+  // Collections existantes du site, chargées une fois — le choix se faisait
+  // avant sans demander, toujours dans « Soldes » ; l'admin choisit
+  // maintenant la catégorie à chaque publication (ou en crée une nouvelle).
+  const [collectionsBoutique, setCollectionsBoutique] = useState([]);
+  useEffect(() => { chargerCollectionsBoutique().then(setCollectionsBoutique).catch(() => {}); }, []);
+  // Produit en attente de choix de catégorie avant publication.
+  const [choixCategorie, setChoixCategorie] = useState(null); // { p, collectionSlug, collectionNouvelle }
+
+  function demanderPublication(p) {
+    const stock = stockProductFor(p);
+    if (!stock) { alert('Importez d\'abord ce produit dans le Stock.'); return; }
+    setChoixCategorie({ p, collectionSlug: collectionsBoutique[0]?.slug || '', collectionNouvelle: '' });
+  }
+
+  async function publierProduit(p, collection) {
     const stock = stockProductFor(p);
     if (!stock) { alert('Importez d\'abord ce produit dans le Stock.'); return; }
     const key = p.chicId || p.name;
     setPublishing(key);
     try {
-      await publierVersBoutique(stock);
+      await publierVersBoutique(stock, collection);
       markPublished(key);
+      if (collection?.slug && !collectionsBoutique.some(c => c.slug === collection.slug)) {
+        setCollectionsBoutique(prev => [...prev, collection].sort((a, b) => a.name.localeCompare(b.name)));
+      }
     } catch (e) {
       alert('Erreur: ' + e.message);
     } finally {
       setPublishing(null);
     }
+  }
+
+  async function confirmerPublication() {
+    const { p, collectionSlug, collectionNouvelle } = choixCategorie;
+    const nouveau = collectionNouvelle.trim();
+    const collection = nouveau
+      ? { slug: nouveau.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''), name: nouveau }
+      : collectionsBoutique.find(c => c.slug === collectionSlug);
+    if (!collection?.slug) { alert('Choisissez une catégorie, ou tapez-en une nouvelle.'); return; }
+    setChoixCategorie(null);
+    await publierProduit(p, collection);
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -628,9 +656,9 @@ function ProductsTab() {
                                 <Check size={12} /> Importé
                               </span>
                               <button
-                                onClick={() => publierProduit(p)}
+                                onClick={() => demanderPublication(p)}
                                 disabled={publishing === (p.chicId || p.name)}
-                                title="Publier ce produit sur le site, catégorie Soldes"
+                                title="Publier ce produit sur le site (choix de la catégorie)"
                                 className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition disabled:opacity-50 ${
                                   published.has(p.chicId || p.name) ? 'bg-purple-100 text-purple-700' : 'bg-purple-600 text-white hover:bg-purple-700'
                                 }`}
@@ -688,7 +716,7 @@ function ProductsTab() {
                             <Check size={12} /> Importé
                           </span>
                           <button
-                            onClick={() => publierProduit(p)}
+                            onClick={() => demanderPublication(p)}
                             disabled={publishing === (p.chicId || p.name)}
                             className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition disabled:opacity-50 ${
                               published.has(p.chicId || p.name) ? 'bg-purple-100 text-purple-700' : 'bg-purple-600 text-white hover:bg-purple-700'
@@ -731,6 +759,33 @@ function ProductsTab() {
             </div>
           )}
         </>
+      )}
+
+      {/* Choix de la catégorie du site avant publication — avant, toujours
+          "Soldes" sans demander. */}
+      {choixCategorie && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true"
+          onKeyDown={e => { if (e.key === 'Escape') setChoixCategorie(null); }}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5">
+            <h2 className="font-bold text-gray-800 mb-1">Publier « {choixCategorie.p.name} »</h2>
+            <p className="text-xs text-gray-400 mb-4">Dans quelle catégorie du site ?</p>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Catégorie existante</label>
+            <select value={choixCategorie.collectionSlug}
+              onChange={e => setChoixCategorie(c => ({ ...c, collectionSlug: e.target.value, collectionNouvelle: '' }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3">
+              {collectionsBoutique.length === 0 && <option value="">Aucune — créez-en une ci-dessous</option>}
+              {collectionsBoutique.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+            </select>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Ou nouvelle catégorie</label>
+            <input value={choixCategorie.collectionNouvelle}
+              onChange={e => setChoixCategorie(c => ({ ...c, collectionNouvelle: e.target.value }))}
+              placeholder="ex: Burkini" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setChoixCategorie(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Annuler</button>
+              <button onClick={confirmerPublication} className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700">Publier</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
