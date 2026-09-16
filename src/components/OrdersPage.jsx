@@ -1430,6 +1430,15 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           onClose={() => setNewOrderOpen(false)}
           onSave={(ordersList) => {
             setOrders((prev) => [...ordersList, ...prev]);
+            // Stock manuel (/store/stock) : une commande peut naître DÉJÀ
+            // "Confirmé" (statut choisi dès la création, dans ce même
+            // formulaire) — ce cas ne passe jamais par saveOrder/le menu de
+            // statut, qui sont les seuls endroits qui décrémentaient
+            // jusqu'ici. Sans ça, une commande créée directement en
+            // "Confirmé" ne faisait jamais bouger le total.
+            for (const o of ordersList) {
+              if (o.status === 'confirme') decrementerStockManuel(o);
+            }
             setNewOrderOpen(false);
             addToast('success', `${ordersList.length} commande(s) créée(s)`, ordersList[0]?.recipient.name);
           }}
