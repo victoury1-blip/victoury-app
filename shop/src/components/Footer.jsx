@@ -9,7 +9,7 @@ import { useLang } from '../lib/i18n';
 /* Pied de page — description, contact et mentions viennent de /store/theme.
    Les listes sont vides par défaut plutôt que pré-remplies d'une marque qui
    n'est pas la vôtre : rien n'apparaît tant que l'administration n'a rien réglé. */
-export default function Footer({ theme, collections }) {
+export default function Footer({ theme, collections, pret }) {
   const { t, lang } = useLang();
   const f = theme?.footer || {};
   // Libellé arabe optionnel (labelAr) réglé à côté du français dans
@@ -104,8 +104,37 @@ export default function Footer({ theme, collections }) {
             </div>
           </div>
         </div>
-        {liens(t('collections'), categories)}
-        {liens(t('mentionsLegales'), f.mentions)}
+        {/* Sur une vraie première visite (rien en cache — exactement un clic
+            sur une pub), `categories`/`f.mentions` sont encore vides à cet
+            instant, pas "vraiment vides" : Supabase n'a simplement pas
+            encore répondu. Sans repère, ces deux colonnes étaient absentes
+            au tout premier rendu puis apparaissaient d'un coup une fois la
+            réponse arrivée — le plus gros décalage de mise en page (CLS)
+            relevé sur les pages catégorie, où le pied de page est proche du
+            haut de l'écran. Un squelette DE MÊME TAILLE tient leur place
+            pendant l'attente, remplacé par le vrai contenu (ou rien, si
+            l'admin n'a vraiment rien réglé) une fois `pret`. */}
+        {pret ? (
+          <>
+            {liens(t('collections'), categories)}
+            {liens(t('mentionsLegales'), f.mentions)}
+          </>
+        ) : (
+          <>
+            <div className="text-center animate-pulse">
+              <div className="h-3.5 w-24 bg-white/10 rounded mx-auto" />
+              <div className="mt-5 space-y-3.5">
+                {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-4 w-20 bg-white/10 rounded mx-auto" />)}
+              </div>
+            </div>
+            <div className="text-center animate-pulse">
+              <div className="h-3.5 w-28 bg-white/10 rounded mx-auto" />
+              <div className="mt-5 space-y-3.5">
+                {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-4 w-24 bg-white/10 rounded mx-auto" />)}
+              </div>
+            </div>
+          </>
+        )}
       </div>
       <div className="border-t border-gray-200">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">

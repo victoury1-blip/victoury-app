@@ -103,6 +103,20 @@ function Vitrine() {
   const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
+  // Sur une première visite (jamais de cache local — exactement le cas d'un
+  // clic sur une pub), collections ET reglages démarrent vides : les
+  // colonnes "Collections"/"Mentions légales" du pied de page n'existaient
+  // tout simplement pas au premier rendu, puis apparaissaient d'un coup une
+  // fois Supabase répondu — le plus gros décalage de mise en page (CLS)
+  // relevé sur les pages catégorie, où le pied de page est proche du haut.
+  // Tant que ce n'est pas prêt, le Footer garde une hauteur de secours au
+  // lieu d'ajouter/retirer ces colonnes.
+  // Déjà "prêt" si un cache existait dès ce premier rendu (visite pas
+  // vraiment "première") — seule une vraie première visite, sans rien en
+  // localStorage, doit passer par l'état de secours du Footer.
+  const [pretFooter, setPretFooter] = useState(() => {
+    try { return !!localStorage.getItem(CACHE_COLLECTIONS) && !!localStorage.getItem(CACHE_REGLAGES); } catch { return false; }
+  });
 
   useEffect(() => {
     // Import dynamique : charge catalog.js (et le client Supabase qu'il tire
@@ -111,14 +125,15 @@ function Vitrine() {
     // haut de ce fichier aurait eu le même effet qu'importer Accueil
     // statiquement, l'un des deux suffisant à retarder le tout premier rendu.
     import('./lib/catalog').then(({ chargerCollections, chargerReglages }) => {
-      chargerCollections().then(c => {
+      const c1 = chargerCollections().then(c => {
         setCollections(c);
         try { localStorage.setItem(CACHE_COLLECTIONS, JSON.stringify(c)); } catch {}
       }).catch(() => {});
-      chargerReglages().then(r => {
+      const c2 = chargerReglages().then(r => {
         setReglages(r);
         try { localStorage.setItem(CACHE_REGLAGES, JSON.stringify(r)); } catch {}
       }).catch(() => {});
+      Promise.all([c1, c2]).then(() => setPretFooter(true));
     });
   }, []);
 
@@ -228,7 +243,7 @@ function Vitrine() {
         </Suspense>
       </main>
 
-      <Footer telephone={reglages.telephone} theme={reglages.theme} collections={collections} />
+      <Footer telephone={reglages.telephone} theme={reglages.theme} collections={collections} pret={pretFooter} />
 
       <TiroirPanier
         ouvert={panierOuvert} lignes={lignes} paliers={reglages.paliers} remises={reglages.remises}
