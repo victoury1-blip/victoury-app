@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
 import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifCommande';
@@ -8,6 +9,7 @@ import { activerPushCommande, pushDisponible } from '../lib/pushNotif';
 import { chargerReglages } from '../lib/catalog';
 import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
 import { compterCommandesEnAttente } from '../lib/commandesSite';
+import { lireCommandesNonVues, ajouterCommandeNonVue, marquerCommandesVues } from '../lib/clocheCommandes';
 import Wordmark from '../components/Wordmark';
 
 const LIENS = [
@@ -70,6 +72,15 @@ export default function AdminLayout() {
   const { pathname } = useLocation();
   useEffect(() => { setMenuOuvert(false); }, [pathname]);
 
+  // Filet de sécurité derrière le son et la notification système : les deux
+  // dépendent d'une permission navigateur et d'un onglet resté ouvert — si
+  // l'un des deux manque, RIEN ne prévenait avant. Cette liste, elle, vit en
+  // localStorage et s'affiche à chaque retour sur l'administration, même
+  // après un rechargement complet ou un onglet fermé au moment de la
+  // commande.
+  const [commandesNonVues, setCommandesNonVues] = useState(() => lireCommandesNonVues());
+  const [clocheOuverte, setClocheOuverte] = useState(false);
+
   useEffect(() => {
     const canal = supabase
       .channel('shop-nouvelle-commande')
@@ -77,10 +88,20 @@ export default function AdminLayout() {
         if (!String(payload.new?.id || '').startsWith('VS-')) return;
         jouerSonCommande(sonRef.current);
         notifierNouvelleCommande(payload.new);
+        setCommandesNonVues(ajouterCommandeNonVue(payload.new));
       })
       .subscribe();
     return () => { supabase.removeChannel(canal); };
   }, []);
+
+  function ouvrirCloche() {
+    setClocheOuverte(o => !o);
+  }
+  function toutMarquerVu() {
+    marquerCommandesVues();
+    setCommandesNonVues([]);
+    setClocheOuverte(false);
+  }
 
   // Les navigateurs (surtout sur téléphone) bloquent tout son déclenché sans
   // geste préalable de la personne, ET Chrome refuse carrément d'afficher la
@@ -155,9 +176,12 @@ export default function AdminLayout() {
           sans elle, aucun moyen d'atteindre le menu sur petit écran. */}
       <div className="sm:hidden fixed top-0 inset-x-0 z-30 h-14 bg-[#0f1424] flex items-center justify-between px-4">
         <Wordmark className="text-white text-sm" />
-        <button onClick={() => setMenuOuvert(true)} className="text-white p-1.5" aria-label="Menu">
-          <Menu size={20} />
-        </button>
+        <div className="flex items-center gap-1">
+          <BoutonCloche count={commandesNonVues.length} onClick={ouvrirCloche} />
+          <button onClick={() => setMenuOuvert(true)} className="text-white p-1.5" aria-label="Menu">
+            <Menu size={20} />
+          </button>
+        </div>
       </div>
 
       {menuOuvert && (
@@ -177,15 +201,58 @@ export default function AdminLayout() {
       )}
 
       <aside className="w-60 shrink-0 bg-[#0f1424] hidden sm:flex flex-col">
-        <div className="px-5 py-5 flex items-center gap-2 border-b border-white/10">
-          <Wordmark className="text-white text-base" />
-          <span className="text-[9px] font-semibold tracking-wider uppercase bg-white/10 text-white/70 px-1.5 py-0.5 rounded">
-            Admin
-          </span>
+        <div className="px-5 py-5 flex items-center justify-between border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <Wordmark className="text-white text-base" />
+            <span className="text-[9px] font-semibold tracking-wider uppercase bg-white/10 text-white/70 px-1.5 py-0.5 rounded">
+              Admin
+            </span>
+          </div>
+          <BoutonCloche count={commandesNonVues.length} onClick={ouvrirCloche} />
         </div>
         {Nav}
       </aside>
       <main className="flex-1 min-w-0 p-5 pt-20 sm:p-8"><Outlet /></main>
+
+      {clocheOuverte && (
+        <>
+          {/* Un clic n'importe où ailleurs ferme le panneau — le bouton lui-même
+              n'a pas ce comportement (il a déjà son propre onClick de bascule). */}
+          <div className="fixed inset-0 z-40" onClick={() => setClocheOuverte(false)} />
+          <div className="fixed top-16 sm:top-20 right-4 sm:right-8 z-50 w-80 max-w-[90vw] bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-800">Commandes non vues</span>
+              {commandesNonVues.length > 0 && (
+                <button onClick={toutMarquerVu} className="text-xs text-ink hover:underline">Tout marquer comme vu</button>
+              )}
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              {commandesNonVues.length === 0 ? (
+                <p className="px-4 py-6 text-xs text-gray-400 text-center">Rien de nouveau.</p>
+              ) : commandesNonVues.map(c => (
+                <Link key={c.id} to="/store/commandes" onClick={() => setClocheOuverte(false)}
+                  className="block px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                  <p className="text-sm text-gray-800">{c.nom}{c.prix ? ` — ${c.prix} DH` : ''}</p>
+                  <p className="text-xs text-gray-400">{c.ville}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function BoutonCloche({ count, onClick }) {
+  return (
+    <button onClick={onClick} className="relative text-white/80 hover:text-white p-1.5" aria-label="Commandes non vues">
+      <Bell size={18} />
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-semibold rounded-full min-w-[16px] h-[16px] px-1 grid place-items-center">
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </button>
   );
 }
