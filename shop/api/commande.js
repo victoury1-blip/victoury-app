@@ -9,11 +9,9 @@
 
 import { champsManquants, construireCommande, normaliserTelephone } from '../src/lib/commande.js';
 import { totalPanier } from '../src/lib/pricing.js';
-import { rateLimited } from './_rateLimit.js';
+import { rateLimited, clientIp } from './_rateLimit.js';
 
 const SOURCES_CONNUES = new Set(['Instagram', 'Facebook', 'TikTok', 'Google', 'WhatsApp', 'Direct']);
-
-const clientIp = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || null;
 
 /* Le prix envoyé par le navigateur (lignes.price, total) n'a jamais été fiable
    côté serveur : c'est un simple champ de localStorage, modifiable via les
@@ -172,7 +170,12 @@ export default async function handler(req, res) {
   const manque = champsManquants(form, lignes);
   if (manque.length) return res.status(400).json({ ok: false, manque });
 
-  const ip = clientIp(req);
+  // clientIp() retombe sur 'inconnu' quand aucun en-tête n'est présent — un
+  // repli théorique en local seulement, jamais sur Vercel. Ce module s'appuie
+  // sur `if (ip)` pour distinguer « IP connue » de « IP absente » : on ramène
+  // donc ce repli à une valeur fausse comme avant.
+  const ipBrute = clientIp(req);
+  const ip = (ipBrute && ipBrute !== 'inconnu') ? ipBrute : null;
 
   // Un abus grossier (bot, ou la faille de prix ci-dessous scriptée en boucle)
   // n'a plus aucun frein sans ceci : quelques commandes par minute suffisent

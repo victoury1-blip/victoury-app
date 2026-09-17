@@ -9,13 +9,25 @@
 
 const buckets = new Map();
 
-/** Adresse de l'appelant, telle que vue derrière le proxy Vercel. */
+/** Adresse de l'appelant, telle que vue derrière le proxy Vercel.
+ *
+ * `x-forwarded-for` peut contenir plusieurs adresses séparées par des virgules
+ * — et son PREMIER élément est justement celui qu'un visiteur peut fabriquer
+ * lui-même en l'envoyant dans sa propre requête : Vercel ne le remplace pas,
+ * il AJOUTE la vraie IP à la fin de la liste. Faire confiance au premier
+ * élément revient donc à faire confiance à ce que le visiteur prétend être —
+ * exactement ce qui permettait de contourner un blocage par IP ou de fausser
+ * la géolocalisation envoyée à la publicité. `x-real-ip`, lui, est posé par le
+ * proxy de Vercel lui-même et ne peut pas être falsifié par le client. */
 export function clientIp(req) {
-  return (
-    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    req.socket?.remoteAddress ||
-    'unknown'
-  );
+  const realIp = req.headers['x-real-ip'];
+  if (realIp) return String(realIp).trim();
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const parts = String(forwarded).split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 /**

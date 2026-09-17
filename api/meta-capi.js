@@ -49,7 +49,11 @@ export default async function handler(req, res) {
   // ajouter ici (plutôt que de faire confiance à ce que le navigateur
   // prétendrait être son IP) élève la « qualité de correspondance des
   // évènements » que Meta note dans le Gestionnaire d'évènements.
-  const ip = clientIp(req);
+  // clientIp() retombe sur 'unknown' quand aucun en-tête n'est présent — un cas
+  // qui n'arrive jamais sur Vercel, mais mieux vaut ne rien envoyer à Meta
+  // plutôt que la chaîne littérale "unknown" comme adresse IP.
+  const ipBrute = clientIp(req);
+  const ip = (ipBrute && ipBrute !== 'unknown') ? ipBrute : null;
   const ua = req.headers['user-agent'];
   const eventsEnrichis = events.map(e => ({
     ...e,

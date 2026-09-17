@@ -16,5 +16,20 @@ export function rateLimited(cle, max, fenetreMs) {
   return entree.n > max;
 }
 
-export const clientIp = (req) =>
-  (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || 'inconnu';
+/* `x-forwarded-for` peut contenir plusieurs adresses séparées par des
+ * virgules — et la PREMIÈRE est justement celle qu'un visiteur peut fabriquer
+ * lui-même en l'envoyant dans sa requête : Vercel ne la remplace pas, il
+ * AJOUTE la vraie IP à la fin de la liste. S'y fier revenait à faire
+ * confiance à ce que le visiteur prétend être — une IP bloquée pouvait ainsi
+ * se faire passer pour une autre. `x-real-ip` est posé par le proxy de
+ * Vercel lui-même et ne peut pas être falsifié par le client. */
+export const clientIp = (req) => {
+  const realIp = req.headers['x-real-ip'];
+  if (realIp) return String(realIp).trim();
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const parts = String(forwarded).split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return req.socket?.remoteAddress || 'inconnu';
+};
