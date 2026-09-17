@@ -74,6 +74,22 @@ export function trackPixel(nom, donnees, eventID) {
   window.fbq('track', nom, donnees || {}, eventID ? { eventID } : undefined);
 }
 
+/* Correspondance avancée (Advanced Matching) : réinitialiser le pixel avec
+ * l'e-mail/téléphone du client, DÈS QU'ON LES CONNAÎT (à la validation, pas
+ * au chargement de la page où ils sont encore vides), fait que TOUS les
+ * évènements suivants du pixel navigateur (pas seulement celui de l'API de
+ * Conversions côté serveur) portent ces identifiants. Le pixel le hache
+ * lui-même côté navigateur — on lui passe la valeur en clair, jamais
+ * autrement. Sans effet si le pixel n'est pas chargé. */
+export function correspondanceAvancee(pixelId, { email, telephone } = {}) {
+  if (typeof window === 'undefined' || !window.fbq || !pixelId) return;
+  const donnees = {};
+  if (email) donnees.em = email.trim().toLowerCase();
+  if (telephone) donnees.ph = telephonePourMeta(telephone);
+  if (!Object.keys(donnees).length) return;
+  window.fbq('init', pixelId, donnees);
+}
+
 /* Relais serveur (API de Conversions) — le jeton reste côté serveur, dans une
  * variable d'environnement Vercel (voir api/meta-capi.js). L'identifiant du
  * pixel n'est pas un secret : c'est la même valeur que le pixel du navigateur

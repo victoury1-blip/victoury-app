@@ -7,7 +7,7 @@ import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
-import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta } from '../lib/pixel';
+import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, correspondanceAvancee } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 import { miniature, surErreurMiniature } from '../lib/img';
@@ -20,7 +20,7 @@ const champ = 'w-full border-2 border-ink px-3 py-3 text-sm focus:outline-none t
 export default function Commander({ lignes, reglages, onQuantite, onRetirer, onVider }) {
   const { t: tr, lang } = useLang();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ nom: '', telephone: '', ville: '', adresse: '' });
+  const [form, setForm] = useState({ nom: '', telephone: '', ville: '', adresse: '', email: '' });
   const [promo, setPromo] = useState(null);
   const [code, setCode] = useState('');
   const [codeErreur, setCodeErreur] = useState('');
@@ -62,14 +62,30 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // Une seule fois à l'arrivée sur la page : la publicité doit voir un panier
   // qui entre en commande, pas chaque changement de quantité qui le précède.
   useEffect(() => {
+    const eventID = idEvenement('checkout');
     trackPixel('InitiateCheckout', {
       value: t.total, currency: 'MAD', num_items: t.articles,
       content_ids: lignes.map(l => l.slug), content_type: 'product',
-    });
+    }, eventID);
     trackTikTok('InitiateCheckout', {
       contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
       value: t.total, currency: 'MAD',
     });
+    // Doublon côté serveur du même évènement, avec le même event_id (Meta
+    // déduplique) : un client (ou son ad-blocker) qui empêche le pixel
+    // navigateur de charger laissait jusqu'ici cette étape — la plus proche
+    // de l'achat après le panier — invisible à la publicité. Pas encore de
+    // nom/téléphone à ce stade (le client vient d'arriver sur la page) :
+    // seuls les cookies _fbp/_fbc et l'IP/user-agent (ajoutés côté serveur)
+    // identifient cet évènement, mais ça suffit à ne pas le perdre.
+    if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
+      envoyerCAPI(reglages.pixel.pixelId, [{
+        event_name: 'InitiateCheckout', event_time: Math.floor(Date.now() / 1000),
+        event_id: eventID, action_source: 'website',
+        user_data: cookiesFbPourMeta(),
+        custom_data: { value: t.total, currency: 'MAD', num_items: t.articles },
+      }], reglages.pixel.testCode).catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -139,6 +155,12 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
        bloqué par les bloqueurs de pub) et le relais serveur (toujours reçu)
        envoient le MÊME achat, et Meta déduplique au lieu de le compter deux fois. */
     const eventID = idEvenement(r.id);
+    // Réinjecte e-mail/téléphone dans le pixel navigateur (haché par le pixel
+    // lui-même, jamais transmis en clair) juste avant l'évènement Purchase :
+    // sans ça, le pixel n'associait cet achat à AUCUNE identité, seulement le
+    // relais serveur ci-dessous le faisait — l'évènement navigateur (souvent
+    // reçu plus vite que le relais) restait donc mal apparié chez Meta.
+    correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone });
     trackPixel('Purchase', { value: t.total, currency: 'MAD', content_ids: lignes.map(l => l.slug), content_type: 'product' }, eventID);
     trackTikTok('CompletePayment', {
       contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
@@ -154,18 +176,21 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
       // ajoutés côté serveur (api/meta-capi.js), qui seul connaît la vraie
       // adresse IP de l'appelant.
       const [prenom, ...reste] = String(form.nom || '').trim().split(/\s+/);
+      const email = String(form.email || '').trim().toLowerCase();
       Promise.all([
         sha256(telephonePourMeta(form.telephone)),
         prenom ? sha256(prenom.toLowerCase()) : null,
         reste.length ? sha256(reste.join(' ').toLowerCase()) : null,
         form.ville ? sha256(form.ville.trim().toLowerCase()) : null,
         sha256(String(r.id)),
-      ]).then(([ph, fn, ln, ct, externalId]) => envoyerCAPI(reglages.pixel.pixelId, [{
+        email.includes('@') ? sha256(email) : null,
+      ]).then(([ph, fn, ln, ct, externalId, em]) => envoyerCAPI(reglages.pixel.pixelId, [{
         event_name: 'Purchase', event_time: Math.floor(Date.now() / 1000),
         event_id: eventID, action_source: 'website',
         user_data: {
           ph: [ph], external_id: [externalId],
           ...(fn ? { fn: [fn] } : {}), ...(ln ? { ln: [ln] } : {}), ...(ct ? { ct: [ct] } : {}),
+          ...(em ? { em: [em] } : {}),
           ...cookiesFbPourMeta(),
         },
         custom_data: { value: t.total, currency: 'MAD', order_id: r.id },
@@ -248,6 +273,11 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('adresse')} <span className="text-red-500">*</span></label>
               <input value={form.adresse} onChange={e => u('adresse', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('adresse')}`} />
             </div>
+          </div>
+          <div>
+            <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('emailOptionnel')}</label>
+            <input type="email" value={form.email} onChange={e => u('email', e.target.value)}
+              placeholder="exemple@email.com" dir="ltr" className={`${champ} text-left`} />
           </div>
 
           <div className="border border-ink px-4 py-3 flex items-center justify-center gap-3">
