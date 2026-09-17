@@ -7,7 +7,7 @@ import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
-import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement } from '../lib/pixel';
+import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 import { miniature, surErreurMiniature } from '../lib/img';
@@ -145,15 +145,31 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
       value: t.total, currency: 'MAD',
     });
     if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
-      // Sans e-mail collecté, le téléphone (haché) reste le seul signal
-      // d'identification envoyé à l'API de Conversions.
-      sha256(telephonePourMeta(form.telephone))
-        .then(ph => envoyerCAPI(reglages.pixel.pixelId, [{
-          event_name: 'Purchase', event_time: Math.floor(Date.now() / 1000),
-          event_id: eventID, action_source: 'website',
-          user_data: { ph: [ph] },
-          custom_data: { value: t.total, currency: 'MAD', order_id: r.id },
-        }], reglages.pixel.testCode)).catch(() => {});
+      // Sans e-mail collecté (le formulaire n'en demande pas), le téléphone reste
+      // le signal d'identification principal — mais le nom, la ville et les
+      // cookies _fbp/_fbc du pixel navigateur donnent à Meta plusieurs signaux
+      // supplémentaires pour rattacher l'achat à la bonne personne/session
+      // publicitaire ("qualité de correspondance des évènements" dans le
+      // Gestionnaire d'évènements). client_ip_address/client_user_agent sont
+      // ajoutés côté serveur (api/meta-capi.js), qui seul connaît la vraie
+      // adresse IP de l'appelant.
+      const [prenom, ...reste] = String(form.nom || '').trim().split(/\s+/);
+      Promise.all([
+        sha256(telephonePourMeta(form.telephone)),
+        prenom ? sha256(prenom.toLowerCase()) : null,
+        reste.length ? sha256(reste.join(' ').toLowerCase()) : null,
+        form.ville ? sha256(form.ville.trim().toLowerCase()) : null,
+        sha256(String(r.id)),
+      ]).then(([ph, fn, ln, ct, externalId]) => envoyerCAPI(reglages.pixel.pixelId, [{
+        event_name: 'Purchase', event_time: Math.floor(Date.now() / 1000),
+        event_id: eventID, action_source: 'website',
+        user_data: {
+          ph: [ph], external_id: [externalId],
+          ...(fn ? { fn: [fn] } : {}), ...(ln ? { ln: [ln] } : {}), ...(ct ? { ct: [ct] } : {}),
+          ...cookiesFbPourMeta(),
+        },
+        custom_data: { value: t.total, currency: 'MAD', order_id: r.id },
+      }], reglages.pixel.testCode)).catch(() => {});
     }
     if (reglages?.tiktok?.enabled && reglages?.tiktok?.pixelId) {
       sha256(telephonePourMeta(form.telephone))

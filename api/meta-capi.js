@@ -44,8 +44,24 @@ export default async function handler(req, res) {
     }
   }
 
+  // client_ip_address / client_user_agent : ce serveur, seul, connaît la vraie
+  // adresse IP et le user-agent du navigateur qui a passé la commande — les
+  // ajouter ici (plutôt que de faire confiance à ce que le navigateur
+  // prétendrait être son IP) élève la « qualité de correspondance des
+  // évènements » que Meta note dans le Gestionnaire d'évènements.
+  const ip = clientIp(req);
+  const ua = req.headers['user-agent'];
+  const eventsEnrichis = events.map(e => ({
+    ...e,
+    user_data: {
+      ...(ip ? { client_ip_address: ip } : {}),
+      ...(ua ? { client_user_agent: ua } : {}),
+      ...e.user_data,
+    },
+  }));
+
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${pixelId}/events`;
-  const body = { data: events, access_token: token };
+  const body = { data: eventsEnrichis, access_token: token };
   if (testCode) body.test_event_code = String(testCode);
 
   const ac = new AbortController();

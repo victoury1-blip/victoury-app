@@ -33,6 +33,25 @@ export function idEvenement(prefixe) {
   return `${prefixe}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Cookies `_fbp`/`_fbc` posés par le pixel navigateur — à joindre TELS QUELS
+ *  (non hachés) à l'API de Conversions : c'est ce qui relie l'évènement serveur
+ *  à la session publicitaire précise (clic, campagne) plutôt qu'au seul
+ *  téléphone. Meta les note comme le signal de correspondance le plus fort
+ *  après l'e-mail. */
+export function cookiesFbPourMeta() {
+  if (typeof document === 'undefined') return {};
+  const lire = (nom) => {
+    const m = document.cookie.match(new RegExp(`(?:^|; )${nom}=([^;]*)`));
+    return m ? decodeURIComponent(m[1]) : undefined;
+  };
+  const fbp = lire('_fbp');
+  const fbc = lire('_fbc');
+  const out = {};
+  if (fbp) out.fbp = fbp;
+  if (fbc) out.fbc = fbc;
+  return out;
+}
+
 /* Charge le pixel du navigateur une seule fois. Le code injecté est le
    boilerplate officiel de Meta — rien d'autre n'y transite. */
 export function chargerPixel(pixelId) {
