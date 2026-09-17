@@ -1619,6 +1619,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
 
       {deliveryOrder && (
         <DeliveryStatusModal
+          key={deliveryOrder.id}
           order={deliveryOrder}
           onClose={() => setDeliveryOrder(null)}
           onSave={(id, newStatus, newNote, newOzTn, ozoneLastStatus) => {
