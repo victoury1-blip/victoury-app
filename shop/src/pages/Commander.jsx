@@ -68,7 +68,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
       content_ids: lignes.map(l => l.slug), content_type: 'product',
     }, eventID);
     trackTikTok('InitiateCheckout', {
-      contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+      contents: lignes.map(l => ({ content_id: l.slug, content_type: 'product', content_name: l.name, price: l.price, quantity: l.qty })),
       value: t.total, currency: 'MAD',
     });
     if (reglages?.tiktok?.enabled && reglages?.tiktok?.pixelId) {
@@ -77,7 +77,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
         user: cookieTtpPourTikTok(),
         page: { url: window.location.href },
         properties: {
-          contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+          contents: lignes.map(l => ({ content_id: l.slug, content_type: 'product', content_name: l.name, price: l.price, quantity: l.qty })),
           value: t.total, currency: 'MAD',
         },
       }], reglages.tiktok.testCode).catch(() => {});
@@ -174,7 +174,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone });
     trackPixel('Purchase', { value: t.total, currency: 'MAD', content_ids: lignes.map(l => l.slug), content_type: 'product' }, eventID);
     trackTikTok('CompletePayment', {
-      contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+      contents: lignes.map(l => ({ content_id: l.slug, content_type: 'product', content_name: l.name, price: l.price, quantity: l.qty })),
       value: t.total, currency: 'MAD',
     });
     if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
@@ -218,7 +218,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
         user: { phone, external_id, ...(email ? { email } : {}), ...cookieTtpPourTikTok() },
         page: { url: window.location.href },
         properties: {
-          contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+          contents: lignes.map(l => ({ content_id: l.slug, content_type: 'product', content_name: l.name, price: l.price, quantity: l.qty })),
           value: t.total, currency: 'MAD',
         },
       }], reglages.tiktok.testCode)).catch(() => {});

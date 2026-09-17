@@ -76,7 +76,7 @@ export default function Produit({ onAjouter, theme, remises }) {
             value: p.price, currency: 'MAD',
           });
           trackTikTok('ViewContent', {
-            contents: [{ content_id: p.slug, content_name: p.name, price: p.price, quantity: 1 }],
+            contents: [{ content_id: p.slug, content_type: 'product', content_name: p.name, price: p.price, quantity: 1 }],
             value: p.price, currency: 'MAD',
           });
         }

@@ -195,7 +195,7 @@ function Vitrine() {
       value: ligne.price, currency: 'MAD',
     });
     trackTikTok('AddToCart', {
-      contents: [{ content_id: ligne.slug, content_name: ligne.name, price: ligne.price, quantity: 1 }],
+      contents: [{ content_id: ligne.slug, content_type: 'product', content_name: ligne.name, price: ligne.price, quantity: 1 }],
       value: ligne.price, currency: 'MAD',
     });
   }, []);
