@@ -7,7 +7,15 @@
  * clients différents.
  */
 export function normalizePhone(p) {
-  let s = (p || '').replace(/[\s\-.+]/g, '').replace(/^(00212|212)/, '0');
+  // Ne garder que les chiffres : au-delà des espaces/tirets/points/plus déjà
+  // visibles, une valeur venue d'une API tierce (Ozon Express, panneau
+  // arabe) peut transporter des caractères invisibles — marques de sens de
+  // lecture (LRM/RLM U+200E/U+200F), espace insécable — qui ne se VOIENT
+  // jamais à l'écran mais empêchent deux numéros identiques de comparer égaux
+  // (===). C'est exactement ce qui déclenchait une fausse alerte « ce code
+  // d'envoi appartient à une autre commande » sur un numéro pourtant identique
+  // au pixel près dans les deux panneaux.
+  let s = (p || '').replace(/\D/g, '').replace(/^(00212|212)/, '0');
   // Google Sheets stocke le téléphone comme un nombre et supprime le 0 initial
   // (ex: 0709015213 → 709015213). On le rétablit pour les numéros marocains.
   if (/^[5-7]\d{8}$/.test(s)) s = '0' + s;

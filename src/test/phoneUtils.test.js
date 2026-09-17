@@ -29,6 +29,15 @@ describe('normalizePhone', () => {
   it('handles undefined input', () => {
     expect(normalizePhone(undefined)).toBe('');
   });
+
+  it('strips invisible bidi marks and non-breaking spaces from a third-party API value', () => {
+    // Cas réel : Ozon Express (panneau arabe) renvoie parfois un numéro
+    // visuellement identique mais truffé de marques invisibles (LRM/RLM,
+    // espace insécable), qui ne bloquaient plus la comparaison une fois que
+    // seuls les chiffres sont conservés.
+    expect(normalizePhone('‎0687603348‎')).toBe('0687603348');
+    expect(normalizePhone('0687 603348')).toBe('0687603348');
+  });
 });
 
 /* Le cas qui déclenchait une fausse alerte « ce code d'envoi appartient à une
