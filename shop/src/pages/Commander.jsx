@@ -81,7 +81,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
       envoyerCAPI(reglages.pixel.pixelId, [{
         event_name: 'InitiateCheckout', event_time: Math.floor(Date.now() / 1000),
-        event_id: eventID, action_source: 'website',
+        event_id: eventID, action_source: 'website', event_source_url: window.location.href,
         user_data: cookiesFbPourMeta(),
         custom_data: { value: t.total, currency: 'MAD', num_items: t.articles },
       }], reglages.pixel.testCode).catch(() => {});
@@ -186,7 +186,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
         email.includes('@') ? sha256(email) : null,
       ]).then(([ph, fn, ln, ct, externalId, em]) => envoyerCAPI(reglages.pixel.pixelId, [{
         event_name: 'Purchase', event_time: Math.floor(Date.now() / 1000),
-        event_id: eventID, action_source: 'website',
+        event_id: eventID, action_source: 'website', event_source_url: window.location.href,
         user_data: {
           ph: [ph], external_id: [externalId],
           ...(fn ? { fn: [fn] } : {}), ...(ln ? { ln: [ln] } : {}), ...(ct ? { ct: [ct] } : {}),
@@ -257,7 +257,8 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             </div>
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('telephone')} <span className="text-red-500">*</span></label>
-              <input value={form.telephone} onChange={e => u('telephone', e.target.value)} onBlur={() => noterPanierAbandonne()}
+              <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
+                onBlur={() => { noterPanierAbandonne(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
                 inputMode="tel" placeholder="06 12 34 56 78" dir="ltr" className={`${champ} text-left ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
                 <p className={`mt-1 text-[11px] text-red-500 ${alignTexte}`}>{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>

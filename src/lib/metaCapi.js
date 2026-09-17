@@ -20,10 +20,26 @@ const cloud = () => import('./cloudSettings');
 
 export function getMetaConfig() {
   try {
-    return JSON.parse(localStorage.getItem(KEY) || 'null') || {};
+    // Repasse par normalizeMetaConfig() à chaque lecture : un réglage
+    // enregistré avant que sourceUrl soit auto-complété d'un protocole
+    // (https://) resterait sinon boiteux jusqu'à ce que quelqu'un
+    // ré-enregistre la page Réglages à la main.
+    return normalizeMetaConfig(JSON.parse(localStorage.getItem(KEY) || 'null') || {});
   } catch {
     return {};
   }
+}
+
+/* Meta exige une URL complète (avec son protocole) pour `event_source_url` —
+ * sans lui, un évènement API Conversions est traité comme n'ayant AUCUNE
+ * source (c'est justement ce que le Gestionnaire d'évènements signale :
+ * « seront bloqués dans 56 jours »). Le champ de Réglages accepte qu'on
+ * tape juste "victoury-maroc.com" ; on complète ici plutôt que d'exiger que
+ * l'utilisateur pense à taper "https://" lui-même. */
+function normaliserUrl(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
 }
 
 /** Forme retenue en stockage — jamais autre chose que ces cinq champs. */
@@ -33,7 +49,7 @@ export function normalizeMetaConfig(cfg) {
     pixelId: String(cfg?.pixelId || '').replace(/\D/g, ''),
     token: String(cfg?.token || '').trim(),
     testCode: String(cfg?.testCode || '').trim(),
-    sourceUrl: String(cfg?.sourceUrl || '').trim(),
+    sourceUrl: normaliserUrl(cfg?.sourceUrl),
   };
 }
 
