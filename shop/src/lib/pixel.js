@@ -38,6 +38,15 @@ export function idEvenement(prefixe) {
  *  à la session publicitaire précise (clic, campagne) plutôt qu'au seul
  *  téléphone. Meta les note comme le signal de correspondance le plus fort
  *  après l'e-mail. */
+/** Cookie `_ttp` posé par le pixel TikTok — équivalent de _fbp pour Meta : à
+ *  joindre tel quel (non haché) pour relier l'évènement serveur à la session
+ *  publicitaire précise plutôt qu'au seul téléphone. */
+export function cookieTtpPourTikTok() {
+  if (typeof document === 'undefined') return {};
+  const m = document.cookie.match(/(?:^|; )_ttp=([^;]*)/);
+  return m ? { ttp: decodeURIComponent(m[1]) } : {};
+}
+
 export function cookiesFbPourMeta() {
   if (typeof document === 'undefined') return {};
   const lire = (nom) => {

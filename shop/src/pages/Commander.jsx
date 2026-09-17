@@ -7,7 +7,7 @@ import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
-import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, correspondanceAvancee } from '../lib/pixel';
+import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, cookieTtpPourTikTok, correspondanceAvancee } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 import { miniature, surErreurMiniature } from '../lib/img';
@@ -71,6 +71,17 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
       contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
       value: t.total, currency: 'MAD',
     });
+    if (reglages?.tiktok?.enabled && reglages?.tiktok?.pixelId) {
+      envoyerTikTokCAPI(reglages.tiktok.pixelId, [{
+        event: 'InitiateCheckout', event_time: Math.floor(Date.now() / 1000), event_id: eventID,
+        user: cookieTtpPourTikTok(),
+        page: { url: window.location.href },
+        properties: {
+          contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+          value: t.total, currency: 'MAD',
+        },
+      }], reglages.tiktok.testCode).catch(() => {});
+    }
     // Doublon côté serveur du même évènement, avec le même event_id (Meta
     // déduplique) : un client (ou son ad-blocker) qui empêche le pixel
     // navigateur de charger laissait jusqu'ici cette étape — la plus proche
@@ -197,15 +208,20 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
       }], reglages.pixel.testCode)).catch(() => {});
     }
     if (reglages?.tiktok?.enabled && reglages?.tiktok?.pixelId) {
-      sha256(telephonePourMeta(form.telephone))
-        .then(ph => envoyerTikTokCAPI(reglages.tiktok.pixelId, [{
-          event: 'CompletePayment', event_time: Math.floor(Date.now() / 1000), event_id: eventID,
-          user: { phone: ph },
-          properties: {
-            contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
-            value: t.total, currency: 'MAD',
-          },
-        }], reglages.tiktok.testCode)).catch(() => {});
+      const emailTt = String(form.email || '').trim().toLowerCase();
+      Promise.all([
+        sha256(telephonePourMeta(form.telephone)),
+        sha256(String(r.id)),
+        emailTt.includes('@') ? sha256(emailTt) : null,
+      ]).then(([phone, external_id, email]) => envoyerTikTokCAPI(reglages.tiktok.pixelId, [{
+        event: 'CompletePayment', event_time: Math.floor(Date.now() / 1000), event_id: eventID,
+        user: { phone, external_id, ...(email ? { email } : {}), ...cookieTtpPourTikTok() },
+        page: { url: window.location.href },
+        properties: {
+          contents: lignes.map(l => ({ content_id: l.slug, content_name: l.name, price: l.price, quantity: l.qty })),
+          value: t.total, currency: 'MAD',
+        },
+      }], reglages.tiktok.testCode)).catch(() => {});
     }
     onVider();
     // Le panier est vidé juste avant (onVider) : sans les transmettre ici,

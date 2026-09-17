@@ -44,8 +44,24 @@ export default async function handler(req, res) {
     }
   }
 
+  // ip / user_agent : ce serveur, seul, connaît la vraie adresse IP et le
+  // user-agent du visiteur — les ajouter ici (plutôt que de dépendre de ce
+  // que le navigateur aurait pu transmettre) élève le score EMQ (qualité de
+  // correspondance) que TikTok note dans son Gestionnaire d'évènements.
+  const ipBrute = clientIp(req);
+  const ip = (ipBrute && ipBrute !== 'unknown') ? ipBrute : null;
+  const ua = req.headers['user-agent'];
+  const eventsEnrichis = events.map(e => ({
+    ...e,
+    user: {
+      ...(ip ? { ip } : {}),
+      ...(ua ? { user_agent: ua } : {}),
+      ...e.user,
+    },
+  }));
+
   const url = `https://business-api.tiktok.com/open_api/${API_VERSION}/event/track/`;
-  const body = { event_source: 'web', event_source_id: pixelId, data: events };
+  const body = { event_source: 'web', event_source_id: pixelId, data: eventsEnrichis };
   if (testCode) body.test_event_code = String(testCode);
 
   const ac = new AbortController();
