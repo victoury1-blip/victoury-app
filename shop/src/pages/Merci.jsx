@@ -83,13 +83,13 @@ export default function Merci() {
                   {[l.size, l.color].filter(Boolean).join(' · ')} {ar ? '· الكمية' : '· Qté'} : {l.qty}
                 </p>
               </div>
-              <span className="text-sm font-medium text-gray-800 shrink-0">{fmtPrix(l.price * l.qty)}</span>
+              <span className="text-sm font-medium text-gray-800 shrink-0">{fmtPrix(l.price * l.qty, lang)}</span>
             </div>
           ))}
         </div>
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 text-sm font-semibold">
           <span>{ar ? 'المجموع' : 'Total'}</span>
-          <span>{fmtPrix(total)}</span>
+          <span>{fmtPrix(total, lang)}</span>
         </div>
       </div>
 

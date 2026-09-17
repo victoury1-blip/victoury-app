@@ -319,7 +319,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
                       par quantité s'applique à cette ligne précise. */}
                   {l.remiseDh > 0 && (
                     <span className="inline-block mt-1.5 bg-red-600 text-white text-[10px] font-medium px-2 py-1 rounded">
-                      RÉDUCTION {l.remisePourcent}% (−{fmtPrix(l.remiseDh)})
+                      RÉDUCTION {l.remisePourcent}% (−{fmtPrix(l.remiseDh, lang)})
                     </span>
                   )}
                   {onQuantite && (
@@ -339,11 +339,11 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
                 <div className="text-right">
                   {l.remiseDh > 0 ? (
                     <>
-                      <p className="text-sm font-medium text-red-600">{fmtPrix(l.price * l.qty - l.remiseDh)}</p>
-                      <p className="text-xs text-gray-400 line-through">{fmtPrix(l.price * l.qty)}</p>
+                      <p className="text-sm font-medium text-red-600">{fmtPrix(l.price * l.qty - l.remiseDh, lang)}</p>
+                      <p className="text-xs text-gray-400 line-through">{fmtPrix(l.price * l.qty, lang)}</p>
                     </>
                   ) : (
-                    <p className="text-sm">{fmtPrix(l.price * l.qty)}</p>
+                    <p className="text-sm">{fmtPrix(l.price * l.qty, lang)}</p>
                   )}
                   <button onClick={() => onRetirer(cleLigne(l))} className="mt-1 text-gray-300 hover:text-red-500" aria-label={tr('retirer')}>
                     <X size={13} />
@@ -354,16 +354,16 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           </div>
 
           <div className="mt-6 pt-4 border-t border-gray-200 space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">{tr('sousTotal')}</span><span>{fmtPrix(t.sousTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">{tr('sousTotal')}</span><span>{fmtPrix(t.sousTotal, lang)}</span></div>
             {t.remiseQuantite > 0 && (
-              <div className="flex justify-between text-green-700"><span>{tr('remise')}</span><span>−{fmtPrix(t.remiseQuantite)}</span></div>
+              <div className="flex justify-between text-green-700"><span>{tr('remise')}</span><span>−{fmtPrix(t.remiseQuantite, lang)}</span></div>
             )}
             {t.remisePromo > 0 && (
-              <div className="flex justify-between text-green-700"><span>{tr('codePromo')}</span><span>−{fmtPrix(t.remisePromo)}</span></div>
+              <div className="flex justify-between text-green-700"><span>{tr('codePromo')}</span><span>−{fmtPrix(t.remisePromo, lang)}</span></div>
             )}
             <div className="flex justify-between">
               <span className="text-gray-500">{lang === 'ar' ? 'التوصيل' : 'Livraison'}</span>
-              <span>{t.livraison > 0 ? fmtPrix(t.livraison) : (lang === 'ar' ? 'مجاني' : 'Gratuite')}</span>
+              <span>{t.livraison > 0 ? fmtPrix(t.livraison, lang) : (lang === 'ar' ? 'مجاني' : 'Gratuite')}</span>
             </div>
             {/* Le total en vert (pas juste en noir comme le reste) : la
                 dernière chose que le client lit avant de valider, et un
@@ -371,7 +371,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
                 plutôt que comme une grosse somme intimidante. */}
             <div className="flex justify-between pt-2 border-t border-gray-200 font-medium">
               <span>{lang === 'ar' ? 'المجموع الكلي' : 'Total'}</span>
-              <span className="text-green-600 font-bold text-base">{fmtPrix(t.total)}</span>
+              <span className="text-green-600 font-bold text-base">{fmtPrix(t.total, lang)}</span>
             </div>
           </div>
 
@@ -390,7 +390,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             className="mt-5 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60">
             {envoi
               ? tr('envoiEnCours')
-              : <>{tr('validerCommande')} — <span className="text-green-400 font-bold">{fmtPrix(t.total)}</span></>}
+              : <>{tr('validerCommande')} — <span className="text-green-400 font-bold">{fmtPrix(t.total, lang)}</span></>}
           </button>
 
           {/* Rappel des garanties juste sous le bouton : c'est LA seconde

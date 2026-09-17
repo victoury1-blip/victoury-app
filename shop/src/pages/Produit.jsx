@@ -348,7 +348,7 @@ export default function Produit({ onAjouter, theme, remises }) {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm text-gray-800 truncate">{produitsLies[0].name}</p>
-                  <p className="text-xs text-gray-500">{fmtPrix(produitsLies[0].price)}</p>
+                  <p className="text-xs text-gray-500">{fmtPrix(produitsLies[0].price, lang)}</p>
                 </div>
               </label>
             </div>
