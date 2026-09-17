@@ -66,7 +66,10 @@ export default async function handler(req, res) {
       images[0].url,
       images[1]?.url || '',
       'VICTOURY',
-      nomCollection.get(p.collection_id) || '',
+      // TikTok recommande ce champ pour mieux cibler les annonces ; sans
+      // collection connue, une catégorie générique reste préférable à un
+      // champ vide (signalé comme "manquant" par le diagnostic du flux).
+      nomCollection.get(p.collection_id) || 'Apparel & Accessories > Clothing',
       p.group_id || p.slug,
     ].map(echapperCsv);
     lignes.push(ligne.join(','));
