@@ -146,20 +146,37 @@ function Vitrine() {
 
   // Le pixel se charge une fois, dès que son réglage arrive — jamais avant,
   // pour ne jamais l'activer avec un identifiant vide ou périmé.
+  //
+  // Les quatre scripts tiers (Meta, Clarity, TikTok, GA4) sont différés d'un
+  // cran : PageSpeed a montré que gtag.js SEUL pèse 167 Kio, et qu'ajouté aux
+  // trois autres, ils se mettent tous à télécharger EN MÊME TEMPS que
+  // l'image du produit — sur le réseau lent d'un navigateur intégré
+  // (Instagram/TikTok, exactement le cas d'un clic sur une pub), ils lui
+  // volaient de la bande passante et retardaient de plusieurs secondes le
+  // Largest Contentful Paint, la mesure qui compte le plus pour la première
+  // impression. `requestIdleCallback` les repousse après que le navigateur
+  // ait fini le travail plus urgent (afficher la page) — un `setTimeout` en
+  // repli pour Safari, qui ne le connaît pas.
+  const differe = (fn) => {
+    if (typeof window === 'undefined') return;
+    if ('requestIdleCallback' in window) window.requestIdleCallback(fn, { timeout: 3000 });
+    else setTimeout(fn, 2000);
+  };
+
   useEffect(() => {
-    if (reglages.pixel?.enabled && reglages.pixel?.pixelId) chargerPixel(reglages.pixel.pixelId);
+    if (reglages.pixel?.enabled && reglages.pixel?.pixelId) differe(() => chargerPixel(reglages.pixel.pixelId));
   }, [reglages.pixel?.enabled, reglages.pixel?.pixelId]);
 
   useEffect(() => {
-    if (reglages.clarity?.enabled && reglages.clarity?.projectId) chargerClarity(reglages.clarity.projectId);
+    if (reglages.clarity?.enabled && reglages.clarity?.projectId) differe(() => chargerClarity(reglages.clarity.projectId));
   }, [reglages.clarity?.enabled, reglages.clarity?.projectId]);
 
   useEffect(() => {
-    if (reglages.tiktok?.enabled && reglages.tiktok?.pixelId) chargerTikTokPixel(reglages.tiktok.pixelId);
+    if (reglages.tiktok?.enabled && reglages.tiktok?.pixelId) differe(() => chargerTikTokPixel(reglages.tiktok.pixelId));
   }, [reglages.tiktok?.enabled, reglages.tiktok?.pixelId]);
 
   useEffect(() => {
-    if (reglages.ga4?.enabled && reglages.ga4?.measurementId) chargerGA4(reglages.ga4.measurementId);
+    if (reglages.ga4?.enabled && reglages.ga4?.measurementId) differe(() => chargerGA4(reglages.ga4.measurementId));
   }, [reglages.ga4?.enabled, reglages.ga4?.measurementId]);
 
   // Site en une seule page (SPA) : gtag ne voit jamais de rechargement, donc
