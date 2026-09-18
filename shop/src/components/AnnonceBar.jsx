@@ -31,7 +31,7 @@ export default function AnnonceBar({ theme }) {
 
   return (
     <div
-      className="py-2 overflow-hidden transition-colors"
+      className="py-2 overflow-hidden"
       style={{
         background: theme.couleurAnnonceFond || '#111111', color: theme.couleurAnnonceTexte || '#ffffff',
         fontSize: `${theme.tailleAnnonce || 11}px`, fontWeight: theme.epaisseurAnnonce || 'normal',
