@@ -50,7 +50,23 @@
     <meta name="description" content="Ensembles sport, burkinis et robes. Livraison partout au Maroc, paiement à la livraison." />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Contenu statique, sans JavaScript : servi immédiatement par le HTML
+         lui-même, avant même que le bundle React n'ait fini de se
+         télécharger/exécuter. Sur une connexion lente (le pire cas : un clic
+         sur une pub ouvert dans le navigateur intégré d'Instagram/TikTok),
+         un visiteur ne voyait rien du tout — écran blanc — pendant plusieurs
+         secondes, ce qui donnait l'impression que la page ne chargeait pas.
+         Le nom de la marque s'affiche à la place, dans le même style que
+         Wordmark.jsx (voir src/components/Wordmark.jsx et .wordmark dans
+         index.css) : React le remplace dès qu'il prend le relais, sans
+         décalage visuel puisque c'est le même texte, à la même place. -->
+    <div id="root">
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;">
+        <span style="font-family:Jost,Futura,'Century Gothic',system-ui,sans-serif;font-weight:400;letter-spacing:0.22em;text-transform:uppercase;font-size:1.5rem;color:#111;">
+          Victoury
+        </span>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
