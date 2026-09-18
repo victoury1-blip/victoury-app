@@ -32,6 +32,7 @@ export default function CommandesListe() {
   const [commandes, setCommandes] = useState(null);
   const [q, setQ] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
+  const [filtreSource, setFiltreSource] = useState('');
   const [ipsBloquees, setIpsBloquees] = useState(new Set());
   const [telsBloques, setTelsBloques] = useState(new Set());
 
@@ -138,6 +139,24 @@ export default function CommandesListe() {
     };
   }, [commandes]);
 
+  // Répond à "d'où viennent les commandes, et lesquelles se vendent
+  // vraiment ?" — le badge "Source" existait déjà par ligne, mais fallait
+  // les compter à la main pour savoir où mettre le budget pub. "Livrées"
+  // ici, pas "total", car une source qui génère beaucoup de commandes mais
+  // peu de livraisons n'est pas forcément la plus rentable.
+  const parSource = useMemo(() => {
+    const liste = (commandes || []).filter(c => !c.is_deleted);
+    const map = new Map();
+    for (const c of liste) {
+      const cle = c.recipient?.source || 'Inconnue';
+      const e = map.get(cle) || { source: cle, total: 0, livrees: 0, ca: 0 };
+      e.total += 1;
+      if (c.status === 'livre') { e.livrees += 1; e.ca += c.price || 0; }
+      map.set(cle, e);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [commandes]);
+
   const visibles = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (commandes || []).filter(c => {
@@ -148,11 +167,12 @@ export default function CommandesListe() {
       // pour la retrouver.
       if (c.is_deleted) return false;
       if (filtreStatut && filtreStatut !== 'archivee' && c.status !== filtreStatut) return false;
+      if (filtreSource && (c.recipient?.source || 'Inconnue') !== filtreSource) return false;
       if (!s) return true;
       const r = c.recipient || {};
       return [c.id, r.name, r.phone, r.city].some(v => String(v || '').toLowerCase().includes(s));
     });
-  }, [commandes, q, filtreStatut]);
+  }, [commandes, q, filtreStatut, filtreSource]);
 
   if (!commandes) return <p className="text-sm text-gray-400">Chargement…</p>;
 
@@ -168,6 +188,44 @@ export default function CommandesListe() {
         <Carte label="Chiffre d'affaires" valeur={fmtPrix(stats.ca)} />
       </div>
 
+      {/* D'où viennent les commandes, et lesquelles se transforment vraiment
+          en ventes (livrées) — pas juste "combien sont passées". Cliquer une
+          ligne filtre le tableau du dessous sur cette source, comme les 4
+          cartes de statut au-dessus le font déjà pour le statut. */}
+      {parSource.length > 0 && (
+        <div className="mt-5 bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-sm font-medium text-gray-800">Répartition par source</p>
+            <p className="text-xs text-gray-400 mt-0.5">Cliquez une source pour filtrer le tableau des commandes ci-dessous</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+              <tr>
+                <th className="text-left px-4 py-2.5">Source</th>
+                <th className="text-right px-4 py-2.5">Commandes</th>
+                <th className="text-right px-4 py-2.5">Livrées</th>
+                <th className="text-right px-4 py-2.5">Taux de livraison</th>
+                <th className="text-right px-4 py-2.5">CA livré</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {parSource.map(s => (
+                <tr key={s.source} onClick={() => setFiltreSource(f => f === s.source ? '' : s.source)}
+                  className={`cursor-pointer hover:bg-gray-50 ${filtreSource === s.source ? 'bg-blue-50' : ''}`}>
+                  <td className="px-4 py-2.5">
+                    <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700">{s.source}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-right">{s.total}</td>
+                  <td className="px-4 py-2.5 text-right text-green-700">{s.livrees}</td>
+                  <td className="px-4 py-2.5 text-right text-gray-500">{s.total ? Math.round((s.livrees / s.total) * 100) : 0}%</td>
+                  <td className="px-4 py-2.5 text-right font-medium">{fmtPrix(s.ca)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="mt-5 flex flex-wrap gap-3">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher par nom, ID, téléphone, ville…"
           className="flex-1 min-w-[16rem] border border-gray-200 px-3 py-2.5 text-sm bg-white" />
@@ -176,6 +234,12 @@ export default function CommandesListe() {
           {Object.entries(STATUT).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
           <option value="archivee">Archivées</option>
         </select>
+        {filtreSource && (
+          <button onClick={() => setFiltreSource('')}
+            className="flex items-center gap-1.5 text-xs px-3 py-2.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+            Source : {filtreSource} <X size={13} />
+          </button>
+        )}
       </div>
 
       <div className="mt-5 bg-white border border-gray-200 rounded-xl overflow-x-auto">
