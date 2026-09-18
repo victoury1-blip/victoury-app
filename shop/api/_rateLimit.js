@@ -16,7 +16,17 @@ export function rateLimited(cle, max, fenetreMs) {
   return entree.n > max;
 }
 
-/* `x-forwarded-for` peut contenir plusieurs adresses séparées par des
+/* `cf-connecting-ip` est prioritaire : quand le site passe par Cloudflare
+ * (CDN devant Vercel), les en-têtes suivants (`x-real-ip`,
+ * `x-forwarded-for`) ne reflètent plus que la connexion Cloudflare → Vercel
+ * — dont l'IP source est un nœud de périphérie Cloudflare, LE MÊME pour des
+ * visiteurs totalement différents. C'est ce qui faisait apparaître des
+ * commandes de villes marocaines différentes avec exactement la même IP, et
+ * une géolocalisation (Marseille, Madrid…) sans rapport avec le vrai
+ * visiteur. Cloudflare pose cet en-tête lui-même à son bord — un visiteur
+ * ne peut pas le falsifier, il est écrasé avant d'atteindre Vercel.
+ *
+ * `x-forwarded-for` peut contenir plusieurs adresses séparées par des
  * virgules — et la PREMIÈRE est justement celle qu'un visiteur peut fabriquer
  * lui-même en l'envoyant dans sa requête : Vercel ne la remplace pas, il
  * AJOUTE la vraie IP à la fin de la liste. S'y fier revenait à faire
@@ -24,6 +34,8 @@ export function rateLimited(cle, max, fenetreMs) {
  * se faire passer pour une autre. `x-real-ip` est posé par le proxy de
  * Vercel lui-même et ne peut pas être falsifié par le client. */
 export const clientIp = (req) => {
+  const cf = req.headers['cf-connecting-ip'];
+  if (cf) return String(cf).trim();
   const realIp = req.headers['x-real-ip'];
   if (realIp) return String(realIp).trim();
   const forwarded = req.headers['x-forwarded-for'];
