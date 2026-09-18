@@ -3,6 +3,14 @@
 // rien tant que la commande n'est pas une commande DU SITE (id "VS-...") :
 // les commandes saisies dans le CRM ne doivent pas déclencher ce push-là.
 //
+// Cette route était appelable par N'IMPORTE QUI, sans la moindre
+// vérification : il suffisait de connaître l'URL et de POSTer un JSON
+// {"record":{"id":"VS-x", "recipient":{...}, ...}} fabriqué à la main pour
+// déclencher un vrai push, avec un texte entièrement choisi par l'appelant,
+// vers TOUS les abonnés (spam/hameçonnage "Nouvelle commande — cliquez
+// ici…", ou simplement épuiser le quota d'envoi). Un secret partagé, connu
+// uniquement du webhook Supabase et de ce serveur, ferme cette porte.
+//
 // Variables d'environnement requises (Vercel → Settings → Environment
 // Variables, projet DU SITE — pas celui du CRM) :
 //   VITE_SUPABASE_URL          (déjà présente)
@@ -10,12 +18,32 @@
 //   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY  (générées une fois, jamais régénérées
 //     ensuite — les abonnements existants deviendraient invalides)
 //   VAPID_SUBJECT               (ex. "mailto:contact@victoury-maroc.com")
+//   PUSH_NOTIFY_SECRET          (chaîne aléatoire longue, choisie par vous) —
+//     à recopier dans Supabase → Database → Webhooks → cette route →
+//     "HTTP Headers" → ajouter `x-webhook-secret: <la même valeur>`.
+//     Tant que cette variable n'est pas définie, la route reste ouverte
+//     (pour ne pas casser l'envoi existant avant que le webhook soit
+//     reconfiguré) — définissez-la dès que possible.
 
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
+import { timingSafeEqual } from 'crypto';
+
+function secretValide(req) {
+  const attendu = process.env.PUSH_NOTIFY_SECRET;
+  if (!attendu) return true; // pas encore configuré — voir commentaire ci-dessus
+  const recu = req.headers['x-webhook-secret'];
+  if (!recu || recu.length !== attendu.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(recu), Buffer.from(attendu));
+  } catch {
+    return false;
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
+  if (!secretValide(req)) return res.status(401).json({ error: 'Non autorisé' });
 
   const commande = req.body?.record || req.body?.new || req.body;
   if (!commande?.id || !String(commande.id).startsWith('VS-')) {

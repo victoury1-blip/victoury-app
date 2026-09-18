@@ -1,7 +1,20 @@
 /* Proxy d'images Chic Affiliate avec extension dans le chemin
    (/api/img/<base64url>.jpg) : WordPress/WooCommerce refuse de télécharger
-   une URL sans extension, et chic-affiliate.com exige un Referer. */
+   une URL sans extension, et chic-affiliate.com exige un Referer.
+
+   Volontairement SANS authentification : cette route est appelée comme
+   src d'une balise <img> sur un site WooCommerce tiers — un navigateur ne
+   peut pas y joindre d'en-tête Authorization. Elle reste protégée par
+   l'allowlist d'hôte ci-dessous, une limite de débit (repli si l'appel se
+   fait trop nombreux), et — comme chic-image.js — en ne relayant que ce
+   qui est vraiment une image, jamais le type de contenu renvoyé tel quel. */
+import { rateLimited, clientIp } from './_rateLimit.js';
+
 export default async function handler(req, res) {
+  if (rateLimited(`img:${clientIp(req)}`, 120, 60000)) {
+    return res.status(429).json({ error: 'Trop de requêtes' });
+  }
+
   const { file } = req.query;
   if (!file) return res.status(400).json({ error: 'Missing file' });
 
@@ -26,12 +39,20 @@ export default async function handler(req, res) {
     });
     if (!response.ok) return res.status(response.status).end();
 
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    // Ne relayer QUE des images : renvoyer le type distant tel quel
+    // permettrait de servir du HTML (donc du script) depuis notre domaine
+    // si chic-affiliate.com était un jour compromis.
+    const contentType = response.headers.get('content-type') || '';
+    if (!/^image\//i.test(contentType)) {
+      return res.status(415).json({ error: 'Ressource non-image' });
+    }
     const buffer = Buffer.from(await response.arrayBuffer());
     res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.status(200).send(buffer);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('img proxy:', e?.message || e);
+    res.status(502).json({ error: 'Image indisponible' });
   }
 }

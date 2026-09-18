@@ -1,4 +1,10 @@
+import { rateLimited, clientIp } from './_rateLimit.js';
+
 export default async function handler(req, res) {
+  if (rateLimited(`chic-image:${clientIp(req)}`, 120, 60000)) {
+    return res.status(429).json({ error: 'Trop de requêtes' });
+  }
+
   const { url } = req.query;
   if (!url) {
     return res.status(400).json({ error: 'Missing url' });
