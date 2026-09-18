@@ -7,7 +7,7 @@ import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
-import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, cookieTtpPourTikTok, correspondanceAvancee } from '../lib/pixel';
+import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, cookieTtpPourTikTok, correspondanceAvancee, trackGA4 } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 import { miniature, surErreurMiniature } from '../lib/img';
@@ -70,6 +70,10 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     trackTikTok('InitiateCheckout', {
       contents: lignes.map(l => ({ content_id: l.slug, content_type: 'product', content_name: l.name, price: l.price, quantity: l.qty })),
       value: t.total, currency: 'MAD',
+    });
+    trackGA4('begin_checkout', {
+      currency: 'MAD', value: t.total,
+      items: lignes.map(l => ({ item_id: l.slug, item_name: l.name, price: l.price, quantity: l.qty })),
     });
     if (reglages?.tiktok?.enabled && reglages?.tiktok?.pixelId) {
       envoyerTikTokCAPI(reglages.tiktok.pixelId, [{
@@ -176,6 +180,10 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     trackTikTok('CompletePayment', {
       contents: lignes.map(l => ({ content_id: l.slug, content_type: 'product', content_name: l.name, price: l.price, quantity: l.qty })),
       value: t.total, currency: 'MAD',
+    });
+    trackGA4('purchase', {
+      transaction_id: r.id, currency: 'MAD', value: t.total,
+      items: lignes.map(l => ({ item_id: l.slug, item_name: l.name, price: l.price, quantity: l.qty })),
     });
     if (reglages?.pixel?.enabled && reglages?.pixel?.pixelId) {
       // Sans e-mail collecté (le formulaire n'en demande pas), le téléphone reste

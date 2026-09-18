@@ -6,7 +6,7 @@ import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
 import WhatsAppBulle from './components/WhatsAppBulle';
 import ErrorBoundary from './components/ErrorBoundary';
-import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEFAUT } from './lib/catalogDefaults';
+import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEFAUT, GA4_DEFAUT } from './lib/catalogDefaults';
 
 /* Un visiteur qui atterrit sur l'accueil (le cas des clics publicitaires)
    n'a jamais besoin du code de la caisse, des fiches produit ou — surtout —
@@ -45,11 +45,12 @@ const CommandesListe = lazy(() => import('./store/CommandesListe'));
 const PaniersAbandonnesListe = lazy(() => import('./store/PaniersAbandonnesListe'));
 const MicrosoftClarity = lazy(() => import('./store/MicrosoftClarity'));
 const TikTokPixel = lazy(() => import('./store/TikTokPixel'));
+const GoogleAnalytics = lazy(() => import('./store/GoogleAnalytics'));
 const RemisesListe = lazy(() => import('./store/RemisesListe'));
 const Reglages = lazy(() => import('./store/Reglages'));
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
-import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok } from './lib/pixel';
+import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok, chargerGA4, trackGA4 } from './lib/pixel';
 import { LangProvider } from './lib/i18n';
 
 /* React Router ne remet PAS le défilement en haut tout seul en changeant de
@@ -77,7 +78,7 @@ function ScrollToTop() {
 // que confirmer ou corriger, sans "flash" visible.
 const CACHE_REGLAGES = 'shop_reglages_cache';
 function reglagesInitiaux() {
-  const defaut = { ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT, clarity: CLARITY_DEFAUT, tiktok: TIKTOK_DEFAUT };
+  const defaut = { ...REGLAGES_DEFAUT, pixel: PIXEL_DEFAUT, theme: THEME_DEFAUT, clarity: CLARITY_DEFAUT, tiktok: TIKTOK_DEFAUT, ga4: GA4_DEFAUT };
   try {
     const brut = localStorage.getItem(CACHE_REGLAGES);
     return brut ? { ...defaut, ...JSON.parse(brut) } : defaut;
@@ -99,6 +100,7 @@ function collectionsInitiales() {
 }
 
 function Vitrine() {
+  const { pathname } = useLocation();
   const [collections, setCollections] = useState(collectionsInitiales);
   const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);
@@ -156,6 +158,19 @@ function Vitrine() {
     if (reglages.tiktok?.enabled && reglages.tiktok?.pixelId) chargerTikTokPixel(reglages.tiktok.pixelId);
   }, [reglages.tiktok?.enabled, reglages.tiktok?.pixelId]);
 
+  useEffect(() => {
+    if (reglages.ga4?.enabled && reglages.ga4?.measurementId) chargerGA4(reglages.ga4.measurementId);
+  }, [reglages.ga4?.enabled, reglages.ga4?.measurementId]);
+
+  // Site en une seule page (SPA) : gtag ne voit jamais de rechargement, donc
+  // jamais de "page_view" tout seul au-delà du tout premier écran — un
+  // évènement à chaque changement de route pour que Google Analytics compte
+  // la navigation interne comme de vraies pages vues (Accueil → Collection →
+  // Produit…), pas une seule visite figée.
+  useEffect(() => {
+    trackGA4('page_view', { page_path: pathname, page_location: window.location.href });
+  }, [pathname]);
+
   // La couleur principale (texte, boutons, bordures actives) est une variable
   // CSS : la changer ici touche tout le site d'un coup, sans recompiler.
   useEffect(() => {
@@ -197,6 +212,10 @@ function Vitrine() {
     trackTikTok('AddToCart', {
       contents: [{ content_id: ligne.slug, content_type: 'product', content_name: ligne.name, price: ligne.price, quantity: 1 }],
       value: ligne.price, currency: 'MAD',
+    });
+    trackGA4('add_to_cart', {
+      currency: 'MAD', value: ligne.price,
+      items: [{ item_id: ligne.slug, item_name: ligne.name, price: ligne.price, quantity: 1 }],
     });
   }, []);
 
@@ -279,6 +298,7 @@ function Administration() {
             <Route path="paniers-abandonnes" element={<PaniersAbandonnesListe />} />
             <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
             <Route path="tiktok-pixel" element={<TikTokPixel />} />
+            <Route path="google-analytics" element={<GoogleAnalytics />} />
             <Route path="reglages" element={<Reglages />} />
           </Route>
         </Routes>

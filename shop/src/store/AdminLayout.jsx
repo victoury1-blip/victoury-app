@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
@@ -29,6 +29,7 @@ const LIENS = [
   { to: '/store/meta-pixel', label: 'Meta Pixel', icon: Radio },
   { to: '/store/microsoft-clarity', label: 'Microsoft Clarity', icon: Activity },
   { to: '/store/tiktok-pixel', label: 'TikTok Pixel', icon: Music2 },
+  { to: '/store/google-analytics', label: 'Google Analytics', icon: BarChart3 },
   { to: '/store/reglages', label: 'Réglages', icon: Settings },
 ];
 

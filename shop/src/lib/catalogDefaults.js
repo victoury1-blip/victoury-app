@@ -44,6 +44,14 @@ export const CLARITY_DEFAUT = { enabled: false, projectId: '' };
    secret, aucun jeton d'API côté serveur ici (voir MetaPixel pour ce cas). */
 export const TIKTOK_DEFAUT = { enabled: false, pixelId: '', testCode: '' };
 
+/* Google Analytics 4 : l'identifiant de mesure (G-XXXXXXX) n'a rien d'un
+   secret — c'est la même valeur que n'importe qui verrait déjà dans le
+   code source de la page. Sert surtout à répondre à « les visiteurs
+   viennent d'où ? » (Instagram, Facebook, TikTok, direct…) — GA4 lit tout
+   seul les paramètres utm_source déjà ajoutés par ces plateformes
+   publicitaires aux liens de leurs annonces. */
+export const GA4_DEFAUT = { enabled: false, measurementId: '' };
+
 /* L'apparence de la boutique — logo, favicon, bandeau d'annonce — vit elle
    aussi à part : ce sont des réglages visuels, réglés depuis /store/theme,
    pas des règles de vente comme les remises ou la livraison. */

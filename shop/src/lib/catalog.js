@@ -1,12 +1,12 @@
 import { supabase } from './supabase';
 import { paliersEffectifs } from './remises';
-import { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, TIKTOK_DEFAUT, stockTaille } from './catalogDefaults';
+import { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, TIKTOK_DEFAUT, GA4_DEFAUT, stockTaille } from './catalogDefaults';
 
 // Réexportés pour que les fichiers qui les importaient déjà depuis ici (la
 // majorité du code) n'aient rien à changer — seuls App.jsx et Accueil.jsx,
 // qui doivent éviter de tirer le client Supabase dans leur chargement
 // initial, les importent désormais directement depuis catalogDefaults.js.
-export { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, stockTaille };
+export { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, GA4_DEFAUT, stockTaille };
 
 /* Lecture du catalogue.
  *
@@ -181,7 +181,7 @@ export async function chargerPage(slug) {
 
 export async function chargerReglages() {
   const { data, error } = await supabase.from('shop_settings').select('key, value');
-  if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT }, tiktok: { ...TIKTOK_DEFAUT } };
+  if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT }, tiktok: { ...TIKTOK_DEFAUT }, ga4: { ...GA4_DEFAUT } };
   const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
   const themeSauve = map.theme || {};
   const remises = Array.isArray(map.remises) ? map.remises : [];
@@ -198,6 +198,7 @@ export async function chargerReglages() {
     pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
     clarity: { ...CLARITY_DEFAUT, ...(map.microsoft_clarity || {}) },
     tiktok: { ...TIKTOK_DEFAUT, ...(map.tiktok_pixel || {}) },
+    ga4: { ...GA4_DEFAUT, ...(map.ga4 || {}) },
     theme: {
       ...THEME_DEFAUT, ...themeSauve,
       hero: { ...THEME_DEFAUT.hero, ...(themeSauve.hero || {}) },

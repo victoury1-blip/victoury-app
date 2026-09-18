@@ -4,7 +4,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
-import { trackPixel, trackTikTok } from '../lib/pixel';
+import { trackPixel, trackTikTok, trackGA4 } from '../lib/pixel';
 import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
 import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
@@ -78,6 +78,10 @@ export default function Produit({ onAjouter, theme, remises }) {
           trackTikTok('ViewContent', {
             contents: [{ content_id: p.slug, content_type: 'product', content_name: p.name, price: p.price, quantity: 1 }],
             value: p.price, currency: 'MAD',
+          });
+          trackGA4('view_item', {
+            currency: 'MAD', value: p.price,
+            items: [{ item_id: p.slug, item_name: p.name, price: p.price }],
           });
         }
       })

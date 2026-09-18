@@ -170,3 +170,34 @@ export function chargerClarity(projectId) {
   })(window, document, "clarity", "script", projectId);
   /* eslint-enable */
 }
+
+/* Google Analytics 4 — répond à « les visiteurs viennent d'où ? » (Instagram,
+ * Facebook, TikTok, direct…) sans code supplémentaire : gtag.js lit tout seul
+ * les paramètres utm_source/utm_medium/utm_campaign déjà présents sur les
+ * liens que les campagnes Meta/TikTok ajoutent elles-mêmes (voir
+ * "Paramètres d'URL" dans chaque gestionnaire de publicités), et retombe sur
+ * le Referer HTTP quand un lien n'en a pas (visite directe, partage manuel).
+ * Boilerplate officiel Google — rien d'autre n'y transite. */
+let ga4Charge = false;
+export function chargerGA4(measurementId) {
+  if (ga4Charge || !measurementId || typeof window === 'undefined') return;
+  ga4Charge = true;
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function gtag() { window.dataLayer.push(arguments); };
+  window.gtag('js', new Date());
+  // send_page_view: false — la boutique est une SPA (React Router), pas des
+  // rechargements de page. C'est trackGA4('page_view', ...) qui s'en charge,
+  // à chaque changement de route, sinon gtag ne comptabiliserait que le tout
+  // premier écran visité et jamais la navigation qui suit.
+  window.gtag('config', measurementId, { send_page_view: false });
+}
+
+/** Émet un évènement GA4, sans effet si le script n'est pas chargé. */
+export function trackGA4(nom, parametres) {
+  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
+  window.gtag('event', nom, parametres || {});
+}
