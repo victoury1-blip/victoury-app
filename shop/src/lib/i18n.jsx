@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 /* Deux langues, un bouton pour basculer — pas de détection automatique
    (fiable à moitié, et un client qui a mis son téléphone en anglais ne
@@ -118,14 +118,24 @@ export function LangProvider({ children }) {
     // avec l'arabe la casserait — seul le texte change de langue.
   }, [lang]);
 
-  const t = (cle) => DICT[lang]?.[cle] ?? DICT.fr[cle] ?? cle;
-
-  return <LangContext.Provider value={{
-    lang, setLang, t,
+  // Header et CarteProduit sont enveloppés dans React.memo justement pour ne
+  // PAS se re-rendre à chaque ajout au panier (voir leurs commentaires) —
+  // mais un objet `value` recréé à CHAQUE rendu de LangProvider (donc à
+  // chaque fois que Vitrine se re-rend, cart compris, puisque LangProvider
+  // l'enveloppe tout entier) donnait une nouvelle référence de contexte à
+  // chaque fois, ce qui re-rendait quand même tout composant appelant
+  // useLang() — React.memo ne protège que des props, jamais d'un contexte
+  // qui change. useMemo garde la même référence tant que `lang` ne change
+  // pas vraiment, ce qui redonne son effet au memo de ces deux composants.
+  const valeur = useMemo(() => ({
+    lang, setLang,
+    t: (cle) => DICT[lang]?.[cle] ?? DICT.fr[cle] ?? cle,
     remisePalier: (pourcent, rang) => remisePalier(lang, pourcent, rang),
     encoreEtRemise: (manque, pourcent) => encoreEtRemise(lang, manque, pourcent),
     etLivraisonGratuite: () => etLivraisonGratuite(lang),
-  }}>{children}</LangContext.Provider>;
+  }), [lang]);
+
+  return <LangContext.Provider value={valeur}>{children}</LangContext.Provider>;
 }
 
 export const useLang = () => useContext(LangContext);
