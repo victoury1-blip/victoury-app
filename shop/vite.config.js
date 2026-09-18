@@ -34,6 +34,19 @@ export default defineConfig({
     // visiteurs (navigateurs à jour), ce que PageSpeed signalait comme
     // "JavaScript ancien" envoyé pour rien.
     target: 'esnext',
+    modulePreload: {
+      // Vite ajoute par défaut un <link rel="modulepreload"> pour CHAQUE
+      // chunk atteignable par un import dynamique depuis l'entrée — y
+      // compris "supabase" (~220 Kio), pourtant chargé exprès en dynamique
+      // dans App.jsx (voir son commentaire) pour ne JAMAIS retarder le tout
+      // premier rendu. Sans ce filtre, le navigateur le téléchargeait quand
+      // même dès le chargement de la page, juste "au cas où" — annulant
+      // l'intérêt du chargement dynamique. C'est précisément ce qui rendait
+      // la toute première ouverture d'une pub (le pire réseau : navigateur
+      // intégré Instagram/TikTok) lente à afficher ne serait-ce que le
+      // squelette de chargement.
+      resolveDependencies: (filename, deps) => deps.filter(d => !d.includes('supabase')),
+    },
     rollupOptions: {
       output: {
         // Le code des librairies change bien moins souvent que le code du
