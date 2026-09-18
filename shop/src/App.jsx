@@ -155,12 +155,22 @@ function Vitrine() {
   // volaient de la bande passante et retardaient de plusieurs secondes le
   // Largest Contentful Paint, la mesure qui compte le plus pour la première
   // impression. `requestIdleCallback` les repousse après que le navigateur
-  // ait fini le travail plus urgent (afficher la page) — un `setTimeout` en
-  // repli pour Safari, qui ne le connaît pas.
+  // ait fini le travail plus urgent (afficher la page).
+  //
+  // `requestIdleCallback` s'est révélé pas fiable pour ça : le navigateur ne
+  // le déclenche que quand il se croit "inactif", et avec une extension de
+  // diagnostic ouverte (Meta/TikTok Pixel Helper) ou simplement un onglet
+  // resté actif à faire autre chose, il pouvait ne jamais se déclencher dans
+  // un délai raisonnable — le pixel restait alors introuvable même après
+  // avoir attendu, ce qui perdait pour de bon l'évènement InitiateCheckout
+  // (déclenché dès l'arrivée sur /commander, AVANT que le pixel ait fini de
+  // charger). L'évènement "load" de la fenêtre, lui, se déclenche TOUJOURS,
+  // une seule fois, dès que la page a fini de charger ses ressources — aussi
+  // tard que voulu pour ne jamais concurrencer le LCP, mais garanti.
   const differe = (fn) => {
     if (typeof window === 'undefined') return;
-    if ('requestIdleCallback' in window) window.requestIdleCallback(fn, { timeout: 3000 });
-    else setTimeout(fn, 2000);
+    if (document.readyState === 'complete') fn();
+    else window.addEventListener('load', fn, { once: true });
   };
 
   useEffect(() => {
