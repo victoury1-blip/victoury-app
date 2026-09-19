@@ -42,6 +42,12 @@
     <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-400-normal.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-500-normal.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-600-normal.woff2" crossorigin />
+    <!-- Logo affiché dans le contenu de secours ci-dessous (#root, avant que
+         React ne prenne le relais) : préchargé en parallèle du bundle JS pour
+         qu'il soit déjà là au moment où le HTML l'affiche, au lieu d'un
+         second aller-retour réseau qui le ferait apparaître avec un temps de
+         retard visible. -->
+    <link rel="preload" as="image" href="/loading-logo.png" />
     <!-- Court exprès : un titre long ("VICTOURY — Ensembles sport...") se
          voit tronqué dans un onglet étroit et affiche alors l'URL à la
          place, ce que le client lit comme "le site ne s'appelle pas
@@ -62,9 +68,7 @@
          décalage visuel puisque c'est le même texte, à la même place. -->
     <div id="root">
       <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;">
-        <span style="font-family:Jost,Futura,'Century Gothic',system-ui,sans-serif;font-weight:400;letter-spacing:0.22em;text-transform:uppercase;font-size:1.5rem;color:#111;">
-          Victoury
-        </span>
+        <img src="/loading-logo.png" alt="Victoury" width="180" height="75" style="width:180px;height:auto;" />
       </div>
     </div>
     <script type="module" src="/src/main.jsx"></script>
