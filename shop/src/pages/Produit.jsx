@@ -4,7 +4,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
-import { trackPixel, trackTikTok, trackGA4 } from '../lib/pixel';
+import { trackPixel, trackTikTok, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from '../lib/pixel';
 import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
 import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
@@ -26,7 +26,7 @@ function Accordeon({ titre, children }) {
   );
 }
 
-export default function Produit({ onAjouter, theme, remises }) {
+export default function Produit({ onAjouter, theme, remises, tiktok }) {
   const { t, remisePalier, lang } = useLang();
   const ar = lang === 'ar';
   const { slug } = useParams();
@@ -79,6 +79,20 @@ export default function Produit({ onAjouter, theme, remises }) {
             contents: [{ content_id: p.slug, content_type: 'product', content_name: p.name, price: p.price, quantity: 1 }],
             value: p.price, currency: 'MAD',
           });
+          // Doublon serveur — même raison qu'AddToCart (voir App.jsx) : le
+          // Gestionnaire de publicités TikTok signalait "View content :
+          // aucune activité récente" faute d'un relais fiable ici.
+          if (tiktok?.enabled && tiktok?.pixelId) {
+            envoyerTikTokCAPI(tiktok.pixelId, [{
+              event: 'ViewContent', event_time: Math.floor(Date.now() / 1000), event_id: idEvenement('viewcontent'),
+              user: cookieTtpPourTikTok(),
+              page: { url: window.location.href },
+              properties: {
+                contents: [{ content_id: p.slug, content_type: 'product', content_name: p.name, price: p.price, quantity: 1 }],
+                value: p.price, currency: 'MAD',
+              },
+            }], tiktok.testCode).catch(() => {});
+          }
           trackGA4('view_item', {
             currency: 'MAD', value: p.price,
             items: [{ item_id: p.slug, item_name: p.name, price: p.price }],

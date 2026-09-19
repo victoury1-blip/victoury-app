@@ -50,7 +50,7 @@ const RemisesListe = lazy(() => import('./store/RemisesListe'));
 const Reglages = lazy(() => import('./store/Reglages'));
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
-import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok, chargerGA4, trackGA4 } from './lib/pixel';
+import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok, chargerGA4, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from './lib/pixel';
 import { LangProvider } from './lib/i18n';
 
 /* React Router ne remet PAS le défilement en haut tout seul en changeant de
@@ -240,11 +240,27 @@ function Vitrine() {
       contents: [{ content_id: ligne.slug, content_type: 'product', content_name: ligne.name, price: ligne.price, quantity: 1 }],
       value: ligne.price, currency: 'MAD',
     });
+    // Doublon serveur, même principe qu'InitiateCheckout/CompletePayment
+    // (voir Commander.jsx) : sans lui, un ad-blocker ou un pixel navigateur
+    // pas encore chargé au moment du clic laissait cet évènement invisible
+    // à TikTok — c'est justement ce que le Gestionnaire de publicités
+    // signalait comme "Add to cart : aucune activité récente".
+    if (reglages?.tiktok?.enabled && reglages?.tiktok?.pixelId) {
+      envoyerTikTokCAPI(reglages.tiktok.pixelId, [{
+        event: 'AddToCart', event_time: Math.floor(Date.now() / 1000), event_id: idEvenement('addtocart'),
+        user: cookieTtpPourTikTok(),
+        page: { url: window.location.href },
+        properties: {
+          contents: [{ content_id: ligne.slug, content_type: 'product', content_name: ligne.name, price: ligne.price, quantity: 1 }],
+          value: ligne.price, currency: 'MAD',
+        },
+      }], reglages.tiktok.testCode).catch(() => {});
+    }
     trackGA4('add_to_cart', {
       currency: 'MAD', value: ligne.price,
       items: [{ item_id: ligne.slug, item_name: ligne.name, price: ligne.price, quantity: 1 }],
     });
-  }, []);
+  }, [reglages.tiktok]);
 
   const onQuantite = useCallback((cle, qty) => setLignes(prev => { const s = changerQuantite(prev, cle, qty); ecrirePanier(s); return s; }), []);
   const onRetirer  = useCallback((cle) => setLignes(prev => { const s = retirer(prev, cle); ecrirePanier(s); return s; }), []);
@@ -277,8 +293,8 @@ function Vitrine() {
                 une annonce en cours pointe dessus, et la changer l'arrêterait. */}
             <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
-            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
-            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} />} />
+            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} />} />
+            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} />} />
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
             <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/merci/:id" element={<Merci />} />
