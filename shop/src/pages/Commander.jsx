@@ -31,6 +31,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // téléphone perd le focus créerait une ligne de plus dans les paniers
   // abandonnés, pour la même personne qui hésite juste entre deux champs.
   const panierEnregistre = useRef(false);
+  // Un seul envoi par visite, même chose : Meta a déjà l'e-mail dès le
+  // premier envoi, pas besoin de le renvoyer à chaque nouvelle lettre tapée.
+  const emailEnvoyeCapi = useRef(false);
   // Sur iPhone, quitter Safari (bouton Accueil, balayer l'appli, fermer
   // l'onglet) ne déclenche PAS toujours l'événement "blur" du champ
   // téléphone — surtout si le client tape le numéro puis quitte direct sans
@@ -121,6 +124,27 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
         paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
       }).total,
     }).then(() => {}, () => { panierEnregistre.current = false; });
+  }
+
+  // Meta recommande d'envoyer l'e-mail dès qu'il est connu pour l'évènement
+  // "Paiement initié" (Gestionnaire d'évènements → Optimisez les
+  // performances) — envoyé en clair à l'arrivée sur la page (avant que le
+  // client n'ait rien tapé), cet évènement ne portait jusqu'ici que les
+  // cookies _fbp/_fbc, aucune identité. Un évènement complémentaire, avec un
+  // nouvel identifiant (pas de doublon avec celui de l'arrivée), donne à
+  // Meta un signal de correspondance bien plus fort dès que l'e-mail est
+  // renseigné — sans attendre l'achat.
+  function noterEmailInitiateCheckout() {
+    if (emailEnvoyeCapi.current) return;
+    const email = String(form.email || '').trim().toLowerCase();
+    if (!email.includes('@') || !reglages?.pixel?.enabled || !reglages?.pixel?.pixelId) return;
+    emailEnvoyeCapi.current = true;
+    sha256(email).then(em => envoyerCAPI(reglages.pixel.pixelId, [{
+      event_name: 'InitiateCheckout', event_time: Math.floor(Date.now() / 1000),
+      event_id: idEvenement('checkout-email'), action_source: 'website', event_source_url: window.location.href,
+      user_data: { em: [em], ...cookiesFbPourMeta() },
+      custom_data: { value: t.total, currency: 'MAD', num_items: t.articles },
+    }], reglages.pixel.testCode)).catch(() => { emailEnvoyeCapi.current = false; });
   }
 
   // Filet de sécurité pour iOS : "pagehide" et l'onglet qui devient caché
@@ -302,6 +326,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           <div>
             <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('emailOptionnel')}</label>
             <input type="email" value={form.email} onChange={e => u('email', e.target.value)}
+              onBlur={() => { noterEmailInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
               placeholder="exemple@email.com" dir="ltr" className={`${champ} text-left`} />
           </div>
 
