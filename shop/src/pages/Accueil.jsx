@@ -10,7 +10,7 @@ import SectionVedette from '../components/SectionVedette';
 import { chargerNouveautes, chargerAvis, chargerCollectionsAvecCompte } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
 
-export default function Accueil({ collections, reglages }) {
+export default function Accueil({ collections, reglages, pret }) {
   const { t } = useLang();
   const [produits, setProduits] = useState([]);
   const pisteRef = useRef(null);
@@ -136,7 +136,7 @@ export default function Accueil({ collections, reglages }) {
         </section>
       )}
 
-      <SectionVedette config={reglages?.theme?.sectionVedette} remises={reglages?.remises} />
+      <SectionVedette config={reglages?.theme?.sectionVedette} remises={reglages?.remises} chargement={!pret} />
 
       <Reassurance items={reglages?.theme?.reassurance} active={reglages?.theme?.reassuranceActive} />
 

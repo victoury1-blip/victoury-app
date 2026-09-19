@@ -288,7 +288,7 @@ function Vitrine() {
             une fraction de seconde. */}
         <Suspense fallback={null}>
           <Routes>
-            <Route path="/" element={<Accueil collections={collections} reglages={reglages} />} />
+            <Route path="/" element={<Accueil collections={collections} reglages={reglages} pret={pretFooter} />} />
             {/* Les adresses reprennent EXACTEMENT celles de l'ancienne boutique :
                 une annonce en cours pointe dessus, et la changer l'arrêterait. */}
             <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />

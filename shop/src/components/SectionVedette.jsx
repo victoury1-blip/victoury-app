@@ -9,7 +9,7 @@ import { useLang } from '../lib/i18n';
 /* Une collection mise en avant à mi-page — grande photo + quelques produits —
    plutôt qu'une simple carte parmi d'autres dans "Nos catégories" : le genre
    de mise en avant qu'un site de mode réserve à son lancement du moment. */
-export default function SectionVedette({ config, remises }) {
+export default function SectionVedette({ config, remises, chargement }) {
   const [produits, setProduits] = useState([]);
   const { lang } = useLang();
   const droite = config?.imagePosition === 'droite';
@@ -26,6 +26,29 @@ export default function SectionVedette({ config, remises }) {
       .then(({ produits }) => setProduits(produits.slice(0, 6)))
       .catch(() => setProduits([]));
   }, [config?.collectionSlug]);
+
+  // Tant que /store/reglages n'a pas encore répondu, `config` est encore
+  // indéterminé (ni actif ni inactif) — le rendre "absent" par défaut
+  // insérait cette section entière (jusqu'à 560px de haut) d'un coup une
+  // fois la réponse arrivée, poussant tout ce qui suit (Reassurance, avis,
+  // pied de page) d'un bloc : le plus gros décalage de mise en page (CLS)
+  // relevé sur la page d'accueil. Un squelette de même hauteur le temps de
+  // savoir vraiment si la section est active évite ce saut, comme pour
+  // "Nos catégories"/"Nos nouveautés" juste au-dessus.
+  if (chargement) {
+    return (
+      <section className="mt-16">
+        <div className="flex flex-row lg:min-h-[560px] animate-pulse">
+          <div className="w-1/3 sm:w-1/2 aspect-[3/4] sm:aspect-auto bg-gray-100 shrink-0" />
+          <div className="w-2/3 sm:w-1/2 flex flex-col justify-center px-4 py-6 sm:px-10 lg:px-16 gap-3">
+            <div className="h-6 w-2/3 bg-gray-100 rounded" />
+            <div className="h-4 w-full bg-gray-100 rounded" />
+            <div className="h-4 w-24 bg-gray-100 rounded" />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (!config?.active || !config.image || !config.collectionSlug) return null;
 
