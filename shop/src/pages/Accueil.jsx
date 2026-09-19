@@ -138,7 +138,7 @@ export default function Accueil({ collections, reglages, pret }) {
 
       <SectionVedette config={reglages?.theme?.sectionVedette} remises={reglages?.remises} chargement={!pret} />
 
-      <Reassurance items={reglages?.theme?.reassurance} active={reglages?.theme?.reassuranceActive} />
+      <Reassurance items={reglages?.theme?.reassurance} active={reglages?.theme?.reassuranceActive} chargement={!pret} />
 
       <AvisClients avis={avis} chargement={chargementAvis} />
     </>
