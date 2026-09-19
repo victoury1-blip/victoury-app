@@ -31,8 +31,8 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // téléphone perd le focus créerait une ligne de plus dans les paniers
   // abandonnés, pour la même personne qui hésite juste entre deux champs.
   const panierEnregistre = useRef(false);
-  // Un seul envoi par visite, même chose : Meta a déjà l'e-mail dès le
-  // premier envoi, pas besoin de le renvoyer à chaque nouvelle lettre tapée.
+  // Un seul envoi par visite, même chose : Meta a déjà ce qui était rempli
+  // dès le premier envoi, pas besoin de le renvoyer à chaque champ suivant.
   const emailEnvoyeCapi = useRef(false);
   // Sur iPhone, quitter Safari (bouton Accueil, balayer l'appli, fermer
   // l'onglet) ne déclenche PAS toujours l'événement "blur" du champ
@@ -126,23 +126,39 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     }).then(() => {}, () => { panierEnregistre.current = false; });
   }
 
-  // Meta recommande d'envoyer l'e-mail dès qu'il est connu pour l'évènement
-  // "Paiement initié" (Gestionnaire d'évènements → Optimisez les
-  // performances) — envoyé en clair à l'arrivée sur la page (avant que le
-  // client n'ait rien tapé), cet évènement ne portait jusqu'ici que les
-  // cookies _fbp/_fbc, aucune identité. Un évènement complémentaire, avec un
-  // nouvel identifiant (pas de doublon avec celui de l'arrivée), donne à
-  // Meta un signal de correspondance bien plus fort dès que l'e-mail est
-  // renseigné — sans attendre l'achat.
-  function noterEmailInitiateCheckout() {
+  // Meta recommande d'envoyer e-mail/ville/prénom/nom dès qu'ils sont connus
+  // pour l'évènement "Paiement initié" (Gestionnaire d'évènements →
+  // Optimisez les performances — +22,31 % de conversions supplémentaires
+  // signalées en moyenne avec l'e-mail à elle seule). Envoyé en clair à
+  // l'arrivée sur la page (avant que le client n'ait rien tapé), cet
+  // évènement ne portait jusqu'ici que les cookies _fbp/_fbc, aucune
+  // identité. Un évènement complémentaire, avec un nouvel identifiant (pas de
+  // doublon avec celui de l'arrivée), donne à Meta un signal de
+  // correspondance bien plus fort dès qu'un de ces champs est renseigné —
+  // sans attendre l'achat. Envoyé une seule fois, avec tout ce qui est déjà
+  // rempli à cet instant (pas forcément tout) — inutile d'attendre que
+  // chaque champ soit rempli pour profiter de ceux qui le sont déjà.
+  function noterInfosInitiateCheckout() {
     if (emailEnvoyeCapi.current) return;
     const email = String(form.email || '').trim().toLowerCase();
-    if (!email.includes('@') || !reglages?.pixel?.enabled || !reglages?.pixel?.pixelId) return;
+    const ville = String(form.ville || '').trim();
+    const [prenom, ...reste] = String(form.nom || '').trim().split(/\s+/).filter(Boolean);
+    const aQuelqueChose = email.includes('@') || ville || prenom;
+    if (!aQuelqueChose || !reglages?.pixel?.enabled || !reglages?.pixel?.pixelId) return;
     emailEnvoyeCapi.current = true;
-    sha256(email).then(em => envoyerCAPI(reglages.pixel.pixelId, [{
+    Promise.all([
+      email.includes('@') ? sha256(email) : null,
+      ville ? sha256(ville.toLowerCase()) : null,
+      prenom ? sha256(prenom.toLowerCase()) : null,
+      reste.length ? sha256(reste.join(' ').toLowerCase()) : null,
+    ]).then(([em, ct, fn, ln]) => envoyerCAPI(reglages.pixel.pixelId, [{
       event_name: 'InitiateCheckout', event_time: Math.floor(Date.now() / 1000),
-      event_id: idEvenement('checkout-email'), action_source: 'website', event_source_url: window.location.href,
-      user_data: { em: [em], ...cookiesFbPourMeta() },
+      event_id: idEvenement('checkout-infos'), action_source: 'website', event_source_url: window.location.href,
+      user_data: {
+        ...(em ? { em: [em] } : {}), ...(ct ? { ct: [ct] } : {}),
+        ...(fn ? { fn: [fn] } : {}), ...(ln ? { ln: [ln] } : {}),
+        ...cookiesFbPourMeta(),
+      },
       custom_data: { value: t.total, currency: 'MAD', num_items: t.articles },
     }], reglages.pixel.testCode)).catch(() => { emailEnvoyeCapi.current = false; });
   }
@@ -301,12 +317,13 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('nomComplet')} <span className="text-red-500">*</span></label>
-              <input value={form.nom} onChange={e => u('nom', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('nom')}`} />
+              <input value={form.nom} onChange={e => u('nom', e.target.value)} onBlur={noterInfosInitiateCheckout}
+                dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('nom')}`} />
             </div>
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('telephone')} <span className="text-red-500">*</span></label>
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
-                onBlur={() => { noterPanierAbandonne(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
+                onBlur={() => { noterPanierAbandonne(); noterInfosInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
                 inputMode="tel" placeholder="06 12 34 56 78" dir="ltr" className={`${champ} text-left ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
                 <p className={`mt-1 text-[11px] text-red-500 ${alignTexte}`}>{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
@@ -316,7 +333,8 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('ville')} <span className="text-red-500">*</span></label>
-              <input value={form.ville} onChange={e => u('ville', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('ville')}`} />
+              <input value={form.ville} onChange={e => u('ville', e.target.value)} onBlur={noterInfosInitiateCheckout}
+                dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('ville')}`} />
             </div>
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('adresse')} <span className="text-red-500">*</span></label>
@@ -326,7 +344,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           <div>
             <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('emailOptionnel')}</label>
             <input type="email" value={form.email} onChange={e => u('email', e.target.value)}
-              onBlur={() => { noterEmailInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
+              onBlur={() => { noterInfosInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
               placeholder="exemple@email.com" dir="ltr" className={`${champ} text-left`} />
           </div>
 
