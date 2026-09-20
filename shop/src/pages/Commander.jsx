@@ -206,10 +206,17 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     const r = await envoyerCommande(form, lignes, t.total, promo ? code : undefined, geoGPS.current);
     setEnvoi(false);
     if (!r.ok) { setErreur(r.error || 'Envoi impossible. Réessayez.'); return; }
-    /* Un même identifiant des deux côtés : le pixel du navigateur (rapide, mais
-       bloqué par les bloqueurs de pub) et le relais serveur (toujours reçu)
-       envoient le MÊME achat, et Meta déduplique au lieu de le compter deux fois. */
-    const eventID = idEvenement(r.id);
+    /* Identifiant STABLE (pas idEvenement, qui est aléatoire) : `useMetaCapi`
+       (admin, voir src/hooks/useMetaCapi.js) renvoie un second évènement
+       "Purchase" à Meta plus tard, quand la commande passe "Livré" — avec le
+       même identifiant `${id}:Purchase`. Sans cette correspondance EXACTE,
+       Meta comptait CHAQUE commande passée ici (paiement à la livraison, pas
+       encore garanti) puis, à la livraison confirmée, l'admin renvoyait un
+       second "Achat" avec un identifiant différent — doublant le nombre
+       d'achats réellement compté (et donc son coût par achat) alors qu'une
+       seule vente a eu lieu. Avec le même identifiant des deux côtés (et
+       navigateur+serveur ici), Meta déduplique les trois en un seul achat. */
+    const eventID = `${r.id}:Purchase`;
     // Réinjecte e-mail/téléphone dans le pixel navigateur (haché par le pixel
     // lui-même, jamais transmis en clair) juste avant l'évènement Purchase :
     // sans ça, le pixel n'associait cet achat à AUCUNE identité, seulement le
