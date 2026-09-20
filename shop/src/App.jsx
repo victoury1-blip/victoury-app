@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
 import WhatsAppBulle from './components/WhatsAppBulle';
+import ExitIntentModal from './components/ExitIntentModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEFAUT, GA4_DEFAUT } from './lib/catalogDefaults';
 
@@ -105,6 +106,7 @@ function Vitrine() {
   const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
+  const [exitIntentOuvert, setExitIntentOuvert] = useState(false);
   // Sur une première visite (jamais de cache local — exactement le cas d'un
   // clic sur une pub), collections ET reglages démarrent vides : les
   // colonnes "Collections"/"Mentions légales" du pied de page n'existaient
@@ -137,6 +139,38 @@ function Vitrine() {
       }).catch(() => {});
       Promise.all([c1, c2]).then(() => setPretFooter(true));
     });
+  }, []);
+
+  // Popup "avant de partir" — n'intercepte QUE le bouton/geste retour du
+  // téléphone ou du navigateur (le "X" propre au navigateur intégré
+  // Instagram/TikTok appartient à leur application, aucun site ne peut
+  // l'intercepter). Une entrée d'historique "sentinelle" est ajoutée une
+  // seule fois par visite (après un court délai, pour ne jamais capter le
+  // tout premier retour d'une navigation normale entre deux pages) : le
+  // "retour" suivant la consomme sans changer de page, ce qui donne
+  // l'occasion d'afficher le popup au lieu de quitter directement — une
+  // seule fois par visite (sessionStorage), pour ne jamais devenir un piège
+  // qui empêche vraiment de repartir.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const CLE = 'victoury_exit_intent_vu';
+    let armee = false;
+    try { if (sessionStorage.getItem(CLE)) return; } catch { return; }
+    const delai = setTimeout(() => {
+      window.history.pushState({ sentinelleSortie: true }, '', window.location.href);
+      armee = true;
+    }, 4000);
+    const surRetour = () => {
+      if (!armee) return;
+      try {
+        if (sessionStorage.getItem(CLE)) return;
+        sessionStorage.setItem(CLE, '1');
+      } catch { /* navigation privée : tant pis, une seule tentative suffit */ }
+      window.history.pushState({ sentinelleSortie: true }, '', window.location.href);
+      setExitIntentOuvert(true);
+    };
+    window.addEventListener('popstate', surRetour);
+    return () => { clearTimeout(delai); window.removeEventListener('popstate', surRetour); };
   }, []);
 
   // Le preconnect vers Supabase est maintenant dans index.html (voir
@@ -313,6 +347,8 @@ function Vitrine() {
         onFermer={fermerPanier} onQuantite={onQuantite} onRetirer={onRetirer}
       />
       <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} />
+      <ExitIntentModal ouvert={exitIntentOuvert} onFermer={() => setExitIntentOuvert(false)}
+        numero={reglages.theme?.footer?.contacts?.whatsapp} />
     </div>
     </LangProvider>
   );
