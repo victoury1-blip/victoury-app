@@ -58,6 +58,16 @@ export default function useMetaCapi(orders) {
     const pending = orders.filter(o => {
       const spec = eventForStatus(o?.status);
       if (!spec) return false;
+      // `recipient.source` n'existe QUE sur une commande passée depuis la
+      // boutique (voir shop/api/commande.js — toujours rempli, au pire
+      // "Direct") : une commande créée à la main dans l'administration
+      // (client au téléphone, sur place...) n'a jamais transité par le site
+      // ni par sa publicité, et n'a donc RIEN à voir avec Meta. Sans ce
+      // filtre, marquer une telle commande "Livré" faisait quand même
+      // remonter un "Achat" à Meta — gonflant le nombre de ventes attribuées
+      // à la pub (et donc son coût par achat affiché) avec des ventes qui ne
+      // lui doivent rien.
+      if (!o?.recipient?.source) return false;
       if (sentRef.current.has(eventId(o, spec.name))) return false;
       const t = orderTimestamp(o);
       return Number.isFinite(t) && now - t <= MAX_AGE_MS;
