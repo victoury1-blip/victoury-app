@@ -8,7 +8,7 @@ import { useLang } from '../lib/i18n';
    pour tout le catalogue, pas une promo à personnaliser produit par
    produit. */
 export default function GarantiesGrid() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const items = [
     { Icone: Truck, titre: t('garantiesLivraisonTitre'), texte: t('garantiesLivraisonTexte') },
     { Icone: Banknote, titre: t('garantiesPaiementTitre'), texte: t('garantiesPaiementTexte') },
@@ -19,7 +19,8 @@ export default function GarantiesGrid() {
   return (
     <div className="mt-4 grid grid-cols-2 gap-2.5">
       {items.map(({ Icone, titre, texte }, i) => (
-        <div key={i} className="border border-gray-200 rounded-xl p-3 flex flex-col gap-1.5">
+        <div key={i} dir={lang === 'ar' ? 'rtl' : 'ltr'}
+          className={`border border-gray-200 rounded-xl p-3 flex flex-col gap-1.5 ${lang === 'ar' ? 'items-end text-right' : 'items-start text-left'}`}>
           <div className="w-8 h-8 rounded-full bg-orange-50 grid place-items-center">
             <Icone size={16} className="text-orange-500" />
           </div>
