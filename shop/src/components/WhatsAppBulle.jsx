@@ -25,7 +25,7 @@ export default function WhatsAppBulle({ numero, icone }) {
           qu'avant, comme demandé. */}
       <span dir={ar ? 'rtl' : 'ltr'}
         className="bg-white text-[#25D366] text-xs font-semibold whitespace-nowrap px-3 py-1.5 rounded-full shadow-md border border-[#25D366]/20">
-        {ar ? 'تواصل معانا' : 'Contactez-nous'}
+        {ar ? 'تواصل معنا' : 'Contactez-nous'}
       </span>
       <span className="w-14 h-14 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-full shadow-lg ring-2 ring-white transition-all overflow-hidden">
         {icone ? <img src={icone} alt="" className="w-full h-full object-cover" /> : <IconeWhatsApp size={28} />}
