@@ -8,8 +8,11 @@ import { trackPixel, trackTikTok, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikT
 import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
 import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
+import GarantiesGrid from '../components/GarantiesGrid';
 import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
+import { IconeWhatsApp } from '../components/icons';
+import { numeroWhatsApp } from '../lib/commande';
 
 function Accordeon({ titre, children }) {
   const [ouvert, setOuvert] = useState(false);
@@ -341,20 +344,37 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             occasion de partir sans jamais commander. L'ancien bouton
             "Ajouter au panier" (sans passer commande tout de suite) a été
             retiré : un seul bouton, un seul geste. */}
-        <button
-          disabled={!taille}
-          onClick={() => {
-            onAjouter({
-              slug: produit.slug, name: produit.name, price: produit.price,
-              size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
-              stock: stockTaille, collectionId: produit.collection_id,
-            });
-            onAchatRapide?.();
-          }}
-          className="mt-7 w-full bg-green-600 hover:bg-green-700 text-white py-4 text-xs tracking-widest uppercase
-                     disabled:bg-gray-200 disabled:text-gray-400 transition-colors shadow-lg shadow-green-600/30">
-          {taille ? t('acheterMaintenant') : t('choisirTaille')}
-        </button>
+        <div className="mt-7 flex gap-2.5">
+          <button
+            disabled={!taille}
+            onClick={() => {
+              onAjouter({
+                slug: produit.slug, name: produit.name, price: produit.price,
+                size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
+                stock: stockTaille, collectionId: produit.collection_id,
+              });
+              onAchatRapide?.();
+            }}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 text-xs tracking-widest uppercase
+                       disabled:bg-gray-200 disabled:text-gray-400 transition-colors shadow-lg shadow-green-600/30">
+            {taille ? t('acheterMaintenant') : t('choisirTaille')}
+          </button>
+          {/* Le doute qui bloque un achat ("elle va vraiment aller avec quoi ?",
+              "le délai c'est combien ?") se règle en une question — sans ce
+              bouton juste à côté du geste d'achat, il faudrait déjà avoir
+              repéré la bulle flottante en bas d'écran, un pas de plus qu'un
+              client hésitant ne fait pas toujours. */}
+          {numeroWhatsApp(theme?.footer?.contacts?.whatsapp) && (
+            <a href={`https://wa.me/${numeroWhatsApp(theme.footer.contacts.whatsapp)}?text=${encodeURIComponent(
+                (ar ? 'السلام، عندي سؤال على ' : "Bonjour, j'ai une question sur ") + produit.name)}`}
+              target="_blank" rel="noreferrer"
+              className="shrink-0 w-14 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded transition-all">
+              <IconeWhatsApp size={22} />
+            </a>
+          )}
+        </div>
+
+        <GarantiesGrid />
 
         {/* Suggestion "achetés ensemble" : un seul autre article de la même
             collection, pas une liste — l'objectif est un ajout rapide, pas

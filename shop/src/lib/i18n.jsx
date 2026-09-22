@@ -38,6 +38,10 @@ const DICT = {
     achetezEnsemble: 'Souvent achetés ensemble', ajouterLaSelection: 'Obtenez les 2 articles',
     pourSeulement: 'pour', seulement: 'seulement', auLieuDe: 'au lieu de',
     guideTailles: 'Guide des tailles',
+    garantiesLivraisonTitre: 'Livraison 24-72h', garantiesLivraisonTexte: 'Partout au Maroc',
+    garantiesPaiementTitre: 'Paiement à la livraison', garantiesPaiementTexte: 'Aucun acompte',
+    garantiesGarantieTitre: 'Garantie', garantiesGarantieTexte: 'Selon produit',
+    garantiesRetourTitre: 'Retour gratuit', garantiesRetourTexte: 'Sous 7 jours',
   },
   ar: {
     accueil: 'الرئيسية', voirCollection: 'مشاهدة المجموعة',
@@ -70,6 +74,10 @@ const DICT = {
     achetezEnsemble: 'غالبًا ما يُشترى مع', ajouterLaSelection: 'احصل على القطعتين معًا',
     pourSeulement: 'ب', seulement: 'فقط', auLieuDe: 'عوض',
     guideTailles: 'دليل المقاسات',
+    garantiesLivraisonTitre: 'التوصيل 24-72 ساعة', garantiesLivraisonTexte: 'فجميع أنحاء المغرب',
+    garantiesPaiementTitre: 'الدفع عند الاستلام', garantiesPaiementTexte: 'بلا تسبيق',
+    garantiesGarantieTitre: 'ضمان', garantiesGarantieTexte: 'حسب المنتوج',
+    garantiesRetourTitre: 'إرجاع مجاني', garantiesRetourTexte: 'خلال 7 أيام',
   },
 };
 
