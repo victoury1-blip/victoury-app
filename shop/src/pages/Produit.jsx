@@ -334,40 +334,27 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           </div>
         </div>
 
+        {/* Achat direct uniquement : ajoute au panier puis ouvre tout de
+            suite le formulaire de commande, sans passer par le tiroir du
+            panier — un visiteur venu d'une pub pour UN seul article n'a
+            rien à décider de plus, chaque clic/étape en trop est une
+            occasion de partir sans jamais commander. L'ancien bouton
+            "Ajouter au panier" (sans passer commande tout de suite) a été
+            retiré : un seul bouton, un seul geste. */}
         <button
           disabled={!taille}
-          onClick={() => onAjouter({
-            slug: produit.slug, name: produit.name, price: produit.price,
-            size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
-            stock: stockTaille, collectionId: produit.collection_id,
-          })}
+          onClick={() => {
+            onAjouter({
+              slug: produit.slug, name: produit.name, price: produit.price,
+              size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
+              stock: stockTaille, collectionId: produit.collection_id,
+            });
+            onAchatRapide?.();
+          }}
           className="mt-7 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase
                      disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
-          {taille ? t('ajouterPanier') : t('choisirTaille')}
+          {taille ? t('acheterMaintenant') : t('choisirTaille')}
         </button>
-
-        {/* Achat direct : ajoute au panier puis envoie tout de suite à la
-            page de commande, sans passer par le tiroir du panier — un
-            visiteur venu d'une pub pour UN seul article n'a rien à décider
-            de plus, chaque clic/étape en trop est une occasion de partir
-            sans jamais commander. Le panier normal ("ajouterPanier"
-            ci-dessus) reste inchangé pour qui veut ajouter plusieurs
-            articles avant de passer commande. */}
-        {taille && (
-          <button
-            onClick={() => {
-              onAjouter({
-                slug: produit.slug, name: produit.name, price: produit.price,
-                size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
-                stock: stockTaille, collectionId: produit.collection_id,
-              });
-              onAchatRapide?.();
-            }}
-            className="mt-2.5 w-full border border-ink text-ink py-4 text-xs tracking-widest uppercase
-                       hover:bg-ink hover:text-white transition-colors">
-            {t('acheterMaintenant')}
-          </button>
-        )}
 
         {/* Suggestion "achetés ensemble" : un seul autre article de la même
             collection, pas une liste — l'objectif est un ajout rapide, pas
