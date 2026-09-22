@@ -449,8 +449,12 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
 
           {erreur && <p className="mt-4 text-xs text-red-600 bg-red-50 p-3">{erreur}</p>}
 
+          {/* Vert vif plutôt que le noir de marque (bg-ink) : c'est le
+              dernier geste avant l'achat, il doit sauter aux yeux au milieu
+              d'un formulaire par ailleurs sobre — pas se fondre avec le
+              reste des boutons noirs de la page. */}
           <button onClick={valider} disabled={envoi}
-            className="mt-5 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60">
+            className="mt-5 w-full bg-green-600 hover:bg-green-700 text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60 transition-colors shadow-lg shadow-green-600/30">
             {envoi ? tr('envoiEnCours') : tr('validerCommande')}
           </button>
 
