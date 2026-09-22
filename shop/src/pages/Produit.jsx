@@ -368,8 +368,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             <a href={`https://wa.me/${numeroWhatsApp(theme.footer.contacts.whatsapp)}?text=${encodeURIComponent(
                 (ar ? 'السلام، عندي سؤال على ' : "Bonjour, j'ai une question sur ") + produit.name)}`}
               target="_blank" rel="noreferrer"
-              className="shrink-0 w-14 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded transition-all">
-              <IconeWhatsApp size={22} />
+              className="shrink-0 w-16 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-lg shadow-lg shadow-green-600/20 transition-all">
+              <IconeWhatsApp size={26} />
             </a>
           )}
         </div>
