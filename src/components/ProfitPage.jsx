@@ -49,6 +49,12 @@ export default function ProfitPage({ orders = [], setOrders }) {
   const [applied,  setApplied]  = useState({ dateFrom: firstDay, dateTo: lastDay });
   const [activePreset, setActivePreset] = useState('mois');
   const [showCost, setShowCost] = useState(false);
+  // Commandes à 2+ produits repliées par défaut dans le détail du Coût
+  // d'Achat : une ligne par COMMANDE (montant total), pas une ligne par
+  // produit — pour voir d'un coup d'œil s'il faut corriger le prix d'achat
+  // une fois, deux fois ou trois fois. Ouvrir une commande donne accès au
+  // détail produit par produit, éditable comme avant.
+  const [colisOuverts, setColisOuverts] = useState(() => new Set());
   // Prix d'achat MANUELS par nom de produit (override, saisis depuis le détail Coût d'Achat).
   const [manualCost, setManualCost] = useState(() => {
     try { return JSON.parse(localStorage.getItem('victoury_product_cost') || '{}'); } catch { return {}; }
@@ -885,40 +891,99 @@ export default function ProfitPage({ orders = [], setOrders }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {livresColis.flatMap((c) => getProductCostDetail(c).map((it, j) => (
-                    <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.echange ? 'bg-amber-50/50' : it.unitCost === 0 ? 'bg-red-50/60' : it.manual ? 'bg-blue-50/40' : ''}`}>
-                      <td className="px-2 py-2 font-mono font-bold text-blue-600">{j === 0 ? c.orderId : ''}</td>
-                      <td className="px-2 py-2 text-gray-700">{it.name}</td>
-                      <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
-                      <td className="px-2 py-2 text-right font-semibold text-gray-800">{j === 0 ? `${fmt(c.prix)}` : ''}</td>
-                      <td className="px-2 py-2 text-right">
-                        <input
-                          type="number" min="0" step="0.01"
-                          defaultValue={it.unitCost || ''}
-                          onBlur={(e) => setProductCost(it.name, e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                          placeholder="0.00"
-                          className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        />
-                      </td>
-                      {/* Modifiable : c'est la quantité, et non le prix unitaire,
-                          qu'il faut corriger quand le coût d'une commande ne
-                          tombe pas juste. */}
-                      <td className="px-2 py-2 text-center">
-                        {setOrders && !it.echange ? (
-                          <input
-                            type="number" min="1" step="1"
-                            defaultValue={it.qty}
-                            onBlur={(e) => setProductQty(c.orderId, it.index, e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                            title="Nombre de pièces sur cette commande"
-                            className="w-14 border border-gray-200 rounded px-1.5 py-1 text-center text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
-                          />
-                        ) : it.qty}
-                      </td>
-                      <td className="px-2 py-2 text-right font-semibold text-red-600">{fmt(it.cost)}</td>
-                    </tr>
-                  )))}
+                  {livresColis.flatMap((c) => {
+                    const items = getProductCostDetail(c);
+                    // Une seule ligne de produit : rien à replier, comme avant.
+                    if (items.length <= 1) {
+                      return items.map((it, j) => (
+                        <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.echange ? 'bg-amber-50/50' : it.unitCost === 0 ? 'bg-red-50/60' : it.manual ? 'bg-blue-50/40' : ''}`}>
+                          <td className="px-2 py-2 font-mono font-bold text-blue-600">{c.orderId}</td>
+                          <td className="px-2 py-2 text-gray-700">{it.name}</td>
+                          <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
+                          <td className="px-2 py-2 text-right font-semibold text-gray-800">{fmt(c.prix)}</td>
+                          <td className="px-2 py-2 text-right">
+                            <input
+                              type="number" min="0" step="0.01"
+                              defaultValue={it.unitCost || ''}
+                              onBlur={(e) => setProductCost(it.name, e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                              placeholder="0.00"
+                              className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            {setOrders && !it.echange ? (
+                              <input
+                                type="number" min="1" step="1"
+                                defaultValue={it.qty}
+                                onBlur={(e) => setProductQty(c.orderId, it.index, e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                title="Nombre de pièces sur cette commande"
+                                className="w-14 border border-gray-200 rounded px-1.5 py-1 text-center text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+                              />
+                            ) : it.qty}
+                          </td>
+                          <td className="px-2 py-2 text-right font-semibold text-red-600">{fmt(it.cost)}</td>
+                        </tr>
+                      ));
+                    }
+
+                    // Plusieurs produits sur la même commande : une ligne RÉSUMÉ
+                    // (total, repliée par défaut) plutôt qu'une ligne par produit —
+                    // pour voir d'un coup d'œil s'il faut corriger le prix d'achat
+                    // une seule fois ou plusieurs. "Voir le détail" ouvre les
+                    // lignes éditables, une par produit, comme avant.
+                    const ouvert = colisOuverts.has(c.orderId);
+                    const totalCout = items.reduce((s, it) => s + it.cost, 0);
+                    const totalQty = items.reduce((s, it) => s + it.qty, 0);
+                    const rows = [
+                      <tr key={c.orderId} className={`border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${items.some(it => it.unitCost === 0 && !it.echange) ? 'bg-red-50/60' : 'bg-gray-50/40'}`}
+                        onClick={() => setColisOuverts(prev => { const n = new Set(prev); n.has(c.orderId) ? n.delete(c.orderId) : n.add(c.orderId); return n; })}>
+                        <td className="px-2 py-2 font-mono font-bold text-blue-600">{c.orderId}</td>
+                        <td className="px-2 py-2 text-gray-700" colSpan={2}>
+                          <span className="inline-block w-3">{ouvert ? '▾' : '▸'}</span> {items.length} produits — {items.map(it => it.name).join(' + ')}
+                        </td>
+                        <td className="px-2 py-2 text-right font-semibold text-gray-800">{fmt(c.prix)}</td>
+                        <td className="px-2 py-2 text-right text-gray-400 italic">{ouvert ? '' : 'voir détail'}</td>
+                        <td className="px-2 py-2 text-center font-semibold">{totalQty}</td>
+                        <td className="px-2 py-2 text-right font-semibold text-red-600">{fmt(totalCout)}</td>
+                      </tr>,
+                    ];
+                    if (ouvert) {
+                      items.forEach((it, j) => rows.push(
+                        <tr key={`${c.orderId}-${j}`} className={`border-b border-gray-50 ${it.echange ? 'bg-amber-50/50' : it.unitCost === 0 ? 'bg-red-50/60' : it.manual ? 'bg-blue-50/40' : ''}`}>
+                          <td className="px-2 py-2"></td>
+                          <td className="px-2 py-2 text-gray-700 ps-4">↳ {it.name}</td>
+                          <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
+                          <td className="px-2 py-2"></td>
+                          <td className="px-2 py-2 text-right">
+                            <input
+                              type="number" min="0" step="0.01"
+                              defaultValue={it.unitCost || ''}
+                              onBlur={(e) => setProductCost(it.name, e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                              placeholder="0.00"
+                              className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            {setOrders && !it.echange ? (
+                              <input
+                                type="number" min="1" step="1"
+                                defaultValue={it.qty}
+                                onBlur={(e) => setProductQty(c.orderId, it.index, e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                title="Nombre de pièces sur cette commande"
+                                className="w-14 border border-gray-200 rounded px-1.5 py-1 text-center text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+                              />
+                            ) : it.qty}
+                          </td>
+                          <td className="px-2 py-2 text-right font-semibold text-red-600">{fmt(it.cost)}</td>
+                        </tr>
+                      ));
+                    }
+                    return rows;
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-50 font-bold">
