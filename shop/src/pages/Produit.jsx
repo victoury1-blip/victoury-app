@@ -351,8 +351,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             });
             onAchatRapide?.();
           }}
-          className="mt-7 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase
-                     disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+          className="mt-7 w-full bg-green-600 hover:bg-green-700 text-white py-4 text-xs tracking-widest uppercase
+                     disabled:bg-gray-200 disabled:text-gray-400 transition-colors shadow-lg shadow-green-600/30">
           {taille ? t('acheterMaintenant') : t('choisirTaille')}
         </button>
 
