@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck, User, MapPin, Phone } from 'lucide-react';
+import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
@@ -325,20 +325,14 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('nomComplet')} <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <input value={form.nom} onChange={e => u('nom', e.target.value)} onBlur={noterInfosInitiateCheckout}
-                  dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('nom')} ${ar ? 'ps-10' : 'pe-10'}`} />
-                <User size={16} className={`absolute inset-y-0 my-auto text-gray-400 pointer-events-none ${ar ? 'start-3' : 'end-3'}`} />
-              </div>
+              <input value={form.nom} onChange={e => u('nom', e.target.value)} onBlur={noterInfosInitiateCheckout}
+                dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('nom')}`} />
             </div>
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('telephone')} <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
-                  onBlur={() => { noterPanierAbandonne(); noterInfosInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
-                  inputMode="tel" placeholder="06 12 34 56 78" dir="ltr" className={`${champ} text-left pe-10 ${enErreur('telephone')}`} />
-                <Phone size={16} className="absolute inset-y-0 my-auto text-gray-400 pointer-events-none end-3" />
-              </div>
+              <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
+                onBlur={() => { noterPanierAbandonne(); noterInfosInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
+                inputMode="tel" placeholder="06 12 34 56 78" dir="ltr" className={`${champ} text-left ${enErreur('telephone')}`} />
               {manque.includes('telephone') && (
                 <p className={`mt-1 text-[11px] text-red-500 ${alignTexte}`}>{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
               )}
@@ -347,19 +341,12 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('ville')} <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <input value={form.ville} onChange={e => u('ville', e.target.value)} onBlur={noterInfosInitiateCheckout}
-                  dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('ville')} ${ar ? 'ps-10' : 'pe-10'}`} />
-                <MapPin size={16} className={`absolute inset-y-0 my-auto text-gray-400 pointer-events-none ${ar ? 'start-3' : 'end-3'}`} />
-              </div>
+              <input value={form.ville} onChange={e => u('ville', e.target.value)} onBlur={noterInfosInitiateCheckout}
+                dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('ville')}`} />
             </div>
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('adresse')} <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <input value={form.adresse} onChange={e => u('adresse', e.target.value)} dir={dirTexte}
-                  className={`${champ} ${alignTexte} ${enErreur('adresse')} ${ar ? 'ps-10' : 'pe-10'}`} />
-                <MapPin size={16} className={`absolute inset-y-0 my-auto text-gray-400 pointer-events-none ${ar ? 'start-3' : 'end-3'}`} />
-              </div>
+              <input value={form.adresse} onChange={e => u('adresse', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('adresse')}`} />
             </div>
           </div>
           <div>
