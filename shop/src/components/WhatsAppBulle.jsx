@@ -20,11 +20,15 @@ export default function WhatsAppBulle({ numero }) {
 
   return (
     <a href={href} target="_blank" rel="noreferrer"
-      className="fixed bottom-5 right-5 z-30 flex items-center gap-2 bg-[#25D366] text-white rounded-full shadow-lg
-                 px-4 py-3 hover:brightness-95 transition-all animate-bounce">
-      <IconeWhatsApp size={20} />
-      <span dir={ar ? 'rtl' : 'ltr'} className="text-sm font-medium whitespace-nowrap">
+      className="fixed bottom-5 right-5 z-30 flex flex-col items-center gap-1.5">
+      {/* Étiquette au-dessus, séparée de la bulle — pas dans la même pilule
+          qu'avant, comme demandé. */}
+      <span dir={ar ? 'rtl' : 'ltr'}
+        className="bg-white text-[#25D366] text-xs font-semibold whitespace-nowrap px-3 py-1.5 rounded-full shadow-md border border-[#25D366]/20">
         {ar ? 'تواصل معانا' : 'Contactez-nous'}
+      </span>
+      <span className="w-14 h-14 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-full shadow-lg transition-all animate-bounce">
+        <IconeWhatsApp size={26} />
       </span>
     </a>
   );
