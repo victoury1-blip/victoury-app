@@ -411,7 +411,12 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             ))}
           </div>
 
-          <div className="mt-6 pt-4 border-t border-gray-200 space-y-2 text-sm">
+          {/* dir={dirTexte} ici : la ligne "libellé — montant" doit se lire
+              dans le même sens que la langue (libellé côté départ de
+              lecture, montant côté fin) — en arabe, le libellé à droite et
+              le montant à gauche, l'inverse de ce qu'un simple
+              "justify-between" (toujours LTR) donnait. */}
+          <div dir={dirTexte} className="mt-6 pt-4 border-t border-gray-200 space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">{tr('sousTotal')}</span><span>{fmtPrix(t.sousTotal, lang)}</span></div>
             {t.remiseQuantite > 0 && (
               <div className="flex justify-between text-green-700"><span>{tr('remise')}</span><span>−{fmtPrix(t.remiseQuantite, lang)}</span></div>
