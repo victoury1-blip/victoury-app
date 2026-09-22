@@ -11,6 +11,18 @@ export function IconeWhatsApp({ size = 16, ...props }) {
   );
 }
 
+/* Logo WhatsApp complet (bulle avec la petite pointe en bas à gauche +
+   silhouette du combiné) — celui affiché tel quel, sans cercle englobant
+   dessiné à côté, pour ressembler exactement au logo officiel (voir la
+   bulle flottante WhatsAppBulle). */
+export function IconeWhatsAppLogo({ size = 24, ...props }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size} {...props}>
+      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929h.003c3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.767-5.771Zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.199.534 1.286.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.087.274.072.376-.043.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087.159.058 1.011.477 1.185.564.173.087.289.13.332.202.043.072.043.419-.101.824ZM12 2C6.477 2 2 6.477 2 12c0 1.849.505 3.578 1.383 5.06L2 22l5.11-1.34A9.958 9.958 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2Z" />
+    </svg>
+  );
+}
+
 export function IconeTikTok({ size = 16, ...props }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size} {...props}>
