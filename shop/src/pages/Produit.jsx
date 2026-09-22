@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
@@ -26,11 +26,10 @@ function Accordeon({ titre, children }) {
   );
 }
 
-export default function Produit({ onAjouter, theme, remises, tiktok }) {
+export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapide }) {
   const { t, remisePalier, lang } = useLang();
   const ar = lang === 'ar';
   const { slug } = useParams();
-  const navigate = useNavigate();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
   const [taille, setTaille] = useState('');
@@ -362,7 +361,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok }) {
                 size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
                 stock: stockTaille, collectionId: produit.collection_id,
               });
-              navigate('/commander');
+              onAchatRapide?.();
             }}
             className="mt-2.5 w-full border border-ink text-ink py-4 text-xs tracking-widest uppercase
                        hover:bg-ink hover:text-white transition-colors">

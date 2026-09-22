@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { X } from 'lucide-react';
 import AnnonceBar from './components/AnnonceBar';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -106,6 +107,17 @@ function Vitrine() {
   const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);
   const [panierOuvert, setPanierOuvert] = useState(false);
+  // "Acheter maintenant" (Produit.jsx) : le même Commander, dans une fenêtre
+  // par-dessus la fiche produit plutôt qu'une navigation vers /commander —
+  // le client reste sur la même page, rien à recharger, le clic depuis une
+  // pub ne perd jamais son contexte. La validation d'une commande, elle,
+  // navigue quand même vers /merci/:id (dans Commander.jsx) : cette
+  // confirmation-là mérite sa propre page.
+  const [achatRapideOuvert, setAchatRapideOuvert] = useState(false);
+  // Commander navigue vers /merci/:id tout seul une fois la commande validée
+  // (voir Commander.jsx) — sans ça, la fenêtre resterait ouverte par-dessus
+  // la page de confirmation au lieu de la laisser s'afficher.
+  useEffect(() => { if (pathname.startsWith('/merci/')) setAchatRapideOuvert(false); }, [pathname]);
   const [exitIntentOuvert, setExitIntentOuvert] = useState(false);
   // Sur une première visite (jamais de cache local — exactement le cas d'un
   // clic sur une pub), collections ET reglages démarrent vides : les
@@ -327,8 +339,8 @@ function Vitrine() {
                 une annonce en cours pointe dessus, et la changer l'arrêterait. */}
             <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
-            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} />} />
-            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} />} />
+            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} />} />
+            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} />} />
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
             <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/merci/:id" element={<Merci />} />
@@ -346,6 +358,22 @@ function Vitrine() {
         livraison={reglages.livraison} seuilGratuit={reglages.seuilGratuit}
         onFermer={fermerPanier} onQuantite={onQuantite} onRetirer={onRetirer}
       />
+
+      {achatRapideOuvert && (
+        <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setAchatRapideOuvert(false)}>
+          <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-2xl sm:h-fit sm:max-h-[90vh]
+                          bg-white rounded-t-2xl sm:rounded-2xl overflow-y-auto max-h-[92vh]"
+            onClick={e => e.stopPropagation()}>
+            <button type="button" onClick={() => setAchatRapideOuvert(false)} aria-label="Fermer"
+              className="sticky top-3 float-left ms-3 z-10 w-9 h-9 rounded-full bg-white shadow border border-gray-100 grid place-items-center text-ink">
+              <X size={18} />
+            </button>
+            <Suspense fallback={<div className="p-10 text-center text-sm text-gray-400">…</div>}>
+              <Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />
+            </Suspense>
+          </div>
+        </div>
+      )}
       <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} />
       <ExitIntentModal ouvert={exitIntentOuvert} onFermer={() => setExitIntentOuvert(false)}
         numero={reglages.theme?.footer?.contacts?.whatsapp} />
