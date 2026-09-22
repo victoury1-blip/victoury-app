@@ -451,9 +451,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
 
           <button onClick={valider} disabled={envoi}
             className="mt-5 w-full bg-ink text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60">
-            {envoi
-              ? tr('envoiEnCours')
-              : <>{tr('validerCommande')} — <span className="text-green-400 font-bold">{fmtPrix(t.total, lang)}</span></>}
+            {envoi ? tr('envoiEnCours') : tr('validerCommande')}
           </button>
 
           {/* Rappel des garanties juste sous le bouton : c'est LA seconde

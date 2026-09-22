@@ -55,7 +55,7 @@ const DICT = {
     coordonnees: 'يرجى إدخال معلومات التوصيل الخاصة بك',
     nomComplet: 'الاسم الكامل', telephone: 'الهاتف', ville: 'المدينة', adresse: 'العنوان',
     emailOptionnel: 'البريد الإلكتروني (اختياري)',
-    codePromo: 'رمز الخصم', appliquer: 'تطبيق', validerCommande: 'تأكيد الطلب',
+    codePromo: 'رمز الخصم', appliquer: 'تطبيق', validerCommande: 'اضغط لتأكيد الطلب',
     envoiEnCours: 'جارٍ الإرسال…', retourBoutique: 'العودة إلى المتجر',
     suivezNous: 'تابعونا', contact: 'تواصل معنا', collections: 'المجموعات',
     mentionsLegales: 'الشروط والأحكام', rechercher: 'بحث',
