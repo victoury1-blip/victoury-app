@@ -6,6 +6,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import TiroirPanier from './components/TiroirPanier';
 import WhatsAppBulle from './components/WhatsAppBulle';
+import BulleCustom from './components/BulleCustom';
 import ExitIntentModal from './components/ExitIntentModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEFAUT, GA4_DEFAUT } from './lib/catalogDefaults';
@@ -375,6 +376,7 @@ function Vitrine() {
         </div>
       )}
       <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} />
+      <BulleCustom icone={reglages.theme?.bulleCustom?.icone} lien={reglages.theme?.bulleCustom?.lien} />
       <ExitIntentModal ouvert={exitIntentOuvert} onFermer={() => setExitIntentOuvert(false)}
         numero={reglages.theme?.footer?.contacts?.whatsapp} />
     </div>

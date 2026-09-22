@@ -573,6 +573,20 @@ export default function EditTheme() {
             </div>
           </section>
 
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <h2 className="text-sm font-medium">Bulle personnalisée</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Une icône flottante de plus, à côté de la bulle WhatsApp — mettez l'image et le lien que vous voulez (Instagram, une promo, une page…). Laissez l'image vide pour la masquer.</p>
+            <div className="mt-4 flex flex-wrap gap-4 items-start">
+              <DeposeImage titre="Icône" aide="Carrée, transparente de préférence" url={t.bulleCustom?.icone || ''}
+                onChange={v => u('bulleCustom', { ...t.bulleCustom, icone: v })} className="w-16 h-16 rounded-full" />
+              <div className="flex-1 min-w-[12rem]">
+                <label className={label}>Lien (où ça mène au clic)</label>
+                <input value={t.bulleCustom?.lien || ''} onChange={e => u('bulleCustom', { ...t.bulleCustom, lien: e.target.value })}
+                  placeholder="https://instagram.com/… ou /soldes" className={champ} />
+              </div>
+            </div>
+          </section>
+
           <ListeDeLiens titre="Collections" aide="Liens de collections affichés dans le footer — laissez vide pour reprendre automatiquement les collections du site"
             items={t.footer.collections} onChange={v => uFooter('collections', v)} placeholderUrl="/product-category/ensemble-sport/" />
           <ListeDeLiens titre="Réseaux sociaux" aide='Liens affichés dans la section "Suivez-nous"'
