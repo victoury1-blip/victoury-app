@@ -10,6 +10,7 @@ const DICT = {
   fr: {
     accueil: 'Accueil', voirCollection: 'Voir la collection',
     ajouterPanier: 'Ajouter au panier', choisirTaille: 'Choisissez une taille',
+    acheterMaintenant: 'Acheter maintenant',
     tailleLabel: 'Choisissez votre taille :', detailsProduit: 'Détails du produit',
     livraisonTitre: 'Livraison', livraisonTexte: 'Livraison partout au Maroc. Paiement à la livraison.',
     produitsSimilaires: 'Produits similaires', nosNouveautes: 'Nos nouveautés',
@@ -41,6 +42,7 @@ const DICT = {
   ar: {
     accueil: 'الرئيسية', voirCollection: 'مشاهدة المجموعة',
     ajouterPanier: 'أضف إلى السلة', choisirTaille: 'اختر مقاسًا',
+    acheterMaintenant: 'اشتري الآن',
     tailleLabel: 'اختر القياس المناسب لك:', detailsProduit: 'تفاصيل المنتج',
     livraisonTitre: 'التوصيل', livraisonTexte: 'التوصيل إلى جميع أنحاء المغرب. الدفع عند الاستلام.',
     produitsSimilaires: 'منتجات مشابهة', nosNouveautes: 'أحدث المنتجات',

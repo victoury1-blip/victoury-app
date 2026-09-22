@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
@@ -30,6 +30,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok }) {
   const { t, remisePalier, lang } = useLang();
   const ar = lang === 'ar';
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [produit, setProduit] = useState(null);
   const [couleurs, setCouleurs] = useState([]);
   const [taille, setTaille] = useState('');
@@ -345,6 +346,29 @@ export default function Produit({ onAjouter, theme, remises, tiktok }) {
                      disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
           {taille ? t('ajouterPanier') : t('choisirTaille')}
         </button>
+
+        {/* Achat direct : ajoute au panier puis envoie tout de suite à la
+            page de commande, sans passer par le tiroir du panier — un
+            visiteur venu d'une pub pour UN seul article n'a rien à décider
+            de plus, chaque clic/étape en trop est une occasion de partir
+            sans jamais commander. Le panier normal ("ajouterPanier"
+            ci-dessus) reste inchangé pour qui veut ajouter plusieurs
+            articles avant de passer commande. */}
+        {taille && (
+          <button
+            onClick={() => {
+              onAjouter({
+                slug: produit.slug, name: produit.name, price: produit.price,
+                size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
+                stock: stockTaille, collectionId: produit.collection_id,
+              });
+              navigate('/commander');
+            }}
+            className="mt-2.5 w-full border border-ink text-ink py-4 text-xs tracking-widest uppercase
+                       hover:bg-ink hover:text-white transition-colors">
+            {t('acheterMaintenant')}
+          </button>
+        )}
 
         {/* Suggestion "achetés ensemble" : un seul autre article de la même
             collection, pas une liste — l'objectif est un ajout rapide, pas
