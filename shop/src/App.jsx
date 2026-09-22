@@ -375,7 +375,7 @@ function Vitrine() {
           </div>
         </div>
       )}
-      <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} />
+      <WhatsAppBulle numero={reglages.theme?.footer?.contacts?.whatsapp} icone={reglages.theme?.footer?.contacts?.whatsappIcone} />
       <BulleCustom icone={reglages.theme?.bulleCustom?.icone} lien={reglages.theme?.bulleCustom?.lien} />
       <ExitIntentModal ouvert={exitIntentOuvert} onFermer={() => setExitIntentOuvert(false)}
         numero={reglages.theme?.footer?.contacts?.whatsapp} />

@@ -562,6 +562,11 @@ export default function EditTheme() {
             <div className="mt-4 grid sm:grid-cols-2 gap-4">
               <div><label className={label}>WhatsApp (numéro)</label>
                 <input value={t.footer.contacts?.whatsapp || ''} onChange={e => uFooter('contacts', { ...t.footer.contacts, whatsapp: e.target.value })} placeholder="0612345678" className={champ} /></div>
+              <div>
+                <label className={label}>Icône de la bulle WhatsApp</label>
+                <DeposeImage aide="Laissez vide pour garder l'icône par défaut" url={t.footer.contacts?.whatsappIcone || ''}
+                  onChange={v => uFooter('contacts', { ...t.footer.contacts, whatsappIcone: v })} className="w-14 h-14 rounded-full" />
+              </div>
               <div><label className={label}>Appel (numéro)</label>
                 <input value={t.footer.contacts?.appel || ''} onChange={e => uFooter('contacts', { ...t.footer.contacts, appel: e.target.value })} placeholder="0612345678" className={champ} /></div>
               <div><label className={label}>Instagram (lien)</label>

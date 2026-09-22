@@ -10,7 +10,7 @@ import { useLang } from '../lib/i18n';
    langue choisie (avant : toujours en arabe, même en français) — et un
    léger rebond continu attire l'œil vers elle plutôt que de compter sur le
    client pour la remarquer tout seul en bas de l'écran. */
-export default function WhatsAppBulle({ numero }) {
+export default function WhatsAppBulle({ numero, icone }) {
   const { lang } = useLang();
   const ar = lang === 'ar';
   const digits = numeroWhatsApp(numero);
@@ -27,8 +27,8 @@ export default function WhatsAppBulle({ numero }) {
         className="bg-white text-[#25D366] text-xs font-semibold whitespace-nowrap px-3 py-1.5 rounded-full shadow-md border border-[#25D366]/20">
         {ar ? 'تواصل معانا' : 'Contactez-nous'}
       </span>
-      <span className="w-11 h-11 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-full shadow-lg ring-2 ring-white transition-all">
-        <IconeWhatsApp size={22} />
+      <span className="w-11 h-11 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-full shadow-lg ring-2 ring-white transition-all overflow-hidden">
+        {icone ? <img src={icone} alt="" className="w-full h-full object-cover" /> : <IconeWhatsApp size={22} />}
       </span>
     </a>
   );
