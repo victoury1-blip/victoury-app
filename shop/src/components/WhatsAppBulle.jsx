@@ -1,5 +1,5 @@
 import React from 'react';
-import { IconeWhatsAppLogo } from './icons';
+import { IconeWhatsApp } from './icons';
 import { numeroWhatsApp } from '../lib/commande';
 import { useLang } from '../lib/i18n';
 
@@ -27,8 +27,8 @@ export default function WhatsAppBulle({ numero }) {
         className="bg-white text-[#25D366] text-xs font-semibold whitespace-nowrap px-3 py-1.5 rounded-full shadow-md border border-[#25D366]/20">
         {ar ? 'تواصل معانا' : 'Contactez-nous'}
       </span>
-      <span className="w-14 h-14 grid place-items-center hover:brightness-95 text-[#25D366] rounded-full shadow-lg transition-all">
-        <IconeWhatsAppLogo size={56} />
+      <span className="w-11 h-11 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-full shadow-lg ring-2 ring-white transition-all">
+        <IconeWhatsApp size={22} />
       </span>
     </a>
   );
