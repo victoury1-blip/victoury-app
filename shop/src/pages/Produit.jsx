@@ -360,7 +360,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             occasion de partir sans jamais commander. L'ancien bouton
             "Ajouter au panier" (sans passer commande tout de suite) a été
             retiré : un seul bouton, un seul geste. */}
-        <div className="mt-7 flex gap-2.5">
+        <div className="mt-7">
           <button
             disabled={!taille}
             onClick={() => {
@@ -371,21 +371,29 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               });
               onAchatRapide?.();
             }}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 text-xs tracking-widest uppercase
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 text-xs tracking-widest uppercase
                        disabled:bg-gray-200 disabled:text-gray-400 transition-colors shadow-lg shadow-green-600/30">
             {taille ? t('acheterMaintenant') : t('choisirTaille')}
           </button>
           {/* Le doute qui bloque un achat ("elle va vraiment aller avec quoi ?",
               "le délai c'est combien ?") se règle en une question — sans ce
-              bouton juste à côté du geste d'achat, il faudrait déjà avoir
+              bouton juste sous le geste d'achat, il faudrait déjà avoir
               repéré la bulle flottante en bas d'écran, un pas de plus qu'un
-              client hésitant ne fait pas toujours. */}
+              client hésitant ne fait pas toujours. Bandeau pleine largeur
+              (plutôt qu'une icône étroite à côté du bouton d'achat) : demandé
+              tel quel, sur le modèle d'un exemple fourni. */}
           {numeroWhatsApp(theme?.footer?.contacts?.whatsapp) && (
             <a href={`https://wa.me/${numeroWhatsApp(theme.footer.contacts.whatsapp)}?text=${encodeURIComponent(
                 (ar ? 'السلام، عندي سؤال على ' : "Bonjour, j'ai une question sur ") + produit.name)}`}
               target="_blank" rel="noreferrer"
-              className="shrink-0 w-16 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-lg shadow-lg shadow-green-600/20 transition-all">
-              <IconeWhatsApp size={26} />
+              className="mt-2.5 block bg-[#25D366] hover:brightness-95 text-white rounded-lg shadow-lg shadow-green-600/20 transition-all py-3 px-4 text-center">
+              <span className="flex items-center justify-center gap-2 font-bold text-sm">
+                <IconeWhatsApp size={20} />
+                {ar ? 'اضغط هنا للتواصل معنا' : 'Cliquez ici pour nous contacter'}
+              </span>
+              <span className="block mt-1 text-[11px] text-white/90 font-normal">
+                {ar ? 'خدمة العملاء مستعدين لخدمتك على الفور من خلال الواتساب' : 'Notre service client vous répond immédiatement sur WhatsApp'}
+              </span>
             </a>
           )}
         </div>
