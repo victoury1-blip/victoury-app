@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { slugifier } from '../lib/slug';
 import {
   listerProduits, enregistrerProduit, listerCollections, listerGroupes,
-  enregistrerGroupe, remplacerTailles, remplacerImages, televerserPhoto,
+  enregistrerGroupe, remplacerTailles, remplacerImages, televerserPhoto, televerserVideo,
 } from '../lib/admin';
 import MediaPicker from './MediaPicker';
 
@@ -30,7 +30,7 @@ const COULEURS_COURANTES = [
 const VIDE = {
   name: '', slug: '', description: '', details: '', price: '', compare_at: '',
   gender: 'Unisexe', status: 'Actif', collection_id: '', group_id: '',
-  color_name: '', color_hex: '#000000', is_bestseller: false,
+  color_name: '', color_hex: '#000000', is_bestseller: false, video_url: '',
 };
 
 export default function ProduitForm() {
@@ -64,7 +64,7 @@ export default function ProduitForm() {
         price: p.price ?? '', compare_at: p.compare_at ?? '', gender: p.gender, status: p.status,
         collection_id: p.collection_id || '', group_id: p.group_id || '',
         color_name: p.color_name || '', color_hex: p.color_hex || '#000000',
-        is_bestseller: p.is_bestseller || false,
+        is_bestseller: p.is_bestseller || false, video_url: p.video_url || '',
       });
       setTailles(p.sizes?.length ? p.sizes.map(s => ({ size: s.size, stock: s.stock })) : [{ size: '', stock: '' }]);
       setImages(p.images?.length ? p.images.map(i => ({ url: i.url, alt: i.alt || '' })) : [{ url: '', alt: '' }]);
@@ -81,6 +81,19 @@ export default function ProduitForm() {
   const majImage = (i, v) => setImages(im => im.map((x, j) => (j === i ? { ...x, url: v } : x)));
   const ajouterImage = () => setImages(im => [...im, { url: '', alt: '' }]);
   const retirerImage = (i) => setImages(im => im.filter((_, j) => j !== i));
+
+  async function surFichierVideo(fichier) {
+    if (!fichier) return;
+    setTeleverse(true);
+    try {
+      const url = await televerserVideo(fichier);
+      u('video_url', url);
+    } catch (e) {
+      setErreur(e.message || "Envoi de la vidéo impossible");
+    } finally {
+      setTeleverse(false);
+    }
+  }
 
   async function surFichier(i, fichier) {
     if (!fichier) return;
@@ -120,7 +133,7 @@ export default function ProduitForm() {
         gender: form.gender, status: form.status,
         collection_id: form.collection_id || null, group_id: form.group_id || null,
         color_name: form.color_name || null, color_hex: form.group_id ? form.color_hex : null,
-        is_bestseller: !!form.is_bestseller,
+        is_bestseller: !!form.is_bestseller, video_url: form.video_url || null,
       };
       const p = await enregistrerProduit(payload);
       await remplacerTailles(p.id, tailles);
@@ -274,6 +287,23 @@ export default function ProduitForm() {
           <button type="button" onClick={ajouterTaille} className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
             <Plus size={13} /> Ajouter une taille
           </button>
+        </div>
+
+        <div className="border-t border-gray-100 pt-5">
+          <label className={label}>Vidéo (optionnelle — affichée en premier dans la galerie de la fiche produit)</label>
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 bg-sand shrink-0 grid place-items-center">
+              {form.video_url ? <video src={form.video_url} className="w-full h-full object-cover" muted /> : <span className="text-[10px] text-gray-300">Aucune</span>}
+            </div>
+            <input value={form.video_url} onChange={e => u('video_url', e.target.value)} placeholder="URL de la vidéo" className={`${champ} flex-1`} />
+            <label className="px-3 py-2.5 border border-gray-200 text-xs cursor-pointer flex items-center gap-1.5 shrink-0">
+              <Upload size={13} /> Choisir
+              <input type="file" accept="video/*" hidden onChange={e => surFichierVideo(e.target.files?.[0])} />
+            </label>
+            {form.video_url && (
+              <button type="button" onClick={() => u('video_url', '')} className="text-gray-300 hover:text-red-500 shrink-0"><Trash2 size={16} /></button>
+            )}
+          </div>
         </div>
 
         <div className="border-t border-gray-100 pt-5">

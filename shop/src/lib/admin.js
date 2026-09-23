@@ -200,6 +200,20 @@ export async function televerserPhoto(fichierBrut) {
   return supabase.storage.from('boutique').getPublicUrl(nom).data.publicUrl;
 }
 
+/* Vidéo produit : déposée telle quelle, sans le pipeline de compression
+   d'image (redimensionner()) qui ne comprend que les images — un fichier
+   vidéo garde son poids d'origine, à filmer/exporter déjà léger côté
+   téléphone avant de la déposer ici. */
+export async function televerserVideo(fichier) {
+  const ext = (fichier.name.split('.').pop() || 'mp4').toLowerCase();
+  const nom = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from('boutique').upload(nom, fichier, {
+    cacheControl: '31536000', upsert: false, contentType: fichier.type || 'video/mp4',
+  });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from('boutique').getPublicUrl(nom).data.publicUrl;
+}
+
 // Photos déjà déposées AVANT la compression automatique — recompressées à
 // la demande depuis la médiathèque, sur place (même nom de fichier, donc
 // même URL publique) pour que rien de ce qui la référence déjà (fiche

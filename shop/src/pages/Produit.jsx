@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
 import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
@@ -138,7 +138,12 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   // qu'elle n'a jamais existé, quand elle est seulement épuisée pour l'instant.
   // Le client la voit, comprend qu'elle reviendra, et choisit parmi les autres.
   const tailles = produit.sizes || [];
-  const photos = produit.images?.length ? produit.images : [{ url: '' }];
+  // La vidéo (si réglée) ouvre la galerie — c'est ce que le client voit en
+  // premier en arrivant sur la fiche, avant même la 1ère photo.
+  const photos = [
+    ...(produit.video_url ? [{ url: '', video: produit.video_url }] : []),
+    ...(produit.images?.length ? produit.images : [{ url: '' }]),
+  ];
   const promo = produit.compare_at > produit.price;
   // Même règle que CarteProduit.jsx : épuisé seulement si des tailles sont
   // réglées et qu'aucune n'a de stock.
@@ -196,7 +201,10 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                       [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {photos.map((img, i) => (
               <div key={i} className="aspect-square overflow-hidden shrink-0 w-full snap-center" style={{ background: '#D8D8D5' }}>
-                {img.url
+                {img.video
+                  ? <video src={img.video} className="w-full h-full object-contain" controls playsInline
+                      preload={i === photoActive ? 'auto' : 'none'} />
+                  : img.url
                   // Seule la 1ère photo (déjà visible à l'ouverture de la fiche) charge
                   // tout de suite en pleine résolution — les suivantes ne se
                   // téléchargent qu'une fois atteintes par le défilement horizontal :
@@ -243,7 +251,13 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                 }`}>
                 {/* Vignette 48px : la miniature (500px) suffit largement, pas la photo
                     pleine résolution (jusqu'à 1600px) juste pour ce petit carré. */}
-                {img.url && <img src={miniature(img.url)} onError={(e) => surErreurMiniature(e, img.url)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                {img.video ? (
+                  <div className="w-full h-full bg-ink grid place-items-center">
+                    <Play size={16} className="text-white fill-white" />
+                  </div>
+                ) : img.url && (
+                  <img src={miniature(img.url)} onError={(e) => surErreurMiniature(e, img.url)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                )}
               </button>
             ))}
           </div>
