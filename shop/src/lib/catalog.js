@@ -17,7 +17,7 @@ export { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, GA4_DEFAUT
 
 const PRODUIT = `
   id, slug, name, description, details, price, compare_at, gender, status,
-  color_name, color_hex, position, group_id, collection_id, is_bestseller,
+  color_name, color_hex, position, group_id, collection_id, is_bestseller, video_url,
   images:shop_product_images(url, alt, position),
   sizes:shop_product_sizes(size, stock, position)
 `;
