@@ -20,7 +20,7 @@ export default function GarantiesGrid() {
     <div className="mt-4 grid grid-cols-2 gap-2.5">
       {items.map(({ Icone, titre, texte }, i) => (
         <div key={i} dir={lang === 'ar' ? 'rtl' : 'ltr'}
-          className={`border border-gray-200 rounded-xl p-3 flex flex-col gap-1.5 ${lang === 'ar' ? 'items-end text-right' : 'items-start text-left'}`}>
+          className={`border border-gray-200 rounded-xl p-3 flex flex-col gap-1.5 items-start ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
           <div className="w-8 h-8 rounded-full bg-orange-50 grid place-items-center">
             <Icone size={16} className="text-orange-500" />
           </div>
