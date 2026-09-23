@@ -85,6 +85,9 @@ export default function Footer({ theme, collections, pret }) {
               l'image est simplement contenue (object-contain) dans une
               boîte qui ne change jamais de taille, quel que soit son ratio
               réel. */}
+          {f.description && (
+            <p dir={lang === 'ar' ? 'rtl' : 'ltr'} className="mb-4 text-base opacity-70 leading-relaxed max-w-xs">{f.description}</p>
+          )}
           <div className="-mt-3 flex items-center justify-center" style={{ height: (theme?.logoHauteur || 36) + 8, width: 160 }}>
             {theme?.logoUrl
               ? <img src={theme.logoUrl} alt="Victoury" width={160} height={(theme?.logoHauteur || 36) + 8}
@@ -92,7 +95,6 @@ export default function Footer({ theme, collections, pret }) {
                   style={{ filter: 'invert(1)', mixBlendMode: 'screen' }} />
               : <Wordmark style={{ color: '#fff', fontSize: ((theme?.logoHauteur || 36) + 8) * 0.7 }} />}
           </div>
-          {f.description && <p className="mt-4 text-base opacity-70 leading-relaxed max-w-xs">{f.description}</p>}
           <div className="mt-7 flex gap-12 sm:gap-14">
             <div>
               <h3 className="text-base uppercase tracking-widest opacity-60 mb-3.5 font-medium">{t('suivezNous')}</h3>
