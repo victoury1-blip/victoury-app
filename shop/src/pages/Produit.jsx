@@ -394,7 +394,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                       alt="" loading="lazy" className="w-full h-full object-cover" />
                   )}
                 </div>
-                <div className="min-w-0">
+                <div className={`min-w-0 ${ar ? 'text-right' : 'text-left'}`}>
                   <p className="text-sm text-gray-800 truncate">{produitsLies[0].name}</p>
                   <p className="text-xs text-gray-500">{fmtPrix(produitsLies[0].price, lang)}</p>
                 </div>
