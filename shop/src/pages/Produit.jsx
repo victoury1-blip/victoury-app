@@ -15,16 +15,18 @@ import { IconeWhatsApp } from '../components/icons';
 import { numeroWhatsApp } from '../lib/commande';
 
 function Accordeon({ titre, children }) {
+  const { lang } = useLang();
+  const ar = lang === 'ar';
   const [ouvert, setOuvert] = useState(false);
   if (!children) return null;
   return (
-    <div className="border-t border-gray-100">
+    <div className="border-t border-gray-100" dir={ar ? 'rtl' : 'ltr'}>
       <button onClick={() => setOuvert(v => !v)}
         className="w-full flex items-center justify-between py-4 text-xs tracking-widest uppercase">
         {titre}
         <ChevronDown size={16} className={`text-gray-400 transition-transform ${ouvert ? 'rotate-180' : ''}`} />
       </button>
-      {ouvert && <div className="pb-5 text-sm text-gray-600 leading-relaxed whitespace-pre-line">{children}</div>}
+      {ouvert && <div className={`pb-5 text-sm text-gray-600 leading-relaxed whitespace-pre-line ${ar ? 'text-right' : 'text-left'}`}>{children}</div>}
     </div>
   );
 }
