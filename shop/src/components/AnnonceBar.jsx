@@ -11,6 +11,7 @@ import { useLang } from '../lib/i18n';
  * qu'on lit le reste du site en arabe se remarque tout de suite. */
 export default function AnnonceBar({ theme }) {
   const { lang } = useLang();
+  const ar = lang === 'ar';
   const source = lang === 'ar' && theme?.annoncesAr?.length ? theme.annoncesAr : theme?.annonces;
   const messages = (source || []).filter(Boolean);
 
@@ -35,6 +36,7 @@ export default function AnnonceBar({ theme }) {
       style={{
         background: theme.couleurAnnonceFond || '#111111', color: theme.couleurAnnonceTexte || '#ffffff',
         fontSize: `${theme.tailleAnnonce || 11}px`, fontWeight: theme.epaisseurAnnonce || 'normal',
+        fontFamily: ar ? "'Cairo', sans-serif" : undefined,
       }}
     >
       <div className="flex w-max whitespace-nowrap tracking-wide" style={{ animation: `annonce-defile ${duree}s linear infinite` }}>

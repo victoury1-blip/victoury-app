@@ -28,6 +28,14 @@
          déjà présente en clair dans le bundle JS livré au navigateur). -->
     <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
+    <!-- Cairo (Google Fonts) pour le bandeau d'annonce en arabe : Jost ne
+         couvre pas les glyphes arabes, le texte y retombait sur la police
+         système par défaut, moins soignée que le reste du site. Chargée à la
+         demande (pas préchargée comme Jost) : ne s'affiche que sur la
+         version arabe du site, pas sur toutes les visites. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet" />
     <!-- Jost est maintenant hébergée sur ce site (public/fonts, voir
          index.css) plutôt que chez Google Fonts : plus de connexion à un
          domaine tiers à établir avant de pouvoir l'afficher. Les 4 poids
