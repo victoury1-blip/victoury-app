@@ -21,11 +21,14 @@ export default function WhatsAppBulle({ numero, icone }) {
   return (
     <a href={href} target="_blank" rel="noreferrer"
       className="fixed bottom-5 right-5 z-30 flex flex-col items-center gap-1.5">
-      {/* Étiquette au-dessus, séparée de la bulle — pas dans la même pilule
-          qu'avant, comme demandé. */}
+      {/* Bulle de chat façon "assistant" (Ozzy d'Ozone Express, etc.) : un
+          message d'accueil chaleureux avec une petite pointe qui redescend
+          vers l'icône, plutôt qu'une simple étiquette "Contactez-nous". */}
       <span dir={ar ? 'rtl' : 'ltr'}
-        className="bg-white text-[#25D366] text-xs font-semibold whitespace-nowrap px-3 py-1.5 rounded-full shadow-md border border-[#25D366]/20">
-        {ar ? 'تواصل معنا' : 'Contactez-nous'}
+        className="relative bg-white text-ink text-xs font-semibold whitespace-nowrap px-3.5 py-2 rounded-2xl shadow-md
+                   after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2 after:-bottom-[5px]
+                   after:border-[6px] after:border-transparent after:border-t-white">
+        {ar ? 'سلام 👋 عندك سؤال؟' : 'Bonjour 👋 une question ?'}
       </span>
       <span className="w-14 h-14 grid place-items-center bg-[#25D366] hover:brightness-95 text-white rounded-full shadow-lg ring-2 ring-white transition-all overflow-hidden">
         {icone ? <img src={icone} alt="" className="w-full h-full object-cover" /> : <IconeWhatsApp size={28} />}
