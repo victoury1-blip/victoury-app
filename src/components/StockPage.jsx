@@ -6,7 +6,8 @@ import {
   ChevronDown, ChevronUp, Check, ImageIcon, X,
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
-import { importProductsFromWooCommerce, updateWooStock, pushProductToWoo, deleteWooProduct, fetchWooProductIds } from '../lib/woocommerce';
+import { updateWooStock, pushProductToWoo, deleteWooProduct } from '../lib/woocommerce';
+import { importProductsFromShop } from '../lib/shopImport';
 import { chargerStockManuel, lireStockManuelCache, definirStockManuel } from '../lib/stockManuel';
 
 /* ─── helpers ─── */
@@ -283,10 +284,8 @@ export default function StockPage() {
 
   async function handleSynchroniser() {
     setSyncing(true);
-    setSyncStatus({ type: 'syncing', message: 'Connexion à WooCommerce...' });
-    const result = await importProductsFromWooCommerce((msg) => {
-      setSyncStatus({ type: 'syncing', message: msg });
-    });
+    setSyncStatus({ type: 'syncing', message: 'Récupération des produits de la boutique...' });
+    const result = await importProductsFromShop();
     setSyncing(false);
     if (!result.success) {
       setSyncStatus({ type: 'error', message: `Erreur: ${result.error}` });
@@ -296,13 +295,13 @@ export default function StockPage() {
     setProducts(prev => {
       const updated = [...prev];
       let added = 0, updated_count = 0;
-      for (const wp of result.products) {
-        const idx = updated.findIndex(p => p.wooId === wp.wooId);
+      for (const sp of result.products) {
+        const idx = updated.findIndex(p => p.shopProductId === sp.shopProductId);
         if (idx >= 0) {
-          updated[idx] = { ...updated[idx], name: wp.name, ref: wp.ref, prix: wp.prix, compareAt: wp.compareAt, statut: wp.statut, image: wp.image || updated[idx].image, variations: wp.variations };
+          updated[idx] = { ...updated[idx], name: sp.name, ref: sp.ref, prix: sp.prix, compareAt: sp.compareAt, statut: sp.statut, image: sp.image || updated[idx].image, variations: sp.variations };
           updated_count++;
         } else {
-          updated.unshift(wp);
+          updated.unshift(sp);
           added++;
         }
       }
@@ -394,7 +393,6 @@ export default function StockPage() {
   /* ── Publication en masse : détecte les produits ABSENTS de WooCommerce
      (y compris ceux avec un ancien wooId qui n'existe plus côté boutique)
      et les publie automatiquement, un par un, avec progression. ── */
-  const [bulkPush, setBulkPush] = useState(null); // null | { done, total, name }
 
   /* Sélection de produits (cases à cocher) pour publier uniquement ceux choisis. */
   const [selected, setSelected] = useState(() => new Set());
@@ -407,49 +405,6 @@ export default function StockPage() {
     const allSelected = filtered.length > 0 && filtered.every(p => prev.has(p.id));
     return allSelected ? new Set() : new Set(filtered.map(p => p.id));
   });
-
-  async function bulkPushToWoo() {
-    if (bulkPush) return;
-    setBulkPush({ done: 0, total: 0, name: 'Vérification WooCommerce…' });
-    try {
-      const existingIds = await fetchWooProductIds();
-      // Base = la sélection si des cases sont cochées, sinon tous les produits.
-      const pool = selected.size ? products.filter(p => selected.has(p.id)) : products;
-      // Manquants = pas de wooId, OU wooId qui n'existe plus sur la boutique.
-      const missing = pool.filter(p => !p.wooId || !existingIds.has(p.wooId));
-      if (!missing.length) {
-        alert(selected.size
-          ? '✅ Les produits sélectionnés sont déjà sur WooCommerce.'
-          : '✅ Tous les produits sont déjà sur WooCommerce.');
-        setBulkPush(null);
-        return;
-      }
-      if (!window.confirm(`${missing.length} produit(s)${selected.size ? ' sélectionné(s)' : ''} absent(s) de WooCommerce.\nLes publier maintenant ?`)) {
-        setBulkPush(null);
-        return;
-      }
-      let done = 0, failed = [];
-      let current = products;
-      for (const p of missing) {
-        setBulkPush({ done, total: missing.length, name: p.name });
-        try {
-          const created = await pushProductToWoo(p);
-          current = current.map(x => x.id === p.id ? { ...x, wooId: created.id, boutique: 'WooCommerce' } : x);
-          persist(current);
-        } catch (e) {
-          failed.push(`${p.name}: ${e.message}`);
-        }
-        done++;
-      }
-      alert(`✅ ${done - failed.length}/${missing.length} produit(s) publié(s) sur WooCommerce.` +
-        (failed.length ? `\n\n❌ Échecs:\n${failed.slice(0, 5).join('\n')}` : ''));
-      setSelected(new Set());
-    } catch (e) {
-      alert('❌ Erreur: ' + e.message);
-    } finally {
-      setBulkPush(null);
-    }
-  }
 
   const filtered = useMemo(() => products.filter(p => {
     const q = debouncedSearch.toLowerCase();
@@ -503,18 +458,9 @@ export default function StockPage() {
         <button
           onClick={handleSynchroniser}
           disabled={syncing}
+          title="Récupérer les produits déposés dans la boutique en ligne"
           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 disabled:opacity-60">
-          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} /> Synchroniser
-        </button>
-        <button
-          onClick={bulkPushToWoo}
-          disabled={!!bulkPush}
-          title="Publier sur WooCommerce tous les produits qui n'y sont pas encore"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-60">
-          <Upload size={14} className={bulkPush ? 'animate-pulse' : ''} />
-          {bulkPush
-            ? (bulkPush.total ? `${bulkPush.done}/${bulkPush.total} — ${bulkPush.name.slice(0, 24)}` : bulkPush.name)
-            : (selected.size ? `Publier sur Woo (${selected.size})` : 'Publier sur Woo')}
+          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} /> Importer du Shop
         </button>
 
         <div className="flex items-center gap-2 ml-2">
