@@ -371,8 +371,9 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               });
               onAchatRapide?.();
             }}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
-                       disabled:bg-gray-200 disabled:text-gray-400 transition-colors shadow-lg shadow-green-600/30">
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
+                       disabled:bg-gray-200 disabled:text-gray-400 disabled:animate-none transition-colors shadow-lg shadow-orange-600/30"
+            style={taille ? { animation: 'bouton-pulse 1.8s ease-in-out infinite' } : undefined}>
             {taille ? t('acheterMaintenant') : t('choisirTaille')}
           </button>
           {/* Le doute qui bloque un achat ("elle va vraiment aller avec quoi ?",
