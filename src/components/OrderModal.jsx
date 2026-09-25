@@ -4,6 +4,7 @@ import { useStatuses } from '../contexts/StatusContext';
 import { loadProducts, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
 import { orderableProducts } from '../lib/orderProducts';
 import { useToast } from './Toast';
+import ProductSelect from './orders/ProductSelect';
 
 function getCitiesForLivreur(livreurName) {
   try {
@@ -293,19 +294,9 @@ export default function OrderModal({ order, onClose, onSave }) {
                 const sizeOptions = sizes.includes(prod.size || '') || !prod.size ? sizes : [prod.size, ...sizes];
                 return (
                   <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2 border border-gray-100">
-                    <select
-                      value={prod.name}
-                      onChange={(e) => { updateProduct(idx, 'name', e.target.value); updateProduct(idx, 'size', ''); }}
-                      className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                    >
-                      <option value="">-- Choisir un produit --</option>
-                      {prod.name && !stockProducts.find(p => p.name === prod.name) && (
-                        <option value={prod.name}>{prod.name}</option>
-                      )}
-                      {stockProducts.map(p => (
-                        <option key={p.id} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
+                    <ProductSelect value={prod.name}
+                      onChange={(v) => { updateProduct(idx, 'name', v); updateProduct(idx, 'size', ''); }}
+                      products={stockProducts} />
                     <select
                       value={prod.size || ''}
                       onChange={(e) => updateProduct(idx, 'size', e.target.value)}

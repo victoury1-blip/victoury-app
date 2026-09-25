@@ -5,6 +5,7 @@ import { loadProducts, loadProductsRemote, SIZE_OPTIONS, NUMERIC_SIZES } from '.
 import { orderableProducts } from '../../lib/orderProducts';
 import { now } from '../../lib/dateUtils';
 import { generateVictId } from '../../lib/victId';
+import ProductSelect from './ProductSelect';
 
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 bg-white transition';
 
@@ -203,17 +204,7 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
                 const sizeOptions = sizes.includes(prod.size || '') || !prod.size ? sizes : [prod.size, ...sizes];
                 return (
                   <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2 border border-gray-100">
-                    <select value={prod.name} onChange={(e) => updateProduct(idx, 'name', e.target.value)}
-                      className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white">
-                      <option value="">-- Choisir un produit --</option>
-                      {/* Un article absent de la liste — d'affiliation, ou retiré
-                          du catalogue — reste affiché : la liste sert à choisir,
-                          pas à effacer ce qui est déjà sur la commande. */}
-                      {prod.name && !stockProducts.some(p => p.name === prod.name) && (
-                        <option value={prod.name}>{prod.name}</option>
-                      )}
-                      {stockProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                    </select>
+                    <ProductSelect value={prod.name} onChange={(v) => updateProduct(idx, 'name', v)} products={stockProducts} />
                     <select value={prod.size || ''} onChange={(e) => updateProduct(idx, 'size', e.target.value)}
                       className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white w-20 shrink-0">
                       <option value="">Taille</option>
