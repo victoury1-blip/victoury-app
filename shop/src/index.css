@@ -47,14 +47,21 @@
   --ink: #111111;
 }
 
-/* Bandeau d'annonce : défilement continu gauche → droite, jamais un saut —
-   la piste contient le message deux fois de suite, et on la fait glisser
+/* Bandeau d'annonce : défilement continu, jamais un saut — la piste
+   contient le message deux fois de suite, et on la fait glisser
    d'exactement une moitié en partant déjà décalée ; la seconde moitié prend
    alors la place de la première à l'identique, donc la boucle ne se voit
-   pas. */
+   pas. Deux sens opposés (voir AnnonceBar.jsx, qui choisit l'un ou l'autre
+   selon la langue) : gauche → droite se lit naturellement en français (le
+   texte avance dans le sens de lecture), mais serait à l'envers en arabe —
+   le sens inverse s'impose alors. */
 @keyframes annonce-defile {
   from { transform: translateX(-50%); }
   to { transform: translateX(0); }
+}
+@keyframes annonce-defile-inverse {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
 @layer base {

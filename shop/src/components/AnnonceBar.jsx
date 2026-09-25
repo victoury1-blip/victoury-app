@@ -39,7 +39,8 @@ export default function AnnonceBar({ theme }) {
         fontFamily: ar ? "'Cairo', sans-serif" : undefined,
       }}
     >
-      <div className="flex w-max whitespace-nowrap tracking-wide" style={{ animation: `annonce-defile ${duree}s linear infinite` }}>
+      <div className="flex w-max whitespace-nowrap tracking-wide"
+        style={{ animation: `${ar ? 'annonce-defile-inverse' : 'annonce-defile'} ${duree}s linear infinite` }}>
         {contenu('a')}
         {contenu('b')}
       </div>
