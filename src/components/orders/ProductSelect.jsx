@@ -50,13 +50,13 @@ export default function ProductSelect({ value, onChange, products, placeholder =
           {/* Article déjà sur la commande mais absent du catalogue (retiré,
               d'affiliation…) — reste sélectionnable, jamais effacé de la liste. */}
           {value && !products.some(p => p.name === value) && (
-            <button type="button" onClick={() => choisir(value)} className="w-full text-left px-2.5 py-2 text-sm text-gray-800 hover:bg-blue-50 truncate">
+            <button type="button" onClick={() => choisir(value)} className="w-full text-left px-2.5 py-2 text-sm text-gray-800 hover:bg-blue-50">
               {value}
             </button>
           )}
           {filtres.map(p => (
             <button key={p.id} type="button" onClick={() => choisir(p.name)}
-              className="w-full text-left px-2.5 py-2 text-sm text-gray-800 hover:bg-blue-50 truncate">
+              className="w-full text-left px-2.5 py-2 text-sm text-gray-800 hover:bg-blue-50">
               {p.name}
             </button>
           ))}
