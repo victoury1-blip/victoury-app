@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pencil, Trash2, Plus, X, Check, RotateCcw } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Pencil, Trash2, Plus, X, Check, RotateCcw, GripVertical } from 'lucide-react';
 import { ALL_STATUSES } from '../data/statuses';
 import { useStatuses } from '../contexts/StatusContext';
 
@@ -87,6 +87,26 @@ export default function EtatsPage() {
     updateStatuses(ALL_STATUSES);
   }
 
+  /* Glisser-déposer une ligne pour réordonner les états à la main — plus
+     simple que de deviner un numéro "Ordre" à saisir un par un. Le champ
+     `order` de chacun est recalculé (1, 2, 3…) selon la nouvelle position
+     dans le tableau, pour rester cohérent avec ce que l'aperçu et le reste
+     de l'app lisent. */
+  const dragIndex = useRef(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
+  function deplacer(index) {
+    const depart = dragIndex.current;
+    if (depart === null || depart === index) return;
+    setStatuses((p) => {
+      const next = [...p];
+      const [ligne] = next.splice(depart, 1);
+      next.splice(index, 0, ligne);
+      return next.map((s, i) => ({ ...s, order: i + 1 }));
+    });
+    dragIndex.current = index;
+  }
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -114,6 +134,7 @@ export default function EtatsPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="px-2 py-3 w-8"></th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Nom</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Slug</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Couleur</th>
@@ -128,8 +149,16 @@ export default function EtatsPage() {
             {statuses.map((s, idx) => (
               <tr
                 key={s.id}
-                className={`border-b border-gray-50 hover:bg-gray-50/50 ${idx % 2 === 0 ? '' : 'bg-gray-50/30'}`}
+                draggable
+                onDragStart={() => { dragIndex.current = idx; }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverIndex(idx); }}
+                onDrop={(e) => { e.preventDefault(); deplacer(idx); setDragOverIndex(null); }}
+                onDragEnd={() => { dragIndex.current = null; setDragOverIndex(null); }}
+                className={`border-b border-gray-50 hover:bg-gray-50/50 ${idx % 2 === 0 ? '' : 'bg-gray-50/30'} ${dragOverIndex === idx ? 'bg-blue-50' : ''}`}
               >
+                <td className="px-2 py-2.5 text-gray-300 cursor-grab active:cursor-grabbing" title="Glisser pour réordonner">
+                  <GripVertical size={14} />
+                </td>
                 <td className="px-4 py-2.5 font-medium text-gray-800">{s.label}</td>
                 <td className="px-4 py-2.5 text-gray-500 font-mono text-xs">{s.slug}</td>
                 <td className="px-4 py-2.5">
