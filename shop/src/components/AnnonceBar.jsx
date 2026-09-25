@@ -40,7 +40,7 @@ export default function AnnonceBar({ theme }) {
       }}
     >
       <div className="flex w-max whitespace-nowrap tracking-wide"
-        style={{ animation: `${ar ? 'annonce-defile-inverse' : 'annonce-defile'} ${duree}s linear infinite` }}>
+        style={{ animation: `${ar ? 'annonce-defile' : 'annonce-defile-inverse'} ${duree}s linear infinite` }}>
         {contenu('a')}
         {contenu('b')}
       </div>
