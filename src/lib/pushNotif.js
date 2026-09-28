@@ -10,6 +10,16 @@ import { supabase } from './supabase';
 
 const CLE_PUBLIQUE = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
+// Portée dédiée, distincte de la racine '/' : le service worker Workbox de
+// l'app (vite-plugin-pwa, voir vite.config.js) se réenregistre lui-même à
+// CHAQUE chargement de page sur la portée '/' — il est volontairement
+// "selfDestroying" et se désinstalle aussitôt. Si le SW du push utilisait
+// aussi la portée '/', ce cycle finissait par emporter avec lui
+// l'enregistrement du push (abonnement retrouvé actif juste après l'avoir
+// activé, mais reperdu au rechargement suivant). Une portée à lui seul
+// évite tout chevauchement entre les deux enregistrements.
+const PORTEE = '/push-scope/';
+
 function urlBase64ToUint8Array(base64) {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
   const base64Safe = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -31,7 +41,7 @@ export async function activerPushCommande() {
     if (p !== 'granted') return { ok: false, raison: 'refuse' };
   }
   try {
-    const reg = await navigator.serviceWorker.register('/sw-push.js');
+    const reg = await navigator.serviceWorker.register('/sw-push.js', { scope: PORTEE });
     await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
@@ -53,7 +63,7 @@ export async function activerPushCommande() {
 /** Retire l'abonnement de cet appareil (désactivation manuelle). */
 export async function desactiverPushCommande() {
   try {
-    const reg = await navigator.serviceWorker.getRegistration();
+    const reg = await navigator.serviceWorker.getRegistration(PORTEE);
     const sub = await reg?.pushManager.getSubscription();
     if (sub) {
       await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
@@ -71,7 +81,7 @@ export async function statutPush() {
 export async function abonnementDejaActif() {
   if (!pushDisponible() || Notification.permission !== 'granted') return false;
   try {
-    const reg = await navigator.serviceWorker.getRegistration();
+    const reg = await navigator.serviceWorker.getRegistration(PORTEE);
     if (!reg) return false;
     const sub = await reg.pushManager.getSubscription();
     return !!sub;
