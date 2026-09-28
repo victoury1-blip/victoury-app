@@ -8,6 +8,7 @@ import {
   Search, ArrowDownCircle, Tag, Upload, Bell, Phone, MessageCircle, FileText, TrendingUp,
 } from 'lucide-react';
 import { requestPermission } from '../hooks/useNotifications';
+import { activerPushCommande, desactiverPushCommande, abonnementDejaActif, pushDisponible } from '../lib/pushNotif';
 import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from '../lib/whatsappTemplates';
 import { fmtDate } from '../lib/dateUtils';
 import { readNextNumber, setNextNumber, peekNextVictId, formatVictId } from '../lib/victId';
@@ -156,6 +157,17 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   });
   const [pushPermission, setPushPermission] = useState(() => 'Notification' in window ? Notification.permission : 'denied');
 
+  // L'état local (`pushCfg.enabled`) peut mentir : permission révoquée
+  // depuis les réglages du téléphone, ou abonnement jamais réellement créé
+  // avant l'ajout du vrai Push API. On recale sur la réalité à l'ouverture.
+  useEffect(() => {
+    if (!pushCfg.enabled) return;
+    abonnementDejaActif().then(actif => {
+      if (!actif && pushDisponible()) savePushCfg({ ...pushCfg, enabled: false });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function savePushCfg(cfg) {
     setPushCfg(cfg);
     localStorage.setItem('push_notifications', JSON.stringify(cfg));
@@ -164,7 +176,16 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
   async function togglePush() {
     if (pushCfg.enabled) {
+      await desactiverPushCommande();
       savePushCfg({ ...pushCfg, enabled: false });
+    } else if (pushDisponible()) {
+      // Vraie souscription Push (réveille le téléphone même app fermée) —
+      // voir src/lib/pushNotif.js. Retombe sur la simple permission
+      // navigateur (notif visible seulement app ouverte) si le VAPID n'est
+      // pas configuré ou si le navigateur ne supporte pas le Push API.
+      const r = await activerPushCommande();
+      setPushPermission(Notification.permission);
+      if (r.ok) savePushCfg({ ...pushCfg, enabled: true });
     } else {
       const perm = await requestPermission();
       setPushPermission(perm);
