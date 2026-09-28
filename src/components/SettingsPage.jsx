@@ -156,6 +156,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     try { return JSON.parse(localStorage.getItem('push_notifications') || '{}'); } catch { return {}; }
   });
   const [pushPermission, setPushPermission] = useState(() => 'Notification' in window ? Notification.permission : 'denied');
+  const [pushErreur, setPushErreur] = useState('');
 
   // L'état local (`pushCfg.enabled`) peut mentir : permission révoquée
   // depuis les réglages du téléphone, ou abonnement jamais réellement créé
@@ -175,6 +176,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   }
 
   async function togglePush() {
+    setPushErreur('');
     if (pushCfg.enabled) {
       await desactiverPushCommande();
       savePushCfg({ ...pushCfg, enabled: false });
@@ -186,7 +188,9 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
       const r = await activerPushCommande();
       setPushPermission(Notification.permission);
       if (r.ok) savePushCfg({ ...pushCfg, enabled: true });
+      else setPushErreur(r.raison || 'Échec inconnu');
     } else {
+      setPushErreur('Push API non disponible (VITE_VAPID_PUBLIC_KEY manquante ou navigateur non compatible)');
       const perm = await requestPermission();
       setPushPermission(perm);
       if (perm === 'granted') savePushCfg({ ...pushCfg, enabled: true });
@@ -1363,6 +1367,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
             {pushPermission === 'denied' && (
               <p className="text-xs text-red-500 mt-2">Les notifications sont bloquées par le navigateur. Activez-les dans les paramètres du site.</p>
             )}
+            {pushErreur && <p className="text-xs text-red-500 mt-2">Erreur : {pushErreur}</p>}
             {pushCfg.enabled && (
               <div className="mt-3 space-y-2">
                 {[
