@@ -20,6 +20,40 @@ function cleCout(nom) {
 }
 function pct(val, total) { return total ? ((val / total) * 100).toFixed(1) : '0.0'; }
 
+/* Champ + bouton "Enregistrer" explicite pour le prix d'achat manuel —
+   avant, seul le onBlur sauvegardait : un clic ailleurs qui ne perd pas le
+   focus du champ (ex. fermer la fenêtre directement) pouvait laisser la
+   saisie non enregistrée sans que rien ne le signale. Le bouton force un
+   geste de sauvegarde explicite, avec une confirmation visuelle brève. */
+function InputCoutManuel({ valeur, onEnregistrer }) {
+  const [val, setVal] = useState(valeur || '');
+  const [enregistre, setEnregistre] = useState(false);
+  useEffect(() => { setVal(valeur || ''); }, [valeur]);
+  function enregistrer() {
+    onEnregistrer(val);
+    setEnregistre(true);
+    setTimeout(() => setEnregistre(false), 1200);
+  }
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <input
+        type="number" min="0" step="0.01"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') enregistrer(); }}
+        placeholder="0.00"
+        className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+      />
+      <button type="button" onClick={enregistrer} title="Enregistrer ce prix"
+        className={`shrink-0 px-1.5 py-1 rounded text-xs font-semibold transition-colors ${
+          enregistre ? 'bg-green-100 text-green-700' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+        }`}>
+        {enregistre ? '✓' : 'OK'}
+      </button>
+    </div>
+  );
+}
+
 const EXPENSE_CATS = [
   { value: 'facebook', label: 'Facebook Ads', color: 'text-blue-600', bg: 'bg-blue-50' },
   { value: 'tiktok', label: 'TikTok Ads', color: 'text-pink-600', bg: 'bg-pink-50' },
@@ -915,14 +949,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
                           <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
                           <td className="px-2 py-2 text-right font-semibold text-gray-800">{fmt(c.prix)}</td>
                           <td className="px-2 py-2 text-right">
-                            <input
-                              type="number" min="0" step="0.01"
-                              defaultValue={it.unitCost || ''}
-                              onBlur={(e) => setProductCost(it.name, e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              placeholder="0.00"
-                              className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
-                            />
+                            <InputCoutManuel valeur={it.unitCost || ''} onEnregistrer={(v) => setProductCost(it.name, v)} />
                           </td>
                           <td className="px-2 py-2 text-center">
                             {setOrders && !it.echange ? (
@@ -970,14 +997,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
                           <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
                           <td className="px-2 py-2"></td>
                           <td className="px-2 py-2 text-right">
-                            <input
-                              type="number" min="0" step="0.01"
-                              defaultValue={it.unitCost || ''}
-                              onBlur={(e) => setProductCost(it.name, e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                              placeholder="0.00"
-                              className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
-                            />
+                            <InputCoutManuel valeur={it.unitCost || ''} onEnregistrer={(v) => setProductCost(it.name, v)} />
                           </td>
                           <td className="px-2 py-2 text-center">
                             {setOrders && !it.echange ? (
