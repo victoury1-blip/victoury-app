@@ -190,28 +190,44 @@ export default async function handler(req, res) {
   // absente (rare, mais possible derrière certains proxys) ne doit jamais
   // bloquer une vraie commande.
   const MESSAGE_PANNE = 'Ce service est temporairement indisponible. Merci de réessayer plus tard.';
-  if (ip) {
-    const estBloquee = await fetch(`${url}/rest/v1/rpc/shop_ip_est_bloquee`, {
+
+  // Tout ce bloc était enchaîné en série (un aller-retour réseau après
+  // l'autre : IP bloquée, puis téléphone bloqué, puis produits, puis
+  // réglages, puis géolocalisation…) — chacun ajoutant 100-500ms, parfois
+  // jusqu'à 3,5s pour la géoloc, le clic sur "Valider" pouvait mettre
+  // plusieurs secondes à répondre alors que ces vérifications ne dépendent
+  // PAS les unes des autres. Les lancer tous en même temps (Promise.all) ne
+  // prend que le temps du plus lent d'entre eux, pas leur somme.
+  const villeGPS = typeof geoGPS?.ville === 'string' ? geoGPS.ville.slice(0, 100) : null;
+  const paysGPS = typeof geoGPS?.pays === 'string' ? geoGPS.pays.slice(0, 100) : null;
+
+  const [estBloquee, telBloque, { lignes: serverLignes, erreur }, { livraison, seuilGratuit, remises }, geoParDefaut] = await Promise.all([
+    ip
+      ? fetch(`${url}/rest/v1/rpc/shop_ip_est_bloquee`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ p_ip: ip }),
+        }).then(r => r.ok ? r.json() : false).catch(() => false)
+      : Promise.resolve(false),
+    fetch(`${url}/rest/v1/rpc/shop_telephone_est_bloque`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ p_ip: ip }),
-    }).then(r => r.ok ? r.json() : false).catch(() => false);
-    if (estBloquee) return res.status(200).json({ ok: false, error: MESSAGE_PANNE });
-  }
-
-  // Complément de l'IP : un visiteur qui rebloque son numéro depuis un autre
-  // wifi/4G (donc une autre IP) reste bloqué via son téléphone.
-  const telBloque = await fetch(`${url}/rest/v1/rpc/shop_telephone_est_bloque`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ p_tel: normaliserTelephone(form.telephone) }),
-  }).then(r => r.ok ? r.json() : false).catch(() => false);
+      body: JSON.stringify({ p_tel: normaliserTelephone(form.telephone) }),
+    }).then(r => r.ok ? r.json() : false).catch(() => false),
+    recalculerLignes(url, key, lignes),
+    chargerReglagesPrix(url, key),
+    // Le GPS du navigateur (si le client l'a accepté) est bien plus fiable
+    // que l'IP — les opérateurs mobiles marocains sortent souvent par des
+    // passerelles enregistrées en Europe, ce qui fait dire "Marseille" ou
+    // "Londres" à toute géolocalisation par IP pour un client réellement au
+    // Maroc. On ne lance l'appel IP que s'il n'y a pas déjà de GPS, mais en
+    // même temps que tout le reste plutôt qu'après.
+    villeGPS ? Promise.resolve(null) : localiser(ip),
+  ]);
+  if (estBloquee) return res.status(200).json({ ok: false, error: MESSAGE_PANNE });
   if (telBloque) return res.status(200).json({ ok: false, error: MESSAGE_PANNE });
-
-  const { lignes: serverLignes, erreur } = await recalculerLignes(url, key, lignes);
   if (erreur) return res.status(200).json({ ok: false, error: erreur });
 
-  const { livraison, seuilGratuit, remises } = await chargerReglagesPrix(url, key);
   // Premier passage sans code promo pour connaître le montant après remise
   // par quantité — c'est CE montant, jamais celui envoyé par le client, que
   // la remise du code promo doit ensuite porter (même règle que côté client,
@@ -220,14 +236,7 @@ export default async function handler(req, res) {
   const promo = await verifierPromoServeur(url, key, code, avantPromo.sousTotal - avantPromo.remiseQuantite);
   const totalVerifie = totalPanier(serverLignes, { remises, promo, livraison, seuilGratuit }).total;
 
-  // Le GPS du navigateur (si le client l'a accepté) est bien plus fiable que
-  // l'IP — les opérateurs mobiles marocains sortent souvent par des passerelles
-  // enregistrées en Europe, ce qui fait dire "Marseille" ou "Londres" à toute
-  // géolocalisation par IP pour un client réellement au Maroc. On ne le fait
-  // JAMAIS attendre : s'il n'est pas déjà là, on retombe sur l'IP.
-  const villeGPS = typeof geoGPS?.ville === 'string' ? geoGPS.ville.slice(0, 100) : null;
-  const paysGPS = typeof geoGPS?.pays === 'string' ? geoGPS.pays.slice(0, 100) : null;
-  const geo = villeGPS ? { ville: villeGPS, pays: paysGPS } : await localiser(ip);
+  const geo = villeGPS ? { ville: villeGPS, pays: paysGPS } : geoParDefaut;
   const commande = construireCommande(form, serverLignes, totalVerifie, new Date(), undefined, {
     source: SOURCES_CONNUES.has(source) ? source : 'Direct',
   });
@@ -257,18 +266,22 @@ export default async function handler(req, res) {
   // sans que ni l'une ni l'autre ne le voie. Un échec ici ne doit jamais faire
   // échouer la commande elle-même — le pire cas est un stock à corriger à la
   // main, pas une vente perdue.
-  await Promise.all(serverLignes.map(l =>
-    fetch(`${url}/rest/v1/rpc/shop_decrement_stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ p_slug: l.slug, p_size: l.size || '', p_qty: l.qty || 1 }),
-    }).catch(() => {})
-  ));
-
-  // Attendu (pas laissé en arrière-plan) : une fois la réponse envoyée, Vercel
-  // peut geler la fonction avant qu'un appel encore en vol n'ait eu le temps
-  // d'aboutir — la copie vers la feuille ne partirait alors jamais.
-  await copierVersSheet(url, key, commande);
+  // En même temps que la copie vers la feuille (elle aussi attendue, voir son
+  // commentaire) plutôt qu'après : les deux sont indépendantes, les
+  // enchaîner ajoutait leur durée l'une à l'autre pour rien.
+  await Promise.all([
+    ...serverLignes.map(l =>
+      fetch(`${url}/rest/v1/rpc/shop_decrement_stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ p_slug: l.slug, p_size: l.size || '', p_qty: l.qty || 1 }),
+      }).catch(() => {})
+    ),
+    // Attendue (pas laissée en arrière-plan) : une fois la réponse envoyée,
+    // Vercel peut geler la fonction avant qu'un appel encore en vol n'ait eu
+    // le temps d'aboutir — la copie vers la feuille ne partirait alors jamais.
+    copierVersSheet(url, key, commande),
+  ]);
 
   return res.status(200).json({ ok: true, id: commande.id });
 }
