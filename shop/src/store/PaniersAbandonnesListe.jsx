@@ -22,7 +22,7 @@ function numeroWhatsApp(tel) {
 function messageRelance(p) {
   const premier = p.lignes?.[0]?.name;
   const article = premier ? `"${premier}"${p.lignes.length > 1 ? ` (+${p.lignes.length - 1})` : ''}` : 'المنتوج ديالك';
-  return `السلام${p.nom ? ' ' + p.nom : ''} 👋 خليتي ${article} فالسلة عند Victoury. مازال معجباك؟ نقدر نعاونك تكملي الطلبية 🙂`;
+  return `السلام عليكم${p.nom ? ' ' + p.nom : ''} 👋 خليتي ${article} عند Victoury. مازال عجباك؟ نقدر نعاونك تكملي الطلبية 🙂`;
 }
 
 export default function PaniersAbandonnesListe() {
