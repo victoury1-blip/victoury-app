@@ -7,6 +7,17 @@ import { loadFactures } from '../data/factures';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// Clé du prix manuel : le nom du produit SANS la taille — "Ensemble Sporte
+// Noir - L" et "Ensemble Sporte Noir - XL" partagent le même prix d'achat
+// (c'est le même article, juste une taille différente). Sans ce nettoyage,
+// un prix saisi une fois sur la taille sans suffixe restait invisible sur
+// les autres tailles de la même commande, qui affichaient 0.
+function cleCout(nom) {
+  return (nom || '').trim().toLowerCase()
+    .replace(/\s*-\s*(xxs|xs|s|m|l|xl|xxl|xxxl|\d+xl|\d+)\s*$/i, '')
+    .trim();
+}
 function pct(val, total) { return total ? ((val / total) * 100).toFixed(1) : '0.0'; }
 
 const EXPENSE_CATS = [
@@ -107,7 +118,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
   }
 
   function setProductCost(name, value) {
-    const key = (name || '').trim().toLowerCase();
+    const key = cleCout(name);
     if (!key) return;
     // Persistance hors de l'updater : celui-ci doit rester pur (React peut le
     // ré-exécuter, ce qui enverrait deux écritures cloud concurrentes).
@@ -298,7 +309,8 @@ export default function ProfitPage({ orders = [], setOrders }) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
       // Prix manuel saisi = priorité (override) — permet de corriger/compléter.
-      if (manualCost[pn] != null) { cost += manualCost[pn] * (p.qty || 1); continue; }
+      const cle = cleCout(p.name);
+      if (manualCost[cle] != null) { cost += manualCost[cle] * (p.qty || 1); continue; }
       const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
       const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
         || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn))
@@ -331,6 +343,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
     for (const [idx, p] of (prods || []).entries()) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
+      const cle = cleCout(p.name);
       const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
       const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
         || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn))
@@ -339,8 +352,8 @@ export default function ProfitPage({ orders = [], setOrders }) {
           const snWords = sn.split(/\s+/).filter(w => w.length > 2);
           return pnWords.filter(w => snWords.some(sw => sw.includes(w) || w.includes(sw))).length >= 2;
         });
-      const isManual = manualCost[pn] != null;
-      const unitCost = isManual ? manualCost[pn] : (sp ? (parseFloat(sp.prixAchat || sp.purchasePrice || 0) || 0) : 0);
+      const isManual = manualCost[cle] != null;
+      const unitCost = isManual ? manualCost[cle] : (sp ? (parseFloat(sp.prixAchat || sp.purchasePrice || 0) || 0) : 0);
       const qty = p.qty || 1;
       // `index` : la ligne exacte de la commande, pour pouvoir corriger sa quantité.
       items.push({ index: idx, name: p.name, matched: isManual ? 'Prix manuel' : (sp?.name || null), manual: isManual, unitCost, qty, cost: unitCost * qty });
