@@ -27,10 +27,13 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState('');
   const [manque, setManque] = useState([]);
-  // Un seul enregistrement par visite : sans ça, chaque fois que le champ
-  // téléphone perd le focus créerait une ligne de plus dans les paniers
-  // abandonnés, pour la même personne qui hésite juste entre deux champs.
-  const panierEnregistre = useRef(false);
+  // Une seule LIGNE par visite (pas un insert à chaque perte de focus), mais
+  // mise à jour à chaque nouvel appel : la ville et l'adresse ne sont
+  // connues qu'après le téléphone (premier déclencheur), donc un simple
+  // insert-une-fois les ratait toujours. L'id de la ligne créée permet de la
+  // compléter au lieu d'en semer une nouvelle par champ rempli.
+  const panierAbandonneId = useRef(null);
+  const panierEnCours = useRef(false);
   // Un seul envoi par visite, même chose : Meta a déjà ce qui était rempli
   // dès le premier envoi, pas besoin de le renvoyer à chaque champ suivant.
   const emailEnvoyeCapi = useRef(false);
@@ -111,19 +114,28 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // d'achat, qu'il valide ou non ensuite. Silencieux et non bloquant — un
   // souci d'écriture ici ne doit jamais gêner la commande elle-même.
   function noterPanierAbandonne(etat) {
-    if (panierEnregistre.current) return;
+    if (panierEnCours.current) return;
     const { form: f, lignes: l } = etat || etatActuel.current;
     const chiffres = f.telephone.replace(/\D/g, '');
     if (chiffres.length < 9 || !l.length) return;
-    panierEnregistre.current = true;
-    supabase.from('shop_paniers_abandonnes').insert({
+    panierEnCours.current = true;
+    const donnees = {
       nom: f.nom || null,
       telephone: f.telephone,
+      ville: f.ville || null,
+      adresse: f.adresse || null,
       lignes: l.map(x => ({ name: x.name, size: x.size, color: x.color, qty: x.qty, price: x.price })),
       total: totalPanier(l, {
         paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
       }).total,
-    }).then(() => {}, () => { panierEnregistre.current = false; });
+    };
+    const requete = panierAbandonneId.current
+      ? supabase.from('shop_paniers_abandonnes').update(donnees).eq('id', panierAbandonneId.current)
+      : supabase.from('shop_paniers_abandonnes').insert(donnees).select('id').single();
+    requete.then(({ data, error }) => {
+      panierEnCours.current = false;
+      if (!error && data?.id) panierAbandonneId.current = data.id;
+    });
   }
 
   // Meta recommande d'envoyer e-mail/ville/prénom/nom dès qu'ils sont connus
@@ -341,12 +353,14 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('ville')} <span className="text-red-500">*</span></label>
-              <input value={form.ville} onChange={e => u('ville', e.target.value)} onBlur={noterInfosInitiateCheckout}
+              <input value={form.ville} onChange={e => u('ville', e.target.value)}
+                onBlur={() => { noterInfosInitiateCheckout(); noterPanierAbandonne(); }}
                 dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('ville')}`} />
             </div>
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('adresse')} <span className="text-red-500">*</span></label>
-              <input value={form.adresse} onChange={e => u('adresse', e.target.value)} dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('adresse')}`} />
+              <input value={form.adresse} onChange={e => u('adresse', e.target.value)} onBlur={() => noterPanierAbandonne()}
+                dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('adresse')}`} />
             </div>
           </div>
           <div>

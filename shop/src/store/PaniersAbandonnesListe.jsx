@@ -71,6 +71,11 @@ export default function PaniersAbandonnesListe() {
                 <p className="text-xs text-gray-500 mt-0.5 truncate">
                   {(p.lignes || []).map(l => `${l.name}${l.size ? ` (${l.size})` : ''} ×${l.qty}`).join(', ')}
                 </p>
+                {(p.ville || p.adresse) && (
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    📍 {[p.ville, p.adresse].filter(Boolean).join(' · ')}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 mt-0.5">
                   {fmtPrix(p.total)} · {new Date(p.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </p>
