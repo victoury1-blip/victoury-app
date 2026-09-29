@@ -54,7 +54,20 @@ export function cookiesFbPourMeta() {
     return m ? decodeURIComponent(m[1]) : undefined;
   };
   const fbp = lire('_fbp');
-  const fbc = lire('_fbc');
+  // Reconstruit `fbc` nous-mêmes à partir du `fbclid` de l'URL, au format
+  // documenté par Meta (fb.1.<horodatage>.<fbclid>), plutôt que de ne
+  // compter que sur le cookie `_fbc` posé par le pixel navigateur : Meta
+  // signale (Gestionnaire d'évènements → Diagnostics) recevoir parfois une
+  // valeur fbclid altérée (mise en minuscules/tronquée) dans ce cookie — un
+  // fbclid pris tel quel, frais, dans l'URL de la visite en cours évite ce
+  // problème. Le cookie reste le repli si l'URL n'a pas (ou plus) fbclid
+  // (page suivante de la navigation, après le clic initial).
+  let fbc;
+  try {
+    const fbclid = new URLSearchParams(window.location.search).get('fbclid');
+    if (fbclid) fbc = `fb.1.${Date.now()}.${fbclid}`;
+  } catch { /* URL illisible */ }
+  if (!fbc) fbc = lire('_fbc');
   const out = {};
   if (fbp) out.fbp = fbp;
   if (fbc) out.fbc = fbc;
