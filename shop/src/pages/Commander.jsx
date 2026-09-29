@@ -455,7 +455,8 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
               d'un formulaire par ailleurs sobre — pas se fondre avec le
               reste des boutons noirs de la page. */}
           <button onClick={valider} disabled={envoi}
-            className="mt-5 w-full bg-green-600 hover:bg-green-700 text-white py-4 text-xs tracking-widest uppercase disabled:opacity-60 transition-colors shadow-lg shadow-green-600/30">
+            className="mt-5 w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase disabled:opacity-60 disabled:animate-none transition-colors shadow-lg shadow-orange-600/30"
+            style={!envoi ? { animation: 'bouton-pulse 1.8s ease-in-out infinite' } : undefined}>
             {envoi ? tr('envoiEnCours') : tr('validerCommande')}
           </button>
 
