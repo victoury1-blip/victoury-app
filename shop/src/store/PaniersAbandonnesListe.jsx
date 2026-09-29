@@ -35,6 +35,14 @@ export default function PaniersAbandonnesListe() {
     await supabase.from('shop_paniers_abandonnes').delete().eq('id', id);
   }
 
+  // Marque le panier "déjà relancé" dès le clic sur WhatsApp — sans bloquer
+  // l'ouverture du lien (fire-and-forget), pour se souvenir de qui a déjà
+  // été contacté d'un coup d'œil plutôt qu'à la mémoire.
+  function marquerEnvoye(id) {
+    setVisibles(list => list.map(p => (p.id === id ? { ...p, envoye: true } : p)));
+    supabase.from('shop_paniers_abandonnes').update({ envoye: true }).eq('id', id).then(() => {});
+  }
+
   if (!visibles) return <p className="text-sm text-gray-400">Chargement…</p>;
 
   return (
@@ -52,7 +60,14 @@ export default function PaniersAbandonnesListe() {
           {visibles.map(p => (
             <div key={p.id} className="flex items-center gap-4 p-4">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">{p.nom || 'Client'} · {p.telephone}</p>
+                <p className="text-sm font-medium text-gray-800">
+                  {p.nom || 'Client'} · {p.telephone}
+                  {p.envoye && (
+                    <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] font-semibold align-middle">
+                      ✓ Envoyé
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5 truncate">
                   {(p.lignes || []).map(l => `${l.name}${l.size ? ` (${l.size})` : ''} ×${l.qty}`).join(', ')}
                 </p>
@@ -61,8 +76,10 @@ export default function PaniersAbandonnesListe() {
                 </p>
               </div>
               <a href={`https://wa.me/${numeroWhatsApp(p.telephone)}?text=${encodeURIComponent(messageRelance(p))}`}
-                target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 shrink-0">
+                target="_blank" rel="noreferrer" onClick={() => marquerEnvoye(p.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg shrink-0 ${
+                  p.envoye ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-green-600 text-white hover:bg-green-700'
+                }`}>
                 <MessageCircle size={14} /> WhatsApp
               </a>
               <button onClick={() => supprimer(p.id)} title="Retirer de la liste"
