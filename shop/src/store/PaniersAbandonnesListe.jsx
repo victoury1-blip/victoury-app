@@ -21,8 +21,8 @@ function numeroWhatsApp(tel) {
 
 function messageRelance(p) {
   const premier = p.lignes?.[0]?.name;
-  const article = premier ? `"${premier}"${p.lignes.length > 1 ? ` (+${p.lignes.length - 1})` : ''}` : 'votre article';
-  return `Bonjour${p.nom ? ' ' + p.nom : ''} 👋 vous avez laissé ${article} dans votre panier chez Victoury. Toujours intéressé(e) ? Je peux vous aider à finaliser votre commande 🙂`;
+  const article = premier ? `"${premier}"${p.lignes.length > 1 ? ` (+${p.lignes.length - 1})` : ''}` : 'المنتوج ديالك';
+  return `السلام${p.nom ? ' ' + p.nom : ''} 👋 خليتي ${article} فالسلة عند Victoury. مازال معجباك؟ نقدر نعاونك تكملي الطلبية 🙂`;
 }
 
 export default function PaniersAbandonnesListe() {
