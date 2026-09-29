@@ -8,15 +8,15 @@ import { cloudGet, cloudSet } from '../lib/cloudSettings';
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-// Clé du prix manuel : le nom du produit SANS la taille — "Ensemble Sporte
-// Noir - L" et "Ensemble Sporte Noir - XL" partagent le même prix d'achat
-// (c'est le même article, juste une taille différente). Sans ce nettoyage,
-// un prix saisi une fois sur la taille sans suffixe restait invisible sur
-// les autres tailles de la même commande, qui affichaient 0.
-function cleCout(nom) {
-  return (nom || '').trim().toLowerCase()
-    .replace(/\s*-\s*(xxs|xs|s|m|l|xl|xxl|xxxl|\d+xl|\d+)\s*$/i, '')
-    .trim();
+// Clé du prix manuel : propre à CETTE ligne de CETTE commande, jamais
+// partagée entre commandes. Un essai de partage par nom de produit (même
+// nettoyé de la taille) s'est révélé pire à l'usage : corriger le prix
+// d'une commande changeait celui de plusieurs autres sans prévenir — un
+// article vendu à un prix d'achat différent une fois (promo fournisseur,
+// erreur de saisie à corriger sur UNE seule commande...) n'a plus aucun
+// moyen de s'en distinguer si la clé est partagée.
+function cleCout(orderId, index) {
+  return `${orderId}::${index}`;
 }
 function pct(val, total) { return total ? ((val / total) * 100).toFixed(1) : '0.0'; }
 
@@ -151,9 +151,8 @@ export default function ProfitPage({ orders = [], setOrders }) {
     }));
   }
 
-  function setProductCost(name, value) {
-    const key = cleCout(name);
-    if (!key) return;
+  function setProductCost(orderId, index, value) {
+    const key = cleCout(orderId, index);
     // Persistance hors de l'updater : celui-ci doit rester pur (React peut le
     // ré-exécuter, ce qui enverrait deux écritures cloud concurrentes).
     const next = { ...manualCost };
@@ -339,11 +338,11 @@ export default function ProfitPage({ orders = [], setOrders }) {
     if (!order || order.echange || colis.echange) return 0;
     const prods = order.products?.length ? order.products : [order.product];
     let cost = 0;
-    for (const p of prods) {
+    for (const [idx, p] of prods.entries()) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
       // Prix manuel saisi = priorité (override) — permet de corriger/compléter.
-      const cle = cleCout(p.name);
+      const cle = cleCout(colis.orderId, idx);
       if (manualCost[cle] != null) { cost += manualCost[cle] * (p.qty || 1); continue; }
       const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
       const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
@@ -377,7 +376,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
     for (const [idx, p] of (prods || []).entries()) {
       if (!p?.name) continue;
       const pn = (p.name || '').trim().toLowerCase();
-      const cle = cleCout(p.name);
+      const cle = cleCout(colis.orderId, idx);
       const pnWords = pn.split(/\s+/).filter(w => w.length > 2);
       const sp = stockProducts.find(s => (s.name || '').trim().toLowerCase() === pn)
         || stockProducts.find(s => pn.includes((s.name || '').trim().toLowerCase()) || (s.name || '').trim().toLowerCase().includes(pn))
@@ -949,7 +948,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
                           <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
                           <td className="px-2 py-2 text-right font-semibold text-gray-800">{fmt(c.prix)}</td>
                           <td className="px-2 py-2 text-right">
-                            <InputCoutManuel valeur={it.unitCost || ''} onEnregistrer={(v) => setProductCost(it.name, v)} />
+                            <InputCoutManuel valeur={it.unitCost || ''} onEnregistrer={(v) => setProductCost(c.orderId, it.index, v)} />
                           </td>
                           <td className="px-2 py-2 text-center">
                             {setOrders && !it.echange ? (
@@ -997,7 +996,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
                           <td className={`px-2 py-2 ${it.echange ? 'text-amber-700 font-semibold' : it.manual ? 'text-blue-600 font-semibold' : it.matched ? 'text-gray-600' : 'text-red-600 font-semibold'}`}>{it.matched || '⚠ non trouvé'}</td>
                           <td className="px-2 py-2"></td>
                           <td className="px-2 py-2 text-right">
-                            <InputCoutManuel valeur={it.unitCost || ''} onEnregistrer={(v) => setProductCost(it.name, v)} />
+                            <InputCoutManuel valeur={it.unitCost || ''} onEnregistrer={(v) => setProductCost(c.orderId, it.index, v)} />
                           </td>
                           <td className="px-2 py-2 text-center">
                             {setOrders && !it.echange ? (
