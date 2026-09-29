@@ -163,6 +163,27 @@ export default function ProfitPage({ orders = [], setOrders }) {
     setManualCost(next);
   }
 
+  // Remplit d'un coup toutes les lignes SANS prix (0 ou non trouvé) — pour
+  // les cas où le coût d'achat est le même pour tout le lot du moment, sans
+  // avoir à cliquer "OK" ligne par ligne. Ne touche jamais une ligne qui a
+  // déjà un prix (manuel ou trouvé via le Stock), et ignore les échanges.
+  function remplirPrixManquants(prixParDefaut) {
+    const v = parseFloat(prixParDefaut);
+    if (!v || v <= 0) return;
+    const next = { ...manualCost };
+    for (const c of livresColis) {
+      for (const it of getProductCostDetail(c)) {
+        if (it.echange || it.unitCost > 0) continue;
+        next[cleCout(c.orderId, it.index)] = v;
+      }
+    }
+    localStorage.setItem('victoury_product_cost', JSON.stringify(next));
+    cloudSet('victoury_product_cost', next);
+    setManualCost(next);
+  }
+
+  const [remplissageVal, setRemplissageVal] = useState('');
+
   const [adTransfers, setAdTransfers] = useState(() => {
     try { return JSON.parse(localStorage.getItem('ad_transfers') || '[]'); } catch { return []; }
   });
@@ -913,6 +934,18 @@ export default function ProfitPage({ orders = [], setOrders }) {
               </div>
               <button onClick={() => setShowCost(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">✕</button>
             </div>
+            <div className="px-5 pt-3 flex items-center gap-2">
+              <span className="text-xs text-gray-500">Remplir les lignes sans prix (0) à :</span>
+              <input type="number" min="0" step="0.01" placeholder="100" value={remplissageVal}
+                onChange={(e) => setRemplissageVal(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { remplirPrixManquants(remplissageVal); setRemplissageVal(''); } }}
+                className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300" />
+              <button type="button"
+                onClick={() => { remplirPrixManquants(remplissageVal); setRemplissageVal(''); }}
+                className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+                Remplir tout
+              </button>
+            </div>
             <div className="overflow-auto p-3">
               <p className="text-xs text-gray-500 px-2 pb-2">
                 Le coût d'achat vient du <b>Prix d'achat</b> (Stock) × quantité, pour les commandes livrées.
@@ -920,9 +953,9 @@ export default function ProfitPage({ orders = [], setOrders }) {
                 {/* Les deux cases ne jouent pas le même rôle, et les confondre coûte
                     cher : doubler un prix unitaire pour rattraper UNE commande
                     fausse aussitôt toutes les autres du même produit. */}
-                <br />👉 <b>« Prix achat U. »</b> = ce que coûte <b>une pièce</b>. Il vaut pour <b>tous</b> les colis du même produit — ne le change que si le prix d'achat a vraiment changé.
+                <br />👉 <b>« Prix achat U. »</b> = ce que coûte <b>une pièce sur cette commande précise</b>. Propre à cette ligne : le corriger ici ne change aucune autre commande.
                 <br />👉 <b>« Qté »</b> = le nombre de pièces <b>de cette commande</b>. C'est elle qu'il faut corriger quand un total ne tombe pas juste (400 DH pour 2 ensembles → Qté 2, prix unitaire inchangé).
-                <br />Entrée pour valider ; tout est enregistré aussitôt.
+                <br />Entrée ou « OK » pour valider.
               </p>
               <table className="w-full text-xs border-collapse">
                 <thead>
