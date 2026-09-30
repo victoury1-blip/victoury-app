@@ -7,6 +7,7 @@ import { printBon } from '../lib/printBon';
 import { findOrderByCode, checkRetourScan, retourTargetStatus } from '../lib/scanUtils';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { fmtDate, now } from '../lib/dateUtils';
+import { jouerBip, jouerErreur, debloquerAudio } from '../lib/beep';
 
 
 function ScannerRetourPage({ orders, setOrders }) {
@@ -18,39 +19,8 @@ function ScannerRetourPage({ orders, setOrders }) {
   const scannedIdsRef = useRef(new Set());
   const navigate = useNavigate();
 
-  function playBeep() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.setValueAtTime(1200, ctx.currentTime);
-      osc.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.5, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
-    } catch {}
-  }
-
-  function playError() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(300, ctx.currentTime);
-      osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
-      osc.frequency.setValueAtTime(150, ctx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.6, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.5);
-    } catch {}
-  }
+  const playBeep = jouerBip;
+  const playError = jouerErreur;
 
   function showMessage(text, type = 'success') {
     if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
@@ -242,7 +212,7 @@ function ScannerRetourPage({ orders, setOrders }) {
           </div>
           <div className="p-4 space-y-4">
             <button
-              onClick={() => setScanning(true)}
+              onClick={() => { debloquerAudio(); setScanning(true); }}
               className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition w-full justify-center"
             >
               <QrCode size={18} />

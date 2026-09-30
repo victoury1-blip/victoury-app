@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ScanLine } from 'lucide-react';
 import { findOrderByCode } from '../../lib/scanUtils';
 import useBarcodeScanner from '../../hooks/useBarcodeScanner';
+import { jouerBip, debloquerAudio } from '../../lib/beep';
 
 export default function ScanModal({ orders, onFound, onClose }) {
   const [msg, setMsg] = useState(null);
@@ -12,7 +13,7 @@ export default function ScanModal({ orders, onFound, onClose }) {
   const processCode = useCallback((code) => {
     const order = findOrderByCode(orders, code);
     if (!order) { setMsg({ text: `Non trouvé: ${String(code || '').trim()}`, error: true }); return; }
-    try { new (window.AudioContext || window.webkitAudioContext)().createOscillator(); } catch {}
+    jouerBip();
     onFound(order.id);
     setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });
   }, [orders, onFound]);
@@ -47,7 +48,7 @@ export default function ScanModal({ orders, onFound, onClose }) {
         <div className="p-5 space-y-3">
           {!scanning ? (
             <button
-              onClick={() => setScanning(true)}
+              onClick={() => { debloquerAudio(); setScanning(true); }}
               className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 flex items-center justify-center gap-2"
             >
               <ScanLine size={18} /> Scanner QR Code
