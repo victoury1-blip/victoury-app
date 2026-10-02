@@ -46,6 +46,12 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   const [inclurePartenaire, setInclurePartenaire] = useState(true);
   const [tailleBundle, setTailleBundle] = useState('');
   const [photoActive, setPhotoActive] = useState(0);
+  // Zoom plein écran sur la photo — un tap pour entrer, un sur la croix
+  // (ou en dehors de la photo) pour sortir. `zoomNiveau` à 2 fait grossir
+  // la photo d'un second tap, pas une vraie pince à deux doigts (pas
+  // nécessaire ici, la photo est déjà grande plein écran).
+  const [zoomOuvert, setZoomOuvert] = useState(false);
+  const [zoomNiveau, setZoomNiveau] = useState(1);
   const [guideOuvert, setGuideOuvert] = useState(false);
   const carouselRef = useRef(null);
 
@@ -216,8 +222,9 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                   // au-dessus/dessous ou de chaque côté. Ce fond est le même gris que
                   // le studio des photos produits (plutôt que bg-sand, crème) : la
                   // bande se fond dans la photo au lieu de trancher avec elle.
-                  ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-contain"
-                      loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
+                  ? <img src={img.url} alt={img.alt || produit.name} className="w-full h-full object-contain cursor-zoom-in"
+                      loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined}
+                      onClick={() => { setZoomNiveau(1); setZoomOuvert(true); }} />
                   : <div className="w-full h-full grid place-items-center text-gray-300 text-xs">{t('photoAVenir')}</div>}
               </div>
             ))}
@@ -501,6 +508,23 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               </button>
             </div>
             <img src={theme.guideTailles.image} alt={t('guideTailles')} className="w-full h-auto" />
+          </div>
+        </div>
+      )}
+
+      {/* Zoom plein écran sur la photo active — tap la photo pour entrer,
+          la croix (ou en dehors, ou un second tap) pour sortir. */}
+      {zoomOuvert && photos[photoActive]?.url && (
+        <div className="fixed inset-0 bg-black z-50 overflow-auto" onClick={() => setZoomOuvert(false)}>
+          <button onClick={() => setZoomOuvert(false)} aria-label="Fermer"
+            className="fixed top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/90 grid place-items-center">
+            <X size={20} className="text-ink" />
+          </button>
+          <div className="min-h-full flex items-center justify-center p-4">
+            <img src={photos[photoActive].url} alt={photos[photoActive].alt || produit.name}
+              onClick={(e) => { e.stopPropagation(); setZoomNiveau(z => (z === 1 ? 2.5 : 1)); }}
+              style={{ transform: `scale(${zoomNiveau})`, transition: 'transform 0.2s' }}
+              className="max-w-full max-h-full object-contain cursor-zoom-in" />
           </div>
         </div>
       )}
