@@ -363,17 +363,6 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
                 dir={dirTexte} className={`${champ} ${alignTexte} ${enErreur('adresse')}`} />
             </div>
           </div>
-          <div>
-            <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('emailOptionnel')}</label>
-            <input type="email" value={form.email} onChange={e => u('email', e.target.value)}
-              onBlur={() => { noterInfosInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
-              placeholder="exemple@email.com" dir="ltr" className={`${champ} text-left`} />
-          </div>
-
-          <div className="border border-ink px-4 py-3 flex items-center justify-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-ink" />
-            <span className="text-xs">{tr('paiementLivraison')}</span>
-          </div>
         </div>
 
         <div className="bg-sand p-5">
