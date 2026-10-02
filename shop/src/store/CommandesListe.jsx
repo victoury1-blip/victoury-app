@@ -121,8 +121,26 @@ export default function CommandesListe() {
     supabase.from('orders')
       .select('id, recipient, product, products, price, status, date_added, is_deleted')
       .like('id', 'VS-%')
-      .order('date_added', { ascending: false }).limit(300)
-      .then(({ data }) => setCommandes(data || []))
+      // Trié par `created_at` (vraie colonne timestamp) pour que LIMIT 300
+      // retienne bien les 300 commandes les plus récentes — PAS par
+      // `date_added`, un texte "JJ/MM/AAAA HH:MM:SS" (voir horodatage() dans
+      // lib/commande.js) que Postgres compare ici comme une CHAÎNE :
+      // "03/09/…" passait avant "02/10/…" parce que '3' > '2' au premier
+      // chiffre, sans le moindre égard pour le mois — les commandes les plus
+      // récentes se retrouvaient noyées au milieu, voire en bas, de la
+      // liste. Le tri d'affichage définitif, juste après, reparse quand
+      // même `date_added` en vraie date : c'est le champ que l'utilisateur
+      // voit, il doit rester la source de vérité de l'ordre affiché.
+      .order('created_at', { ascending: false })
+      .limit(300)
+      .then(({ data }) => {
+        const parseTs = (s) => {
+          const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+          if (!m) return 0;
+          return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime();
+        };
+        setCommandes((data || []).sort((a, b) => parseTs(b.date_added) - parseTs(a.date_added)));
+      })
       .catch(() => setCommandes([]));
   }, []);
 
