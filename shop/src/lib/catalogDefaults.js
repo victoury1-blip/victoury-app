@@ -26,6 +26,11 @@ export const REGLAGES_DEFAUT = {
   // dans la liste des commandes — activée par défaut, désactivable ici si
   // jamais la demande d'autorisation gêne des clients.
   geoGPSActif: true,
+  // Affiche (ou non) le champ "Code promo" à la caisse — réglable depuis
+  // /store/codes-promo, séparément de l'activation de chaque code lui-même :
+  // masquer le champ évite qu'un client curieux tente des codes au hasard
+  // tant qu'aucune offre n'est en cours.
+  codePromoActif: true,
 };
 
 // Le Meta Pixel vit dans sa propre clé : ni son activation ni son identifiant

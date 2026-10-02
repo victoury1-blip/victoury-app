@@ -453,14 +453,18 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             </div>
           </div>
 
-          <div className="mt-4 flex gap-2">
-            <input value={code} onChange={e => setCode(e.target.value)} placeholder={tr('codePromo')}
-              className="flex-1 border border-gray-200 px-3 py-2.5 text-sm bg-white" />
-            <button onClick={appliquerCode} className="px-4 bg-ink text-white text-[11px] tracking-widest uppercase">
-              {tr('appliquer')}
-            </button>
-          </div>
-          {codeErreur && <p className="mt-1 text-[11px] text-red-500">{codeErreur}</p>}
+          {reglages?.codePromoActif !== false && (
+            <>
+              <div className="mt-4 flex gap-2">
+                <input value={code} onChange={e => setCode(e.target.value)} placeholder={tr('codePromo')}
+                  className="flex-1 border border-gray-200 px-3 py-2.5 text-sm bg-white" />
+                <button onClick={appliquerCode} className="px-4 bg-ink text-white text-[11px] tracking-widest uppercase">
+                  {tr('appliquer')}
+                </button>
+              </div>
+              {codeErreur && <p className="mt-1 text-[11px] text-red-500">{codeErreur}</p>}
+            </>
+          )}
 
           {erreur && <p className="mt-4 text-xs text-red-600 bg-red-50 p-3">{erreur}</p>}
 

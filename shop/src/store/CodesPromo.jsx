@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { listerCodes, enregistrerCode, supprimerCode } from '../lib/admin';
+import { supabase } from '../lib/supabase';
+import { REGLAGES_DEFAUT } from '../lib/catalog';
 
 const champ = 'border border-gray-200 px-3 py-2.5 text-sm bg-white';
 const VIDE = { code: '', kind: 'percent', value: '', min_total: '', max_uses: '' };
@@ -8,9 +10,25 @@ const VIDE = { code: '', kind: 'percent', value: '', min_total: '', max_uses: ''
 export default function CodesPromo() {
   const [codes, setCodes] = useState([]);
   const [form, setForm] = useState(VIDE);
+  // Interrupteur global, séparé de l'activation de chaque code : masque tout
+  // le champ "Code promo" à la caisse plutôt que de désactiver chaque code
+  // un par un quand aucune offre n'est en cours.
+  const [champVisible, setChampVisible] = useState(true);
 
   const recharger = () => listerCodes().then(setCodes).catch(() => {});
-  useEffect(() => { recharger(); }, []);
+  useEffect(() => {
+    recharger();
+    supabase.from('shop_settings').select('value').eq('key', 'boutique').maybeSingle()
+      .then(({ data }) => setChampVisible(data?.value?.codePromoActif ?? REGLAGES_DEFAUT.codePromoActif));
+  }, []);
+
+  async function basculerChampVisible() {
+    const nouveauEtat = !champVisible;
+    setChampVisible(nouveauEtat);
+    const { data } = await supabase.from('shop_settings').select('value').eq('key', 'boutique').maybeSingle();
+    const valeur = { ...REGLAGES_DEFAUT, ...(data?.value || {}), codePromoActif: nouveauEtat };
+    await supabase.from('shop_settings').upsert({ key: 'boutique', value: valeur });
+  }
 
   async function ajouter() {
     if (!form.code.trim() || !form.value) return;
@@ -37,6 +55,19 @@ export default function CodesPromo() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-lg font-medium">Codes promo</h1>
+
+      <div className="mt-4 bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">Champ "Code promo" sur le site</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {champVisible ? 'Visible à la caisse — le client peut saisir un code.' : "Masqué — le champ n'apparaît plus du tout à la caisse."}
+          </p>
+        </div>
+        <button onClick={basculerChampVisible}
+          className={`text-xs px-3 py-1.5 rounded-full font-medium ${champVisible ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+          {champVisible ? 'Actif' : 'Inactif'}
+        </button>
+      </div>
 
       <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5 space-y-3">
         <div className="grid grid-cols-2 gap-3">
