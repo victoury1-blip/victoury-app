@@ -11,6 +11,7 @@ import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoye
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 import { miniature, surErreurMiniature } from '../lib/img';
+import OffreTimer from '../components/OffreTimer';
 
 // La couleur du thème (--ink, réglable dans /store/theme), pas le vert de la
 // sélection de taille — un champ de saisie n'est pas un choix, il ne doit pas
@@ -20,7 +21,15 @@ const champ = 'w-full border-2 border-ink px-3 py-3 text-sm focus:outline-none t
 export default function Commander({ lignes, reglages, onQuantite, onRetirer, onVider }) {
   const { t: tr, lang } = useLang();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ nom: '', telephone: '', ville: '', adresse: '', email: '' });
+  const [form, setForm] = useState(() => {
+    // Client qui a déjà commandé sur cet appareil : ses coordonnées sont
+    // pré-remplies pour lui éviter de les retaper à chaque nouvelle commande.
+    try {
+      const sauvegarde = JSON.parse(localStorage.getItem('victoury_client_info') || 'null');
+      if (sauvegarde) return { nom: '', telephone: '', ville: '', adresse: '', email: '', ...sauvegarde };
+    } catch {}
+    return { nom: '', telephone: '', ville: '', adresse: '', email: '' };
+  });
   const [promo, setPromo] = useState(null);
   const [code, setCode] = useState('');
   const [codeErreur, setCodeErreur] = useState('');
@@ -290,6 +299,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
         },
       }], reglages.tiktok.testCode)).catch(() => {});
     }
+    try {
+      localStorage.setItem('victoury_client_info', JSON.stringify({ nom: form.nom, telephone: form.telephone, ville: form.ville, adresse: form.adresse }));
+    } catch {}
     onVider();
     // Le panier est vidé juste avant (onVider) : sans les transmettre ici,
     // la page de remerciement n'aurait plus aucun moyen de savoir ce qui a
@@ -469,6 +481,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             className="mt-5 w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase disabled:opacity-60 transition-colors shadow-lg shadow-orange-600/30">
             {envoi ? tr('envoiEnCours') : tr('validerCommande')}
           </button>
+          <OffreTimer className="mt-2 justify-center" />
 
           {/* Rappel des garanties juste sous le bouton : c'est LA seconde
               d'hésitation avant de valider — le doute ("et si le produit ne

@@ -13,6 +13,7 @@ import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
 import { IconeWhatsApp } from '../components/icons';
 import { numeroWhatsApp } from '../lib/commande';
+import OffreTimer from '../components/OffreTimer';
 
 function Accordeon({ titre, children }) {
   const { lang } = useLang();
@@ -297,6 +298,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             {remisePalier(paliers[0].pourcent, paliers[0].rang)}
           </p>
         )}
+        {promo && <OffreTimer className="mt-2" />}
 
         {couleurs.length > 1 && (
           <div className="mt-6">
