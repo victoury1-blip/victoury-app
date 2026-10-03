@@ -360,6 +360,14 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               );
             })}
           </div>
+          {/* Stock réel (pas un chiffre inventé) : seulement quand il est
+              bas, pour créer une vraie urgence sans jamais mentir au client
+              — un stock confortable n'affiche rien du tout. */}
+          {taille && stockTaille > 0 && stockTaille <= 5 && (
+            <p className="mt-2 text-xs font-medium text-red-600">
+              {ar ? `⚡ غير ${stockTaille} قطع متبقية من هاد المقاس!` : `⚡ Plus que ${stockTaille} en stock dans cette taille !`}
+            </p>
+          )}
         </div>
 
         {/* Achat direct uniquement : ajoute au panier puis ouvre tout de
