@@ -341,8 +341,8 @@ function Vitrine() {
                 une annonce en cours pointe dessus, et la changer l'arrêterait. */}
             <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
-            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} />} />
-            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} />} />
+            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
+            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
             <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/merci/:id" element={<Merci />} />

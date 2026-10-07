@@ -33,7 +33,7 @@ function Accordeon({ titre, children }) {
   );
 }
 
-export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapide }) {
+export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapide, lignes, reglages, onQuantite, onRetirer, onVider }) {
   const { t, remisePalier, lang } = useLang();
   const ar = lang === 'ar';
   const { slug } = useParams();
@@ -168,13 +168,13 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
       <LandingVente
         produit={produit} photos={photos} taille={taille} setTaille={setTaille}
         tailles={tailles} stockTaille={stockTaille} promo={promo} theme={theme}
-        onAchat={() => {
+        lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider}
+        onAjouterAuPanier={() => {
           onAjouter({
             slug: produit.slug, name: produit.name, price: produit.price,
             size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
             stock: stockTaille, collectionId: produit.collection_id,
           });
-          onAchatRapide?.();
         }}
       />
     );

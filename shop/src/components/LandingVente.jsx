@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { useLang } from '../lib/i18n';
@@ -8,16 +8,28 @@ import GarantiesGrid from './GarantiesGrid';
 import AvisProduit from './AvisProduit';
 import OffreTimer from './OffreTimer';
 
+// Même chargement différé que dans App.jsx (son code n'est pas nécessaire
+// avant qu'un client clique "Commander") — importé ici une seconde fois,
+// Vite/React partagent le même chunk, pas de doublon de code téléchargé.
+const Commander = lazy(() => import('../pages/Commander'));
+
 /* Page de vente longue (landing page de pub), pour un produit "non listé" —
    un seul article à vendre, un seul geste à faire : défilement vertical,
    argumentaire avant le choix, un seul bouton d'achat répété en haut et en
    bas. Tout le contraire de la fiche produit classique (grille 2 colonnes,
    comparaison entre articles) : ici rien ne doit détourner du scroll vers
-   l'achat. */
-export default function LandingVente({ produit, photos, taille, setTaille, tailles, stockTaille, promo, theme, onAchat }) {
+   l'achat.
+   Le formulaire de commande (nom, téléphone, ville, adresse) s'ouvre
+   directement DANS la page — pas dans une fenêtre superposée comme sur la
+   fiche produit classique — pour qu'un client déjà convaincu par
+   l'argumentaire n'ait même pas besoin d'un clic de plus pour voir où taper
+   ses coordonnées. */
+export default function LandingVente({ produit, photos, taille, setTaille, tailles, stockTaille, promo, theme,
+  lignes, reglages, onQuantite, onRetirer, onVider, onAjouterAuPanier }) {
   const { t, lang } = useLang();
   const ar = lang === 'ar';
   const [zoomUrl, setZoomUrl] = useState(null);
+  const [commandeVisible, setCommandeVisible] = useState(false);
 
   // Une ligne par argument — l'admin tape ses points forts dans "Détails"
   // du formulaire produit (un par ligne), affichés ici en liste à coches
@@ -28,8 +40,16 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
   const epuise = tailles.length > 0 && !tailles.some(s => s.stock > 0);
 
   function handleAchat() {
-    if (!taille) { document.getElementById('lv-tailles')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-    onAchat();
+    if (tailles.length > 0 && !taille) {
+      document.getElementById('lv-tailles')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // Un seul clic ajoute l'article ET fait apparaître le formulaire — le
+    // client n'a besoin de rien choisir d'autre, ce n'est pas un vrai panier
+    // à gérer (quantité, plusieurs articles), juste CE produit.
+    onAjouterAuPanier();
+    setCommandeVisible(true);
+    requestAnimationFrame(() => document.getElementById('lv-commande')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   return (
@@ -116,6 +136,19 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
           </a>
         )}
       </div>
+
+      {/* Formulaire de commande intégré — apparaît ici, dans la page, dès le
+          premier clic sur "Acheter maintenant" (en haut ou dans la barre
+          collante). Même composant que le reste du site (promo, livraison
+          gratuite, pixels…), simplement affiché en place plutôt que dans une
+          fenêtre superposée. */}
+      {commandeVisible && (
+        <div id="lv-commande" className="mt-6 border border-gray-200 rounded-xl overflow-hidden scroll-mt-4">
+          <Suspense fallback={<div className="p-10 text-center text-sm text-gray-400">…</div>}>
+            <Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />
+          </Suspense>
+        </div>
+      )}
 
       <GarantiesGrid />
 
