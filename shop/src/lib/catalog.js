@@ -16,7 +16,7 @@ export { REGLAGES_DEFAUT, PIXEL_DEFAUT, CLARITY_DEFAUT, THEME_DEFAUT, GA4_DEFAUT
  */
 
 const PRODUIT = `
-  id, slug, name, description, details, price, compare_at, gender, status,
+  id, slug, name, description, details, price, compare_at, gender, status, unlisted,
   color_name, color_hex, position, group_id, collection_id, is_bestseller, video_url,
   images:shop_product_images(url, alt, position),
   sizes:shop_product_sizes(size, stock, position)
@@ -55,7 +55,7 @@ export async function chargerCollections() {
 export async function chargerCollectionsAvecCompte() {
   const [collections, { data: produits }] = await Promise.all([
     chargerCollections(),
-    supabase.from('shop_products').select('collection_id').eq('status', 'Actif'),
+    supabase.from('shop_products').select('collection_id').eq('status', 'Actif').eq('unlisted', false),
   ]);
   const comptes = {};
   (produits || []).forEach(p => { if (p.collection_id) comptes[p.collection_id] = (comptes[p.collection_id] || 0) + 1; });
@@ -78,6 +78,7 @@ export async function chargerProduitsDeCollection(slug) {
     .select(`${PRODUIT}, collection:shop_collections!inner(id, slug, name, description)`)
     .eq('collection.slug', slug)
     .eq('status', 'Actif')
+    .eq('unlisted', false)
     .order('position');
   if (error) throw error;
   if (!data || data.length === 0) {
@@ -123,7 +124,7 @@ export async function chargerProduitsLies(collectionId, produitIdAExclure, limit
   // lignes étaient 4 couleurs du même article.
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT)
-    .eq('collection_id', collectionId).eq('status', 'Actif').neq('id', produitIdAExclure)
+    .eq('collection_id', collectionId).eq('status', 'Actif').eq('unlisted', false).neq('id', produitIdAExclure)
     .order('position').limit(limite * 3);
   if (error) return [];
   return unProduitParGroupe((data || []).map(trier)).slice(0, limite);
@@ -146,7 +147,7 @@ export async function chargerProduitsParSlugs(slugs) {
 
 export async function chargerNouveautes(limite = 8) {
   const { data, error } = await supabase
-    .from('shop_products').select(PRODUIT).eq('status', 'Actif').order('created_at', { ascending: false }).limit(limite * 3);
+    .from('shop_products').select(PRODUIT).eq('status', 'Actif').eq('unlisted', false).order('created_at', { ascending: false }).limit(limite * 3);
   if (error) throw error;
   return unProduitParGroupe((data || []).map(trier)).slice(0, limite);
 }
@@ -158,7 +159,7 @@ export async function chargerNouveautes(limite = 8) {
 export async function chargerProduitsParCollections(collectionIds, limite = 8) {
   if (!collectionIds?.length) return [];
   const { data, error } = await supabase
-    .from('shop_products').select(PRODUIT).eq('status', 'Actif')
+    .from('shop_products').select(PRODUIT).eq('status', 'Actif').eq('unlisted', false)
     .in('collection_id', collectionIds).order('created_at', { ascending: false }).limit(limite * 3);
   if (error) throw error;
   return unProduitParGroupe((data || []).map(trier)).slice(0, limite);

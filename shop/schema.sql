@@ -600,3 +600,12 @@ alter table shop_paniers_abandonnes add column if not exists relance_envoyee_at 
 create index if not exists shop_paniers_abandonnes_relance_idx on shop_paniers_abandonnes(relance_envoyee, created_at);
 -- Le cron (api/relance-paniers.js) écrit avec la clé de service (contourne
 -- RLS) — pas de nouvelle policy nécessaire pour l'UPDATE de ces deux colonnes.
+
+-- ============================================================
+--  PRODUIT "NON LISTÉ" — page produit accessible uniquement par son lien
+--  direct (ex: landing page de pub), absente de l'accueil, des collections,
+--  des nouveautés et des suggestions. Reste 'Actif' (achetable, la commande
+--  rejoint bien l'app Victoury) : seul son affichage dans les grilles change,
+--  pas sa vente — d'où un drapeau séparé de `status`, pas une 3ᵉ valeur dessus.
+-- ============================================================
+alter table shop_products add column if not exists unlisted boolean not null default false;
