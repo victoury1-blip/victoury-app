@@ -174,7 +174,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             slug: produit.slug, name: produit.name, price: produit.price,
             size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
             stock: stockTaille, collectionId: produit.collection_id,
-          });
+          }, { ouvrirTiroir: false });
         }}
       />
     );

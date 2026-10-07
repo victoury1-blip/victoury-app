@@ -1,6 +1,7 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
+import { cleLigne } from '../lib/panier';
 import { useLang } from '../lib/i18n';
 import { IconeWhatsApp } from '../components/icons';
 import { numeroWhatsApp } from '../lib/commande';
@@ -9,27 +10,32 @@ import AvisProduit from './AvisProduit';
 import OffreTimer from './OffreTimer';
 
 // Même chargement différé que dans App.jsx (son code n'est pas nécessaire
-// avant qu'un client clique "Commander") — importé ici une seconde fois,
+// avant que le formulaire n'apparaisse) — importé ici une seconde fois,
 // Vite/React partagent le même chunk, pas de doublon de code téléchargé.
 const Commander = lazy(() => import('../pages/Commander'));
 
 /* Page de vente longue (landing page de pub), pour un produit "non listé" —
    un seul article à vendre, un seul geste à faire : défilement vertical,
-   argumentaire avant le choix, un seul bouton d'achat répété en haut et en
-   bas. Tout le contraire de la fiche produit classique (grille 2 colonnes,
-   comparaison entre articles) : ici rien ne doit détourner du scroll vers
-   l'achat.
-   Le formulaire de commande (nom, téléphone, ville, adresse) s'ouvre
-   directement DANS la page — pas dans une fenêtre superposée comme sur la
-   fiche produit classique — pour qu'un client déjà convaincu par
-   l'argumentaire n'ait même pas besoin d'un clic de plus pour voir où taper
-   ses coordonnées. */
+   argumentaire, formulaire déjà sous les yeux. Tout le contraire de la fiche
+   produit classique (grille 2 colonnes, comparaison entre articles) : ici
+   rien ne doit détourner du scroll vers l'achat.
+
+   Le formulaire de commande (nom, téléphone, ville, adresse) est visible DÈS
+   L'ARRIVÉE sur la page — pas besoin de cliquer "Acheter" d'abord — et
+   l'article y est déjà présent : un client déjà convaincu par l'argumentaire
+   n'a aucun clic de plus à faire avant de taper ses coordonnées.
+
+   Remise par quantité (ex. "2 pour 450 DH") : ce n'est pas un prix codé en
+   dur ici, mais la remise par palier déjà existante du site (réglée depuis
+   /store/remises, par collection) — prendre 2 exemplaires du même article
+   déclenche la même remise que prendre 2 articles différents de la même
+   collection. Le total exact s'affiche dans le récapitulatif du formulaire
+   ci-dessous dès que la quantité change. */
 export default function LandingVente({ produit, photos, taille, setTaille, tailles, stockTaille, promo, theme,
   lignes, reglages, onQuantite, onRetirer, onVider, onAjouterAuPanier }) {
   const { t, lang } = useLang();
   const ar = lang === 'ar';
   const [zoomUrl, setZoomUrl] = useState(null);
-  const [commandeVisible, setCommandeVisible] = useState(false);
 
   // Une ligne par argument — l'admin tape ses points forts dans "Détails"
   // du formulaire produit (un par ligne), affichés ici en liste à coches
@@ -39,17 +45,22 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
 
   const epuise = tailles.length > 0 && !tailles.some(s => s.stock > 0);
 
-  function handleAchat() {
-    if (tailles.length > 0 && !taille) {
-      document.getElementById('lv-tailles')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    // Un seul clic ajoute l'article ET fait apparaître le formulaire — le
-    // client n'a besoin de rien choisir d'autre, ce n'est pas un vrai panier
-    // à gérer (quantité, plusieurs articles), juste CE produit.
+  // Ajout automatique au panier dès que la page (et une taille, s'il y en a)
+  // est prête — le formulaire ci-dessous a donc toujours un article à
+  // commander, sans attendre un clic sur un bouton "Acheter" séparé.
+  useEffect(() => {
+    if (epuise) return;
+    if (tailles.length > 0 && !taille) return;
     onAjouterAuPanier();
-    setCommandeVisible(true);
-    requestAnimationFrame(() => document.getElementById('lv-commande')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produit.id, taille, epuise]);
+
+  const cle = cleLigne({ slug: produit.slug, size: taille || '' });
+  const ligneActuelle = lignes.find(l => cleLigne(l) === cle);
+  const quantite = ligneActuelle?.qty || 1;
+
+  function allerAuFormulaire() {
+    document.getElementById('lv-commande')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   return (
@@ -117,8 +128,26 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
           </>
         )}
 
-        <button disabled={epuise} onClick={handleAchat}
-          className="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
+        {/* Pas de taille sur ce produit : une quantité à choisir à la place.
+            Le prix exact pour 2+ (remise par palier réglée dans
+            /store/remises) se lit dans le récapitulatif du formulaire
+            juste en dessous, pas ici — deux chiffres différents à deux
+            endroits de la page serait l'assurance d'une contestation. */}
+        {tailles.length === 0 && ligneActuelle && (
+          <div className="mb-4">
+            <p className="text-[13px] font-medium text-ink mb-2">{ar ? 'الكمية' : 'Quantité'}</p>
+            <div className="inline-flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => onQuantite(cle, Math.max(1, quantite - 1))}
+                className="w-10 h-10 grid place-items-center text-lg text-gray-500 hover:bg-gray-50">−</button>
+              <span className="w-10 text-center font-medium">{quantite}</span>
+              <button type="button" onClick={() => onQuantite(cle, quantite + 1)}
+                className="w-10 h-10 grid place-items-center text-lg text-gray-500 hover:bg-gray-50">+</button>
+            </div>
+          </div>
+        )}
+
+        <button disabled={epuise} onClick={allerAuFormulaire}
+          className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
                      disabled:bg-gray-200 disabled:text-gray-400 disabled:animate-none transition-colors shadow-lg shadow-orange-600/30"
           style={!epuise ? { animation: 'bouton-pulse 1.8s ease-in-out infinite' } : undefined}>
           {epuise ? t('epuiseTampon') : t('acheterMaintenant')}
@@ -137,12 +166,12 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
         )}
       </div>
 
-      {/* Formulaire de commande intégré — apparaît ici, dans la page, dès le
-          premier clic sur "Acheter maintenant" (en haut ou dans la barre
-          collante). Même composant que le reste du site (promo, livraison
+      {/* Formulaire de commande intégré — visible dès l'arrivée sur la page
+          (pas besoin de cliquer "Acheter" d'abord), avec l'article déjà
+          présent. Même composant que le reste du site (promo, livraison
           gratuite, pixels…), simplement affiché en place plutôt que dans une
           fenêtre superposée. */}
-      {commandeVisible && (
+      {ligneActuelle && (
         <div id="lv-commande" className="mt-6 border border-gray-200 rounded-xl overflow-hidden scroll-mt-4">
           <Suspense fallback={<div className="p-10 text-center text-sm text-gray-400">…</div>}>
             <Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />
@@ -176,7 +205,7 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
       <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
         <div className="max-w-xl mx-auto flex items-center gap-3">
           <bdi className="shrink-0 font-extrabold text-orange-600">{fmtPrix(produit.price, lang)}</bdi>
-          <button disabled={epuise} onClick={handleAchat}
+          <button disabled={epuise} onClick={allerAuFormulaire}
             className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-3 text-sm font-semibold tracking-widest uppercase
                        disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
             {epuise ? t('epuiseTampon') : t('acheterMaintenant')}

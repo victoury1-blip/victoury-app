@@ -277,9 +277,12 @@ function Vitrine() {
     };
   }, []);
 
-  const onAjouter = useCallback((ligne) => {
+  const onAjouter = useCallback((ligne, { ouvrirTiroir = true } = {}) => {
     setLignes(prev => { const s = ajouter(prev, ligne); ecrirePanier(s); return s; });
-    setPanierOuvert(true);
+    // L'ajout automatique d'une landing page (LandingVente.jsx) n'a pas à
+    // faire surgir le tiroir panier — le formulaire de commande est déjà
+    // affiché en place dans la page, le tiroir ferait doublon par-dessus.
+    if (ouvrirTiroir) setPanierOuvert(true);
     trackPixel('AddToCart', {
       content_name: ligne.name, content_ids: [ligne.slug], content_type: 'product',
       value: ligne.price, currency: 'MAD',
