@@ -366,7 +366,7 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
   );
 }
 
-export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading, onDeleteOrder, currentUser }) {
+export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading, onDeleteOrder, currentUser, unreserveDeletedIds }) {
   const { statuses } = useStatuses();
   const orders = externalOrders;
   function setOrders(updater) {
@@ -1429,6 +1429,13 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           orders={orders}
           onClose={() => setNewOrderOpen(false)}
           onSave={(ordersList) => {
+            // generateVictId() réutilise délibérément le numéro d'une commande
+            // supprimée (le numéro est "libéré") — mais sans ceci, la liste
+            // noire anti-réimport de setOrdersWithSync rejetait aussitôt cette
+            // commande TOUTE NEUVE en la prenant pour une résurrection de
+            // l'ancienne, avant même qu'elle n'atteigne Supabase. Voir le
+            // commentaire de unreserveDeletedIds dans App.jsx.
+            unreserveDeletedIds?.(ordersList.map(o => o.id));
             setOrders((prev) => [...ordersList, ...prev]);
             // Stock manuel (/store/stock) : une commande peut naître DÉJÀ
             // "Confirmé" (statut choisi dès la création, dans ce même

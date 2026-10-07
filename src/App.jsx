@@ -79,7 +79,7 @@ function assignVictTracking(freshOrders, allOrders) {
   return freshOrders;
 }
 
-function OrdersRoute({ orders, setOrdersWithSync, isLoading, onDeleteOrder, currentUser }) {
+function OrdersRoute({ orders, setOrdersWithSync, isLoading, onDeleteOrder, currentUser, unreserveDeletedIds }) {
   const { tab } = useParams();
   const activeTab = tabFromParam(tab);
   const navigate = useNavigate();
@@ -92,6 +92,7 @@ function OrdersRoute({ orders, setOrdersWithSync, isLoading, onDeleteOrder, curr
       isLoading={isLoading}
       onDeleteOrder={onDeleteOrder}
       currentUser={currentUser}
+      unreserveDeletedIds={unreserveDeletedIds}
     />
   );
 }
@@ -1181,6 +1182,26 @@ export default function App() {
     return (data || []).map(mapRow);
   }
 
+  /* Libère un ou plusieurs numéros VIxxxxx de la liste noire : generateVictId()
+     réutilise délibérément le numéro d'une commande supprimée (voir son
+     commentaire dans NewOrderModal), mais la liste noire — conçue pour
+     empêcher un RÉ-IMPORT externe (WooCommerce, Ozon…) de faire réapparaître
+     une commande supprimée — ne faisait pas la différence : une commande
+     TOUTE NEUVE qui réutilisait ce numéro par coïncidence se faisait
+     silencieusement rejeter par `setOrdersWithSync` juste après sa création,
+     sans erreur ni trace (elle n'atteignait même jamais Supabase). Appelé
+     AVANT setOrdersWithSync, au moment même où ces numéros sont attribués à
+     une commande neuve, pour que ce rejet ne se produise plus. */
+  function unreserveDeletedIds(ids) {
+    let changed = false;
+    for (const id of ids) {
+      if (deletedIdsRef.current.delete(id)) changed = true;
+    }
+    if (changed) {
+      try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
+    }
+  }
+
   /* Restaure une commande supprimée : is_deleted=false + retrait de la liste noire */
   async function restoreOrder(orderId) {
     deletedIdsRef.current.delete(orderId);
@@ -1357,7 +1378,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard orders={orders} isLoading={isLoading} />} />
           <Route path="/analytics" element={<AnalyticsPage orders={orders} />} />
           <Route path="/commandes" element={<Navigate to="/commandes/a-confirmer" replace />} />
-          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} />} />
+          <Route path="/commandes/:tab" element={<OrdersRoute orders={orders} setOrdersWithSync={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} currentUser={session?.user?.email || 'inconnu'} unreserveDeletedIds={unreserveDeletedIds} />} />
           <Route path="/liste-colis" element={<ListeColisPage orders={orders} setOrders={setOrdersWithSync} isLoading={isLoading} onDeleteOrder={(id) => { setOrders(prev => prev.filter(o => o.id !== id)); deleteOrderFromSupabase(id); }} fetchDeletedOrders={fetchDeletedOrders} restoreOrder={restoreOrder} purgeOrder={purgeOrder} />} />
           <Route path="/import-sheets" element={<GoogleSheetsPage orders={orders} setOrders={setOrdersWithSync} />} />
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
