@@ -1457,25 +1457,15 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             // que personne ne le remarque avant qu'un client ne se plaigne.
             const idsACreer = ordersList.map(o => o.id);
             setTimeout(() => {
-              supabase.from('orders').select('id, status').in('id', idsACreer).then(({ data, error }) => {
+              supabase.from('orders').select('id').in('id', idsACreer).then(({ data, error }) => {
                 if (error) return;
-                const parId = new Map((data || []).map(r => [r.id, r]));
-                const manquantes = ordersList.filter(o => !parId.has(o.id));
-                // Diagnostic temporaire : montre le statut RÉELLEMENT enregistré en
-                // base pour chaque commande créée (même quand tout va bien), pour
-                // comparer avec la valeur attendue par l'onglet "Confirmé" sans
-                // deviner — à retirer une fois le mystère des commandes
-                // "invisibles" (créées mais absentes de l'onglet) élucidé.
-                const diagnostic = ordersList.map(o => {
-                  const row = parId.get(o.id);
-                  return `${o.id} : attendu="${o.status}" / en base="${row ? row.status : 'ABSENTE'}"`;
-                }).join('\n');
-                if (manquantes.length || ordersList.some(o => parId.get(o.id)?.status !== o.status)) {
+                const presents = new Set((data || []).map(r => r.id));
+                const manquantes = ordersList.filter(o => !presents.has(o.id));
+                if (manquantes.length) {
                   alert(
-                    (manquantes.length
-                      ? `⚠️ Attention : ${manquantes.length} commande(s) affichée(s) comme créée(s) n'ont PAS été enregistrées en base.\n`
-                      : `⚠️ Le statut enregistré en base diffère de celui choisi à la création.\n`) +
-                    diagnostic
+                    `⚠️ Attention : ${manquantes.length} commande(s) affichée(s) comme créée(s) n'ont PAS été enregistrées en base ` +
+                    `(${manquantes.map(o => `${o.id} — ${o.recipient.name}`).join(', ')}). ` +
+                    `Réessayez de les créer, et signalez ce message si ça se reproduit.`
                   );
                 }
               });
