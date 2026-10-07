@@ -14,6 +14,7 @@ import { miniature, surErreurMiniature } from '../lib/img';
 import { IconeWhatsApp } from '../components/icons';
 import { numeroWhatsApp } from '../lib/commande';
 import OffreTimer from '../components/OffreTimer';
+import LandingVente from '../components/LandingVente';
 
 function Accordeon({ titre, children }) {
   const { lang } = useLang();
@@ -158,6 +159,27 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   // Règles globales + celles ciblant justement la collection de ce produit.
   const paliers = paliersEffectifs(remises, produit.collection_id);
   const stockTaille = tailles.find(s => s.size === taille)?.stock;
+
+  // "Non listé" : page de vente longue dédiée à une pub, pas la fiche
+  // produit classique (grille 2 colonnes, comparaison avec d'autres
+  // articles) — voir le champ du formulaire admin dans ProduitForm.jsx.
+  if (produit.unlisted) {
+    return (
+      <LandingVente
+        produit={produit} photos={photos} taille={taille} setTaille={setTaille}
+        tailles={tailles} stockTaille={stockTaille} promo={promo} theme={theme}
+        onAchat={() => {
+          onAjouter({
+            slug: produit.slug, name: produit.name, price: produit.price,
+            size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
+            stock: stockTaille, collectionId: produit.collection_id,
+          });
+          onAchatRapide?.();
+        }}
+      />
+    );
+  }
+
   // Le prix affiché pour la sélection "achetés ensemble" doit tenir compte
   // de la même remise par quantité que le panier lui appliquerait (ex.
   // "-20% dès le 2ᵉ article") — annoncer la somme brute des deux prix
