@@ -77,13 +77,15 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
       </div>
       {promo && <OffreTimer className="mt-2" />}
 
-      {/* Visuel principal — photo/vidéo d'ouverture, grand format carré,
-          identique au reste du site pour la cohérence de studio. */}
-      <div className="mt-4 aspect-square overflow-hidden rounded-xl" style={{ background: '#D8D8D5' }}>
+      {/* Visuel principal — en hauteur NATURELLE (pas un carré rogné) : une
+          landing page vient souvent d'un visuel déjà entièrement composé
+          (Canva, très haut, texte+preuves+arguments déjà dedans), que
+          recadrer en carré couperait n'importe où. */}
+      <div className="mt-4 rounded-xl overflow-hidden">
         {photos[0]?.video
-          ? <video src={photos[0].video} className="w-full h-full object-contain" controls playsInline autoPlay muted loop />
+          ? <video src={photos[0].video} className="w-full h-auto" controls playsInline autoPlay muted loop />
           : photos[0]?.url
-          ? <img src={photos[0].url} alt={produit.name} className="w-full h-full object-contain cursor-zoom-in"
+          ? <img src={photos[0].url} alt={produit.name} className="w-full h-auto cursor-zoom-in"
               onClick={() => setZoomUrl(photos[0].url)} />
           : null}
       </div>

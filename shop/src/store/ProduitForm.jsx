@@ -163,7 +163,11 @@ export default function ProduitForm() {
           <div>
             <label className={label}>Adresse (slug) *</label>
             <input value={form.slug} onChange={e => { setSlugModifie(true); u('slug', slugifier(e.target.value)); }} className={champ} />
-            <p className="mt-1 text-[11px] text-gray-400">/product/{form.slug || '…'}/</p>
+            <p className="mt-1 text-[11px] text-gray-400">
+              {form.unlisted
+                ? `victoury-maroc.com/${form.slug || '…'}`
+                : `/product/${form.slug || '…'}/`}
+            </p>
           </div>
         </div>
 

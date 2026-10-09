@@ -30,6 +30,7 @@ const Favoris = lazy(() => import('./pages/Favoris'));
 const Commander = lazy(() => import('./pages/Commander'));
 const Merci = lazy(() => import('./pages/Merci'));
 const PageStatique = lazy(() => import('./pages/PageStatique'));
+const SlugRouter = lazy(() => import('./pages/SlugRouter'));
 const AdminAuth = lazy(() => import('./store/AdminAuth'));
 const AdminLayout = lazy(() => import('./store/AdminLayout'));
 const Dashboard = lazy(() => import('./store/Dashboard'));
@@ -349,8 +350,12 @@ function Vitrine() {
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
             <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/merci/:id" element={<Merci />} />
-            <Route path="/:slug/" element={<PageStatique />} />
-            <Route path="/:slug" element={<PageStatique />} />
+            {/* Adresse racine partagée entre pages statiques ET landing pages
+                de produits "non listés" (voir SlugRouter.jsx) — une landing
+                page garde ainsi le même lien court "victoury-maroc.com/<nom>"
+                qu'une pub pointe dessus, sans le préfixe /product/. */}
+            <Route path="/:slug/" element={<SlugRouter onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
+            <Route path="/:slug" element={<SlugRouter onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
