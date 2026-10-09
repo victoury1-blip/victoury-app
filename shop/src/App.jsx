@@ -124,6 +124,17 @@ function Vitrine() {
   // la page de confirmation au lieu de la laisser s'afficher.
   useEffect(() => { if (pathname.startsWith('/merci/')) setAchatRapideOuvert(false); }, [pathname]);
   const [exitIntentOuvert, setExitIntentOuvert] = useState(false);
+  // Une landing page (produit "non listé", voir LandingVente.jsx) masque le
+  // bandeau d'annonce, l'en-tête ET le pied de page du site — un visiteur
+  // venu d'une pub pour UN SEUL article ne doit pas pouvoir s'évader vers le
+  // reste du catalogue via le menu ; rien ne doit détourner du scroll vers
+  // l'achat. Remis à "visible" à CHAQUE changement d'adresse, avant que la
+  // page suivante ne décide si elle est elle-même une landing page — sans
+  // ce reset, l'en-tête resterait caché en quittant une landing page pour
+  // une page normale.
+  const [chromeVisible, setChromeVisible] = useState(true);
+  useEffect(() => { setChromeVisible(true); }, [pathname]);
+  const onLandingDetectee = useCallback((estLanding) => setChromeVisible(!estLanding), []);
   // Sur une première visite (jamais de cache local — exactement le cas d'un
   // clic sur une pub), collections ET reglages démarrent vides : les
   // colonnes "Collections"/"Mentions légales" du pied de page n'existaient
@@ -330,9 +341,11 @@ function Vitrine() {
     <LangProvider>
     <div className="min-h-screen flex flex-col">
       <ScrollToTop />
-      <AnnonceBar theme={reglages.theme} />
-      <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
-        logoPosition={reglages.theme?.logoPosition} logoHauteur={reglages.theme?.logoHauteur} onOuvrirPanier={ouvrirPanier} />
+      {chromeVisible && <AnnonceBar theme={reglages.theme} />}
+      {chromeVisible && (
+        <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
+          logoPosition={reglages.theme?.logoPosition} logoHauteur={reglages.theme?.logoHauteur} onOuvrirPanier={ouvrirPanier} />
+      )}
 
       <main className="flex-1">
         {/* Repli vide (pas de spinner) : ces pages sont déjà découpées en
@@ -347,8 +360,8 @@ function Vitrine() {
                 une annonce en cours pointe dessus, et la changer l'arrêterait. */}
             <Route path="/product-category/:slug" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
             <Route path="/product-category/:slug/" element={<Collection theme={reglages.theme} remises={reglages.remises} />} />
-            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
-            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
+            <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onLandingDetectee={onLandingDetectee} />} />
+            <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onLandingDetectee={onLandingDetectee} />} />
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
             <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
             <Route path="/merci/:id" element={<Merci />} />
@@ -356,8 +369,8 @@ function Vitrine() {
                 de produits "non listés" (voir SlugRouter.jsx) — une landing
                 page garde ainsi le même lien court "victoury-maroc.com/<nom>"
                 qu'une pub pointe dessus, sans le préfixe /product/. */}
-            <Route path="/:slug/" element={<SlugRouter onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
-            <Route path="/:slug" element={<SlugRouter onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
+            <Route path="/:slug/" element={<SlugRouter onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onLandingDetectee={onLandingDetectee} />} />
+            <Route path="/:slug" element={<SlugRouter onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onLandingDetectee={onLandingDetectee} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

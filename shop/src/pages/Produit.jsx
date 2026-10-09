@@ -33,7 +33,7 @@ function Accordeon({ titre, children }) {
   );
 }
 
-export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapide, lignes, reglages, onQuantite, onRetirer, onVider }) {
+export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapide, lignes, reglages, onQuantite, onRetirer, onVider, onLandingDetectee }) {
   const { t, remisePalier, lang } = useLang();
   const ar = lang === 'ar';
   const { slug } = useParams();
@@ -116,6 +116,15 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
       .finally(() => setChargement(false));
     window.scrollTo(0, 0);
   }, [slug]);
+
+  // Prévient le parent (App.jsx) dès que l'on sait si cette fiche est une
+  // landing page — il masque alors bandeau d'annonce, en-tête et pied de
+  // page le temps de l'affichage (voir LandingVente.jsx / App.jsx). Dépend
+  // de `produit` entier (pas juste `.unlisted`) pour couvrir aussi le
+  // changement de couleur (choisirCouleur, plus bas), qui recharge une
+  // autre fiche sans jamais redéclencher l'effet ci-dessus (clé `slug`
+  // inchangée par design, pour éviter le flash de rechargement de page).
+  useEffect(() => { onLandingDetectee?.(!!produit?.unlisted); }, [produit, onLandingDetectee]);
 
   // Changer de couleur ne doit PAS recharger la page : c'est un choix au même
   // titre que la taille, pas une nouvelle fiche à part. On met juste à jour
