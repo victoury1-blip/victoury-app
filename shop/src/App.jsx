@@ -36,6 +36,8 @@ const AdminLayout = lazy(() => import('./store/AdminLayout'));
 const Dashboard = lazy(() => import('./store/Dashboard'));
 const ProduitsListe = lazy(() => import('./store/ProduitsListe'));
 const ProduitForm = lazy(() => import('./store/ProduitForm'));
+const LandingPagesListe = lazy(() => import('./store/LandingPagesListe'));
+const LandingPageForm = lazy(() => import('./store/LandingPageForm'));
 const CollectionsListe = lazy(() => import('./store/CollectionsListe'));
 const MediaListe = lazy(() => import('./store/MediaListe'));
 const ImportWoo = lazy(() => import('./store/ImportWoo'));
@@ -402,6 +404,8 @@ function Administration() {
             <Route index element={<Dashboard />} />
             <Route path="produits" element={<ProduitsListe />} />
             <Route path="produits/:id" element={<ProduitForm />} />
+            <Route path="landing-pages" element={<LandingPagesListe />} />
+            <Route path="landing-pages/:id" element={<LandingPageForm />} />
             <Route path="collections" element={<CollectionsListe />} />
             <Route path="media" element={<MediaListe />} />
             <Route path="import-woo" element={<ImportWoo />} />

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3, Heart } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3, Heart, Rocket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
@@ -15,6 +15,7 @@ import Wordmark from '../components/Wordmark';
 const LIENS = [
   { to: '/store', label: 'Tableau de bord', icon: LayoutGrid, fin: true },
   { to: '/store/produits', label: 'Produits', icon: Package },
+  { to: '/store/landing-pages', label: 'Landing pages', icon: Rocket },
   { to: '/store/collections', label: 'Collections', icon: Layers },
   { to: '/store/import-woo', label: 'Importer WooCommerce', icon: DownloadCloud },
   { to: '/store/media', label: 'Médiathèque', icon: Image },

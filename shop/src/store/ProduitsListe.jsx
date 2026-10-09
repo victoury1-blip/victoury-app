@@ -98,7 +98,10 @@ export default function ProduitsListe() {
   // dès que `produits` passe de null à sa vraie valeur).
   const [groupesOuverts, setGroupesOuverts] = useState({});
 
-  const recharger = () => listerProduits().then(setProduits).catch(() => setProduits([]));
+  // Les landing pages ("non listé") ont leur propre liste dédiée
+  // (/store/landing-pages, voir LandingPagesListe.jsx) — ce ne sont pas des
+  // fiches de catalogue, les montrer ici aussi doublerait inutilement.
+  const recharger = () => listerProduits().then(ps => setProduits(ps.filter(p => !p.unlisted))).catch(() => setProduits([]));
   useEffect(() => { recharger(); }, []);
   useEffect(() => { listerCollections().then(setCollections).catch(() => {}); }, []);
   useEffect(() => { listerGroupes().then(setGroupes).catch(() => {}); }, []);

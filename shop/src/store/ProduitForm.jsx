@@ -30,7 +30,7 @@ const COULEURS_COURANTES = [
 const VIDE = {
   name: '', slug: '', description: '', details: '', price: '', compare_at: '',
   gender: 'Unisexe', status: 'Actif', collection_id: '', group_id: '',
-  color_name: '', color_hex: '#000000', is_bestseller: false, video_url: '', unlisted: false,
+  color_name: '', color_hex: '#000000', is_bestseller: false, video_url: '',
 };
 
 // Brouillon du produit en cours de création, pas encore enregistré —
@@ -78,7 +78,7 @@ export default function ProduitForm() {
         price: p.price ?? '', compare_at: p.compare_at ?? '', gender: p.gender, status: p.status,
         collection_id: p.collection_id || '', group_id: p.group_id || '',
         color_name: p.color_name || '', color_hex: p.color_hex || '#000000',
-        is_bestseller: p.is_bestseller || false, video_url: p.video_url || '', unlisted: p.unlisted || false,
+        is_bestseller: p.is_bestseller || false, video_url: p.video_url || '',
       });
       setTailles(p.sizes?.length ? p.sizes.map(s => ({ size: s.size, stock: s.stock })) : [{ size: '', stock: '' }]);
       setImages(p.images?.length ? p.images.map(i => ({ url: i.url, alt: i.alt || '' })) : [{ url: '', alt: '' }]);
@@ -156,7 +156,6 @@ export default function ProduitForm() {
         collection_id: form.collection_id || null, group_id: form.group_id || null,
         color_name: form.color_name || null, color_hex: form.group_id ? form.color_hex : null,
         is_bestseller: !!form.is_bestseller, video_url: form.video_url || null,
-        unlisted: !!form.unlisted,
       };
       const p = await enregistrerProduit(payload);
       await remplacerTailles(p.id, tailles);
@@ -186,11 +185,7 @@ export default function ProduitForm() {
           <div>
             <label className={label}>Adresse (slug) *</label>
             <input value={form.slug} onChange={e => { setSlugModifie(true); u('slug', slugifier(e.target.value)); }} className={champ} />
-            <p className="mt-1 text-[11px] text-gray-400">
-              {form.unlisted
-                ? `victoury-maroc.com/${form.slug || '…'}`
-                : `/product/${form.slug || '…'}/`}
-            </p>
+            <p className="mt-1 text-[11px] text-gray-400">/product/{form.slug || '…'}/</p>
           </div>
         </div>
 
@@ -218,16 +213,6 @@ export default function ProduitForm() {
           <input type="checkbox" checked={!!form.is_bestseller} onChange={e => u('is_bestseller', e.target.checked)}
             className="w-4 h-4" />
           Meilleure vente <span className="text-gray-400 text-xs">(affiche un badge sur la boutique)</span>
-        </label>
-
-        {/* Reste achetable via son lien direct (produit/<slug>) — utile pour
-            une landing page de pub — mais disparaît de l'accueil, des
-            collections, des nouveautés et des suggestions : un client qui
-            navigue le site normalement ne tombe jamais dessus par hasard. */}
-        <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
-          <input type="checkbox" checked={!!form.unlisted} onChange={e => u('unlisted', e.target.checked)}
-            className="w-4 h-4" />
-          Non listé <span className="text-gray-400 text-xs">(masqué du site, accessible uniquement par son lien direct)</span>
         </label>
 
         <div className="grid sm:grid-cols-2 gap-4">
