@@ -1,15 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, ImageOff, ExternalLink, Trash2 } from 'lucide-react';
-import { listerProduits, supprimerProduit } from '../lib/admin';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, ImageOff, ExternalLink, Trash2, Copy } from 'lucide-react';
+import { listerProduits, supprimerProduit, dupliquerProduit } from '../lib/admin';
 import { fmtPrix } from '../lib/pricing';
 
 /* Liste des produits "non listés" uniquement — une landing page de pub,
    jamais mélangée aux fiches du catalogue (voir ProduitsListe.jsx, qui
    montre tout sauf celles-ci — un produit n'apparaît que dans l'une des
-   deux listes, jamais les deux). */
+   deux listes, jamais les deux).
+
+   "Dupliquer" sert de modèle : repartir d'une page déjà construite (images,
+   texte, mise en forme) pour la prochaine pub, plutôt que remplir le
+   formulaire vide à chaque fois — exactement ce qu'un outil comme Youcan
+   propose avec ses modèles prêts à l'emploi. */
 export default function LandingPagesListe() {
   const [liste, setListe] = useState(null);
+  const [enCours, setEnCours] = useState(null);
+  const navigate = useNavigate();
 
   const recharger = () => listerProduits().then(ps => setListe(ps.filter(p => p.unlisted))).catch(() => setListe([]));
   useEffect(() => { recharger(); }, []);
@@ -18,6 +25,18 @@ export default function LandingPagesListe() {
     if (!confirm(`Supprimer "${p.name}" ?`)) return;
     await supprimerProduit(p.id);
     recharger();
+  }
+
+  async function dupliquer(p) {
+    setEnCours(p.id);
+    try {
+      const copie = await dupliquerProduit(p);
+      navigate(`/store/landing-pages/${copie.id}`);
+    } catch (e) {
+      alert(e.message || 'Duplication impossible');
+    } finally {
+      setEnCours(null);
+    }
   }
 
   return (
@@ -66,6 +85,10 @@ export default function LandingPagesListe() {
                   <div className="flex items-center justify-end gap-1">
                     <a href={`/${p.slug}/`} target="_blank" rel="noreferrer" title="Voir la page"
                       className="p-1.5 rounded text-gray-400 hover:bg-gray-100"><ExternalLink size={14} /></a>
+                    <button onClick={() => dupliquer(p)} disabled={enCours === p.id} title="Dupliquer comme modèle"
+                      className="p-1.5 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-40">
+                      <Copy size={14} />
+                    </button>
                     <button onClick={() => retirer(p)} title="Supprimer" className="p-1.5 rounded text-red-400 hover:bg-red-50">
                       <Trash2 size={14} />
                     </button>
