@@ -33,21 +33,35 @@ const VIDE = {
   color_name: '', color_hex: '#000000', is_bestseller: false, video_url: '', unlisted: false,
 };
 
+// Brouillon du produit en cours de création, pas encore enregistré —
+// retrouver un formulaire vidé après être sorti copier un champ ailleurs
+// (ex. un texte généré par l'assistant) forçait à tout retaper depuis le
+// début. N'existe que pour "nouveau" : un produit déjà enregistré a sa vraie
+// source de vérité en base, pas besoin de brouillon local.
+const CLE_BROUILLON = 'victoury_produit_brouillon';
+function lireBrouillon() {
+  try { return JSON.parse(localStorage.getItem(CLE_BROUILLON) || 'null'); } catch { return null; }
+}
+function effacerBrouillon() {
+  try { localStorage.removeItem(CLE_BROUILLON); } catch { /* quota */ }
+}
+
 export default function ProduitForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const nouveau = id === 'nouveau';
+  const brouillon = nouveau ? lireBrouillon() : null;
 
-  const [form, setForm] = useState(VIDE);
-  const [tailles, setTailles] = useState([{ size: '', stock: '' }]);
-  const [images, setImages] = useState([{ url: '', alt: '' }]);
+  const [form, setForm] = useState(brouillon?.form || VIDE);
+  const [tailles, setTailles] = useState(brouillon?.tailles || [{ size: '', stock: '' }]);
+  const [images, setImages] = useState(brouillon?.images || [{ url: '', alt: '' }]);
   // Index de la photo dont on ouvre la médiathèque, ou null si fermée —
   // une seule à la fois, comme un input de fichier normal.
   const [bibliotheque, setBibliotheque] = useState(null);
   const [collections, setCollections] = useState([]);
   const [groupes, setGroupes] = useState([]);
   const [nouveauGroupe, setNouveauGroupe] = useState('');
-  const [slugModifie, setSlugModifie] = useState(!nouveau);
+  const [slugModifie, setSlugModifie] = useState(!nouveau || !!brouillon?.form?.slug);
   const [televerse, setTeleverse] = useState(false);
   const [enregistrement, setEnregistrement] = useState(false);
   const [erreur, setErreur] = useState('');
@@ -70,6 +84,14 @@ export default function ProduitForm() {
       setImages(p.images?.length ? p.images.map(i => ({ url: i.url, alt: i.alt || '' })) : [{ url: '', alt: '' }]);
     }).catch(() => {});
   }, [id, nouveau]);
+
+  // Brouillon réenregistré à CHAQUE changement (pas seulement en quittant la
+  // page) : un onglet fermé par erreur, pas juste une navigation propre,
+  // doit lui aussi laisser quelque chose à retrouver.
+  useEffect(() => {
+    if (!nouveau) return;
+    try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ form, tailles, images })); } catch { /* quota */ }
+  }, [nouveau, form, tailles, images]);
 
   const u = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const surNom = (v) => { u('name', v); if (!slugModifie) u('slug', slugifier(v)); };
@@ -139,6 +161,7 @@ export default function ProduitForm() {
       const p = await enregistrerProduit(payload);
       await remplacerTailles(p.id, tailles);
       await remplacerImages(p.id, images);
+      if (nouveau) effacerBrouillon();
       navigate('/store/produits');
     } catch (e) {
       // Une adresse déjà prise est l'échec le plus probable : le dire clairement.
