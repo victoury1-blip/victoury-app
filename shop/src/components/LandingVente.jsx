@@ -63,25 +63,12 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
 
   return (
     <div className="max-w-xl mx-auto px-4 sm:px-6 py-6 pb-28" dir={ar ? 'rtl' : 'ltr'}>
-      {produit.is_bestseller && (
-        <p className="inline-flex items-center bg-gradient-to-r from-amber-500 to-red-500 text-white
-                      text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-sm mb-3">
-          {t('meilleureVente')}
-        </p>
-      )}
-      <h1 className="text-2xl font-bold leading-tight">{produit.name}</h1>
-
-      <div className="mt-2 flex items-center gap-3">
-        <bdi><span className="text-2xl font-extrabold text-orange-600">{fmtPrix(produit.price, lang)}</span></bdi>
-        {promo && <bdi><span className="text-sm text-red-500 line-through">{fmtPrix(produit.compare_at, lang)}</span></bdi>}
-      </div>
-      {promo && <OffreTimer className="mt-2" />}
-
-      {/* Visuel principal — en hauteur NATURELLE (pas un carré rogné) : une
-          landing page vient souvent d'un visuel déjà entièrement composé
-          (Canva, très haut, texte+preuves+arguments déjà dedans), que
-          recadrer en carré couperait n'importe où. */}
-      <div className="mt-4 rounded-xl overflow-hidden">
+      {/* Visuel principal EN PREMIER, rien au-dessus — un visuel déjà
+          entièrement composé (Canva, très haut, texte+preuves+arguments
+          déjà dedans) doit ouvrir la page tel quel, pas être précédé d'un
+          titre/prix qui double ce qu'il contient déjà. En hauteur NATURELLE
+          (pas un carré rogné) : un cadre carré couperait n'importe où. */}
+      <div className="rounded-xl overflow-hidden">
         {photos[0]?.video
           ? <video src={photos[0].video} className="w-full h-auto" controls playsInline autoPlay muted loop />
           : photos[0]?.url
@@ -89,6 +76,20 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
               onClick={() => setZoomUrl(photos[0].url)} />
           : null}
       </div>
+
+      {produit.is_bestseller && (
+        <p className="inline-flex items-center bg-gradient-to-r from-amber-500 to-red-500 text-white
+                      text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-sm mt-4">
+          {t('meilleureVente')}
+        </p>
+      )}
+      <h1 className="mt-3 text-2xl font-bold leading-tight">{produit.name}</h1>
+
+      <div className="mt-2 flex items-center gap-3">
+        <bdi><span className="text-2xl font-extrabold text-orange-600">{fmtPrix(produit.price, lang)}</span></bdi>
+        {promo && <bdi><span className="text-sm text-red-500 line-through">{fmtPrix(produit.compare_at, lang)}</span></bdi>}
+      </div>
+      {promo && <OffreTimer className="mt-2" />}
 
       {arguments_.length > 0 && (
         <ul className="mt-5 space-y-2.5 bg-sand/60 rounded-xl p-4">
