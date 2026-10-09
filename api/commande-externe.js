@@ -53,10 +53,25 @@ function normaliserTelephone(tel) {
   return s;
 }
 
-function secretValide(req) {
+/* L'outil externe peut envoyer le secret sous plusieurs formes selon comment
+   il a été configuré (x-webhook-secret, x-api-key, Authorization: Bearer, ou
+   api_key dans le corps JSON) — toutes acceptées, pour ne pas dépendre d'un
+   réglage précis côté AI Studio. */
+function secretRecu(req, body) {
+  const bearer = req.headers['authorization'];
+  return (
+    req.headers['x-webhook-secret'] ||
+    req.headers['x-api-key'] ||
+    (bearer && bearer.replace(/^Bearer\s+/i, '')) ||
+    body?.api_key ||
+    ''
+  );
+}
+
+function secretValide(req, body) {
   const attendu = process.env.COMMANDE_EXTERNE_SECRET;
   if (!attendu) return true; // pas encore configuré — voir commentaire ci-dessus
-  const recu = req.headers['x-webhook-secret'];
+  const recu = secretRecu(req, body);
   if (!recu || recu.length !== attendu.length) return false;
   try {
     return timingSafeEqual(Buffer.from(recu), Buffer.from(attendu));
@@ -70,12 +85,13 @@ export default async function handler(req, res) {
   // navigateur du client final envoie donc une requête cross-origin.
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-webhook-secret');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-webhook-secret, x-api-key, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
-  if (!secretValide(req)) return res.status(401).json({ error: 'Non autorisé' });
 
   const body = req.body || {};
+  if (!secretValide(req, body)) return res.status(401).json({ error: 'Non autorisé' });
+
   const nom = String(body.customer_name || body.nom || '').trim();
   const phone = normaliserTelephone(body.phone || body.telephone || '');
   const ville = String(body.city || body.ville || '').trim();
