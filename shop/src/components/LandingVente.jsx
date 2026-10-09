@@ -3,8 +3,6 @@ import { Check, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { useLang } from '../lib/i18n';
-import GarantiesGrid from './GarantiesGrid';
-import AvisProduit from './AvisProduit';
 import OffreTimer from './OffreTimer';
 
 // Même chargement différé que dans App.jsx (son code n'est pas nécessaire
@@ -162,8 +160,6 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
         </div>
       )}
 
-      <GarantiesGrid />
-
       {/* Galerie longue : chaque photo supplémentaire en pleine largeur, à la
           suite — le format "scroll infini d'images" des pages de vente
           (usage, détail, mise en situation), pas une grille ni un carrousel. */}
@@ -175,10 +171,6 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
           ))}
         </div>
       )}
-
-      <div className="mt-10">
-        <AvisProduit productId={produit.id} />
-      </div>
 
       {/* Barre collante : le bouton d'achat reste toujours accessible, même
           après un long défilement dans l'argumentaire ou la galerie — sans
