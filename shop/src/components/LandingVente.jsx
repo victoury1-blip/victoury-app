@@ -3,8 +3,6 @@ import { Check, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { useLang } from '../lib/i18n';
-import { IconeWhatsApp } from '../components/icons';
-import { numeroWhatsApp } from '../lib/commande';
 import GarantiesGrid from './GarantiesGrid';
 import AvisProduit from './AvisProduit';
 import OffreTimer from './OffreTimer';
@@ -146,24 +144,6 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
           </div>
         )}
 
-        <button disabled={epuise} onClick={allerAuFormulaire}
-          className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
-                     disabled:bg-gray-200 disabled:text-gray-400 disabled:animate-none transition-colors shadow-lg shadow-orange-600/30"
-          style={!epuise ? { animation: 'bouton-pulse 1.8s ease-in-out infinite' } : undefined}>
-          {epuise ? t('epuiseTampon') : t('acheterMaintenant')}
-        </button>
-
-        {numeroWhatsApp(theme?.footer?.contacts?.whatsapp) && (
-          <a href={`https://wa.me/${numeroWhatsApp(theme.footer.contacts.whatsapp)}?text=${encodeURIComponent(
-              (ar ? 'السلام، عندي سؤال على ' : "Bonjour, j'ai une question sur ") + produit.name)}`}
-            target="_blank" rel="noreferrer"
-            className="mt-2.5 block bg-[#25D366] hover:brightness-95 text-white rounded-lg shadow-lg shadow-green-600/20 transition-all py-3 px-4 text-center">
-            <span className="flex items-center justify-center gap-2 font-bold text-sm">
-              <IconeWhatsApp size={20} />
-              {ar ? 'اضغط هنا للتواصل معنا' : 'Cliquez ici pour nous contacter'}
-            </span>
-          </a>
-        )}
       </div>
 
       {/* Formulaire de commande intégré — visible dès l'arrivée sur la page
