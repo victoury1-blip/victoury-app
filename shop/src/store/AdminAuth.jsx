@@ -17,20 +17,47 @@ export default function AdminAuth({ children }) {
   const [motDePasse, setMotDePasse] = useState('');
   const [erreur, setErreur] = useState('');
   const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState(false);
+  const [lent, setLent] = useState(false);
+  const [essai, setEssai] = useState(0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => setSession(data.session), () => setSession(null));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  /* Dépend de l'identifiant, pas de l'objet session : chaque rafraîchissement
+     du jeton (retour sur l'onglet après une pause) fournit une NOUVELLE
+     session du même utilisateur. Revérifier l'accès à chaque fois démontait
+     toute l'administration le temps de la requête — et la laissait blanche
+     tant que cette requête ne revenait pas. */
+  const userId = session === undefined ? undefined : (session?.user?.id || null);
   useEffect(() => {
-    if (session === undefined) return;
-    if (!session) { setEstAdmin(false); return; }
-    setEstAdmin(undefined);
-    supabase.from('shop_admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
-      .then(({ data }) => setEstAdmin(!!data), () => setEstAdmin(false));
-  }, [session]);
+    if (userId === undefined) return;
+    if (!userId) { setEstAdmin(false); return; }
+    let annule = false;
+    setEstAdmin(undefined); setEchec(false);
+    supabase.from('shop_admins').select('user_id').eq('user_id', userId).maybeSingle()
+      .then(({ data, error }) => {
+        if (annule) return;
+        if (error) setEchec(true); else setEstAdmin(!!data);
+      }, () => { if (!annule) setEchec(true); });
+    return () => { annule = true; };
+  }, [userId, essai]);
+
+  const enChargement = !echec && (session === undefined || (session && estAdmin === undefined));
+  useEffect(() => {
+    if (!enChargement) { setLent(false); return; }
+    const t = setTimeout(() => setLent(true), 8000);
+    return () => clearTimeout(t);
+  }, [enChargement, essai]);
+
+  const reessayer = () => {
+    setLent(false); setEchec(false);
+    if (session === undefined) supabase.auth.getSession().then(({ data }) => setSession(data.session), () => setSession(null));
+    setEssai(n => n + 1);
+  };
 
   const connecter = useCallback(async (e) => {
     e.preventDefault();
@@ -40,7 +67,31 @@ export default function AdminAuth({ children }) {
     if (error) setErreur('E-mail ou mot de passe incorrect.');
   }, [email, motDePasse]);
 
-  if (session === undefined || (session && estAdmin === undefined)) return null;
+  if (echec || lent) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-sand px-4 text-center">
+        <div>
+          <p className="text-sm text-gray-600">
+            {echec ? 'Connexion au serveur impossible.' : 'Le chargement prend plus de temps que prévu.'}
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <button onClick={reessayer}
+              className="bg-ink text-white px-5 py-2.5 text-[11px] tracking-widest uppercase">Réessayer</button>
+            <button onClick={() => window.location.reload()}
+              className="border border-ink px-5 py-2.5 text-[11px] tracking-widest uppercase">Recharger</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (enChargement) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-white">
+        <img src="/loading-logo.png" alt="" width="180" height="75" className="w-[180px] h-auto animate-pulse" />
+      </div>
+    );
+  }
 
   if (session && estAdmin === false) {
     return (
