@@ -14,12 +14,14 @@
 
 create sequence if not exists vi_tracking_seq;
 
+-- Les numéros >= 10000 sont ignorés : un seul code aberrant (commande de
+-- test, saisie manuelle) suffisait à faire sauter toute la série à VI45831.
 select setval('vi_tracking_seq', greatest(1, (
   select coalesce(max(n), 0) from (
     select substring(tracking_number from '^VI(\d+)$')::bigint as n from orders where tracking_number ~ '^VI\d+$'
     union all
     select substring(id from '^VI(\d+)$')::bigint from orders where id ~ '^VI\d+$'
-  ) s
+  ) s where n < 10000
 )));
 
 create or replace function ensure_unique_vi_code() returns trigger
