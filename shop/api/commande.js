@@ -80,6 +80,16 @@ async function verifierPromoServeur(url, key, code, apresQuantite) {
   return r?.[0] || null;
 }
 
+async function promoDejaUtilisee(url, key, code, tel) {
+  if (!code || !tel) return false;
+  const r = await fetch(`${url}/rest/v1/rpc/shop_promo_deja_utilisee`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ p_code: code, p_tel: tel }),
+  }).then(r => r.ok ? r.json() : false).catch(() => false);
+  return r === true;
+}
+
 /* Localisation à partir de l'IP — au mieux : une IP mobile ou un VPN donne
    souvent une ville approximative, parfois rien du tout. Une géolocalisation
    absente ne doit jamais empêcher la commande de partir.
@@ -234,12 +244,23 @@ export default async function handler(req, res) {
   // voir Commander.jsx).
   const avantPromo = totalPanier(serverLignes, { remises, livraison, seuilGratuit });
   const promo = await verifierPromoServeur(url, key, code, avantPromo.sousTotal - avantPromo.remiseQuantite);
+  // Un code par numéro : sans ce contrôle, un code partagé dans un groupe
+  // servait indéfiniment, le compteur d'utilisations ne bloquait rien.
+  if (promo && await promoDejaUtilisee(url, key, code, normaliserTelephone(form.telephone))) {
+    return res.status(200).json({ ok: false, error: 'Ce code a déjà été utilisé avec ce numéro. — هاد الكود تستعمل من قبل بهاد الرقم.' });
+  }
   const totalVerifie = totalPanier(serverLignes, { remises, promo, livraison, seuilGratuit }).total;
 
   const geo = villeGPS ? { ville: villeGPS, pays: paysGPS } : geoParDefaut;
   const commande = construireCommande(form, serverLignes, totalVerifie, new Date(), undefined, {
     source: SOURCES_CONNUES.has(source) ? source : 'Direct',
   });
+  if (promo) {
+    const codePropre = String(code).trim().toUpperCase();
+    const remise = avantPromo.total - totalVerifie;
+    commande.recipient.promo = codePropre;
+    commande.note = `${commande.note} — Code promo ${codePropre}${remise > 0 ? ` (−${remise} DH)` : ''}`;
+  }
   commande.recipient.ip = ip || undefined;
   commande.recipient.geoVille = geo?.ville || undefined;
   commande.recipient.geoPays = geo?.pays || undefined;

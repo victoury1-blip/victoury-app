@@ -59,6 +59,7 @@ import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } fr
 import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok, chargerGA4, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from './lib/pixel';
 import { LangProvider } from './lib/i18n';
+import { capturerCodeUrl } from './lib/promoAuto';
 
 /* React Router ne remet PAS le défilement en haut tout seul en changeant de
    page — la fiche produit s'en charge elle-même (window.scrollTo dans son
@@ -107,7 +108,8 @@ function collectionsInitiales() {
 }
 
 function Vitrine() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  useEffect(() => { capturerCodeUrl(search); }, [search]);
   const [collections, setCollections] = useState(collectionsInitiales);
   const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);

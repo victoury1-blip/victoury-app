@@ -609,3 +609,42 @@ create index if not exists shop_paniers_abandonnes_relance_idx on shop_paniers_a
 --  pas sa vente — d'où un drapeau séparé de `status`, pas une 3ᵉ valeur dessus.
 -- ============================================================
 alter table shop_products add column if not exists unlisted boolean not null default false;
+
+-- ─────────────────────────────────────────────
+--  Codes promo : un seul usage par numéro de téléphone
+--
+--  La commande garde le code utilisé dans recipient->>'promo' (voir
+--  api/commande.js). Une commande annulée ou supprimée libère le code.
+--  Le compteur used_count, jusqu'ici jamais incrémenté, l'est désormais à
+--  chaque commande : max_uses limite enfin quelque chose.
+-- ─────────────────────────────────────────────
+create or replace function shop_promo_deja_utilisee(p_code text, p_tel text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from orders o
+    where upper(o.recipient->>'promo') = upper(trim(p_code))
+      and right(regexp_replace(coalesce(o.recipient->>'phone', ''), '\D', '', 'g'), 9)
+        = right(regexp_replace(coalesce(p_tel, ''), '\D', '', 'g'), 9)
+      and coalesce(o.is_deleted, false) = false
+      and coalesce(o.status, '') <> 'annule'
+  );
+$$;
+grant execute on function shop_promo_deja_utilisee(text, text) to anon, authenticated;
+
+create or replace function shop_compter_promo() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if NEW.recipient->>'promo' is not null then
+    update shop_promo_codes set used_count = used_count + 1
+    where upper(code) = upper(NEW.recipient->>'promo');
+  end if;
+  return NEW;
+end $$;
+
+drop trigger if exists trg_compter_promo on orders;
+create trigger trg_compter_promo after insert on orders
+  for each row execute function shop_compter_promo();

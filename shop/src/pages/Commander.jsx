@@ -7,6 +7,7 @@ import { champsManquants } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
+import { lireCodeAuto, oublierCodeAuto } from '../lib/promoAuto';
 import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, cookieTtpPourTikTok, correspondanceAvancee, trackGA4 } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
@@ -196,6 +197,19 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
       document.removeEventListener('visibilitychange', surVisibilite);
       window.removeEventListener('pagehide', surFermeture);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Code arrivé par le lien d'une pub : appliqué sans rien demander, même
+  // quand le champ « code promo » est masqué pour les autres visiteurs.
+  const [codeAuto, setCodeAuto] = useState(false);
+  useEffect(() => {
+    const auto = lireCodeAuto();
+    if (!auto || promo) return;
+    verifierPromo(auto, t.sousTotal - t.remiseQuantite).then(p => {
+      if (!p) { oublierCodeAuto(); return; }
+      setCode(auto); setPromo(p); setCodeAuto(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -454,7 +468,15 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             </div>
           </div>
 
-          {reglages?.codePromoActif !== false && (
+          {codeAuto && promo && t.remisePromo > 0 && (
+            <p className="mt-4 text-xs text-green-800 bg-green-50 border border-green-200 p-3 text-center font-medium">
+              {lang === 'ar'
+                ? <>🎉 تخفيض خاص ليك مطبق: <bdi dir="ltr">−{fmtPrix(t.remisePromo, lang)}</bdi></>
+                : <>🎉 Votre réduction est appliquée : −{fmtPrix(t.remisePromo, lang)}</>}
+            </p>
+          )}
+
+          {reglages?.codePromoActif !== false && !codeAuto && (
             <>
               <div className="mt-4 flex gap-2">
                 <input value={code} onChange={e => setCode(e.target.value)} placeholder={tr('codePromo')}
