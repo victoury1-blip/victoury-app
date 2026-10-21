@@ -68,6 +68,18 @@ function parseAppDate(str) {
   return Number.isNaN(iso) ? 0 : iso;
 }
 
+/* La base remplace un code VI déjà pris par un autre (sql/unique_vi_tracking.sql).
+   L'écho de NOTRE propre écriture est ignoré par ailleurs (< 15 s) : sans
+   ceci, l'appareil qui a calculé le doublon le garderait affiché — et
+   l'imprimerait — jusqu'au prochain rechargement. */
+function adopterCodeVictServeur(prev, row) {
+  const code = row?.tracking_number;
+  if (!isVictCode(code)) return prev;
+  const local = prev.find(x => x.id === row.id);
+  if (!local || local.trackingNumber === code || !isVictCode(local.trackingNumber || local.id)) return prev;
+  return prev.map(x => x.id === row.id ? { ...x, trackingNumber: code } : x);
+}
+
 function assignVictTracking(freshOrders, allOrders) {
   if (!allOrders || !allOrders.length) return freshOrders;
   freshOrders.forEach((o) => {
@@ -534,7 +546,7 @@ export default function App() {
         const o = reclasserCommandeSite(raw);
         if (o.is_deleted || deletedIdsRef.current.has(o.id)) return;
         setOrders(prev => {
-          if (prev.some(x => x.id === o.id)) return prev;
+          if (prev.some(x => x.id === o.id)) return adopterCodeVictServeur(prev, o);
           if (initialLoadDoneRef.current) notifyNewOrder(mapRow(o));
           return [mapRow(o), ...prev];
         });
@@ -554,7 +566,10 @@ export default function App() {
         // peut être plus ancien que notre état local et « écraserait » l'édition en
         // cours (y compris des champs que l'autre appareil n'a pas touchés).
         const editedAt = recentEditsRef.current.get(o.id);
-        if (editedAt && Date.now() - editedAt < 15000) return;
+        if (editedAt && Date.now() - editedAt < 15000) {
+          setOrders(prev => adopterCodeVictServeur(prev, o));
+          return;
+        }
         setOrders(prev => prev.some(x => x.id === o.id)
           ? prev.map(x => x.id === o.id ? { ...x, ...mapRow(o) } : x)
           : [mapRow(o), ...prev]);
