@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { IconeWhatsApp } from './icons';
 import { numeroWhatsApp } from '../lib/commande';
 import { useLang } from '../lib/i18n';
+import { lignePromoWhatsApp } from '../lib/promoAuto';
 
 /* Le client marocain hésite souvent en silence plutôt que d'écrire — il
    quitte la page sans jamais dire pourquoi (taille, délai, une question sur
@@ -16,9 +17,9 @@ export default function ExitIntentModal({ ouvert, onFermer, numero }) {
   const digits = numeroWhatsApp(numero);
   if (!ouvert || !digits) return null;
 
-  const texte = ar
+  const texte = (ar
     ? 'السلام، كنت كنشوف فـ Victoury وعندي سؤال قبل ما نطلب...'
-    : "Bonjour, j'étais sur Victoury et j'ai une question avant de commander...";
+    : "Bonjour, j'étais sur Victoury et j'ai une question avant de commander...") + lignePromoWhatsApp(ar);
   const href = `https://wa.me/${digits}?text=${encodeURIComponent(texte)}`;
 
   return (

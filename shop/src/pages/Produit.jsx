@@ -15,6 +15,7 @@ import { IconeWhatsApp } from '../components/icons';
 import { numeroWhatsApp } from '../lib/commande';
 import OffreTimer from '../components/OffreTimer';
 import LandingVente from '../components/LandingVente';
+import { lignePromoWhatsApp } from '../lib/promoAuto';
 
 function Accordeon({ titre, children }) {
   const { lang } = useLang();
@@ -433,7 +434,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               tel quel, sur le modèle d'un exemple fourni. */}
           {numeroWhatsApp(theme?.footer?.contacts?.whatsapp) && (
             <a href={`https://wa.me/${numeroWhatsApp(theme.footer.contacts.whatsapp)}?text=${encodeURIComponent(
-                (ar ? 'السلام، عندي سؤال على ' : "Bonjour, j'ai une question sur ") + produit.name)}`}
+                (ar ? 'السلام، عندي سؤال على ' : "Bonjour, j'ai une question sur ") + produit.name + lignePromoWhatsApp(ar))}`}
               target="_blank" rel="noreferrer"
               className="mt-2.5 block bg-[#25D366] hover:brightness-95 text-white rounded-lg shadow-lg shadow-green-600/20 transition-all py-3 px-4 text-center">
               <span className="flex items-center justify-center gap-2 font-bold text-sm">

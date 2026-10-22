@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { IconeWhatsApp } from './icons';
 import { numeroWhatsApp } from '../lib/commande';
 import { useLang } from '../lib/i18n';
+import { lignePromoWhatsApp } from '../lib/promoAuto';
 
 /* Bulle flottante visible sur toutes les pages de la vitrine — le client
    marocain écrit d'abord sur WhatsApp avant de commander, bien plus que par
@@ -41,7 +42,7 @@ export default function WhatsAppBulle({ numero, icone }) {
   }, []);
 
   if (!digits) return null;
-  const message = ar ? 'السلام، بغيت نسولك على...' : "Bonjour, j'ai une question sur...";
+  const message = (ar ? 'السلام، بغيت نسولك على...' : "Bonjour, j'ai une question sur...") + lignePromoWhatsApp(ar);
   const href = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 
   return (

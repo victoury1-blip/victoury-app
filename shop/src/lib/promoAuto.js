@@ -28,3 +28,14 @@ export function lireCodeAuto(maintenant = Date.now()) {
 export function oublierCodeAuto() {
   try { localStorage.removeItem(CLE); } catch { /* stockage indisponible */ }
 }
+
+/* Ligne ajoutée aux messages WhatsApp pré-remplis quand le client est arrivé
+   par un lien de pub avec code : en lisant le message, l'équipe sait tout de
+   suite qu'il vient du retargeting et qu'il faut lui appliquer la remise. */
+export function lignePromoWhatsApp(ar, maintenant = Date.now()) {
+  const code = lireCodeAuto(maintenant);
+  if (!code) return '';
+  return ar
+    ? `\n🎁 بغيت نستافد من التخفيض ديال الإعلان (كود ${code})`
+    : `\n🎁 Je souhaite profiter de la remise de la pub (code ${code})`;
+}
