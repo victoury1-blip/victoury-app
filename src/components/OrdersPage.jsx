@@ -366,6 +366,15 @@ function BulkActionBar({ selected, orders, setOrders, setSelected, onDeleteOrder
   );
 }
 
+/* Code promo utilisé par la boutique (« RETOUR30 −30 DH »), lu dans
+   recipient.promo ou, à défaut, dans la note « Code promo X (−N DH) ». */
+function promoCommande(order) {
+  const m = /Code promo (\S+)(?: \(−(\d+(?:[.,]\d+)?) DH\))?/.exec(order.note || '');
+  const code = order.recipient?.promo || m?.[1];
+  if (!code) return '';
+  return m?.[2] ? `${code} −${m[2]} DH` : code;
+}
+
 export default function OrdersPage({ activeTab, setActiveTab, externalOrders, setExternalOrders, isLoading, onDeleteOrder, currentUser, unreserveDeletedIds }) {
   const { statuses } = useStatuses();
   const orders = externalOrders;
@@ -1142,6 +1151,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 <td className="px-4 py-3 max-w-[220px]">
                   {(order.note || order.noteLivraison) ? (
                     <div className="flex flex-col gap-2">
+                      {promoCommande(order) && (
+                        <span className="self-start text-[11px] font-bold text-white bg-red-600 rounded-full px-2 py-0.5" title="Commande passée avec un code promo">
+                          🎁 {promoCommande(order)}
+                        </span>
+                      )}
                       {order.note && (
                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">
                           {dedupeNote(order.note)}

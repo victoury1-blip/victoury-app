@@ -44,6 +44,13 @@ describe('série VI', () => {
     expect(generateVictId(orders)).toBe('VI00007');
   });
 
+  it('ignore un numéro hors série (plus de 5 chiffres) et un point de départ aberrant', () => {
+    setNextNumber(458317);
+    const orders = [nouveau('VI00429'), nouveau('VI458316')];
+    expect(generateVictId(orders)).toBe('VI00430');
+    expect(generateVictId(orders)).toBe('VI00431');
+  });
+
   it('respecte le point de départ réglé dans Réglages', () => {
     setNextNumber(1);
     const orders = [nouveau('VI00042'), colis('VI00900')];

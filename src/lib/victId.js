@@ -38,6 +38,11 @@ function numOf(val) {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+/* La série tient sur PAD chiffres (VI00001…VI99999). Un numéro plus long vient
+   d'une erreur (ex. commande de test VI458311) : il reste réservé, mais ne doit
+   jamais tirer la suite de la série vers le haut. */
+const MAX_SERIE = 99999;
+
 /** Tous les numéros VI en circulation — sert à ne jamais créer de doublon. */
 function seriesNumsIn(orders) {
   const nums = new Set();
@@ -59,7 +64,7 @@ function seriesMaxIn(orders) {
     if (!A_CONFIRMER.has(o?.status)) continue;
     for (const val of [o.id, o.trackingNumber]) {
       const n = numOf(val);
-      if (n > max) max = n;
+      if (n > max && n <= MAX_SERIE) max = n;
     }
   }
   return max;
@@ -81,7 +86,7 @@ const NEXT_KEY = 'victoury_next_number';
 /** Prochain numéro réglé manuellement, ou 0 si aucun. */
 export function readNextNumber() {
   const n = parseInt(localStorage.getItem(NEXT_KEY) || '0', 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return Number.isFinite(n) && n > 0 && n <= MAX_SERIE ? n : 0;
 }
 
 /** Définit le prochain numéro de la série (Réglages). */
@@ -111,7 +116,7 @@ export function generateVictId(orders) {
   _lastMaxUsed = seriesMax;
   // On ignore les réservations devenues visibles dans la liste : seules comptent
   // celles encore en attente d'enregistrement.
-  _issuedThisSession = _issuedThisSession.filter(n => !used.has(n) && n > seriesMax);
+  _issuedThisSession = _issuedThisSession.filter(n => !used.has(n) && n > seriesMax && n <= MAX_SERIE);
   const maxPending = _issuedThisSession.length ? Math.max(..._issuedThisSession) : 0;
   const explicit = readNextNumber();
   let n = explicit || Math.max(seriesMax, maxPending) + 1;
