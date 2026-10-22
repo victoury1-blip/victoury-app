@@ -360,10 +360,12 @@ function Vitrine() {
           logoPosition={reglages.theme?.logoPosition} logoHauteur={reglages.theme?.logoHauteur} onOuvrirPanier={ouvrirPanier} />
       )}
       {promoLien && (
-        <div dir="rtl" className="bg-green-50 border-b border-green-200 text-green-800 text-center text-xs sm:text-sm font-medium px-4 py-2">
-          🎉 عندك تخفيض خاص:{' '}
-          <b>{Number(promoLien.value)}{promoLien.kind === 'percent' ? '%' : ' درهم'}</b>
-          {' '}على الطلب ديالك، كيتطبق أوتوماتيكيا 🛍️
+        <div dir="rtl" className="bg-gradient-to-l from-red-600 via-rose-600 to-red-600 text-white text-center text-sm sm:text-base font-semibold px-4 py-2.5 shadow-md">
+          🎁 عندك تخفيض خاص بيك:{' '}
+          <span className="inline-block bg-white text-red-600 font-black px-2.5 py-0.5 rounded-full mx-1 animate-pulse">
+            {Number(promoLien.value)}{promoLien.kind === 'percent' ? '%' : ' درهم'}
+          </span>
+          {' '}على الطلب ديالك، كيتطبق أوتوماتيكيا 🔥
         </div>
       )}
 
