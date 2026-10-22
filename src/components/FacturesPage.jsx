@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { findCityRow, feeFromRow } from '../lib/cityMatch';
-import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel, dedupeFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -719,6 +719,21 @@ function NewFactureModal({ orders, onClose, onCreated }) {
 }
 
 /* ─── Main FacturesPage ─── */
+/* Mois d'une facture (« 2026-10 ») d'après sa date de création « jj/mm/aaaa hh:mm »,
+   ou à défaut d'après sa référence FCT-AAAAMMJJ-xxxx. */
+function moisFacture(f) {
+  const d = /(\d{2})\/(\d{2})\/(\d{4})/.exec(f.dateCreation || '');
+  if (d) return `${d[3]}-${d[2]}`;
+  const r = /FCT-(\d{4})(\d{2})/.exec(f.ref || '');
+  return r ? `${r[1]}-${r[2]}` : 'inconnu';
+}
+
+function libelleMois(cle) {
+  if (cle === 'inconnu') return 'Date inconnue';
+  const [a, m] = cle.split('-').map(Number);
+  const txt = new Date(a, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
 export default function FacturesPage({ orders }) {
   const toast = useToast();
   const [factures, setFactures] = useState(() => loadFactures());
@@ -777,6 +792,47 @@ export default function FacturesPage({ orders }) {
     const matchS = !filterStatut || f.statut === filterStatut;
     return matchL && matchS;
   }), [factures, filterLivreur, filterStatut]);
+
+  // Un dossier par mois, le plus récent en haut
+  const groupes = useMemo(() => {
+    const map = new Map();
+    filtered.forEach(f => {
+      const k = moisFacture(f);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(f);
+    });
+    return [...map.entries()]
+      .sort(([a], [b]) => (a === 'inconnu') - (b === 'inconnu') || b.localeCompare(a))
+      .map(([key, list]) => ({
+        key,
+        list,
+        totalNet: list.reduce((s, f) => s + (Number(f.totalNet) || 0), 0),
+        nbCom: list.reduce((s, f) => s + (f.colis?.length || 0), 0),
+        nonVersees: list.filter(f => f.statut !== 'paye').length,
+      }));
+  }, [filtered]);
+
+  // Seul le mois le plus récent est ouvert par défaut
+  const [bascules, setBascules] = useState({});
+  const estOuvert = (k) => bascules[k] ?? (k === groupes[0]?.key);
+  const basculer = (k) => setBascules(p => ({ ...p, [k]: !estOuvert(k) }));
+
+  function enteteDossier(g) {
+    const ouvert = estOuvert(g.key);
+    return (
+      <button onClick={() => basculer(g.key)}
+        className="w-full flex items-center gap-2 px-4 py-2.5 bg-amber-50 hover:bg-amber-100 border-b border-amber-100 text-left">
+        {ouvert ? <ChevronDown size={14} className="text-amber-700" /> : <ChevronRight size={14} className="text-amber-700" />}
+        {ouvert ? <FolderOpen size={16} className="text-amber-600" /> : <Folder size={16} className="text-amber-600" />}
+        <span className="font-bold text-gray-800 text-sm">{libelleMois(g.key)}</span>
+        <span className="text-xs text-gray-500">· {g.list.length} facture{g.list.length > 1 ? 's' : ''} · {g.nbCom} com.</span>
+        {g.nonVersees > 0 && (
+          <span className="text-xs font-semibold text-orange-600 bg-orange-100 rounded-full px-2 py-0.5">{g.nonVersees} non versée{g.nonVersees > 1 ? 's' : ''}</span>
+        )}
+        <span className="ml-auto font-bold text-green-700 text-sm">{fmt(g.totalNet)} DH</span>
+      </button>
+    );
+  }
 
   function updateFacture(updated) {
     setFactures(prev => {
@@ -878,7 +934,11 @@ export default function FacturesPage({ orders }) {
               <span className="text-sm">Aucune facture trouvée</span>
             </div>
           )}
-          {filtered.map(f => (
+          {groupes.map(g => (
+            <div key={g.key} className="mb-2">
+              {enteteDossier(g)}
+              <div className="pt-3">
+              {estOuvert(g.key) && g.list.map(f => (
             <div key={f.id} className="bg-white border border-gray-200 rounded-lg p-4 mb-3 mx-4">
               {/* Top row: ref + statut */}
               <div className="flex items-center justify-between mb-2">
@@ -924,6 +984,9 @@ export default function FacturesPage({ orders }) {
               </div>
             </div>
           ))}
+              </div>
+            </div>
+          ))}
         </div>
         {/* Desktop table */}
         <div className="hidden md:block">
@@ -944,7 +1007,10 @@ export default function FacturesPage({ orders }) {
                 </div>
               </td></tr>
             )}
-            {filtered.map(f => (
+            {groupes.map(g => (
+              <React.Fragment key={g.key}>
+              <tr><td colSpan={12} className="p-0">{enteteDossier(g)}</td></tr>
+              {estOuvert(g.key) && g.list.map(f => (
               <tr key={f.id} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition">
                 {/* Numéro */}
                 <td className="px-4 py-3">
@@ -1008,6 +1074,8 @@ export default function FacturesPage({ orders }) {
                   </div>
                 </td>
               </tr>
+            ))}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
