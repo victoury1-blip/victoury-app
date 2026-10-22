@@ -59,7 +59,7 @@ import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } fr
 import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok, chargerGA4, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from './lib/pixel';
 import { LangProvider } from './lib/i18n';
-import { capturerCodeUrl } from './lib/promoAuto';
+import { capturerCodeUrl, lireCodeAuto, oublierCodeAuto } from './lib/promoAuto';
 
 /* React Router ne remet PAS le défilement en haut tout seul en changeant de
    page — la fiche produit s'en charge elle-même (window.scrollTo dans son
@@ -109,7 +109,18 @@ function collectionsInitiales() {
 
 function Vitrine() {
   const { pathname, search } = useLocation();
-  useEffect(() => { capturerCodeUrl(search); }, [search]);
+  // Code reçu par le lien d'une pub : annoncé dès l'arrivée, sinon le client
+  // ne voit la remise qu'au moment de payer et peut repartir avant.
+  const [promoLien, setPromoLien] = useState(null);
+  useEffect(() => {
+    capturerCodeUrl(search);
+    const code = lireCodeAuto();
+    if (!code) { setPromoLien(null); return; }
+    import('./lib/catalog').then(m => m.verifierPromo(code, 100000)).then(p => {
+      if (!p) { oublierCodeAuto(); setPromoLien(null); return; }
+      setPromoLien(p);
+    }).catch(() => {});
+  }, [search]);
   const [collections, setCollections] = useState(collectionsInitiales);
   const [reglages, setReglages] = useState(reglagesInitiaux);
   const [lignes, setLignes] = useState(lirePanier);
@@ -347,6 +358,13 @@ function Vitrine() {
       {chromeVisible && (
         <Header collections={collections} nbArticles={nbArticles(lignes)} logoUrl={reglages.theme?.logoUrl}
           logoPosition={reglages.theme?.logoPosition} logoHauteur={reglages.theme?.logoHauteur} onOuvrirPanier={ouvrirPanier} />
+      )}
+      {promoLien && (
+        <div dir="rtl" className="bg-green-50 border-b border-green-200 text-green-800 text-center text-xs sm:text-sm font-medium px-4 py-2">
+          🎉 عندك تخفيض خاص:{' '}
+          <b>{Number(promoLien.value)}{promoLien.kind === 'percent' ? '%' : ' درهم'}</b>
+          {' '}على الطلب ديالك، كيتطبق أوتوماتيكيا 🛍️
+        </div>
       )}
 
       <main className="flex-1">
