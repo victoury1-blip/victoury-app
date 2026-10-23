@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
-import { getMetaConfig, loadMetaConfigRemote, buildEvent, eventForStatus, eventId, sendEvents, orderTimestamp, MAX_AGE_MS } from '../lib/metaCapi';
+import { getMetaConfig, loadMetaConfigRemote, buildEvent, eventForStatus, eventId, sendEvents, orderTimestamp, MAX_AGE_MS, LEGACY_DELIVERY_EVENT } from '../lib/metaCapi';
 import { logAlert } from '../lib/errorLog';
 
 const SENT_KEY = 'meta_capi_sent';
@@ -69,6 +69,9 @@ export default function useMetaCapi(orders) {
       // lui doivent rien.
       if (!o?.recipient?.source) return false;
       if (sentRef.current.has(eventId(o, spec.name))) return false;
+      // Livraison déjà signalée sous l'ancien nom (« Purchase ») : ne pas la
+      // renvoyer une seconde fois sous le nouveau.
+      if (spec.withValue && sentRef.current.has(eventId(o, LEGACY_DELIVERY_EVENT))) return false;
       const t = orderTimestamp(o);
       return Number.isFinite(t) && now - t <= MAX_AGE_MS;
     });

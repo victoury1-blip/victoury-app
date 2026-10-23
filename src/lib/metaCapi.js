@@ -128,17 +128,26 @@ export async function hashUserData(order) {
 
 /* Correspondance statut → évènement.
  *
- * `Purchase` n'est émis QUE sur une livraison : c'est le seul moment où l'argent
- * est réellement encaissé, et c'est précisément ce qu'on veut apprendre à Meta.
+ * La livraison part sous un nom PROPRE (`OrderDelivered`), pas `Purchase` :
+ * la boutique envoie déjà `Purchase` au moment de la commande (pixel + relais
+ * serveur, même identifiant `${id}:Purchase`). Meta ne rapproche deux
+ * évènements de même identifiant que dans les 48 h : une commande livrée trois
+ * jours après était comptée DEUX fois comme achat. Un nom distinct ne double
+ * plus rien, et garde l'information « payé » utilisable dans Meta (conversion
+ * personnalisée sur OrderDelivered).
  * La confirmation est un signal intermédiaire, l'annulation un signal négatif. */
 export const EVENT_BY_STATUS = {
-  livre: { name: 'Purchase', withValue: true },
-  echange_recu: { name: 'Purchase', withValue: true },
+  livre: { name: 'OrderDelivered', withValue: true },
+  echange_recu: { name: 'OrderDelivered', withValue: true },
   confirme: { name: 'Lead', withValue: false },
   annule: { name: 'OrderCancelled', withValue: false },
   injoignable: { name: 'OrderCancelled', withValue: false },
   refuse: { name: 'OrderRefused', withValue: false },
 };
+
+/** Ancien nom de l'évènement de livraison : une commande pour laquelle il est
+ *  déjà parti ne doit pas être renvoyée sous le nouveau nom. */
+export const LEGACY_DELIVERY_EVENT = 'Purchase';
 
 /** Y a-t-il un évènement à envoyer pour ce statut ? */
 export const eventForStatus = (status) => EVENT_BY_STATUS[status] || null;

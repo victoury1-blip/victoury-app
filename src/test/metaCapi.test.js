@@ -38,20 +38,21 @@ describe('réglage Meta partagé entre appareils', () => {
 });
 
 describe('correspondance statut → évènement', () => {
-  /* « Purchase » ne doit partir QUE sur une livraison : c'est le seul moment où
-     l'argent est encaissé, et c'est tout l'intérêt de l'envoi. */
-  it('seule une livraison vaut un achat', () => {
-    expect(eventForStatus('livre').name).toBe('Purchase');
+  /* La boutique envoie déjà « Purchase » à la commande : la livraison part sous
+     un nom propre, sinon Meta compte l'achat deux fois au-delà de 48 h. */
+  it('la livraison part sous un nom distinct de « Purchase »', () => {
+    expect(eventForStatus('livre').name).toBe('OrderDelivered');
+    expect(eventForStatus('echange_recu').name).toBe('OrderDelivered');
     expect(eventForStatus('confirme').name).toBe('Lead');
     expect(eventForStatus('annule').name).toBe('OrderCancelled');
     expect(eventForStatus('nouveau')).toBeNull();
     expect(eventForStatus('att_ramassage')).toBeNull();
   });
 
-  it('seuls les achats portent un montant', () => {
+  it('seules les livraisons portent un montant, et rien ne s’appelle « Purchase »', () => {
     for (const [status, spec] of Object.entries(EVENT_BY_STATUS)) {
-      if (spec.withValue) expect(spec.name).toBe('Purchase');
-      else expect(spec.name).not.toBe('Purchase');
+      if (spec.withValue) expect(spec.name).toBe('OrderDelivered');
+      expect(spec.name).not.toBe('Purchase');
       expect(typeof status).toBe('string');
     }
   });
@@ -85,7 +86,7 @@ describe('évènement construit', () => {
 
   it('porte le montant encaissé et sa devise', async () => {
     const ev = await buildEvent(order, {});
-    expect(ev.event_name).toBe('Purchase');
+    expect(ev.event_name).toBe('OrderDelivered');
     expect(ev.custom_data.value).toBe(250);
     expect(ev.custom_data.currency).toBe('MAD');
   });
