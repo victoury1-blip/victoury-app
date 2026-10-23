@@ -8,9 +8,10 @@ import {
   LayoutDashboard, ShoppingCart, Package, Archive, Store,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown, Activity,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
-  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet, Car,
+  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet, Car, PackageX,
 } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
+import { estColisRetour, estRecu, lireRecuIdsLocal } from '../lib/colisRetours';
 import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
 import { ORDER_TABS, tabPath } from '../data/orderTabs';
 
@@ -33,6 +34,9 @@ const NAV_ITEMS = [
     ],
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
+  /* Juste sous la Liste des Colis : les colis refusés / annulés, pour suivre
+     ceux que la société de livraison n'a pas encore rendus (badge = non reçus). */
+  { path: '/colis-retours', label: 'Retours & Annulés', icon: PackageX, perm: 'liste_colis', badge: 'retoursNonRecus' },
   { path: '/factures',    label: 'Factures',        icon: FileText, perm: 'factures' },
   { path: '/profit',      label: 'Profit',          icon: TrendingUp, perm: 'profit' },
   { path: '/fournisseur', label: 'Fournisseur',     icon: Truck, perm: 'stock' },
@@ -280,6 +284,12 @@ export default function Sidebar({ orders = [], session }) {
     return () => window.removeEventListener('open-profile', open);
   }, []);
 
+  // Colis refusés / annulés pas encore rentrés au local (badge du menu).
+  const retoursNonRecus = React.useMemo(() => {
+    const recuIds = lireRecuIdsLocal();
+    return (orders || []).filter(o => estColisRetour(o) && !estRecu(o, recuIds)).length;
+  }, [orders]);
+
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   const visibleItems = NAV_ITEMS.filter(item => {
@@ -391,7 +401,7 @@ export default function Sidebar({ orders = [], session }) {
           }
 
           const active = isActive(item.path);
-          const itemBadge = 0;
+          const itemBadge = item.badge === 'retoursNonRecus' ? retoursNonRecus : 0;
           return (
             <a
               key={item.path}
