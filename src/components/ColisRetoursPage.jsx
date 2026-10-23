@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, PackageX, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Search, PackageX, CheckCircle2, AlertTriangle, Truck, Package } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useStatuses } from '../contexts/StatusContext';
@@ -9,6 +9,9 @@ import useDebounce from '../hooks/useDebounce';
 import Pagination, { paginate } from './Pagination';
 import PhoneChip, { normalizePhone } from './PhoneChip';
 import { estColisRetour, estRecu, lireRecuIdsLocal } from '../lib/colisRetours';
+import DeliveryStatusModal from './colis/DeliveryStatusModal';
+import { COLIS_PIPELINE } from '../data/colisPipeline';
+import { now } from '../lib/dateUtils';
 
 /* Colis refusés / annulés / en retour, sortis de la Liste des Colis : on y
  * voit d'un coup ceux qui sont rentrés au local et ceux que la société de
@@ -40,6 +43,7 @@ export default function ColisRetoursPage({ orders, setOrders }) {
   const q = useDebounce(search, 200).toLowerCase().trim();
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(50);
+  const [deliveryOrder, setDeliveryOrder] = useState(null);
   const searchRef = useRef(null);
   useSearchShortcut(searchRef);
 
@@ -72,6 +76,20 @@ export default function ColisRetoursPage({ orders, setOrders }) {
     supabase.from('orders').update({ recu: !removing }).eq('id', order.id).then(({ error }) => {
       if (error) toast.error('Statut « reçu » non enregistré : ' + error.message);
     });
+  }
+
+  /* Changement de statut depuis la fenêtre Livraison : même règle que la Liste
+     des Colis (note interne ajoutée, sortie du circuit si le statut n'en fait
+     plus partie, code de suivi conservé). */
+  function saveStatut(orderId, newStatus, note) {
+    const ts = now();
+    const quitte = !COLIS_PIPELINE.includes(newStatus) && newStatus !== 'reporter' && newStatus !== 'annule';
+    setOrders(prev => prev.map(o => {
+      if (o.id !== orderId) return o;
+      const u = { ...o, status: newStatus, dateUpdated: ts, note: (o.note || '') + (note ? `\nNote interne: ${note}` : '') };
+      if (quitte) u.validated = false;
+      return u;
+    }));
   }
 
   const retours = useMemo(() => {
@@ -172,14 +190,14 @@ export default function ColisRetoursPage({ orders, setOrders }) {
           <table className="w-full text-sm min-w-[760px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Code', 'Client', 'Ville', 'Produit', 'Livreur', 'Statut', 'Date', 'Reçu'].map(h => (
+                {['Code', 'Client', 'Ville', 'Produit', 'Livreur', 'Statut', 'Date', 'Suivi', 'Reçu'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pageItems.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400 text-sm">
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm">
                   {filtre === 'non_recu' ? 'Aucun colis en attente de retour 🎉' : 'Aucun colis'}
                 </td></tr>
               )}
@@ -201,6 +219,14 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                     <td className="px-4 py-3"><StatutBadge status={o.status} /></td>
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{o.dateUpdated || o.dateAdded}</td>
                     <td className="px-4 py-3">
+                      {/* Camion = suivi Ozon (historique, « Retourné », agence) ; livreur personnel = colis. */}
+                      <button onClick={() => setDeliveryOrder(o)}
+                        className="p-2 rounded-lg bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors"
+                        title="Suivi livraison" aria-label="Suivi livraison">
+                        {/ozon/i.test(o.recipient?.delivery || '') ? <Truck size={15} /> : <Package size={15} />}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
                       <button onClick={() => toggleRecu(o)}
                         className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition whitespace-nowrap ${recu
                           ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
@@ -215,6 +241,21 @@ export default function ColisRetoursPage({ orders, setOrders }) {
           </table>
         </div>
       </div>
+
+      {deliveryOrder && (
+        <DeliveryStatusModal
+          key={deliveryOrder.id}
+          order={deliveryOrder}
+          onClose={() => setDeliveryOrder(null)}
+          onSave={(id, newStatus, newNote, newOzTn, ozoneLastStatus) => {
+            if (newOzTn || ozoneLastStatus) {
+              setOrders(prev => prev.map(o => o.id === id ? { ...o, ...(newOzTn ? { ozoneTracking: newOzTn } : {}), ...(ozoneLastStatus ? { ozoneLastStatus } : {}) } : o));
+            }
+            if (newNote !== '' || newStatus !== deliveryOrder?.status) saveStatut(id, newStatus, newNote);
+            if (!newOzTn) setDeliveryOrder(null);
+          }}
+        />
+      )}
 
       {liste.length > perPage && (
         <Pagination total={liste.length} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={setPerPage} />
