@@ -12,6 +12,11 @@ import { estColisRetour, estRecu, lireRecuIdsLocal } from '../lib/colisRetours';
 import DeliveryStatusModal from './colis/DeliveryStatusModal';
 import { COLIS_PIPELINE } from '../data/colisPipeline';
 import { now } from '../lib/dateUtils';
+import { chargerEtapeOzon, lireEtapesCache, ecrireEtapeCache } from '../lib/ozonEtape';
+
+const estOzon = (o) => /ozon/i.test(o?.recipient?.delivery || '');
+// Une étape lue il y a moins de 30 min n'est pas redemandée à Ozon.
+const ETAPE_FRAICHE_MS = 30 * 60 * 1000;
 
 /* Colis refusés / annulés / en retour, sortis de la Liste des Colis : on y
  * voit d'un coup ceux qui sont rentrés au local et ceux que la société de
@@ -55,6 +60,22 @@ export default function ColisRetoursPage({ orders, setOrders }) {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(50);
   const [deliveryOrder, setDeliveryOrder] = useState(null);
+  const [etapes, setEtapes] = useState(lireEtapesCache);
+  const enCoursRef = useRef(new Set());
+
+  async function rafraichirEtape(order) {
+    if (enCoursRef.current.has(order.id)) return;
+    enCoursRef.current.add(order.id);
+    try {
+      // Introuvable chez Ozon : mémorisé quand même (vide), pour ne pas
+      // laisser l'emplacement en chargement ni redemander en boucle.
+      const e = (await chargerEtapeOzon(order)) || { statut: '', commentaire: '', date: '' };
+      const saved = ecrireEtapeCache(order.id, e);
+      setEtapes(prev => ({ ...prev, [order.id]: saved }));
+    } finally {
+      enCoursRef.current.delete(order.id);
+    }
+  }
   const searchRef = useRef(null);
   useSearchShortcut(searchRef);
 
@@ -140,6 +161,23 @@ export default function ColisRetoursPage({ orders, setOrders }) {
 
   useEffect(() => { setPage(1); }, [filtre, livreur, q]);
   const pageItems = paginate(liste, page, perPage);
+
+  /* Dernière étape Ozon des colis affichés, demandée en arrière-plan, trois à
+     la fois : la page s'affiche tout de suite, les étapes arrivent ensuite. */
+  const aCharger = pageItems
+    .filter(o => estOzon(o) && !(etapes[o.id] && Date.now() - etapes[o.id].at < ETAPE_FRAICHE_MS))
+    .map(o => o.id).join(',');
+  useEffect(() => {
+    if (!aCharger) return;
+    const file = pageItems.filter(o => aCharger.split(',').includes(o.id));
+    let annule = false;
+    const ouvrier = async () => {
+      while (!annule && file.length) await rafraichirEtape(file.shift());
+    };
+    Promise.all([ouvrier(), ouvrier(), ouvrier()]);
+    return () => { annule = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aCharger]);
 
   return (
     <div className="p-4 sm:p-6 page-enter">
@@ -247,12 +285,21 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                           title="Suivi livraison" aria-label="Suivi livraison">
                           {/ozon/i.test(o.recipient?.delivery || '') ? <Truck size={15} /> : <Package size={15} />}
                         </button>
-                        {/* Dernier statut connu chez Ozon : se met à jour en ouvrant le suivi. */}
-                        {o.ozoneLastStatus && /ozon/i.test(o.recipient?.delivery || '') && (
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${couleurOzon(o.ozoneLastStatus)}`}>
-                            {o.ozoneLastStatus}
-                          </span>
-                        )}
+                        {/* Dernière étape Ozon : statut + commentaire (agence, ramasseur, client…). */}
+                        {estOzon(o) && (() => {
+                          const e = etapes[o.id];
+                          const statut = e?.statut || o.ozoneLastStatus;
+                          if (!statut) return e ? null : <span className="h-4 w-20 rounded bg-gray-100 animate-pulse" />;
+                          return (
+                            <div className="max-w-[200px]">
+                              <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${couleurOzon(statut)}`}>
+                                {statut}
+                              </span>
+                              {e?.commentaire && <p className="text-[11px] font-semibold text-gray-700 mt-1 leading-snug">{e.commentaire}</p>}
+                              {e?.date && <p className="text-[10px] text-gray-400 mt-0.5">{e.date}</p>}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -275,7 +322,7 @@ export default function ColisRetoursPage({ orders, setOrders }) {
         <DeliveryStatusModal
           key={deliveryOrder.id}
           order={deliveryOrder}
-          onClose={() => setDeliveryOrder(null)}
+          onClose={() => { if (estOzon(deliveryOrder)) rafraichirEtape(deliveryOrder); setDeliveryOrder(null); }}
           onSave={(id, newStatus, newNote, newOzTn, ozoneLastStatus) => {
             if (newOzTn || ozoneLastStatus) {
               setOrders(prev => prev.map(o => o.id === id ? { ...o, ...(newOzTn ? { ozoneTracking: newOzTn } : {}), ...(ozoneLastStatus ? { ozoneLastStatus } : {}) } : o));
