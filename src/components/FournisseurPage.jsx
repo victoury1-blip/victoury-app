@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff } from 'lucide-react';
+import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff, Undo2 } from 'lucide-react';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
@@ -34,6 +34,16 @@ const PAY_METHODS = [
 const methodOf = (v) => PAY_METHODS.find(m => m.value === v) || PAY_METHODS[0];
 
 const paidOf = (f) => (f?.paiements || []).reduce((n, p) => n + (parseFloat(p.montant) || 0), 0);
+
+/* Retours au fournisseur (pièces défectueuses renvoyées) : ni payées, ni
+   gardées — elles sortent du coût de la facture et donc du reste à payer. */
+const retourQty = (r) => parseInt(r.qte, 10) || 0;
+const retourMontant = (r) => retourQty(r) * (parseFloat(r.prix) || 0);
+const retoursQtyOf = (f) => (f?.retours || []).reduce((n, r) => n + retourQty(r), 0);
+const retoursMontantOf = (f) => (f?.retours || []).reduce((n, r) => n + retourMontant(r), 0);
+const factureCout = (f) => (f?.items || []).reduce((n, it) => n + itemCost(it), 0);
+/** Coût de la facture une fois les retours déduits. */
+const factureNet = (f) => factureCout(f) - retoursMontantOf(f);
 
 /** Date du jour au format jj/mm/aaaa, pour préremplir le formulaire. */
 function todayFr() {
@@ -137,6 +147,99 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
             })}
             disabled={invalide}
             className="flex-1 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RetourModal({ facture, onClose, onSave }) {
+  const items = facture?.items || [];
+  const [form, setForm] = useState(() => ({
+    itemId: items.length === 1 ? items[0].id : '',
+    qte: '',
+    prix: items.length === 1 ? String(items[0].prix || '') : '',
+    date: todayFr(),
+    note: '',
+  }));
+  const choisirArticle = (id) => {
+    const it = items.find(i => i.id === id);
+    setForm(p => ({ ...p, itemId: id, prix: it ? String(it.prix || '') : p.prix }));
+  };
+  const qte = parseInt(form.qte, 10) || 0;
+  const prix = parseFloat(form.prix) || 0;
+  const total = qte * prix;
+  const article = items.find(i => i.id === form.itemId);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900">Retour au fournisseur</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{facture.ref} · pièces défectueuses renvoyées</p>
+          </div>
+          <button onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {items.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Article</label>
+              <select value={form.itemId} onChange={(e) => choisirArticle(e.target.value)} className={fieldCls + ' w-full bg-white'}>
+                <option value="">— Choisir —</option>
+                {items.map(it => (
+                  <option key={it.id} value={it.id}>{it.modele}{it.couleur ? ` (${it.couleur})` : ''} · {(it.prix || 0).toLocaleString('fr-FR')} DH</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Quantité rendue</label>
+              <input type="number" inputMode="numeric" min="0" value={form.qte} autoFocus
+                onChange={(e) => setForm(p => ({ ...p, qte: e.target.value }))}
+                className={fieldCls + ' w-full font-bold'} placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Prix unitaire (DH)</label>
+              <input type="number" inputMode="decimal" min="0" value={form.prix}
+                onChange={(e) => setForm(p => ({ ...p, prix: e.target.value }))}
+                className={fieldCls + ' w-full font-bold'} placeholder="0" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Date</label>
+            <input value={form.date} onChange={(e) => setForm(p => ({ ...p, date: e.target.value }))}
+              className={fieldCls + ' w-full'} placeholder="jj/mm/aaaa" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Motif (facultatif)</label>
+            <input value={form.note} onChange={(e) => setForm(p => ({ ...p, note: e.target.value }))}
+              className={fieldCls + ' w-full'} placeholder="Défaut de couture, tache…" />
+          </div>
+
+          <div className="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 flex items-center justify-between">
+            <span className="text-xs text-orange-700 font-semibold">Déduit du reste à payer</span>
+            <span className="text-lg font-bold text-orange-700">−{total.toLocaleString('fr-FR')} DH</span>
+          </div>
+        </div>
+
+        <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50">Annuler</button>
+          <button onClick={() => onSave({
+              id: `RET${Date.now()}${Math.floor(Math.random() * 1000)}`,
+              itemId: form.itemId || null,
+              modele: article ? `${article.modele}${article.couleur ? ` (${article.couleur})` : ''}` : '',
+              qte, prix, date: form.date.trim() || todayFr(), note: form.note.trim(),
+            })}
+            disabled={qte <= 0 || prix <= 0}
+            className="flex-1 py-2.5 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-40">
             Enregistrer
           </button>
         </div>
@@ -271,6 +374,7 @@ export default function FournisseurPage() {
   // Factures dépliées : le contenu n'apparaît qu'au clic sur l'œil (vue façon facture).
   const [expanded, setExpanded] = useState(() => new Set());
   const [payFacture, setPayFacture] = useState(null);
+  const [retourFacture, setRetourFacture] = useState(null);
   const toggleExpand = (id) => setExpanded(prev => {
     const n = new Set(prev);
     n.has(id) ? n.delete(id) : n.add(id);
@@ -380,17 +484,40 @@ export default function FournisseurPage() {
       : f));
   }
 
+  /* ── Retours ── */
+  function addRetour(factureId, retour) {
+    persist(factures.map(f => f.id === factureId
+      ? { ...f, retours: [...(f.retours || []), retour] }
+      : f));
+    setRetourFacture(null);
+    toast.success(`Retour enregistré : −${retourMontant(retour).toLocaleString('fr-FR')} DH`);
+  }
+
+  function deleteRetour(factureId, retourId) {
+    if (!confirm('Supprimer ce retour ?')) return;
+    persist(factures.map(f => f.id === factureId
+      ? { ...f, retours: (f.retours || []).filter(r => r.id !== retourId) }
+      : f));
+  }
+
   function deleteItem(factureId, itemId) {
     if (!confirm('Supprimer cet article ?')) return;
     persist(factures.map(f => f.id === factureId ? { ...f, items: (f.items || []).filter(i => i.id !== itemId) } : f));
   }
 
   const totals = useMemo(() => {
-    let cout = 0, qte = 0;
-    for (const f of factures) for (const it of (f.items || [])) {
-      cout += itemCost(it);
-      qte += itemQty(it);
+    let cout = 0, qte = 0, retQte = 0, retMontant = 0;
+    for (const f of factures) {
+      for (const it of (f.items || [])) {
+        cout += itemCost(it);
+        qte += itemQty(it);
+      }
+      retQte += retoursQtyOf(f);
+      retMontant += retoursMontantOf(f);
     }
+    // Les pièces rendues ne sont ni dues ni gardées.
+    cout -= retMontant;
+    qte -= retQte;
     const paye = factures.reduce((n, f) => n + paidOf(f), 0);
     const du = cout - paye;
     /* Prix moyen réellement payé la pièce, déduit des factures — et non un
@@ -400,7 +527,7 @@ export default function FournisseurPage() {
     /* Pièces que la somme encore due représente : c'est en pièces qu'on
        raisonne face au fournisseur, pas en dirhams. */
     const piecesDues = prixPiece > 0 ? Math.round(du / prixPiece) : 0;
-    return { cout, qte, paye, du, prixPiece, piecesDues };
+    return { cout, qte, paye, du, prixPiece, piecesDues, retQte, retMontant };
   }, [factures]);
 
   const visibleFactures = useMemo(() => {
@@ -425,7 +552,7 @@ export default function FournisseurPage() {
       </div>
 
       {/* Résumé global */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 mb-5">
         <SummaryCard label="Coût total" value={`${totals.cout.toLocaleString('fr-FR')} DH`} color="text-gray-800" />
         <SummaryCard label="Qté prise" value={totals.qte} color="text-blue-600" />
         <SummaryCard label="Payé" value={`${totals.paye.toLocaleString('fr-FR')} DH`} color="text-emerald-600" />
@@ -434,6 +561,8 @@ export default function FournisseurPage() {
         <SummaryCard label="Pièces non payées" value={totals.piecesDues}
           color={totals.piecesDues > 0 ? 'text-amber-600' : 'text-emerald-700'}
           hint={totals.prixPiece > 0 ? `à ${Math.round(totals.prixPiece).toLocaleString('fr-FR')} DH la pièce` : undefined} />
+        <SummaryCard label="Retours" value={`${totals.retQte} pcs`} color={totals.retQte > 0 ? 'text-orange-600' : 'text-gray-400'}
+          hint={totals.retMontant > 0 ? `−${totals.retMontant.toLocaleString('fr-FR')} DH déduits` : 'Pièces défectueuses rendues'} />
         <SummaryCard label="Stock au local" value={stockManuel} color="text-indigo-600"
           hint="Réglable dans Stock — descend à chaque commande confirmée" />
       </div>
@@ -454,12 +583,13 @@ export default function FournisseurPage() {
 
       <div className="space-y-5">
         {visibleFactures.map(f => {
-          const fQte = (f.items || []).reduce((n, it) => n + itemQty(it), 0);
-          const fCout = (f.items || []).reduce((n, it) => n + itemCost(it), 0);
+          const fQte = (f.items || []).reduce((n, it) => n + itemQty(it), 0) - retoursQtyOf(f);
+          const fRet = retoursMontantOf(f);
+          const fCout = factureNet(f);
           const ouverte = f.status === 'ouverte';
           const fPaye = paidOf(f);
           const fDu = fCout - fPaye;
-          const solde = fDu <= 0 && fCout > 0;
+          const solde = fDu <= 0 && factureCout(f) > 0;
           return (
             <div key={f.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
               {/* En-tête façon facture */}
@@ -506,6 +636,10 @@ export default function FournisseurPage() {
                       Rouvrir
                     </button>
                   )}
+                  <button onClick={() => setRetourFacture(f)}
+                    className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
+                    <Undo2 size={13} /> Retour
+                  </button>
                   <button onClick={() => setPayFacture(f)}
                     className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
                     <Plus size={13} /> Versement
@@ -576,6 +710,12 @@ export default function FournisseurPage() {
                       <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Total facture</p>
                       <p className="text-sm font-bold text-gray-800">{fCout.toLocaleString('fr-FR')} DH</p>
                     </div>
+                    {fRet > 0 && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Retours</p>
+                        <p className="text-sm font-bold text-orange-600">−{fRet.toLocaleString('fr-FR')} DH</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Payé</p>
                       <p className="text-sm font-bold text-emerald-600">{fPaye.toLocaleString('fr-FR')} DH</p>
@@ -597,6 +737,26 @@ export default function FournisseurPage() {
                       </p>
                     </div>
                   </div>
+
+                  {(f.retours || []).length > 0 && (
+                    <div className="space-y-1.5 mb-3">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Retours au fournisseur</p>
+                      {(f.retours || []).map(r => (
+                        <div key={r.id} className="flex items-center gap-2 bg-orange-50/60 border border-orange-100 rounded-lg px-3 py-2">
+                          <span className="text-sm font-bold text-orange-700 w-28 shrink-0">
+                            −{retourMontant(r).toLocaleString('fr-FR')} DH
+                          </span>
+                          <span className="text-xs font-semibold text-gray-700 shrink-0">{retourQty(r)} pcs × {(parseFloat(r.prix) || 0).toLocaleString('fr-FR')} DH</span>
+                          <span className="text-xs text-gray-500 shrink-0">{r.date}</span>
+                          {(r.modele || r.note) && <span className="text-xs text-gray-400 truncate">{[r.modele, r.note].filter(Boolean).join(' · ')}</span>}
+                          <button onClick={() => deleteRetour(f.id, r.id)}
+                            className="ml-auto p-1.5 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Supprimer ce retour">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {(f.paiements || []).length === 0 ? (
                     <p className="text-xs text-gray-400">Aucun versement enregistré.</p>
@@ -635,14 +795,23 @@ export default function FournisseurPage() {
         Les commandes et les livraisons n'y touchent pas — les quantités restent telles que vous les avez saisies.
         Une facture reste ouverte tant que vous n'appuyez pas sur « Clôturer » ; l'article suivant en crée alors une nouvelle.
         Ajoutez autant de versements que nécessaire (espèces, virement, chèque) : le reste à payer se met à jour tout seul.
+        Une pièce défectueuse rendue s'enregistre avec « Retour » : sa quantité et son prix sont déduits de la facture et du reste à payer.
       </p>
 
       {payFacture && (
         <PaiementModal
           facture={payFacture}
-          reste={(payFacture.items || []).reduce((n, it) => n + itemCost(it), 0) - paidOf(payFacture)}
+          reste={factureNet(payFacture) - paidOf(payFacture)}
           onClose={() => setPayFacture(null)}
           onSave={(paiement) => addPaiement(payFacture.id, paiement)}
+        />
+      )}
+
+      {retourFacture && (
+        <RetourModal
+          facture={retourFacture}
+          onClose={() => setRetourFacture(null)}
+          onSave={(retour) => addRetour(retourFacture.id, retour)}
         />
       )}
 
