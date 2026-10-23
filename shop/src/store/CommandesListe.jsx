@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Ban, X, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
+import { PERIODES, dansPeriode, dateCommande } from '../lib/periode';
 
 const STATUT = {
   nouveau:     { label: 'En attente', cls: 'bg-amber-50 text-amber-700' },
@@ -13,6 +14,12 @@ const STATUT = {
   injoignable: { label: 'Injoignable', cls: 'bg-gray-100 text-gray-600' },
 };
 const statut = (s) => STATUT[s] || { label: s || '—', cls: 'bg-gray-100 text-gray-600' };
+
+/* Commande saisie à la main dans l'application (client WhatsApp, Messenger,
+   téléphone…) : identifiant de la série VI, sans source du site. Elle compte
+   avec les commandes du site pour comparer avec Meta, sous la source « Manuel ». */
+const SOURCE_MANUELLE = 'Manuel';
+const sourceDe = (c) => c.recipient?.source || (c._manuel ? SOURCE_MANUELLE : 'Inconnue');
 
 function Carte({ label, valeur, couleur }) {
   return (
@@ -33,6 +40,7 @@ export default function CommandesListe() {
   const [q, setQ] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
   const [filtreSource, setFiltreSource] = useState('');
+  const [periode, setPeriode] = useState('aujourdhui');
   const [ipsBloquees, setIpsBloquees] = useState(new Set());
   const [telsBloques, setTelsBloques] = useState(new Set());
 
@@ -118,44 +126,47 @@ export default function CommandesListe() {
   // reste visible ici, comme une archive — la retirer aussi de cette liste
   // effacerait la trace qu'elle est bien passée par le site.
   useEffect(() => {
-    supabase.from('orders')
-      .select('id, recipient, product, products, price, status, date_added, is_deleted')
-      .like('id', 'VS-%')
-      // Trié par `created_at` (vraie colonne timestamp) pour que LIMIT 300
-      // retienne bien les 300 commandes les plus récentes — PAS par
-      // `date_added`, un texte "JJ/MM/AAAA HH:MM:SS" (voir horodatage() dans
-      // lib/commande.js) que Postgres compare ici comme une CHAÎNE :
-      // "03/09/…" passait avant "02/10/…" parce que '3' > '2' au premier
-      // chiffre, sans le moindre égard pour le mois — les commandes les plus
-      // récentes se retrouvaient noyées au milieu, voire en bas, de la
-      // liste. Le tri d'affichage définitif, juste après, reparse quand
-      // même `date_added` en vraie date : c'est le champ que l'utilisateur
-      // voit, il doit rester la source de vérité de l'ordre affiché.
-      .order('created_at', { ascending: false })
-      .limit(300)
-      .then(({ data }) => {
-        const parseTs = (s) => {
-          const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-          if (!m) return 0;
-          return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime();
-        };
-        setCommandes((data || []).sort((a, b) => parseTs(b.date_added) - parseTs(a.date_added)));
+    const champs = 'id, recipient, product, products, price, status, date_added, is_deleted';
+    // Trié par `created_at` (vraie colonne timestamp) pour que LIMIT retienne
+    // bien les commandes les plus récentes — PAS par `date_added`, un texte
+    // "JJ/MM/AAAA HH:MM:SS" que Postgres compare comme une CHAÎNE ("03/09/…"
+    // passait avant "02/10/…"). Le tri d'affichage, juste après, reparse
+    // `date_added` : c'est la date que l'utilisateur voit.
+    const site = supabase.from('orders').select(champs).like('id', 'VS-%')
+      .order('created_at', { ascending: false }).limit(1000);
+    const manuelles = supabase.from('orders').select(champs).like('id', 'VI%')
+      .order('created_at', { ascending: false }).limit(1000);
+    Promise.all([site, manuelles])
+      .then(([a, b]) => {
+        const duSite = a.data || [];
+        // « VI » suivi de chiffres seulement : écarte les anciennes séries
+        // (VICT…) importées depuis Google Sheets, d'avant le système.
+        const aLaMain = (b.data || [])
+          .filter(c => /^VI\d+$/i.test(c.id) && !c.recipient?.source && c.recipient?.importe !== 'sheet')
+          .map(c => ({ ...c, _manuel: true }));
+        setCommandes([...duSite, ...aLaMain].sort((x, y) => dateCommande(y.date_added) - dateCommande(x.date_added)));
       })
       .catch(() => setCommandes([]));
   }, []);
+
+  // La période filtre tout : cartes, répartition par source et tableau.
+  const dePeriode = useMemo(
+    () => (commandes || []).filter(c => dansPeriode(c.date_added, periode)),
+    [commandes, periode]
+  );
 
   const stats = useMemo(() => {
     // Une commande archivée (supprimée côté app) ne doit plus compter dans
     // le chiffre d'affaires ou les totaux — elle reste visible, mais elle
     // n'est plus une commande "active".
-    const liste = (commandes || []).filter(c => !c.is_deleted);
+    const liste = dePeriode.filter(c => !c.is_deleted);
     return {
       total: liste.length,
       enAttente: liste.filter(c => c.status === 'nouveau').length,
       livrees: liste.filter(c => c.status === 'livre').length,
       ca: liste.reduce((s, c) => s + (c.price || 0), 0),
     };
-  }, [commandes]);
+  }, [dePeriode]);
 
   // Répond à "d'où viennent les commandes, et lesquelles se vendent
   // vraiment ?" — le badge "Source" existait déjà par ligne, mais fallait
@@ -163,21 +174,21 @@ export default function CommandesListe() {
   // ici, pas "total", car une source qui génère beaucoup de commandes mais
   // peu de livraisons n'est pas forcément la plus rentable.
   const parSource = useMemo(() => {
-    const liste = (commandes || []).filter(c => !c.is_deleted);
+    const liste = dePeriode.filter(c => !c.is_deleted);
     const map = new Map();
     for (const c of liste) {
-      const cle = c.recipient?.source || 'Inconnue';
+      const cle = sourceDe(c);
       const e = map.get(cle) || { source: cle, total: 0, livrees: 0, ca: 0 };
       e.total += 1;
       if (c.status === 'livre') { e.livrees += 1; e.ca += c.price || 0; }
       map.set(cle, e);
     }
     return [...map.values()].sort((a, b) => b.total - a.total);
-  }, [commandes]);
+  }, [dePeriode]);
 
   const visibles = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return (commandes || []).filter(c => {
+    return dePeriode.filter(c => {
       if (filtreStatut === 'archivee') return c.is_deleted;
       // Une commande "supprimée" reste en base (archive), mais ne doit plus
       // apparaître dans la liste par défaut — sinon "Supprimer" ne change
@@ -185,19 +196,31 @@ export default function CommandesListe() {
       // pour la retrouver.
       if (c.is_deleted) return false;
       if (filtreStatut && filtreStatut !== 'archivee' && c.status !== filtreStatut) return false;
-      if (filtreSource && (c.recipient?.source || 'Inconnue') !== filtreSource) return false;
+      if (filtreSource && sourceDe(c) !== filtreSource) return false;
       if (!s) return true;
       const r = c.recipient || {};
       return [c.id, r.name, r.phone, r.city].some(v => String(v || '').toLowerCase().includes(s));
     });
-  }, [commandes, q, filtreStatut, filtreSource]);
+  }, [dePeriode, q, filtreStatut, filtreSource]);
 
   if (!commandes) return <p className="text-sm text-gray-400">Chargement…</p>;
 
   return (
     <div>
       <h1 className="text-lg font-medium">Commandes</h1>
-      <p className="text-xs text-gray-400 mt-0.5">Commandes passées sur le site</p>
+      <p className="text-xs text-gray-400 mt-0.5">Commandes passées sur le site, et saisies à la main dans l'application (source « Manuel »)</p>
+
+      {/* Même découpage que Meta (jour, veille, mois…) pour comparer les
+          commandes réelles avec les achats annoncés par le Gestionnaire. */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {PERIODES.map(p => (
+          <button key={p.id} onClick={() => setPeriode(p.id)}
+            className={`text-xs px-3 py-2 rounded-lg border transition ${periode === p.id
+              ? 'bg-ink text-white border-ink' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+            {p.label}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-5 grid sm:grid-cols-4 gap-4">
         <Carte label="Total commandes" valeur={stats.total} />
@@ -315,7 +338,9 @@ export default function CommandesListe() {
                   <td className="px-4 py-3 font-medium">{fmtPrix(c.price)}</td>
                   <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span></td>
                   <td className="px-4 py-3">
-                    {r.source && <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700">{r.source}</span>}
+                    {c._manuel
+                      ? <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700">{SOURCE_MANUELLE}</span>
+                      : r.source && <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700">{r.source}</span>}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">
                     {/* Par défaut, une estimation à partir de l'IP, pas
