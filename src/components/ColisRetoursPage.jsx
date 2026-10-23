@@ -23,6 +23,17 @@ const FILTRES = [
   { id: 'tous', label: 'Tous' },
 ];
 
+/* Couleur du dernier statut Ozon — mêmes teintes que la Liste des Colis. */
+function couleurOzon(statut) {
+  const ls = (statut || '').toLowerCase();
+  if (ls.includes('livr')) return 'bg-green-100 text-green-700';
+  if (ls.includes('refus')) return 'bg-red-100 text-red-700';
+  if (ls.includes('ramassage') || ls.includes('attente')) return 'bg-amber-100 text-amber-700';
+  if (ls.includes('expédi') || ls.includes('recu') || ls.includes('reçu')) return 'bg-blue-100 text-blue-700';
+  if (ls.includes('retour')) return 'bg-gray-200 text-gray-700';
+  return 'bg-teal-100 text-teal-700';
+}
+
 function StatutBadge({ status }) {
   const { getLive } = useStatuses();
   const live = getLive(status);
@@ -219,12 +230,20 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                     <td className="px-4 py-3"><StatutBadge status={o.status} /></td>
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{o.dateUpdated || o.dateAdded}</td>
                     <td className="px-4 py-3">
-                      {/* Camion = suivi Ozon (historique, « Retourné », agence) ; livreur personnel = colis. */}
-                      <button onClick={() => setDeliveryOrder(o)}
-                        className="p-2 rounded-lg bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors"
-                        title="Suivi livraison" aria-label="Suivi livraison">
-                        {/ozon/i.test(o.recipient?.delivery || '') ? <Truck size={15} /> : <Package size={15} />}
-                      </button>
+                      <div className="flex flex-col items-start gap-1">
+                        {/* Camion = suivi Ozon (historique, « Retourné », agence) ; livreur personnel = colis. */}
+                        <button onClick={() => setDeliveryOrder(o)}
+                          className="p-2 rounded-lg bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors"
+                          title="Suivi livraison" aria-label="Suivi livraison">
+                          {/ozon/i.test(o.recipient?.delivery || '') ? <Truck size={15} /> : <Package size={15} />}
+                        </button>
+                        {/* Dernier statut connu chez Ozon : se met à jour en ouvrant le suivi. */}
+                        {o.ozoneLastStatus && /ozon/i.test(o.recipient?.delivery || '') && (
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${couleurOzon(o.ozoneLastStatus)}`}>
+                            {o.ozoneLastStatus}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <button onClick={() => toggleRecu(o)}
