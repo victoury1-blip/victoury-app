@@ -198,23 +198,24 @@ export default function ColisRetoursPage({ orders, setOrders }) {
 
       <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[760px]">
+          <table className="w-full text-sm min-w-[980px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Code', 'Client', 'Ville', 'Produit', 'Livreur', 'Statut', 'Date', 'Suivi', 'Reçu'].map(h => (
+                {['Code', 'Client', 'Ville', 'Produit', 'Note interne', 'Livreur', 'Statut', 'Date', 'Suivi', 'Reçu'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pageItems.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm">
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400 text-sm">
                   {filtre === 'non_recu' ? 'Aucun colis en attente de retour 🎉' : 'Aucun colis'}
                 </td></tr>
               )}
               {pageItems.map((o, idx) => {
                 const recu = estRecu(o, recuIds);
                 const prods = o.products?.length ? o.products : (o.product ? [o.product] : []);
+                const note = (o.note || '').replace('Note interne: ', '').trim();
                 return (
                   <tr key={o.id} className={idx % 2 ? 'bg-gray-50' : 'bg-white'}>
                     <td className="px-4 py-3 font-mono text-xs font-bold text-gray-700 whitespace-nowrap">{o.trackingNumber || o.id}</td>
@@ -223,8 +224,17 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                       {o.recipient?.phone && <PhoneChip phone={o.recipient.phone} allOrders={orders} />}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{o.recipient?.city || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
-                      {prods.map((p, i) => <div key={i}>{p?.name}{p?.qty > 1 ? ` ×${p.qty}` : ''}</div>)}
+                    <td className="px-4 py-3 text-gray-700 text-sm">
+                      {prods.map((p, i) => (
+                        <div key={i} className="whitespace-nowrap">
+                          <span className="font-semibold">{p?.name}</span>
+                          {p?.size && <span className="ml-1 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">{p.size}</span>}
+                          {p?.qty > 1 && <span className="ml-1 text-xs text-gray-500">×{p.qty}</span>}
+                        </div>
+                      ))}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-700 w-[220px] min-w-[200px] max-w-[240px] whitespace-pre-wrap break-words">
+                      {note || <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{o.recipient?.delivery || '—'}</td>
                     <td className="px-4 py-3"><StatutBadge status={o.status} /></td>
