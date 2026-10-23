@@ -13,8 +13,22 @@ const RECU_KEY = 'victoury_recu_ids';
 /** Le colis est passé par la Liste des Colis (même règle que cette page). */
 export const estDansColis = (o) => COLIS_PIPELINE_SET.has(o?.status) || (!!o?.trackingNumber && !!o?.validated);
 
-/** Colis refusé / annulé / en retour, issu de la Liste des Colis. */
-export const estColisRetour = (o) => RETOUR_SET.has(o?.status) && estDansColis(o);
+/* Colis importé depuis Google Sheets (historique d'avant le système) : il
+ * porte le code du tableur comme identifiant ET comme code de suivi. Une
+ * commande du système a, elle, un numéro de la série VI, ou un identifiant de
+ * la boutique / d'une intégration (VS-, EXT-, WC-). Les imports récents sont
+ * en plus marqués explicitement (recipient.importe = 'sheet'). */
+export function estImportSheet(o) {
+  if (o?.recipient?.importe === 'sheet') return true;
+  const id = String(o?.id || '');
+  if (!id || id !== String(o?.trackingNumber || '')) return false;
+  if (/^VI\d+$/i.test(id)) return false;
+  if (/^(VS|EXT|WC)-/i.test(id)) return false;
+  return true;
+}
+
+/** Colis refusé / annulé / en retour, issu de la Liste des Colis (hors import Google Sheets). */
+export const estColisRetour = (o) => RETOUR_SET.has(o?.status) && estDansColis(o) && !estImportSheet(o);
 
 /** Liste locale héritée des colis cochés « reçu » avant la colonne orders.recu. */
 export function lireRecuIdsLocal() {

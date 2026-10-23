@@ -119,7 +119,7 @@ export default function ColisRetoursPage({ orders, setOrders }) {
         <h1 className="text-xl font-bold text-gray-800">Retours &amp; Annulés</h1>
       </div>
       <p className="text-xs text-gray-500 mb-5">
-        Colis refusés, annulés, prêts pour le retour ou retournés — reçus au local ou encore chez la société de livraison.
+        Colis refusés, annulés, prêts pour le retour ou retournés — reçus au local ou encore chez la société de livraison (hors colis importés depuis Google Sheets).
       </p>
 
       <div className="grid grid-cols-3 gap-3 mb-5">

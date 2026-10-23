@@ -383,7 +383,8 @@ export default function SheetImportSection({ orders = [], setOrders }) {
       const sheetDate = (dateCol && String(row[dateCol] || '').trim()) || '';
       newOrders.push({
         id: code,
-        recipient: { name, phone, city, address, delivery: livreur },
+        // Marque d'origine : sert à tenir ces colis historiques à part (Retours & Annulés).
+        recipient: { name, phone, city, address, delivery: livreur, importe: 'sheet' },
         product: { name: product, size: '', color: '', qty: 1, stock: 0 },
         products: product ? [{ name: product, size: '', color: '', qty: 1 }] : null,
         price,
