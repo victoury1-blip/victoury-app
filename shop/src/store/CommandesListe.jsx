@@ -21,6 +21,15 @@ const statut = (s) => STATUT[s] || { label: s || '—', cls: 'bg-gray-100 text-g
 const SOURCE_MANUELLE = 'Manuel';
 const sourceDe = (c) => c.recipient?.source || (c._manuel ? SOURCE_MANUELLE : 'Inconnue');
 
+/* Commande à afficher ici : celles du site (VS-…) et celles saisies à la
+   main dans l'application (série VI, hors import Google Sheets). null sinon. */
+function preparer(c) {
+  const id = String(c?.id || '');
+  if (id.startsWith('VS-')) return c;
+  if (/^VI\d+$/i.test(id) && !c.recipient?.source && c.recipient?.importe !== 'sheet') return { ...c, _manuel: true };
+  return null;
+}
+
 function Carte({ label, valeur, couleur }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5">
@@ -141,12 +150,34 @@ export default function CommandesListe() {
         const duSite = a.data || [];
         // « VI » suivi de chiffres seulement : écarte les anciennes séries
         // (VICT…) importées depuis Google Sheets, d'avant le système.
-        const aLaMain = (b.data || [])
-          .filter(c => /^VI\d+$/i.test(c.id) && !c.recipient?.source && c.recipient?.importe !== 'sheet')
-          .map(c => ({ ...c, _manuel: true }));
+        const aLaMain = (b.data || []).map(preparer).filter(Boolean);
         setCommandes([...duSite, ...aLaMain].sort((x, y) => dateCommande(y.date_added) - dateCommande(x.date_added)));
       })
       .catch(() => setCommandes([]));
+  }, []);
+
+  /* En direct : une commande confirmée, livrée ou annulée dans l'application
+     change de statut ici sans recharger la page, et une nouvelle commande
+     apparaît en haut de la liste. */
+  useEffect(() => {
+    const canal = supabase
+      .channel('store-commandes-liste')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        const ligne = payload.new && Object.keys(payload.new).length ? payload.new : null;
+        if (!ligne) return;
+        const c = preparer(ligne);
+        if (!c) return;
+        setCommandes(list => {
+          if (!list) return list;
+          const i = list.findIndex(x => x.id === c.id);
+          if (i === -1) return [c, ...list];
+          const copie = list.slice();
+          copie[i] = { ...copie[i], ...c };
+          return copie;
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(canal); };
   }, []);
 
   // La période filtre tout : cartes, répartition par source et tableau.
