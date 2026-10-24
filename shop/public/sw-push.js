@@ -11,7 +11,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(titre, {
       body: data.body || '',
       icon: '/icon-512.png',
-      badge: '/icon-512.png',
+      badge: '/badge-96.png', // silhouette blanche sur fond transparent : Android n'affiche que la forme (sinon un carré gris)
       tag: data.tag || undefined,
       data: { url: data.url || '/store/commandes' },
       vibrate: [120, 60, 120],

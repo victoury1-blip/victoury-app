@@ -11,7 +11,7 @@
       ]
     },
     {
-      "source": "/(icon.svg|icon-192.png|icon-512.png|apple-touch-icon.png|manifest-admin.webmanifest)",
+      "source": "/(icon.svg|badge-96.png|icon-192.png|icon-512.png|apple-touch-icon.png|manifest-admin.webmanifest)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=604800" }
       ]
