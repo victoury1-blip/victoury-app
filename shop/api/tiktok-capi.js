@@ -30,6 +30,9 @@ export default async function handler(req, res) {
   // L'identifiant TikTok est alphanumérique (ex. CVAG6PJC77U2KF3E3AV0) —
   // contrôler sa forme évite d'injecter une valeur arbitraire dans l'appel.
   if (!/^[A-Z0-9]{10,30}$/.test(String(pixelId || ''))) return res.status(400).json({ error: 'Pixel ID invalide' });
+  // Même garde-fou que meta-capi.js, appliqué dès que TIKTOK_PIXEL_ID est réglé sur Vercel.
+  const pixelsAutorises = String(process.env.TIKTOK_PIXEL_ID || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (pixelsAutorises.length && !pixelsAutorises.includes(String(pixelId))) return res.status(403).json({ error: 'Pixel non autorisé' });
   if (!Array.isArray(events) || !events.length) return res.status(400).json({ error: 'Aucun évènement' });
   if (events.length > 50) return res.status(400).json({ error: "Trop d'évènements en un envoi" });
 

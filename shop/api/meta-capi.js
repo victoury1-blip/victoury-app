@@ -36,6 +36,12 @@ export default async function handler(req, res) {
   // L'identifiant est un nombre : le contrôler évite d'injecter un chemin
   // arbitraire dans l'URL appelée.
   if (!/^\d{5,25}$/.test(String(pixelId || ''))) return res.status(400).json({ error: 'Pixel ID invalide' });
+  /* Route publique (le navigateur du client l'appelle) qui signe avec NOTRE
+     jeton : sans cette liste, n'importe qui pouvait envoyer de faux achats
+     vers tout autre pixel auquel le jeton a accès. META_PIXEL_ID (Vercel)
+     peut lister plusieurs identifiants séparés par des virgules. */
+  const pixelsAutorises = String(process.env.META_PIXEL_ID || '1080161523515714').split(',').map(x => x.trim()).filter(Boolean);
+  if (!pixelsAutorises.includes(String(pixelId))) return res.status(403).json({ error: 'Pixel non autorisé' });
   if (!Array.isArray(events) || !events.length) return res.status(400).json({ error: 'Aucun évènement' });
   if (events.length > 50) return res.status(400).json({ error: "Trop d'évènements en un envoi" });
 
