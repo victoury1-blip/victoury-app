@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
 import { demanderPermissionNotif, notifierNouvelleCommande } from '../lib/notifCommande';
-import { activerPushCommande, pushDisponible } from '../lib/pushNotif';
+import { activerPushCommande, pushDisponible, enregistrerServiceWorker } from '../lib/pushNotif';
 import { chargerReglages } from '../lib/catalog';
 import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
 import { compterCommandesEnAttente } from '../lib/commandesSite';
@@ -81,7 +81,11 @@ export default function AdminLayout() {
      pour un site qui en a un. Sans lui, l'icône s'ouvrait dans un onglet
      avec le nom et le lien « victoury-maroc.com » en haut. */
   useEffect(() => {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw-push.js').catch(() => {});
+    enregistrerServiceWorker()
+      // L'ancien service worker (racine) vient peut-être d'être retiré avec son
+      // abonnement : on se réabonne aussitôt si la permission est déjà acquise.
+      .then(() => { if (pushDisponible() && Notification.permission === 'granted') return activerPushCommande(); })
+      .catch(() => {});
   }, []);
 
   // Filet de sécurité derrière le son et la notification système : les deux

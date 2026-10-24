@@ -18,6 +18,32 @@ function urlBase64ToUint8Array(base64) {
   return Uint8Array.from([...brut].map(c => c.charCodeAt(0)));
 }
 
+/* Le service worker vit sous /store, comme le manifeste de l'application
+   installée (scope "/store"). Enregistré à la racine "/", il sortait du
+   périmètre de l'application : Android attribuait alors les notifications à
+   Google Chrome (badge sur l'icône Chrome) au lieu de l'icône Victoury. */
+const SCOPE_SW = '/store';
+
+/** Enregistre le service worker sous /store, en retirant l'ancien enregistré
+ *  à la racine (et son abonnement push, en base comme sur l'appareil) —
+ *  sinon chaque commande arriverait deux fois, une fois par Chrome. */
+export async function enregistrerServiceWorker() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null;
+  try {
+    const racine = `${location.origin}/`;
+    for (const r of await navigator.serviceWorker.getRegistrations()) {
+      if (r.scope !== racine) continue;
+      const ancien = await r.pushManager?.getSubscription?.().catch(() => null);
+      if (ancien) {
+        await supabase.from('shop_push_subscriptions').delete().eq('endpoint', ancien.endpoint);
+        await ancien.unsubscribe().catch(() => {});
+      }
+      await r.unregister().catch(() => {});
+    }
+  } catch { /* nettoyage au mieux : ne bloque jamais l'enregistrement */ }
+  return navigator.serviceWorker.register('/sw-push.js', { scope: SCOPE_SW });
+}
+
 export function pushDisponible() {
   return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && !!CLE_PUBLIQUE;
 }
@@ -33,7 +59,7 @@ export async function activerPushCommande() {
     if (p !== 'granted') return { ok: false, raison: 'refuse' };
   }
   try {
-    const reg = await navigator.serviceWorker.register('/sw-push.js');
+    const reg = await enregistrerServiceWorker();
     await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
