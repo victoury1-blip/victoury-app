@@ -29,6 +29,14 @@ const FILTRES = [
 ];
 
 /* Couleur du dernier statut Ozon — mêmes teintes que la Liste des Colis. */
+/** Date d'ajout en millisecondes (« jj/mm/aaaa hh:mm:ss », ISO, ou created_at). */
+function dateAjout(o) {
+  const t = String(o?.dateAdded || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (t) return new Date(+t[3], +t[2] - 1, +t[1], +(t[4] || 0), +(t[5] || 0), +(t[6] || 0)).getTime();
+  const d = Date.parse(o?.createdAt || o?.dateAdded || '');
+  return Number.isFinite(d) ? d : 0;
+}
+
 function couleurOzon(statut) {
   const ls = (statut || '').toLowerCase();
   if (ls.includes('livr')) return 'bg-green-100 text-green-700';
@@ -130,7 +138,12 @@ export default function ColisRetoursPage({ orders, setOrders }) {
       if (!o || vus.has(o.id)) return false;
       vus.add(o.id);
       return estColisRetour(o);
-    });
+    })
+      /* Ordre FIXE : la plus récemment ajoutée en haut, d'après sa date
+         d'ajout (qui ne bouge jamais). L'ordre de la liste des commandes,
+         lui, change à chaque mise à jour (suivi Ozon, synchro) : les lignes
+         sautaient de place sous les yeux. Départage par identifiant. */
+      .sort((a, b) => dateAjout(b) - dateAjout(a) || String(b.id).localeCompare(String(a.id)));
   }, [orders]);
 
   const livreurs = useMemo(
