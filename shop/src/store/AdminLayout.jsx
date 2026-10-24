@@ -75,6 +75,15 @@ export default function AdminLayout() {
   const { pathname } = useLocation();
   useEffect(() => { setMenuOuvert(false); }, [pathname]);
 
+  /* Service worker enregistré dès l'ouverture de l'administration (pas
+     seulement à l'activation des notifications) : Chrome Android n'installe
+     l'icône en vraie application — plein écran, sans barre d'adresse — que
+     pour un site qui en a un. Sans lui, l'icône s'ouvrait dans un onglet
+     avec le nom et le lien « victoury-maroc.com » en haut. */
+  useEffect(() => {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw-push.js').catch(() => {});
+  }, []);
+
   // Filet de sécurité derrière le son et la notification système : les deux
   // dépendent d'une permission navigateur et d'un onglet resté ouvert — si
   // l'un des deux manque, RIEN ne prévenait avant. Cette liste, elle, vit en
