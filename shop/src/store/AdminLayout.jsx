@@ -186,14 +186,16 @@ export default function AdminLayout() {
     <div className="min-h-screen flex bg-gray-50">
       {/* Barre du haut, téléphone seulement : le bouton qui ouvre le tiroir —
           sans elle, aucun moyen d'atteindre le menu sur petit écran. */}
+      {/* Bouton du menu à GAUCHE, côté où s'ouvre le tiroir — comme dans
+          l'application Victoury. */}
       <div className="sm:hidden fixed top-0 inset-x-0 z-30 h-14 bg-[#0f1424] flex items-center justify-between px-4">
-        <Wordmark className="text-white text-sm" />
-        <div className="flex items-center gap-1">
-          <BoutonCloche count={commandesNonVues.length} onClick={ouvrirCloche} />
-          <button onClick={() => setMenuOuvert(true)} className="text-white p-1.5" aria-label="Menu">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setMenuOuvert(true)} className="text-white p-1.5 -ml-1.5" aria-label="Menu">
             <Menu size={20} />
           </button>
+          <Wordmark className="text-white text-sm" />
         </div>
+        <BoutonCloche count={commandesNonVues.length} onClick={ouvrirCloche} />
       </div>
 
       {menuOuvert && (
