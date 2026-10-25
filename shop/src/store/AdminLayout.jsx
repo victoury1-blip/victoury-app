@@ -81,6 +81,13 @@ export default function AdminLayout() {
      pour un site qui en a un. Sans lui, l'icône s'ouvrait dans un onglet
      avec le nom et le lien « victoury-maroc.com » en haut. */
   useEffect(() => {
+    /* Une seule adresse pour l'administration : ouverte aussi depuis
+       www.victoury-maroc.com, elle y gardait un second abonnement push —
+       chaque commande arrivait alors en double. */
+    if (location.hostname === 'www.victoury-maroc.com') {
+      location.replace(`https://victoury-maroc.com${location.pathname}${location.search}`);
+      return;
+    }
     enregistrerServiceWorker()
       // L'ancien service worker (racine) vient peut-être d'être retiré avec son
       // abonnement : on se réabonne aussitôt si la permission est déjà acquise.
