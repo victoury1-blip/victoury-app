@@ -23,7 +23,6 @@ const ProfitPage = React.lazy(() => import('./components/ProfitPage'));
 const RamassagePage = React.lazy(() => import('./components/RamassagePage'));
 const AnalyticsPage = React.lazy(() => import('./components/AnalyticsPage'));
 const RetourPage = React.lazy(() => import('./components/RetourPage'));
-const AssistantWidget = React.lazy(() => import('./components/AssistantWidget'));
 const ModeratorsPage = React.lazy(() => import('./components/ModeratorsPage'));
 import { supabase } from './lib/supabase';
 const _offlineStore = () => import('./lib/offlineStore');
@@ -1435,7 +1434,6 @@ export default function App() {
       <IOSInstallPrompt />
       <OfflineBanner />
       <PWAUpdateBanner />
-      <React.Suspense fallback={null}><AssistantWidget orders={orders} /></React.Suspense>
     </div>
     </PermissionsProvider>
     </ToastProvider>
