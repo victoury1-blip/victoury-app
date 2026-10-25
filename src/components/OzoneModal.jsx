@@ -166,16 +166,22 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
     const ozoneLiv = livreurs.find(l => l.isOzone) || livreurs[0];
     const fraisKey = ozoneLiv ? `frais_${ozoneLiv.id}` : null;
     const stored = fraisKey ? (() => { try { return JSON.parse(localStorage.getItem(fraisKey) || '[]'); } catch { return []; } })() : [];
+    /* La liste enregistrée s'affiche tout de suite, MAIS la liste en direct
+       d'Ozon (étape 2) la remplace dès qu'elle arrive : les identifiants
+       mémorisés vieillissent — Ozon a remplacé certaines villes (ex.
+       Mohammedia) par un nouvel identifiant, et l'ancien renvoyait
+       « City Not Active » alors que le nom était juste. */
+    let enDirect = false;
     if (Array.isArray(stored) && stored.length > 0) {
       const list = stored.map((c) => ({ id: c.id, name: c.ville }));
-      setCities(list); autoMatchCity(list); setCitiesLoading(false); return;
-    }
-    /* 1b. Try Supabase if not in localStorage */
-    if (fraisKey) {
+      setCities(list); autoMatchCity(list); setCitiesLoading(false);
+    } else if (fraisKey) {
+      /* 1b. Try Supabase if not in localStorage */
       cloudGet(fraisKey).then(remote => {
         if (Array.isArray(remote) && remote.length > 0) {
           const list = remote.map((c) => ({ id: c.id, name: c.ville }));
           localStorage.setItem(fraisKey, JSON.stringify(remote));
+          if (enDirect) return; // la liste d'Ozon, plus récente, est déjà là
           setCities(list); autoMatchCity(list); setCitiesLoading(false);
         }
       });
@@ -188,15 +194,28 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
         const raw = await res.json();
         const parsed = parseCities(raw);
         if (parsed.length > 0) {
-          setCities(parsed);
+          enDirect = true;
+          const normNom = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+          // La ville déjà choisie (par nom) passe sur son identifiant actuel.
+          setCities((ancienne) => {
+            setForm((p) => {
+              const nom = ancienne.find((c) => c.id === p.cityId)?.name;
+              const actuelle = nom && parsed.find((c) => normNom(c.name) === normNom(nom));
+              return actuelle ? { ...p, cityId: actuelle.id } : p;
+            });
+            return parsed;
+          });
           autoMatchCity(parsed);
           setCitiesLoading(false);
           return;
         }
       } catch {}
-      /* 3. Fallback */
-      setCities(FALLBACK_CITIES);
-      autoMatchCity(FALLBACK_CITIES);
+      /* 3. Fallback : seulement si rien n'est affiché */
+      setCities((actuelle) => {
+        if (actuelle.length) return actuelle;
+        autoMatchCity(FALLBACK_CITIES);
+        return FALLBACK_CITIES;
+      });
       setCitiesLoading(false);
     })();
   }, []);
