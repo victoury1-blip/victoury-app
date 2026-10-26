@@ -521,7 +521,9 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           </div>
         )}
 
-        {produit.description && <p className="mt-6 text-sm text-gray-600 leading-relaxed">{produit.description}</p>}
+        {/* whitespace-pre-line : les retours à la ligne tapés dans la description
+            (listes, sections) s'affichent tels quels au lieu d'un seul bloc. */}
+        {produit.description && <p dir="auto" className="mt-6 text-sm text-gray-600 leading-relaxed whitespace-pre-line">{produit.description}</p>}
         <div className="mt-8">
           <Accordeon titre={t('detailsProduit')}>{produit.details}</Accordeon>
           <Accordeon titre={t('livraisonTitre')}>{t('livraisonTexte')}</Accordeon>
