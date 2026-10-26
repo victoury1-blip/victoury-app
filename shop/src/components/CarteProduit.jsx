@@ -53,7 +53,9 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
           <span className={`absolute bg-red-600 text-white font-semibold rounded-full
                             ${compact ? 'left-1.5 text-[9px] px-1.5 py-0.5' : 'left-3 text-xs px-2.5 py-1'}
                             ${produit.is_bestseller ? (compact ? 'top-6' : 'top-10') : (compact ? 'top-1.5' : 'top-3')}`}>
-            −{Math.round((1 - produit.price / produit.compare_at) * 100)}%
+            {/* Produit ajouté il y a moins de 30 jours : « Nouveau » plutôt
+                qu'un pourcentage de remise. */}
+            {estNouveau(produit) ? t('nouveauBadge') : `−${Math.round((1 - produit.price / produit.compare_at) * 100)}%`}
           </span>
         )}
         <BoutonFavori slug={produit.slug}
@@ -122,4 +124,10 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
 // Sans ce memo, l'intervalle du carrousel du Hero (toutes les 3s) re-rendait
 // chaque carte de chaque grille de la page d'accueil, même inchangée —
 // une des plus grosses causes du temps de blocage total (TBT).
+const NOUVEAU_JOURS = 30;
+const estNouveau = (p) => {
+  const t = Date.parse(p?.created_at || '');
+  return Number.isFinite(t) && Date.now() - t < NOUVEAU_JOURS * 86400000;
+};
+
 export default React.memo(CarteProduit);
