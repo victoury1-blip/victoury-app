@@ -1156,11 +1156,26 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                           🎁 {promoCommande(order)}
                         </span>
                       )}
-                      {order.note && (
-                        <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">
-                          {dedupeNote(order.note)}
-                        </p>
-                      )}
+                      {order.note && (() => {
+                        /* Les notes internes (ajoutées par l'équipe) ressortent
+                           en ambre, à part du texte automatique (« Commande du
+                           site », code promo…) qui reste en gris. */
+                        const lignes = dedupeNote(order.note).split('\n').map(l => l.trim()).filter(Boolean);
+                        const internes = lignes.filter(l => /^note interne\s*:/i.test(l)).map(l => l.replace(/^note interne\s*:\s*/i, ''));
+                        const autres = lignes.filter(l => !/^note interne\s*:/i.test(l));
+                        return (
+                          <>
+                            {autres.length > 0 && (
+                              <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">{autres.join('\n')}</p>
+                            )}
+                            {internes.map((t, i) => (
+                              <p key={i} dir="auto" className="text-xs font-semibold text-amber-900 bg-amber-50 border-l-4 border-amber-400 rounded px-2 py-1.5 leading-relaxed whitespace-pre-line">
+                                📝 {t}
+                              </p>
+                            ))}
+                          </>
+                        );
+                      })()}
                       {order.noteLivraison && (
                         <p className={`text-xs text-red-600 font-semibold leading-relaxed whitespace-pre-line ${order.note ? 'pt-2 border-t border-gray-200' : ''}`}>
                           Note livraison:<br />{order.noteLivraison}
