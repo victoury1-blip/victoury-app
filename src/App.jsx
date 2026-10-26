@@ -952,7 +952,12 @@ export default function App() {
   /* ── Ozone background sync (every 5 min) ── */
   useEffect(() => {
     if (!session) return;
+    let ozoneEnCours = false;
     async function syncOzoneStatuses() {
+      // Une passe à la fois : la suivante (minuteur, retour au premier plan)
+      // attend la fin de celle-ci au lieu de doubler les appels.
+      if (ozoneEnCours) return;
+      ozoneEnCours = true;
       try {
         let cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
         if (!cfg.customerId || !cfg.apiKey) {
@@ -990,28 +995,40 @@ export default function App() {
         };
         // UNIQUEMENT les livraisons Ozon : interroger Ozon pour une commande confiée à
         // un livreur personnel lui collait un statut Ozon (« Livré ») qui n'a aucun sens.
-        const toSync = ordersRef.current.filter(o =>
-          o.validated && (o.ozoneTracking || o.trackingNumber) && /ozon/i.test(o.recipient?.delivery || ''));
-        // Phase 1 — API officielle de suivi (par numéro, avec variantes du 0).
+        /* Seuls les colis ENCORE EN ROUTE sont interrogés : l'historique (plus de
+           1 700 colis livrés ou retournés) était repassé un par un, en série,
+           à chaque passe — les colis du jour n'étaient atteints qu'au bout de
+           longues minutes, et l'étiquette restait figée (« Mise en
+           distribution » alors qu'Ozon disait « Livré ») tant qu'on n'ouvrait
+           pas la fenêtre du camion. Les plus récemment mis à jour d'abord. */
+        const FINI_APP = new Set(['livre', 'retour_recu', 'echange_recu', 'annule']);
+        const toSync = ordersRef.current
+          .filter(o => o.validated && (o.ozoneTracking || o.trackingNumber) && /ozon/i.test(o.recipient?.delivery || ''))
+          .filter(o => !isFinal(o.ozoneLastStatus) && !FINI_APP.has(o.status))
+          .sort((a, b) => String(b.dateUpdated || '').localeCompare(String(a.dateUpdated || '')));
+        // Phase 1 — API officielle de suivi : tous les codes connus (comme la
+        // fenêtre du camion), avec variantes du 0 ; cinq colis à la fois.
         const stillPending = [];
-        for (const o of toSync) {
+        async function suivre(o) {
           // Le code affiché prime : une correction manuelle doit être suivie.
           const tn = o.trackingNumber || o.ozoneTracking || o.id;
           try {
-            let status = await trackByNumber(tn);
-            if (!status) {
-              const variants = [];
-              const m = tn.match(/^([A-Za-z]+)(\d+)$/);
-              if (m) variants.push(`${m[1]}0${m[2]}`);          // MIMA3251 → MIMA03251
-              if (/^\d+$/.test(tn) && !tn.startsWith('0')) variants.push('0' + tn);
-              for (const v of variants) { status = await trackByNumber(v); if (status) break; }
+            const codes = [...new Set([o.trackingNumber, o.ozoneTracking].filter(Boolean))];
+            for (const c of [...codes]) {
+              const m = c.match(/^([A-Za-z]+)(\d+)$/);
+              if (m) codes.push(`${m[1]}0${m[2]}`);          // MIMA3251 → MIMA03251
+              if (/^\d+$/.test(c) && !c.startsWith('0')) codes.push('0' + c);
             }
+            let status = null;
+            for (const c of codes) { status = await trackByNumber(c); if (status) break; }
             applyStatus(o, status);
-            // Un statut déjà FINAL (côté commande ou déjà enregistré) ne nécessite pas
-            // de re-vérification par le tableau de bord.
-            if (!isFinal(status) && !isFinal(o.ozoneLastStatus)) stillPending.push({ o, tn });
-          } catch { if (!isFinal(o.ozoneLastStatus)) stillPending.push({ o, tn }); }
+            if (!isFinal(status)) stillPending.push({ o, tn });
+          } catch { stillPending.push({ o, tn }); }
         }
+        const file = toSync.slice();
+        await Promise.all(Array.from({ length: 5 }, async () => {
+          while (file.length) await suivre(file.shift());
+        }));
         // Phase 2 — statut réel depuis le tableau Ozon (parcels_json). Ozon exige une
         // correspondance EXACTE : on envoie plusieurs candidats par colis (code, variante
         // avec 0, téléphone) et on retient le 1er qui remonte un statut. Appels groupés.
@@ -1044,10 +1061,11 @@ export default function App() {
             }
           } catch {}
         }
-      } catch {}
+      } catch {} finally { ozoneEnCours = false; }
     }
     const timer = setTimeout(syncOzoneStatuses, 5000);
-    const interval = setInterval(syncOzoneStatuses, 300000);
+    // Toutes les 3 min : la passe ne porte plus que sur les colis en route.
+    const interval = setInterval(syncOzoneStatuses, 180000);
     // Aussi au retour au premier plan (plus réactif que d'attendre 5 min).
     const onVis = () => { if (document.visibilityState === 'visible') syncOzoneStatuses(); };
     document.addEventListener('visibilitychange', onVis);
