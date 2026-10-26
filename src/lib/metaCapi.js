@@ -88,7 +88,8 @@ async function sha256(value) {
 /* Meta exige une normalisation AVANT hachage : minuscules, sans espace ni
    ponctuation. Deux écritures du même client donneraient sinon deux empreintes
    différentes, et le rapprochement échouerait. */
-const clean = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+// Les lettres arabes sont gardées : un nom « حنان » devenait une chaîne vide.
+const clean = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\u0600-\u06ff]/g, '');
 
 /** Numéro au format international sans « + », seule forme acceptée par Meta. */
 export function phoneForMeta(phone) {
@@ -117,11 +118,13 @@ export async function hashUserData(order) {
   if (email.includes('@')) out.em = [await sha256(email)];
   // Le nom complet est découpé : Meta compare prénom et nom séparément.
   const parts = String(r.name || '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length) {
-    out.fn = [await sha256(clean(parts[0]))];
-    if (parts.length > 1) out.ln = [await sha256(clean(parts.slice(1).join('')))];
-  }
-  if (r.city) out.ct = [await sha256(clean(r.city))];
+  // Jamais l'empreinte d'une chaîne vide : elle ne correspond à personne.
+  const fn = clean(parts[0]);
+  const ln = clean(parts.slice(1).join(''));
+  const ct = clean(r.city);
+  if (fn) out.fn = [await sha256(fn)];
+  if (ln) out.ln = [await sha256(ln)];
+  if (ct) out.ct = [await sha256(ct)];
   out.country = [await sha256('ma')];
   return out;
 }

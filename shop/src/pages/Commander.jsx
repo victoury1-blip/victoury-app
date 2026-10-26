@@ -19,6 +19,8 @@ import OffreTimer from '../components/OffreTimer';
 // emprunter la couleur d'un autre geste.
 const champ = 'w-full border-2 border-ink px-3 py-3 text-sm focus:outline-none transition-colors';
 
+const normPourMeta = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]/g, '');
+
 export default function Commander({ lignes, reglages, onQuantite, onRetirer, onVider }) {
   const { t: tr, lang } = useLang();
   const navigate = useNavigate();
@@ -280,10 +282,14 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
       const email = String(form.email || '').trim().toLowerCase();
       Promise.all([
         sha256(telephonePourMeta(form.telephone)),
-        prenom ? sha256(prenom.toLowerCase()) : null,
-        reste.length ? sha256(reste.join(' ').toLowerCase()) : null,
-        form.ville ? sha256(form.ville.trim().toLowerCase()) : null,
-        sha256(String(r.id)),
+        // Normalisation Meta : minuscules, sans espace ni ponctuation — la même
+        // que l'application (src/lib/metaCapi.js), sinon les empreintes diffèrent.
+        prenom ? sha256(normPourMeta(prenom)) : null,
+        reste.length ? sha256(normPourMeta(reste.join(''))) : null,
+        form.ville ? sha256(normPourMeta(form.ville)) : null,
+        // Identifiant CLIENT (dérivé du téléphone), identique à celui de
+        // l'application : Meta relie l'achat et sa livraison à la même personne.
+        sha256(`victoury:${telephonePourMeta(form.telephone)}`),
         email.includes('@') ? sha256(email) : null,
       ]).then(([ph, fn, ln, ct, externalId, em]) => envoyerCAPI(reglages.pixel.pixelId, [{
         event_name: 'Purchase', event_time: Math.floor(Date.now() / 1000),
