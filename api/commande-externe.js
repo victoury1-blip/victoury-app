@@ -48,7 +48,8 @@ function horodatage(d = new Date()) {
 }
 
 function normaliserTelephone(tel) {
-  let s = String(tel || '').replace(/[\s\-.()+]/g, '').replace(/^(00212|212)/, '0');
+  // Chiffres seulement (tirets insécables, marques de direction… copiés depuis WhatsApp).
+  let s = String(tel || '').replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).replace(/\D/g, '').replace(/^(00212|212)/, '0');
   if (/^[5-7]\d{8}$/.test(s)) s = '0' + s;
   return s;
 }

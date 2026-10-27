@@ -36,7 +36,16 @@ export function horodatage(d = new Date()) {
 /* Numéro marocain ramené à sa forme locale : le client l'écrit comme il veut,
    le livreur a besoin d'une seule forme. */
 export function normaliserTelephone(tel) {
-  let s = String(tel || '').replace(/[\s\-.()+]/g, '').replace(/^(00212|212)/, '0');
+  /* Chiffres seulement : un numéro copié depuis WhatsApp ou les contacts
+     arrive avec des caractères invisibles (tiret insécable « ‑ », marques de
+     direction U+202A–U+202E, espaces fines) que l'ancien filtre laissait
+     passer — « +212 666‑411455 » était refusé. Les chiffres arabes (٠-٩) sont
+     convertis. */
+  let s = String(tel || '')
+    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06F0))
+    .replace(/\D/g, '')
+    .replace(/^(00212|212)/, '0');
   if (/^[5-7]\d{8}$/.test(s)) s = '0' + s;
   return s;
 }

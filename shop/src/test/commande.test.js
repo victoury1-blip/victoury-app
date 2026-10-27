@@ -103,3 +103,17 @@ describe('commande écrite en base', () => {
     expect(vus.size).toBe(500);
   });
 });
+
+describe('numéros copiés depuis WhatsApp / contacts', () => {
+  it('accepte toutes les écritures courantes', () => {
+    for (const t of [
+      '+212 666\u2011411455\u202c', '0666\u2011411455\u202c', '212 666\u2011411455\u202c',
+      '+212666411455\u202c', '+212666\u2011411455\u202c', '\u202a+212 6 66 41 14 55\u202c',
+      '00212666411455', '٠٦٦٦٤١١٤٥٥', '666411455',
+    ]) {
+      expect(normaliserTelephone(t)).toBe('0666411455');
+      expect(telephoneValide(t)).toBe(true);
+    }
+  });
+});
+
