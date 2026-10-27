@@ -987,8 +987,10 @@ export default function App() {
         // l'API officielle Ozon renvoie parfois un ancien « Attente ramassage » qui
         // écraserait à tort un « Livré » déjà confirmé par le tableau de bord.
         const shouldApply = (cur, next) => !!next && next !== cur && !(isFinal(cur) && !isFinal(next));
-        const applyStatus = (o, status) => {
-          if (!shouldApply(o.ozoneLastStatus, status)) return;
+        const applyStatus = (o, status, corriger = false) => {
+          // `corriger` : statut final suspect (voir plus bas), remplacé par ce
+          // que dit Ozon pour le code EXACT du colis, même s'il n'est pas final.
+          if (corriger ? (!status || status === o.ozoneLastStatus) : !shouldApply(o.ozoneLastStatus, status)) return;
           setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
           supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id)
             .then(({ error }) => { if (error) console.warn('[ozon] statut non enregistré:', o.id, error.message); });
@@ -1002,28 +1004,38 @@ export default function App() {
            distribution » alors qu'Ozon disait « Livré ») tant qu'on n'ouvrait
            pas la fenêtre du camion. Les plus récemment mis à jour d'abord. */
         const FINI_APP = new Set(['livre', 'retour_recu', 'echange_recu', 'annule']);
+        /* Colis encore « en route » côté application (Expédié, Reçu par livreur…)
+           mais marqués « Livré »/« Retourné » côté Ozon : une passe précédente
+           interrogeait aussi l'ancien code Ozon mémorisé (ozoneTracking) et les
+           variantes du 0, qui pouvaient désigner le colis d'un AUTRE client —
+           l'étiquette affichait « Livré » à tort. Ils sont revérifiés sur leur
+           code exact et corrigés. */
+        const suspect = (o) => isFinal(o.ozoneLastStatus) && !FINI_APP.has(o.status);
         const toSync = ordersRef.current
           .filter(o => o.validated && (o.ozoneTracking || o.trackingNumber) && /ozon/i.test(o.recipient?.delivery || ''))
-          .filter(o => !isFinal(o.ozoneLastStatus) && !FINI_APP.has(o.status))
+          .filter(o => (!isFinal(o.ozoneLastStatus) || suspect(o)) && !FINI_APP.has(o.status))
           .sort((a, b) => String(b.dateUpdated || '').localeCompare(String(a.dateUpdated || '')));
-        // Phase 1 — API officielle de suivi : tous les codes connus (comme la
-        // fenêtre du camion), avec variantes du 0 ; cinq colis à la fois.
+        // Phase 1 — API officielle de suivi, sur le code AFFICHÉ du colis
+        // uniquement ; cinq colis à la fois.
         const stillPending = [];
         async function suivre(o) {
           // Le code affiché prime : une correction manuelle doit être suivie.
           const tn = o.trackingNumber || o.ozoneTracking || o.id;
           try {
-            const codes = [...new Set([o.trackingNumber, o.ozoneTracking].filter(Boolean))];
-            for (const c of [...codes]) {
-              const m = c.match(/^([A-Za-z]+)(\d+)$/);
-              if (m) codes.push(`${m[1]}0${m[2]}`);          // MIMA3251 → MIMA03251
-              if (/^\d+$/.test(c) && !c.startsWith('0')) codes.push('0' + c);
+            let status = await trackByNumber(tn);
+            /* Variantes du 0 seulement pour les anciennes séries (MIMA3251 →
+               MIMA03251) : pour un code VI, la variante (VI000480) est un autre
+               numéro, peut-être le colis de quelqu'un d'autre. */
+            if (!status && !/^VI\d+$/i.test(tn)) {
+              const variants = [];
+              const m = tn.match(/^([A-Za-z]+)(\d+)$/);
+              if (m) variants.push(`${m[1]}0${m[2]}`);
+              if (/^\d+$/.test(tn) && !tn.startsWith('0')) variants.push('0' + tn);
+              for (const v of variants) { status = await trackByNumber(v); if (status) break; }
             }
-            let status = null;
-            for (const c of codes) { status = await trackByNumber(c); if (status) break; }
-            applyStatus(o, status);
+            applyStatus(o, status, suspect(o));
             if (!isFinal(status)) stillPending.push({ o, tn });
-          } catch { stillPending.push({ o, tn }); }
+          } catch { if (!suspect(o)) stillPending.push({ o, tn }); }
         }
         const file = toSync.slice();
         await Promise.all(Array.from({ length: 5 }, async () => {
@@ -1040,7 +1052,7 @@ export default function App() {
             const jobs = stillPending.map(({ o, tn }) => {
               const cands = new Set([tn]);
               const m = tn.match(/^([A-Za-z]+)(\d+)$/);
-              if (m) cands.add(`${m[1]}0${m[2]}`);
+              if (m && !/^VI\d+$/i.test(tn)) cands.add(`${m[1]}0${m[2]}`); // pas de variante pour un code VI
               if (/^\d+$/.test(tn) && !tn.startsWith('0')) cands.add('0' + tn);
               return { o, cands: [...cands].filter(c => /^[A-Za-z0-9]{3,30}$/.test(c)) };
             });
