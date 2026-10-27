@@ -950,7 +950,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [session, initialLoadDone]);
 
-  /* ── Ozone background sync (colis Expédié, toutes les 3 min) ── */
+  /* ── Ozone background sync (colis Expédié, chaque minute) ── */
   useEffect(() => {
     if (!session) return;
     let ozoneEnCours = false;
@@ -984,8 +984,10 @@ export default function App() {
       } catch {} finally { ozoneEnCours = false; }
     }
     const timer = setTimeout(syncOzoneStatuses, 5000);
-    // Toutes les 3 min : une trentaine de colis seulement.
-    const interval = setInterval(syncOzoneStatuses, 180000);
+    /* Chaque minute : une trentaine de colis, deux appels chacun — une passe
+       dure quelques secondes. Plus court chargerait l'API d'Ozon sans rien
+       apporter (une passe en cours n'est jamais doublée). */
+    const interval = setInterval(syncOzoneStatuses, 60000);
     // Aussi au retour au premier plan (plus réactif que d'attendre 5 min).
     const onVis = () => { if (document.visibilityState === 'visible') syncOzoneStatuses(); };
     document.addEventListener('visibilitychange', onVis);
