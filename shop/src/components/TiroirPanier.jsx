@@ -7,6 +7,7 @@ import { cleLigne } from '../lib/panier';
 import { chargerNouveautes, chargerProduitsParCollections } from '../lib/catalog';
 import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
+import { dateDispo } from '../lib/precommande';
 
 export default function TiroirPanier({ ouvert, lignes, paliers, remises, livraison, seuilGratuit, onFermer, onQuantite, onRetirer }) {
   const { t, lang, encoreEtRemise, etLivraisonGratuite } = useLang();
@@ -99,6 +100,11 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                   <p className="text-sm text-gray-800">{l.name}</p>
                   {l.color && <p className="text-xs text-gray-400 mt-0.5">{t('couleur')} : {l.color}</p>}
                   {l.size && <p className="text-xs text-gray-400">{l.size}</p>}
+                  {l.precommande && (
+                    <p className="text-[11px] text-amber-700 font-medium">
+                      {lang === 'ar' ? `⏳ حجز — كيوصل نهار ${dateDispo(l.precommande, true)}` : `⏳ Réservation — disponible le ${dateDispo(l.precommande)}`}
+                    </p>
+                  )}
                   {/* Rouge, comme partout ailleurs sur le site où une remise est
                       signalée (badge produit, prix barré, palier) — le noir est déjà
                       pris par le texte et les boutons, le rouge reste le signal promo. */}

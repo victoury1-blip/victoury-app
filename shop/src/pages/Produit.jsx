@@ -16,6 +16,7 @@ import { numeroWhatsApp } from '../lib/commande';
 import OffreTimer from '../components/OffreTimer';
 import LandingVente from '../components/LandingVente';
 import { lignePromoWhatsApp } from '../lib/promoAuto';
+import { precommandeActive, dateDispo } from '../lib/precommande';
 
 function Accordeon({ titre, children }) {
   const { lang } = useLang();
@@ -61,6 +62,11 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   // Rien n'indiquait qu'il y avait d'autres photos à côté du swipe au doigt —
   // les flèches le rendent visible, et servent aussi de clic direct pour qui
   // ne pense pas à glisser. Vignette cliquée = même mécanisme.
+  // Première taille en stock ; à défaut, si le produit est en réservation,
+  // la première taille tout court (elle se réserve).
+  const tailleParDefaut = (p) => p?.sizes?.find(s => s.stock > 0)?.size
+    || (precommandeActive(reglages?.precommandes, p?.id) ? p?.sizes?.[0]?.size : '') || '';
+
   function irVersPhoto(i, total) {
     const cible = Math.max(0, Math.min(total - 1, i));
     setPhotoActive(cible);
@@ -76,7 +82,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
         // La première taille disponible est déjà choisie : le client qui ne
         // regarde même pas cette ligne peut quand même ajouter au panier, et
         // celui qui veut une autre taille n'a qu'à cliquer dessus.
-        setTaille(p?.sizes?.find(s => s.stock > 0)?.size || '');
+        setTaille(tailleParDefaut(p));
         setPhotoActive(0);
         const cs = p?.group_id ? await chargerCouleurs(p.group_id) : [];
         setCouleurs(cs);
@@ -141,7 +147,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
       const p = await chargerProduit(c.slug);
       if (!p) return;
       setProduit(p);
-      setTaille(p.sizes?.find(s => s.stock > 0)?.size || '');
+      setTaille(tailleParDefaut(p));
       setPhotoActive(0);
       window.history.replaceState(null, '', `/product/${c.slug}/`);
     } finally {
@@ -169,6 +175,10 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   // Règles globales + celles ciblant justement la collection de ce produit.
   const paliers = paliersEffectifs(remises, produit.collection_id);
   const stockTaille = tailles.find(s => s.size === taille)?.stock;
+  // Réservation (réglée dans /store/produits) : les tailles épuisées restent
+  // commandables, avec la date d'arrivage annoncée.
+  const resa = precommandeActive(reglages?.precommandes, produit.id);
+  const reserveTaille = !!resa && !!taille && !(stockTaille > 0);
 
   // "Non listé" : page de vente longue dédiée à une pub, pas la fiche
   // produit classique (grille 2 colonnes, comparaison avec d'autres
@@ -223,12 +233,17 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
         <div className="relative">
           {/* Fixe par-dessus le carrousel entier (pas remis dans chaque
               diapositive) : reste en place quel que soit la photo affichée. */}
-          {epuise && (
+          {epuise && !resa && (
             <div className="absolute inset-0 z-10 bg-black/10 grid place-items-center pointer-events-none">
               <span className="border-2 border-red-600 text-red-600 font-extrabold uppercase tracking-wider bg-white/80 -rotate-[18deg] whitespace-nowrap text-base px-5 py-1.5">
                 {t('epuiseTampon')}
               </span>
             </div>
+          )}
+          {epuise && resa && (
+            <span className="absolute top-3 start-3 z-10 pointer-events-none bg-amber-500 text-white text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-sm shadow">
+              {ar ? 'حجز مسبق' : 'Précommande'}
+            </span>
           )}
           <div
             ref={carouselRef}
@@ -370,7 +385,10 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           <div className={theme?.produitAffichageTailles === 'liste' ? 'flex flex-col gap-2 mt-3 max-w-xs' : 'flex flex-wrap gap-2 mt-3'}>
             {tailles.length === 0 && <p className="text-sm text-gray-400">{t('epuise')}</p>}
             {tailles.map(s => {
-              const epuisee = !(s.stock > 0);
+              // Épuisée mais réservable : même bouton qu'une taille en stock,
+              // sans la croix rouge, avec une mention "حجز" en dessous.
+              const reservable = !(s.stock > 0) && !!resa;
+              const epuisee = !(s.stock > 0) && !resa;
               const liste = theme?.produitAffichageTailles === 'liste';
               return (
                 <button key={s.size} type="button" disabled={epuisee}
@@ -381,6 +399,11 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                       ? 'border-gray-200 text-ink cursor-not-allowed'
                       : taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
                   {s.size}
+                  {reservable && (
+                    <span className={`${liste ? '' : 'block'} text-[10px] leading-tight ${taille === s.size ? 'text-amber-300' : 'text-amber-600'}`}>
+                      {ar ? 'حجز' : 'Réserver'}
+                    </span>
+                  )}
                   {liste && epuisee && <span className="text-xs text-red-500">{t('epuise')}</span>}
                   {/* Une croix au-dessus du chiffre : le chiffre reste lisible,
                       la croix rouge dit à elle seule qu'il n'est pas disponible. */}
@@ -400,6 +423,18 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               {ar ? `⚡ غير ${stockTaille} قطع متبقية من هاد المقاس!` : `⚡ Plus que ${stockTaille} en stock dans cette taille !`}
             </p>
           )}
+          {resa && (epuise || reserveTaille) && (
+            <div className={`mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-900 leading-relaxed ${ar ? 'text-right' : 'text-left'}`}>
+              <p className="font-semibold">
+                {ar ? `⏳ السلعة جاية — كتوصل نهار ${dateDispo(resa, true)}` : `⏳ Arrivage en cours — disponible le ${dateDispo(resa)}`}
+              </p>
+              <p className="mt-0.5">
+                {ar
+                  ? 'احجزي دابا بلا ما تخلصي حتى حاجة، وغنصيفطوها ليك من أول السلعة اللي توصل. الدفع عند الاستلام.'
+                  : "Réservez dès maintenant sans rien payer : votre commande part dès l'arrivage. Paiement à la livraison."}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Achat direct uniquement : ajoute au panier puis ouvre tout de
@@ -417,13 +452,14 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                 slug: produit.slug, name: produit.name, price: produit.price,
                 size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
                 stock: stockTaille, collectionId: produit.collection_id,
+                ...(reserveTaille ? { precommande: resa } : {}),
               });
               onAchatRapide?.();
             }}
             className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
                        disabled:bg-gray-200 disabled:text-gray-400 disabled:animate-none transition-colors shadow-lg shadow-orange-600/30"
             style={taille ? { animation: 'bouton-pulse 1.8s ease-in-out infinite' } : undefined}>
-            {taille ? t('acheterMaintenant') : t('choisirTaille')}
+            {!taille ? t('choisirTaille') : reserveTaille ? (ar ? 'احجزي دابا' : 'Réserver maintenant') : t('acheterMaintenant')}
           </button>
           {/* Le doute qui bloque un achat ("elle va vraiment aller avec quoi ?",
               "le délai c'est combien ?") se règle en une question — sans ce

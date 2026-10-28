@@ -10,6 +10,7 @@
 import { champsManquants, construireCommande, normaliserTelephone } from '../src/lib/commande.js';
 import { totalPanier } from '../src/lib/pricing.js';
 import { rateLimited, clientIp } from './_rateLimit.js';
+import { precommandeActive } from '../src/lib/precommande.js';
 
 const SOURCES_CONNUES = new Set(['Instagram', 'Facebook', 'TikTok', 'Google', 'WhatsApp', 'Direct']);
 
@@ -24,10 +25,10 @@ async function recalculerLignes(url, key, lignes) {
   const slugs = [...new Set((lignes || []).map(l => l.slug).filter(Boolean))];
   if (!slugs.length) return { erreur: 'Panier vide.' };
 
-  const r = await fetch(
-    `${url}/rest/v1/shop_products?select=slug,name,price,collection_id,images:shop_product_images(url,position),sizes:shop_product_sizes(size,stock)&slug=in.(${slugs.map(s => `"${s}"`).join(',')})&status=eq.Actif`,
+  const [r, precommandes] = await Promise.all([fetch(
+    `${url}/rest/v1/shop_products?select=id,slug,name,price,collection_id,images:shop_product_images(url,position),sizes:shop_product_sizes(size,stock)&slug=in.(${slugs.map(s => `"${s}"`).join(',')})&status=eq.Actif`,
     { headers: { apikey: key, Authorization: `Bearer ${key}` } },
-  );
+  ), chargerPrecommandes(url, key)]);
   if (!r.ok) return { erreur: 'Vérification du panier impossible. Réessayez.' };
   const produits = await r.json();
   const parSlug = new Map(produits.map(p => [p.slug, p]));
@@ -43,14 +44,32 @@ async function recalculerLignes(url, key, lignes) {
     const taille = p.sizes?.find(s => s.size === (l.size || ''));
     const stock = taille?.stock ?? 0;
     const qty = Math.max(1, Math.floor(Number(l.qty) || 1));
-    if (stock < qty) return { erreur: `Stock insuffisant pour "${p.name}"${l.size ? ` (${l.size})` : ''}. Ajustez la quantité.` };
+    // Réservation active (réglage relu ici, jamais celui du navigateur) : une
+    // taille existante mais épuisée reste commandable, la commande portera
+    // la date d'arrivage dans sa note.
+    const reservation = taille ? precommandeActive(precommandes, p.id) : null;
+    if (stock < qty && !reservation) return { erreur: `Stock insuffisant pour "${p.name}"${l.size ? ` (${l.size})` : ''}. Ajustez la quantité.` };
     serverLignes.push({
       slug: p.slug, name: p.name, price: p.price, qty, size: l.size || '',
       color: l.color, image: p.images?.slice().sort((a, b) => a.position - b.position)[0]?.url,
       collectionId: p.collection_id,
+      ...(stock < qty ? { precommande: reservation } : {}),
     });
   }
   return { lignes: serverLignes };
+}
+
+/* Réservations actives par produit (voir src/lib/precommande.js) — un échec
+   de lecture retombe sur "aucune réservation", donc sur la règle de stock
+   normale : jamais une vente acceptée par erreur sur un stock vide. */
+async function chargerPrecommandes(url, key) {
+  try {
+    const r = await fetch(`${url}/rest/v1/shop_settings?select=value&key=eq.precommandes`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) return {};
+    return (await r.json())?.[0]?.value || {};
+  } catch { return {}; }
 }
 
 /* Réglages et remises actifs, mêmes règles que celles affichées côté
@@ -259,7 +278,9 @@ export default async function handler(req, res) {
     const codePropre = String(code).trim().toUpperCase();
     const remise = avantPromo.total - totalVerifie;
     commande.recipient.promo = codePropre;
-    commande.note = `${commande.note} — Code promo ${codePropre}${remise > 0 ? ` (−${remise} DH)` : ''}`;
+    // Sur la 1ʳᵉ ligne de la note : une réservation y ajoute ses propres lignes
+    // en dessous (voir src/lib/precommande.js).
+    commande.note = commande.note.replace(/^[^\n]*/, l => `${l} — Code promo ${codePropre}${remise > 0 ? ` (−${remise} DH)` : ''}`);
   }
   commande.recipient.ip = ip || undefined;
   commande.recipient.geoVille = geo?.ville || undefined;

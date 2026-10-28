@@ -196,6 +196,8 @@ export async function chargerReglages() {
     // Bruts, pour qu'une fiche produit calcule la remise propre à SA
     // collection (règles globales + celles ciblant justement cette collection).
     remises,
+    // { [productId]: { date } } — voir src/lib/precommande.js.
+    precommandes: map.precommandes || {},
     pixel: { ...PIXEL_DEFAUT, ...(map.meta_pixel || {}) },
     clarity: { ...CLARITY_DEFAUT, ...(map.microsoft_clarity || {}) },
     tiktok: { ...TIKTOK_DEFAUT, ...(map.tiktok_pixel || {}) },

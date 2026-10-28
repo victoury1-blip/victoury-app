@@ -65,11 +65,16 @@ export default function ProduitForm() {
   const [televerse, setTeleverse] = useState(false);
   const [enregistrement, setEnregistrement] = useState(false);
   const [erreur, setErreur] = useState('');
+  // Réservation (précommande) : stockée à part, dans shop_settings — voir
+  // src/lib/precommande.js pour la raison.
+  const [resaDate, setResaDate] = useState('');
 
   useEffect(() => {
     listerCollections().then(setCollections).catch(() => {});
     listerGroupes().then(setGroupes).catch(() => {});
     if (nouveau) return;
+    supabase.from('shop_settings').select('value').eq('key', 'precommandes').maybeSingle()
+      .then(({ data }) => setResaDate(data?.value?.[id]?.date || ''));
     listerProduits().then(liste => {
       const p = liste.find(x => x.id === id);
       if (!p) return;
@@ -138,6 +143,20 @@ export default function ProduitForm() {
     setNouveauGroupe('');
   }
 
+  // Relit la liste juste avant d'écrire : deux fiches enregistrées l'une après
+  // l'autre ne doivent pas s'écraser leurs réservations.
+  async function enregistrerReservation(productId, date) {
+    const { data, error } = await supabase.from('shop_settings').select('value').eq('key', 'precommandes').maybeSingle();
+    if (error) throw error;
+    const liste = { ...(data?.value || {}) };
+    if (date) liste[productId] = { date };
+    else if (liste[productId]) delete liste[productId];
+    else return;
+    const { error: e2 } = await supabase.from('shop_settings')
+      .upsert({ key: 'precommandes', value: liste, updated_at: new Date().toISOString() });
+    if (e2) throw e2;
+  }
+
   async function enregistrer(e) {
     e.preventDefault();
     setErreur('');
@@ -160,6 +179,7 @@ export default function ProduitForm() {
       const p = await enregistrerProduit(payload);
       await remplacerTailles(p.id, tailles);
       await remplacerImages(p.id, images);
+      await enregistrerReservation(p.id, resaDate);
       if (nouveau) effacerBrouillon();
       navigate('/store/produits');
     } catch (e) {
@@ -310,6 +330,32 @@ export default function ProduitForm() {
           <button type="button" onClick={ajouterTaille} className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
             <Plus size={13} /> Ajouter une taille
           </button>
+
+          {/* Réservation : les tailles à stock 0 restent commandables jusqu'à
+              la date d'arrivage (incluse), puis le réglage s'éteint seul. */}
+          <div className={`mt-4 rounded-lg border px-3 py-3 ${resaDate ? 'bg-amber-50 border-amber-200' : 'border-gray-200'}`}>
+            <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
+              <input type="checkbox" checked={!!resaDate} className="w-4 h-4"
+                onChange={e => {
+                  if (!e.target.checked) return setResaDate('');
+                  const d = new Date(); d.setDate(d.getDate() + 5);
+                  setResaDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+                }} />
+              Réservation (précommande)
+              <span className="text-gray-400 text-xs">— vendre les tailles en rupture avant l'arrivage</span>
+            </label>
+            {resaDate && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-600">Arrivage prévu le</span>
+                <input type="date" value={resaDate} onChange={e => setResaDate(e.target.value)}
+                  className="border border-gray-200 px-2 py-1.5 text-sm bg-white" />
+                <span className="text-[11px] text-gray-500 w-full">
+                  La fiche affiche « السلعة جاية — كتوصل نهار … » et la commande arrive avec « ⏳ RÉSERVATION » dans sa note.
+                  Se désactive tout seul après cette date.
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="border-t border-gray-100 pt-5">

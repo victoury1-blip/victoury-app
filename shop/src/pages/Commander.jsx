@@ -8,6 +8,7 @@ import { envoyerCommande } from '../lib/envoi';
 import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
 import { lireCodeAuto, oublierCodeAuto } from '../lib/promoAuto';
+import { dateDispo } from '../lib/precommande';
 import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, cookieTtpPourTikTok, correspondanceAvancee, trackGA4 } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
@@ -409,6 +410,11 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
                   <p className="text-xs text-gray-500 mt-0.5">
                     {[l.color, l.size].filter(Boolean).join(' · ')}
                   </p>
+                  {l.precommande && (
+                    <p className="text-[11px] text-amber-700 font-medium mt-0.5">
+                      {ar ? `⏳ حجز — كيوصل نهار ${dateDispo(l.precommande, true)}` : `⏳ Réservation — disponible le ${dateDispo(l.precommande)}`}
+                    </p>
+                  )}
                   {/* Même signal que le tiroir panier : rouge, quand une remise
                       par quantité s'applique à cette ligne précise. */}
                   {l.remiseDh > 0 && (

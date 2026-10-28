@@ -9,6 +9,8 @@
 /* Préfixe réservé aux commandes du site. Il les distingue de VICT (saisies à
    la main) et de WC (ancienne boutique), et les règles de la base n'acceptent
    d'un visiteur que des identifiants de cette forme. */
+import { noteReservation } from './precommande.js';
+
 const PREFIXE = 'VS-';
 
 /** Identifiant lisible, date et heure de la commande en clair — VS-030926-093712
@@ -97,7 +99,7 @@ export function construireCommande(form, lignes, total, now = new Date(), id = n
     products: produits,
     price: total,
     status: 'nouveau',
-    note: 'Commande du site',
+    note: ['Commande du site', noteReservation(lignes)].filter(Boolean).join('\n'),
     date_added: ts,
     date_updated: ts,
     validated: false,
