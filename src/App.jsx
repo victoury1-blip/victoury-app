@@ -35,8 +35,7 @@ const deleteOrderOffline = async (...a) => (await _offlineStore()).deleteOrderOf
 const replaceOrdersOffline = async (...a) => (await _offlineStore()).replaceOrdersOffline(...a);
 import { fetchFingerprints, fetchAllOrders, fetchOrdersByIds, staleIds } from './lib/ordersSync';
 import { cloudGet, cloudSet } from './lib/cloudSettings';
-import { getChicConfig, fetchChicRecentOrders, computeChicStatusUpdates } from './lib/chicAffiliate';
-import { AFFILIATE_LIST, platformOf, matchAffiliateProduct, st } from './lib/affiliatePlatforms';
+import { AFFILIATE_LIST, matchAffiliateProduct, st } from './lib/affiliatePlatforms';
 import { loadProducts } from './data/products';
 import { tabFromParam, tabPath } from './data/orderTabs';
 import { logAlert } from './lib/errorLog';
@@ -692,40 +691,10 @@ export default function App() {
     // relancer une synchro complète à chaque changement du nombre de commandes.
   }, [session]);
 
-  /* ── Auto-synchro des statuts Chic Affiliate (avant tout return conditionnel) ──
-     Passe les commandes « Envoyée » à « Livrée » quand Chic les marque
-     livrées, sans clic manuel. */
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    /* Une passe par plateforme configurée : chacune a sa session et ses statuts. */
-    async function syncPlatform(plat) {
-      try {
-        if (!getChicConfig(plat.key)?.sessionCookie) return;
-        if (!ordersRef.current.some(o => o.status === `${plat.statusPrefix}_envoye`)) return;
-        const remote = await fetchChicRecentOrders(100, plat.key);
-        if (cancelled || !remote.length) return;
-        setOrdersWithSync(prev => {
-          const updates = computeChicStatusUpdates(remote, prev, plat.key);
-          if (!updates.length) return prev;
-          const m = new Map(updates.map(u => [u.id, u.status]));
-          const ts = now();
-          return prev.map(o => m.has(o.id) ? { ...o, status: m.get(o.id), dateUpdated: ts, manuallyModified: true } : o);
-        });
-      } catch (e) {
-        logAlert(`Sync ${plat.label}`, `Échec de la synchro automatique : ${e?.message || 'erreur'}`);
-      }
-    }
-    // Onglet caché : pas d'appel serveur (quota Vercel), relancé au retour.
-    const syncChic = () => (document.hidden ? Promise.resolve() : Promise.all(AFFILIATE_LIST.map(syncPlatform)));
-    syncChic();
-    const interval = setInterval(syncChic, 5 * 60 * 1000);
-    const onVis = () => { if (document.visibilityState === 'visible') syncChic(); };
-    document.addEventListener('visibilitychange', onVis);
-    const onChicExpired = (e) => logAlert(platformOf(e?.detail?.plat).label, 'Session expirée — reconnectez-vous (Configuration).');
-    window.addEventListener('chic-session-expired', onChicExpired);
-    return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('chic-session-expired', onChicExpired); };
-  }, [session]);
+  /* Synchro des plateformes d'affiliation (Chic…) : MANUELLE uniquement,
+     depuis leur page. La synchro automatique (toutes les 5 min) échouait dès
+     que la session de la plateforme expirait et remplissait le centre
+     d'alertes de « Failed to fetch » / « Session expirée ». */
 
   /* ── Show loading / login ── */
   if (session === undefined) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
