@@ -350,7 +350,7 @@ export default function ProduitForm() {
                 <input type="date" value={resaDate} onChange={e => setResaDate(e.target.value)}
                   className="border border-gray-200 px-2 py-1.5 text-sm bg-white" />
                 <span className="text-[11px] text-gray-500 w-full">
-                  La fiche affiche « السلعة جاية — كتوصل نهار … » et la commande arrive avec « ⏳ RÉSERVATION » dans sa note.
+                  La fiche affiche « السلعة جاية — غتوجد نهار … » et la commande arrive avec « ⏳ RÉSERVATION » dans sa note.
                   Se désactive tout seul après cette date.
                 </span>
               </div>

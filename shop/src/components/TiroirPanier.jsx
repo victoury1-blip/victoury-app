@@ -102,7 +102,7 @@ export default function TiroirPanier({ ouvert, lignes, paliers, remises, livrais
                   {l.size && <p className="text-xs text-gray-400">{l.size}</p>}
                   {l.precommande && (
                     <p className="text-[11px] text-amber-700 font-medium">
-                      {lang === 'ar' ? `⏳ حجز — كيوصل نهار ${dateDispo(l.precommande, true)}` : `⏳ Réservation — disponible le ${dateDispo(l.precommande)}`}
+                      {lang === 'ar' ? `⏳ حجز — غتوجد نهار ${dateDispo(l.precommande, true)}` : `⏳ Réservation — disponible le ${dateDispo(l.precommande)}`}
                     </p>
                   )}
                   {/* Rouge, comme partout ailleurs sur le site où une remise est

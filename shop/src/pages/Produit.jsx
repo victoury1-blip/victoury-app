@@ -426,12 +426,12 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           {resa && (epuise || reserveTaille) && (
             <div className={`mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-900 leading-relaxed ${ar ? 'text-right' : 'text-left'}`}>
               <p className="font-semibold">
-                {ar ? `⏳ السلعة جاية — كتوصل نهار ${dateDispo(resa, true)}` : `⏳ Arrivage en cours — disponible le ${dateDispo(resa)}`}
+                {ar ? `⏳ السلعة جاية — غتوجد نهار ${dateDispo(resa, true)}` : `⏳ Arrivage en cours — disponible le ${dateDispo(resa)}`}
               </p>
               <p className="mt-0.5">
                 {ar
-                  ? 'احجزي دابا بلا ما تخلصي حتى حاجة، وغنصيفطوها ليك من أول السلعة اللي توصل. الدفع عند الاستلام.'
-                  : "Réservez dès maintenant sans rien payer : votre commande part dès l'arrivage. Paiement à la livraison."}
+                  ? 'نتواصلو معاك نأكدو معاك الطلب. احجزي دابا بلا ما تخلصي حتى حاجة.'
+                  : 'Nous vous contacterons pour confirmer votre commande. Réservez dès maintenant sans rien payer.'}
               </p>
             </div>
           )}
