@@ -69,7 +69,7 @@ function Modal({ open, onClose, title, icon, iconBg, children }) {
   );
 }
 
-export default function SettingsPage({ onWooOrdersImported, orders = [], setOrders }) {
+export default function SettingsPage({ orders = [], setOrders }) {
   const [openModal, setOpenModal] = useState(null);
   const backupInputRef = useRef(null);
 
@@ -118,8 +118,6 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
   const [ozoneTrackResult, setOzoneTrackResult] = useState(null);
   const [ozoneTrackLoading, setOzoneTrackLoading] = useState(false);
 
-  /* ── WooCommerce state ── */
-  const [woo, setWoo] = useState({ siteUrl: '', consumerKey: '', consumerSecret: '', enabled: true, showKey: false, showSecret: false, testStatus: 'idle', syncStatus: 'idle', saved: false });
 
   /* ── Ozon Express state ── */
   const [auzone, setAuzone] = useState({ customerId: '', apiKey: '', showKey: false, testStatus: 'idle', saved: false });
@@ -297,9 +295,6 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
 
   /* ── Load configs from Supabase on mount ── */
   useEffect(() => {
-    cloudGet('woo_config').then(saved => {
-      if (saved?.consumerKey) setWoo(p => ({ ...p, siteUrl: saved.siteUrl || '', consumerKey: saved.consumerKey, consumerSecret: saved.consumerSecret || '', enabled: saved.enabled !== false, saved: true }));
-    });
     cloudGet('auzone_config').then(saved => {
       if (saved?.apiKey) setAuzone(p => ({ ...p, customerId: saved.customerId || '', apiKey: saved.apiKey, saved: true }));
     });
@@ -323,200 +318,6 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
     });
   }, []);
 
-  /* ── WooCommerce handlers ── */
-  function updateWoo(field, val) { setWoo((p) => ({ ...p, [field]: val, testStatus: 'idle', saved: false })); }
-
-  /* Message d'erreur COMPRÉHENSIBLE. Un abandon de requête produit côté
-     navigateur « signal is aborted without reason », qui n'apprend rien à
-     l'utilisateur : on le traduit en cause probable. */
-  function wooErrorText(...errs) {
-    for (const e of errs) {
-      if (!e) continue;
-      if (e.name === 'AbortError' || /aborted/i.test(e.message || '')) {
-        return 'la boutique n’a pas répondu à temps — le site victoury-maroc.com est trop lent, à voir avec l’hébergeur';
-      }
-      if (/failed to fetch|networkerror|load failed/i.test(e.message || '')) {
-        return 'connexion impossible — vérifiez le réseau, un bloqueur ou le pare-feu';
-      }
-      if (e.message) return e.message;
-    }
-    return 'échec de connexion';
-  }
-
-  // fetch WooCommerce : timeout 25s + auth query-string (au cas où l'hébergeur
-  // supprime l'en-tête Authorization) EN PLUS du header Basic.
-  async function wcFetch(path) {
-    const ac = new AbortController();
-    const to = setTimeout(() => ac.abort(), 25000);
-    const sep = path.includes('?') ? '&' : '?';
-    const url = `${path}${sep}consumer_key=${encodeURIComponent(woo.consumerKey)}&consumer_secret=${encodeURIComponent(woo.consumerSecret)}`;
-    try {
-      return await fetch(url, {
-        signal: ac.signal,
-        headers: { 'Authorization': 'Basic ' + btoa(woo.consumerKey + ':' + woo.consumerSecret) },
-      });
-    } finally { clearTimeout(to); }
-  }
-
-  // Récupère les commandes WooCommerce via la fonction serveur (fiable), avec
-  // repli sur l'appel direct. Renvoie un tableau de commandes ou lève une erreur.
-  async function wcGetOrders(status = 'processing,pending') {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      // Sans limite de temps, un serveur qui ne répond jamais bloquait le bouton
-      // « Tester » indéfiniment (aucun repli, aucune erreur affichée).
-      const ac = new AbortController();
-      const to = setTimeout(() => ac.abort(), 15000);
-      let r;
-      try {
-        r = await fetch('/api/woo-orders', {
-          method: 'POST',
-          signal: ac.signal,
-          headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-          body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, status }),
-        });
-      } finally { clearTimeout(to); }
-      const ct = r.headers.get('content-type') || '';
-      if (!r.ok && !ct.includes('json')) {
-        throw new Error(`Requête bloquée avant le serveur (HTTP ${r.status}) — vérifiez le pare-feu/la protection Vercel du projet`);
-      }
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || `API ${r.status}`);
-      return j.orders || [];
-    } catch (apiErr) {
-      // Repli : appel direct via le rewrite Vercel. Si CE chemin échoue aussi,
-      // son erreur remontait telle quelle — d'où le « signal is aborted without
-      // reason » du navigateur, illisible pour l'utilisateur.
-      let res;
-      try {
-        res = await wcFetch(`/wc-api/wp-json/wc/v3/orders?status=${status}&per_page=50`);
-      } catch (directErr) {
-        throw new Error(wooErrorText(apiErr, directErr));
-      }
-      if (!res.ok) throw new Error(`${wooErrorText(apiErr)} (HTTP ${res.status})`);
-      return res.json();
-    }
-  }
-
-  /* Le test interroge UNIQUEMENT la route serveur, sans repli sur l'appel
-     direct : c'est ce repli qui masquait la vraie cause derrière un
-     « signal is aborted » du navigateur. La route serveur, elle, tourne chez
-     Vercel — elle n'est donc pas soumise au réseau local, au bloqueur ou au
-     pare-feu de l'appareil, et elle rapporte l'erreur exacte de la boutique. */
-  /* « La boutique n'a pas répondu » ne dit pas OÙ ça bloque. Après un échec, on
-     sonde séparément le site, l'API de WordPress et la lecture des commandes :
-     le premier maillon rouge désigne le vrai coupable. */
-  async function diagnoseWoo() {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const r = await fetch('/api/woo-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-        body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, diagnose: true }),
-      });
-      const j = await r.json().catch(() => ({}));
-      setWoo((p) => ({ ...p, testSteps: Array.isArray(j.steps) ? j.steps : [] }));
-    } catch {
-      setWoo((p) => ({ ...p, testSteps: [] }));
-    }
-  }
-
-  async function testWoo() {
-    if (!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret) return;
-    setWoo((p) => ({ ...p, testStatus: 'loading', testError: '', testSteps: null }));
-    const ac = new AbortController();
-    const to = setTimeout(() => ac.abort(), 30000);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const r = await fetch('/api/woo-orders', {
-        method: 'POST',
-        signal: ac.signal,
-        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-        body: JSON.stringify({ siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, status: 'any' }),
-      });
-      const ct = r.headers.get('content-type') || '';
-      if (!ct.includes('json')) {
-        setWoo((p) => ({
-          ...p, testStatus: 'error',
-          testError: `réponse non-JSON (HTTP ${r.status}) — la requête est bloquée AVANT le serveur (pare-feu / protection Vercel)`,
-        }));
-        return;
-      }
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setWoo((p) => ({ ...p, testStatus: 'error', testError: `${j.error || 'erreur'} (HTTP ${r.status})` }));
-        diagnoseWoo();
-        return;
-      }
-      setWoo((p) => ({ ...p, testStatus: 'success', testError: `${(j.orders || []).length} commande(s) lue(s)` }));
-    } catch (e) {
-      // La fonction serveur ne répond pas : on vérifie la seconde voie (appel
-      // direct via le rewrite), celle qu'utilise réellement la synchronisation.
-      // Si elle marche, la boutique est joignable et l'import fonctionnera.
-      const cause = e?.name === 'AbortError'
-        ? 'la fonction serveur /api/woo-orders ne répond pas'
-        : `/api/woo-orders injoignable (${e?.message || 'réseau'})`;
-      try {
-        const res = await wcFetch('/wc-api/wp-json/wc/v3/orders?status=any&per_page=1');
-        if (res.ok) {
-          setWoo((p) => ({
-            ...p, testStatus: 'success',
-            testError: `boutique joignable en direct — ${cause}, la synchronisation utilisera la voie directe`,
-          }));
-          return;
-        }
-        setWoo((p) => ({ ...p, testStatus: 'error', testError: `${cause} ; voie directe : HTTP ${res.status}` }));
-      } catch (directErr) {
-        setWoo((p) => ({ ...p, testStatus: 'error', testError: `${cause} ; voie directe : ${wooErrorText(directErr)}` }));
-      }
-    } finally { clearTimeout(to); }
-  }
-
-  function saveWoo() {
-    const cfg = { siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, enabled: woo.enabled };
-    localStorage.setItem('woo_config', JSON.stringify(cfg));
-    cloudSet('woo_config', cfg);
-    setWoo((p) => ({ ...p, saved: true }));
-  }
-
-  // Coupe le sondage sans effacer les clés : les réactiver plus tard n'exige
-  // pas de tout ressaisir. Sauvegardé aussitôt — pas besoin de rouvrir la
-  // fenêtre et cliquer "Enregistrer" juste pour que la coupure prenne effet.
-  function basculerWoo() {
-    const enabled = !woo.enabled;
-    setWoo((p) => ({ ...p, enabled }));
-    const cfg = { siteUrl: woo.siteUrl, consumerKey: woo.consumerKey, consumerSecret: woo.consumerSecret, enabled };
-    localStorage.setItem('woo_config', JSON.stringify(cfg));
-    cloudSet('woo_config', cfg);
-  }
-
-  async function syncWoo() {
-    setWoo((p) => ({ ...p, syncStatus: 'loading' }));
-    try {
-      const data = await wcGetOrders('processing,pending');
-      const getMeta = (meta, ...keys) => {
-        if (!meta) return '';
-        for (const k of keys) { const m = meta.find(x => x.key === k || x.key === `attribute_${k}`); if (m?.value) return String(m.value); }
-        for (const k of keys) { const m = meta.find(x => x.key?.toLowerCase().includes(k.replace('pa_', ''))); if (m?.display_value || m?.value) return String(m.display_value || m.value); }
-        return '';
-      };
-      const mapped = data.map((o) => {
-        const products = (o.line_items || []).map(item => ({ name: item.name || 'Produit', size: getMeta(item.meta_data, 'pa_taille', 'taille', 'size'), color: getMeta(item.meta_data, 'pa_couleur', 'couleur', 'color'), qty: item.quantity || 1 }));
-        const firstItem = o.line_items?.[0] || {};
-        return {
-          id: `WC-${o.id}`,
-          recipient: { name: `${o.billing.first_name} ${o.billing.last_name}`.trim(), address: o.billing.address_1 || '', city: o.billing.city || '', phone: o.billing.phone || '', delivery: null },
-          product: { name: firstItem.name || 'Produit WC', size: getMeta(firstItem.meta_data, 'pa_taille', 'taille', 'size'), color: getMeta(firstItem.meta_data, 'pa_couleur', 'couleur', 'color'), qty: (o.line_items || []).reduce((s, i) => s + (i.quantity || 1), 0), stock: 0 },
-          products: products.length > 0 ? products : null,
-          price: parseFloat(o.total) || 0, status: 'nouveau', note: o.customer_note || '',
-          dateAdded: fmtDate(o.date_created), dateUpdated: fmtDate(o.date_modified), validated: false,
-        };
-      });
-      onWooOrdersImported(mapped);
-      setWoo((p) => ({ ...p, syncStatus: 'success' }));
-      setTimeout(() => setWoo((p) => ({ ...p, syncStatus: 'idle' })), 3000);
-    } catch { setWoo((p) => ({ ...p, syncStatus: 'error' })); setTimeout(() => setWoo((p) => ({ ...p, syncStatus: 'idle' })), 3000); }
-  }
 
   /* ── Auzone handlers ── */
   function updateAuzone(field, val) { setAuzone((p) => ({ ...p, [field]: val, saved: false })); }
@@ -905,18 +706,6 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         : { label: 'Inactif', color: 'text-gray-500 bg-gray-50 border-gray-200' },
     },
     {
-      id: 'woocommerce',
-      title: 'WooCommerce',
-      desc: 'Synchronisation automatique des commandes depuis votre boutique en ligne.',
-      icon: <ShoppingCart size={22} className="text-purple-600" />,
-      iconBg: 'bg-purple-100',
-      cardBg: 'from-purple-50',
-      saved: woo.saved,
-      badge: !woo.saved ? null
-        : woo.enabled ? { label: 'Configuré', color: 'text-green-600 bg-green-50 border-green-200' }
-        : { label: 'Désactivé', color: 'text-gray-500 bg-gray-50 border-gray-200' },
-    },
-    {
       id: 'users',
       title: 'Utilisateurs',
       desc: "Gérez les comptes de votre équipe. Chaque utilisateur apparaît dans l'historique des commandes.",
@@ -1033,7 +822,7 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
           <button
             onClick={async () => {
               if (!window.confirm('⚠️ Réinitialiser TOUT le cache local ? (les suppressions seront sync depuis Supabase)')) return;
-              const keepsafe = ['auzone_config','woo_config','livreurs','system_timezone','user_profiles','frais_1','victoury_factures','victoury_manual_facture','victoury_recu_ids','notification_sound','victoury_shop_config','victoury_app_config','victoury_statuses','ad_transfers','vict_counter','victoury_sent_livreur'];
+              const keepsafe = ['auzone_config','livreurs','system_timezone','user_profiles','frais_1','victoury_factures','victoury_manual_facture','victoury_recu_ids','notification_sound','victoury_shop_config','victoury_app_config','victoury_statuses','ad_transfers','vict_counter','victoury_sent_livreur'];
               const saved = {};
               keepsafe.forEach(k => { const v = localStorage.getItem(k); if (v) saved[k] = v; });
               localStorage.clear();
@@ -1140,72 +929,6 @@ export default function SettingsPage({ onWooOrdersImported, orders = [], setOrde
         ))}
       </div>
 
-      {/* ── WooCommerce Modal ── */}
-      <Modal open={openModal === 'woocommerce'} onClose={() => setOpenModal(null)}
-        title="WooCommerce" icon={<ShoppingCart size={18} className="text-purple-600" />}
-        iconBg="bg-gradient-to-r from-purple-50 to-white">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium text-gray-700">Synchronisation active</p>
-              <p className="text-xs text-gray-400">Coupez-la si la boutique WooCommerce n'existe plus.</p>
-            </div>
-            <button onClick={basculerWoo} role="switch" aria-checked={woo.enabled}
-              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${woo.enabled ? 'bg-purple-600' : 'bg-gray-300'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${woo.enabled ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
-          <InputField label="URL de la boutique" value={woo.siteUrl} onChange={(v) => updateWoo('siteUrl', v)} placeholder="https://monboutique.com" />
-          <InputField label="Consumer Key" type="password" value={woo.consumerKey} onChange={(v) => updateWoo('consumerKey', v)} placeholder="ck_xxxxxxxxxxxx" show={woo.showKey} onToggleShow={() => setWoo((p) => ({ ...p, showKey: !p.showKey }))} />
-          <InputField label="Consumer Secret" type="password" value={woo.consumerSecret} onChange={(v) => updateWoo('consumerSecret', v)} placeholder="cs_xxxxxxxxxxxx" show={woo.showSecret} onToggleShow={() => setWoo((p) => ({ ...p, showSecret: !p.showSecret }))} />
-
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 flex gap-2 text-xs text-amber-700">
-            <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-            <span>WooCommerce → Paramètres → Avancés → REST API → Ajouter une clé</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button onClick={testWoo} disabled={!woo.siteUrl || !woo.consumerKey || !woo.consumerSecret || woo.testStatus === 'loading'}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-300 text-blue-600 text-xs font-medium hover:bg-blue-50 disabled:opacity-40 transition">
-              {woo.testStatus === 'loading' ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
-              Tester
-            </button>
-            {woo.testStatus === 'success' && <>
-              <button onClick={saveWoo} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition">
-                <Save size={12} /> Enregistrer
-              </button>
-              <button onClick={syncWoo} disabled={woo.syncStatus === 'loading'} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 disabled:opacity-60 transition">
-                {woo.syncStatus === 'loading' ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                {woo.syncStatus === 'loading' ? 'Synchro...' : 'Synchroniser'}
-              </button>
-            </>}
-            {woo.testStatus === 'success' && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} /> Connexion OK</span>}
-            {woo.testStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-600"><XCircle size={12} /> Échec{woo.testError ? ` — ${woo.testError}` : ''}</span>}
-            {woo.syncStatus === 'success' && <span className="flex items-center gap-1 text-xs text-purple-600"><CheckCircle2 size={12} /> Importées</span>}
-          </div>
-
-          {/* Diagnostic : le premier maillon en rouge indique ce qu'il faut réparer. */}
-          {Array.isArray(woo.testSteps) && woo.testSteps.length > 0 && (
-            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm text-xs">
-              {woo.testSteps.map((s, i) => (
-                <div key={s.name} className={`flex items-center justify-between gap-2 px-3 py-2 ${i % 2 ? 'bg-gray-50' : 'bg-white'}`}>
-                  <span className="flex items-center gap-1.5">
-                    {s.ok ? <CheckCircle2 size={12} className="text-green-600" /> : <XCircle size={12} className="text-red-600" />}
-                    {s.name}
-                  </span>
-                  <span className={s.ok ? 'text-gray-500' : 'text-red-600'}>
-                    {s.error || `HTTP ${s.status}`} · {s.ms} ms
-                  </span>
-                </div>
-              ))}
-              <div className="px-3 py-2 bg-amber-50 text-amber-700 border-t border-amber-200">
-                Le premier élément en rouge indique où ça bloque. Si le site lui-même est
-                rouge ou lent, c’est l’hébergement du site qu’il faut revoir.
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
 
       {/* ── Users Modal ── */}
       <Modal open={openModal === 'users'} onClose={() => setOpenModal(null)}

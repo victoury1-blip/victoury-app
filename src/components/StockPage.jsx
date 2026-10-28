@@ -6,7 +6,6 @@ import {
   ChevronDown, ChevronUp, Check, ImageIcon, X,
 } from 'lucide-react';
 import { loadProducts, saveProducts, loadProductsRemote, getTotalStock, SIZE_OPTIONS, NUMERIC_SIZES } from '../data/products';
-import { updateWooStock, pushProductToWoo, deleteWooProduct } from '../lib/woocommerce';
 import { importProductsFromShop } from '../lib/shopImport';
 import { chargerStockManuel, lireStockManuelCache, definirStockManuel } from '../lib/stockManuel';
 
@@ -129,7 +128,7 @@ function ProductModal({ initial, onClose, onSave }) {
             <div>
               <label className={lc}>Boutique</label>
               <select value={form.boutique} onChange={e => u('boutique', e.target.value)} className={ic}>
-                <option>Manuel</option><option>Shopify</option><option>WooCommerce</option>
+                <option>Manuel</option><option>Shopify</option>
               </select>
             </div>
             <div>
@@ -345,7 +344,6 @@ export default function StockPage() {
       const vars = (p.variations || []).map((v, i) => {
         if (i !== varIdx) return v;
         const newStock = Math.max(0, (v.stock || 0) + (v.ajust || 0));
-        if (p.wooId) updateWooStock(p.wooId, v.wooVarId, newStock);
         return { ...v, stock: newStock, ajust: 0 };
       });
       return { ...p, variations: vars };
@@ -354,11 +352,7 @@ export default function StockPage() {
 
   function handleDelete(id) {
     const product = products.find(p => p.id === id);
-    const msg = product?.wooId
-      ? 'Supprimer ce produit du Stock ET de WooCommerce ?'
-      : 'Supprimer ce produit ?';
-    if (!window.confirm(msg)) return;
-    if (product?.wooId) deleteWooProduct(product.wooId);
+    if (!product || !window.confirm('Supprimer ce produit ?')) return;
     persist(products.filter(p => p.id !== id));
   }
 
@@ -370,29 +364,6 @@ export default function StockPage() {
     }
     setEditProduct(null);
   }
-
-  const [pushing, setPushing] = useState(null);
-
-  async function handlePushToWoo(product) {
-    if (product.wooId) {
-      alert('Ce produit est déjà sur WooCommerce (ID: ' + product.wooId + ')');
-      return;
-    }
-    setPushing(product.id);
-    try {
-      const created = await pushProductToWoo(product);
-      persist(products.map(p => p.id === product.id ? { ...p, wooId: created.id, boutique: 'WooCommerce' } : p));
-      alert(`✅ Produit publié sur WooCommerce ! (ID: ${created.id})`);
-    } catch (e) {
-      alert('❌ Erreur: ' + e.message);
-    } finally {
-      setPushing(null);
-    }
-  }
-
-  /* ── Publication en masse : détecte les produits ABSENTS de WooCommerce
-     (y compris ceux avec un ancien wooId qui n'existe plus côté boutique)
-     et les publie automatiquement, un par un, avec progression. ── */
 
   /* Sélection de produits (cases à cocher) pour publier uniquement ceux choisis. */
   const [selected, setSelected] = useState(() => new Set());
@@ -470,7 +441,7 @@ export default function StockPage() {
           </select>
           <select value={filterBoutique} onChange={e => setFilterBoutique(e.target.value)} className={selCls}>
             <option value="">Toutes les boutiques</option>
-            <option>Manuel</option><option>Shopify</option><option>WooCommerce</option>
+            <option>Manuel</option><option>Shopify</option>
           </select>
           <button className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
             <Filter size={13} /> Filtrer
@@ -614,15 +585,6 @@ export default function StockPage() {
                           className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 whitespace-nowrap">
                           Voir variations
                         </button>
-                        {!p.wooId && (
-                          <button onClick={() => handlePushToWoo(p)} disabled={pushing === p.id}
-                            className="px-2 py-1 text-xs bg-purple-50 text-purple-600 rounded hover:bg-purple-100 whitespace-nowrap disabled:opacity-50">
-                            {pushing === p.id ? '...' : '🚀 WooCommerce'}
-                          </button>
-                        )}
-                        {p.wooId && (
-                          <span className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded whitespace-nowrap">✅ Woo #{p.wooId}</span>
-                        )}
                         <button onClick={() => { setEditProduct(p); setAddOpen(true); }}
                           className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200" aria-label="Modifier"><Pencil size={13} /></button>
                         <button onClick={() => handleDelete(p.id)}

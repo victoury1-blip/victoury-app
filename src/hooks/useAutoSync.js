@@ -18,7 +18,6 @@ const SYNC_KEYS = [
   'system_timezone',
   'user_profiles',
   'auzone_config',
-  'woo_config',
   'push_notifications',
   'victoury_profile',
   'deleted_order_ids',

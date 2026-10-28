@@ -155,8 +155,6 @@ export default function App() {
   const [session, setSession] = useState(undefined);
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isWooFetching, setIsWooFetching] = useState(false);
-  const [wooError, setWooError] = useState(null);
   const [dbError, setDbError] = useState(null);
   const [offline, setOffline] = useState(!navigator.onLine);
   const modifiedIdsRef = useRef(new Set());
@@ -174,15 +172,6 @@ export default function App() {
   // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
   // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
   const recentEditsRef = useRef(new Map());
-  const wooConfigRef = useRef(null);
-  // Un aléa réseau isolé (30s de polling) ne doit pas afficher un bandeau rouge
-  // à chaque fois : on n'alerte qu'après 2 échecs CONSÉCUTIFS.
-  const wooFailCountRef = useRef(0);
-  /* Prochain instant où réessayer WooCommerce. Boutique injoignable, le sondage
-     repartait toutes les 45 s : chaque tentative attend 9 s pour rien, écrit une
-     ligne d'erreur en base et fait clignoter le bandeau. L'attente double après
-     chaque échec, jusqu'à 30 min. */
-  const wooNextTryRef = useRef(0);
   const notifConfigRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const ordersRef = useRef(orders);
@@ -320,7 +309,7 @@ export default function App() {
     if (!session) return;
     const PRELOAD_KEYS = [
       'victoury_app_config', 'victoury_shop_config', 'victoury_profile',
-      'auzone_config', 'woo_config', 'livreurs', 'victoury_statuses',
+      'auzone_config', 'livreurs', 'victoury_statuses',
       'phone_colors', 'notification_sound', 'system_timezone',
       'victoury_manual_facture',
     ];
@@ -621,7 +610,7 @@ export default function App() {
     if (!session) return;
     const SYNC_KEYS = [
       'livreurs', 'victoury_products', 'victoury_statuses',
-      'auzone_config', 'woo_config', 'victoury_app_config', 'victoury_shop_config',
+      'auzone_config', 'victoury_app_config', 'victoury_shop_config',
       'phone_colors', 'notification_sound',
     ];
     const userId = session?.user?.id;
@@ -656,306 +645,6 @@ export default function App() {
       if (error) console.error('[logError] failed to write to error_logs:', error.message);
     });
   }
-
-  /* ── WC sync logger ── */
-  function logWcSync(entry) {
-    const MAX = 100;
-    cloudGet('wc_sync_logs').then(logs => {
-      const prev = Array.isArray(logs) ? logs : [];
-      const next = [{ ...entry, ts: new Date().toISOString() }, ...prev].slice(0, MAX);
-      cloudSet('wc_sync_logs', next);
-    });
-  }
-
-  /* ── WooCommerce polling ──
-     ATTEND que les commandes soient chargées depuis Supabase. Sans cela, le
-     sondage pouvait s'exécuter alors que la liste locale était encore vide :
-     toutes les commandes WooCommerce paraissaient alors NOUVELLES, recevaient
-     un code de suivi tout neuf et étaient réenregistrées par-dessus l'existant.
-     C'est ainsi que des codes déjà déposés chez le transporteur se retrouvaient
-     remplacés par des VICTOURY fraîchement émis, à chaque rechargement. */
-  useEffect(() => {
-    if (!session || !initialLoadDone) return;
-    /* Attente avant la prochaine tentative : 45 s, puis 1 min 30, 3 min… et au
-       plus 30 min. Une boutique en panne n'est pas réparée par l'insistance. */
-    const backoff = () => {
-      wooNextTryRef.current = Date.now()
-        + Math.min(30 * 60000, 45000 * 2 ** Math.max(0, wooFailCountRef.current - 1));
-    };
-    async function fetchWooOrders(manual = false) {
-      // Boutique injoignable : on espace les tentatives au lieu d'insister
-      // toutes les 45 s. Le bouton « Réessayer » force le passage.
-      if (!manual && Date.now() < wooNextTryRef.current) return;
-      /* Onglet en arrière-plan : aucun appel. Chaque onglet ouvert de
-         l'application sondait le serveur toutes les 45 s, même caché — c'est
-         ce qui consommait le quota de calcul gratuit de Vercel. Le retour au
-         premier plan relance une lecture immédiate (voir plus bas). */
-      if (!manual && document.hidden) return;
-      try {
-        // Relu à chaque appel (pas mis en cache) : un bascule dans Paramètres
-        // doit stopper/reprendre le sondage immédiatement, sans recharger la page.
-        const stored = localStorage.getItem('woo_config');
-        wooConfigRef.current = stored ? JSON.parse(stored) : (wooConfigRef.current || await cloudGet('woo_config') || {});
-        const config = wooConfigRef.current;
-        // Désactivé depuis Paramètres (ex. la boutique WooCommerce n'existe
-        // plus) : ni sondage ni bandeau d'erreur, comme si rien n'était réglé.
-        if (config.enabled === false) { setWooError(null); return; }
-        if (!config.consumerKey || !config.consumerSecret) {
-          setWooError('⚙️ WooCommerce non configuré — ajoutez vos clés API dans Paramètres');
-          return;
-        }
-        // Récupération côté SERVEUR (fonction /api/woo-orders) : bien plus fiable
-        // que le navigateur → rewrite → boutique (évite « Failed to fetch », CORS,
-        // suppression d'en-têtes). Repli sur le rewrite direct si l'API échoue.
-        const WC_TIMEOUT = 25000;
-        /* Une lecture via notre fonction serveur, pour un nombre de commandes
-           donné. Séparée en fonction pour pouvoir RÉESSAYER plus petit : quand
-           la boutique met plus de 9 s à répondre, c'est le volume demandé qui
-           est en cause bien plus souvent que la panne. */
-        async function callWooApi(perPage) {
-          const { data: { session } } = await supabase.auth.getSession();
-          const controller = new AbortController();
-          const to = setTimeout(() => controller.abort(), WC_TIMEOUT + 3000);
-          let apiRes;
-          try {
-            apiRes = await fetch('/api/woo-orders', {
-              method: 'POST',
-              signal: controller.signal,
-              headers: {
-                'Content-Type': 'application/json',
-                ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-              },
-              body: JSON.stringify({ siteUrl: config.siteUrl || 'https://victoury-maroc.com', consumerKey: config.consumerKey, consumerSecret: config.consumerSecret, perPage }),
-            });
-          } finally { clearTimeout(to); }
-          const ct = apiRes.headers.get('content-type') || '';
-          // Une réponse NON-JSON avec un statut d'erreur veut dire que la requête
-          // n'a même pas atteint notre fonction serveur (bloquée en amont, ex.
-          // pare-feu / protection anti-bot Vercel) : le message « vérifiez vos
-          // clés » serait trompeur, la config WooCommerce n'y est pour rien.
-          if (!apiRes.ok && !ct.includes('json')) {
-            throw new Error(`Requête bloquée avant le serveur (HTTP ${apiRes.status}) — vérifiez le pare-feu/la protection Vercel du projet`);
-          }
-          const j = await apiRes.json().catch(() => ({}));
-          if (!apiRes.ok) {
-            const err = new Error(j.error || `API ${apiRes.status}`);
-            err.wooTimeout = !!j.timeout;
-            throw err;
-          }
-          return j.orders || [];
-        }
-        let data;
-        try {
-          try {
-            data = await callWooApi(50);
-          } catch (firstErr) {
-            // Repli sur un lot réduit : les commandes sont triées de la plus
-            // récente à la plus ancienne, donc les nouvelles restent couvertes.
-            if (!firstErr?.wooTimeout) throw firstErr;
-            data = await callWooApi(10);
-          }
-        } catch (apiErr) {
-          // Repli : appel direct via le rewrite Vercel (query-string + header).
-          // Un AbortError renvoie le message brut du navigateur (« signal is
-          // aborted without reason ») : on le reformule pour rester lisible.
-          /* Le message doit désigner la BOUTIQUE : les deux voies (fonction
-             serveur et appel direct) partent d'ici, donc un échec des deux vient
-             du site WordPress, pas de l'application ni des clés API. */
-          const friendly = (err) => {
-            if (err?.name === 'AbortError') return 'la boutique n’a pas répondu à temps';
-            return err?.message || 'erreur réseau';
-          };
-          const wcHeaders = { Authorization: 'Basic ' + btoa(`${config.consumerKey}:${config.consumerSecret}`) };
-          const wcAuthQs = `consumer_key=${encodeURIComponent(config.consumerKey)}&consumer_secret=${encodeURIComponent(config.consumerSecret)}`;
-          const controller = new AbortController();
-          const to = setTimeout(() => controller.abort(), WC_TIMEOUT);
-          let res;
-          try {
-            // Lot réduit : cette voie ne sert que lorsque la boutique répond mal,
-            // lui redemander 50 commandes garantissait un second échec.
-            res = await fetch(`/wc-api/wp-json/wc/v3/orders?status=processing,pending&per_page=10&orderby=date&order=desc&_fields=id,number,status,date_created,date_modified,total,billing,line_items,customer_note&${wcAuthQs}`, { signal: controller.signal, headers: wcHeaders });
-          } catch (directErr) {
-            // Les deux voies ont échoué : afficher le message le plus utile
-            // (celui de l'API serveur, qui explique la vraie cause).
-            wooFailCountRef.current += 1;
-            backoff();
-            if (wooFailCountRef.current >= 2) {
-              const slow = apiErr?.wooTimeout || directErr?.name === 'AbortError';
-              setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || friendly(directErr) || 'connexion impossible')
-                + (slow ? ' — le site victoury-maroc.com est trop lent, à voir avec l’hébergeur' : ''));
-            }
-            return;
-          } finally { clearTimeout(to); }
-          if (!res.ok) {
-            wooFailCountRef.current += 1;
-            backoff();
-            if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + (friendly(apiErr) || 'erreur ' + res.status) + ' — vérifiez vos clés API');
-            return;
-          }
-          data = await res.json();
-        }
-        wooFailCountRef.current = 0;
-        wooNextTryRef.current = 0;
-        setWooError(null);
-        const getMeta = (meta, ...keys) => {
-          if (!meta) return '';
-          /* Exact & attribute_ prefix match */
-          for (const k of keys) {
-            const m = meta.find(x => x.key === k || x.key === `attribute_${k}`);
-            if (m?.value) return String(m.value);
-          }
-          /* Fallback: search any key containing the word (case-insensitive) */
-          for (const k of keys) {
-            const m = meta.find(x => x.key?.toLowerCase().includes(k.replace('pa_', '')));
-            if (m?.display_value || m?.value) return String(m.display_value || m.value);
-          }
-          return '';
-        };
-        /* Produits importés d'une plateforme d'affiliation : leurs commandes site
-           ne passent pas par « À Confirmer » mais par l'onglet Commandes Site de
-           la page correspondante. Chaque plateforme a ses propres noms — sans
-           cette séparation, une commande Bouait atterrirait chez Chic. */
-        const normName = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-        const namesByPlat = new Map();
-        try {
-          const prods = JSON.parse(localStorage.getItem('victoury_products') || '[]');
-          for (const plat of AFFILIATE_LIST) {
-            namesByPlat.set(plat.key, new Set(
-              prods.filter(p => p.source === plat.source).map(p => normName(p.name)).filter(Boolean)
-            ));
-          }
-        } catch { /* cache produits illisible : tout part en « À Confirmer » */ }
-        /* Plateforme d'un produit d'après son nom, ou null s'il n'en vient pas. */
-        const platOfName = (name) => {
-          const n = normName(name);
-          if (!n) return null;
-          for (const [key, names] of namesByPlat) {
-            if (names.has(n)) return key;
-            for (const c of names) { if (c && (n.includes(c) || c.includes(n))) return key; }
-          }
-          return null;
-        };
-        /* Map each WC order individually — bad order is skipped, not crashes the whole poll */
-        const mapped = [];
-        for (const o of data) {
-          try {
-            const products = (o.line_items || []).map(item => ({
-              name: item.name || 'Produit',
-              size: getMeta(item.meta_data, 'pa_taille', 'taille', 'size'),
-              color: getMeta(item.meta_data, 'pa_couleur', 'couleur', 'color'),
-              qty: item.quantity || 1,
-            }));
-            const firstItem = o.line_items?.[0] || {};
-            mapped.push({
-              id: `WC-${o.id}`,
-              recipient: {
-                name: `${o.billing.first_name} ${o.billing.last_name}`.trim(),
-                address: o.billing.address_1 || '',
-                city: o.billing.city || '',
-                phone: o.billing.phone || '',
-                /* L'adresse e-mail est le signal d'identification le plus fort
-                   dont dispose Meta : sans elle, une conversion renvoyée depuis
-                   le serveur se rapproche mal d'une personne, et la publicité
-                   apprend d'autant moins. Elle tient dans `recipient`, déjà
-                   stocké en JSON — aucune colonne à ajouter. */
-                email: o.billing.email || '',
-                delivery: null,
-              },
-              product: {
-                name: firstItem.name || 'Produit WC',
-                size: getMeta(firstItem.meta_data, 'pa_taille', 'taille', 'size'),
-                color: getMeta(firstItem.meta_data, 'pa_couleur', 'couleur', 'color'),
-                qty: (o.line_items || []).reduce((s, i) => s + (i.quantity || 1), 0),
-                stock: 0,
-              },
-              products: products.length > 0 ? products : null,
-              price: parseFloat(o.total) || 0,
-              status: (() => {
-                const plat = products.map(p => platOfName(p.name)).find(Boolean) || platOfName(firstItem.name);
-                return plat ? `${platformOf(plat).statusPrefix}_nouveau` : 'nouveau';
-              })(),
-              note: o.customer_note || '',
-              dateAdded: fmtDate(o.date_created),
-              dateUpdated: fmtDate(o.date_modified),
-              validated: false,
-            });
-          } catch (orderErr) {
-            logError('wc_order_mapping', `Failed to map WC order #${o.id}: ${orderErr.message}`, { wc_id: o.id, error: orderErr.message });
-          }
-        }
-        /* Use localStorage which is already synced with Supabase on startup */
-        setOrders((prev) => {
-          const existingIds = new Set(prev.map((o) => o.id));
-          const fresh = mapped.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
-          if (fresh.length) {
-            assignVictTracking(fresh, prev); // code VICT dès l'entrée
-            /* Browser push notification for first new order */
-            if (initialLoadDoneRef.current) fresh.slice(0, 1).forEach(notifyNewOrder);
-            /* Play notification sound — only after initial DB load */
-            if (initialLoadDoneRef.current) try {
-              notifConfigRef.current = JSON.parse(localStorage.getItem('notification_sound') || '{}');
-              const nc = notifConfigRef.current;
-              if (nc.enabled !== false) {
-                const vol = (nc.volume ?? 80) / 100;
-                if (nc.customSound) {
-                  const a = new Audio(nc.customSound); a.volume = vol; a.play().catch(() => {});
-                } else {
-                  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                  const osc = ctx.createOscillator(); const gain = ctx.createGain();
-                  osc.connect(gain); gain.connect(ctx.destination);
-                  osc.frequency.setValueAtTime(880, ctx.currentTime);
-                  osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
-                  gain.gain.setValueAtTime(vol, ctx.currentTime);
-                  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-                  osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
-                }
-              }
-            } catch {}
-            saveOrdersToSupabase(fresh).catch(err =>
-              logError('supabase_save', `Failed to save ${fresh.length} orders: ${err.message}`, { count: fresh.length, error: err.message })
-            );
-          }
-          /* Update price + products of existing WC orders (skip manually modified orders) */
-          const priceMap = new Map(mapped.map(m => [m.id, { price: m.price, product: m.product, products: m.products }]));
-          const changedWC = [];
-          const updated = prev.map(o => {
-            if (!o.id.startsWith('WC-')) return o;
-            if (modifiedIdsRef.current.has(o.id) || o.manuallyModified) return o;
-            const wc = priceMap.get(o.id);
-            if (!wc || Math.abs((wc.price || 0) - (o.price || 0)) < 0.01) return o;
-            const next = { ...o, price: wc.price, product: wc.product, products: wc.products };
-            changedWC.push(next);
-            return next;
-          });
-          /* Persist price changes to Supabase */
-          changedWC.forEach(o =>
-            // UPDATE (jamais upsert) : un upsert créerait une ligne fantôme sans
-            // statut ni destinataire si la commande n'existe pas encore en base.
-            supabase.from('orders').update({ price: o.price, product: o.product, products: o.products }).eq('id', o.id)
-              .then(({ error }) => { if (error) logError('supabase_price_update', `Failed to update price for ${o.id}: ${error.message}`, { order_id: o.id, error: error.message }); })
-          );
-          /* Log success */
-          if (fresh.length || changedWC.length) logWcSync({ status: 'success', newOrders: fresh.length, updatedOrders: changedWC.length });
-          return fresh.length ? [...fresh, ...updated] : updated;
-        });
-      } catch (e) {
-        const isTimeout = e?.name === 'AbortError';
-        const msg = isTimeout ? 'serveur WooCommerce lent (délai dépassé) — réessai automatique' : (e?.message || 'erreur réseau');
-        wooFailCountRef.current += 1;
-        backoff();
-        if (wooFailCountRef.current >= 2) setWooError('⚠️ WooCommerce: ' + msg);
-        logWcSync({ status: 'error', error: msg });
-        logError('wc_poll', msg, { timeout: isTimeout });
-      } finally {
-        setIsWooFetching(false);
-      }
-    }
-    fetchWooOrders();
-    const interval = setInterval(fetchWooOrders, 45000);
-    const onVisWoo = () => { if (!document.hidden) fetchWooOrders(); };
-    document.addEventListener('visibilitychange', onVisWoo);
-    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisWoo); };
-  }, [session, initialLoadDone]);
 
   /* ── Ozone background sync (colis Expédié, chaque minute) ── */
   useEffect(() => {
@@ -1299,17 +988,6 @@ export default function App() {
     });
   };
 
-  function handleWooImport(newOrders) {
-    setOrders((prev) => {
-      const existingIds = new Set(prev.map((o) => o.id));
-      // Ne pas ressusciter une commande supprimée (WC-xxxx notamment) via un import manuel.
-      const fresh = newOrders.filter((o) => !existingIds.has(o.id) && !deletedIdsRef.current.has(o.id));
-      if (fresh.length) { assignVictTracking(fresh, prev); saveOrdersToSupabase(fresh); }
-      return fresh.length ? [...fresh, ...prev] : prev;
-    });
-    navigate('/commandes/a-confirmer');
-  }
-
   return (
     <ToastProvider>
     <PermissionsProvider session={session}>
@@ -1324,11 +1002,11 @@ export default function App() {
             <span>📡 وضع بدون إنترنت — التغييرات غادي تتزامن ملي ترجع الشبكة</span>
           </div>
         )}
-        {(wooError || dbError) && (
+        {dbError && (
           <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center justify-between text-xs text-red-700 shrink-0">
-            <span>🔴 {dbError || wooError}</span>
-            <button onClick={() => { setDbError(null); setWooError(null); setIsLoading(true); window.location.reload(); }} className="ml-2 px-2 py-0.5 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700">Réessayer</button>
-            <button onClick={() => { setWooError(null); setDbError(null); }} className="ml-2 text-red-400 hover:text-red-600 font-bold">✕</button>
+            <span>🔴 {dbError}</span>
+            <button onClick={() => { setDbError(null); setIsLoading(true); window.location.reload(); }} className="ml-2 px-2 py-0.5 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700">Réessayer</button>
+            <button onClick={() => setDbError(null)} className="ml-2 text-red-400 hover:text-red-600 font-bold">✕</button>
           </div>
         )}
         <div className="flex-1 min-w-0 overflow-auto" ref={scrollContainerRef}>
@@ -1371,7 +1049,7 @@ export default function App() {
           <Route path="/etats" element={<PermGate perm="etats"><EtatsPage /></PermGate>} />
           <Route path="/livraison" element={<PermGate perm="livraison"><LivraisonPage /></PermGate>} />
           <Route path="/moderateurs" element={<ModeratorsPage />} />
-          <Route path="/reglage" element={<PermGate perm="reglages"><SettingsPage onWooOrdersImported={handleWooImport} orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
+          <Route path="/reglage" element={<PermGate perm="reglages"><SettingsPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         </div>
