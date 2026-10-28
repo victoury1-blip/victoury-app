@@ -686,6 +686,11 @@ export default function App() {
       // Boutique injoignable : on espace les tentatives au lieu d'insister
       // toutes les 45 s. Le bouton « Réessayer » force le passage.
       if (!manual && Date.now() < wooNextTryRef.current) return;
+      /* Onglet en arrière-plan : aucun appel. Chaque onglet ouvert de
+         l'application sondait le serveur toutes les 45 s, même caché — c'est
+         ce qui consommait le quota de calcul gratuit de Vercel. Le retour au
+         premier plan relance une lecture immédiate (voir plus bas). */
+      if (!manual && document.hidden) return;
       try {
         // Relu à chaque appel (pas mis en cache) : un bascule dans Paramètres
         // doit stopper/reprendre le sondage immédiatement, sans recharger la page.
@@ -947,7 +952,9 @@ export default function App() {
     }
     fetchWooOrders();
     const interval = setInterval(fetchWooOrders, 45000);
-    return () => clearInterval(interval);
+    const onVisWoo = () => { if (!document.hidden) fetchWooOrders(); };
+    document.addEventListener('visibilitychange', onVisWoo);
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisWoo); };
   }, [session, initialLoadDone]);
 
   /* ── Ozone background sync (colis Expédié, chaque minute) ── */
@@ -960,7 +967,7 @@ export default function App() {
     async function syncOzoneStatuses() {
       // Une passe à la fois : la suivante (minuteur, retour au premier plan)
       // attend la fin de celle-ci au lieu de doubler les appels.
-      if (ozoneEnCours) return;
+      if (ozoneEnCours || document.hidden) return;
       ozoneEnCours = true;
       try {
         let cfg = JSON.parse(localStorage.getItem('auzone_config') || '{}');
@@ -1020,7 +1027,8 @@ export default function App() {
         logAlert(`Sync ${plat.label}`, `Échec de la synchro automatique : ${e?.message || 'erreur'}`);
       }
     }
-    const syncChic = () => Promise.all(AFFILIATE_LIST.map(syncPlatform));
+    // Onglet caché : pas d'appel serveur (quota Vercel), relancé au retour.
+    const syncChic = () => (document.hidden ? Promise.resolve() : Promise.all(AFFILIATE_LIST.map(syncPlatform)));
     syncChic();
     const interval = setInterval(syncChic, 5 * 60 * 1000);
     const onVis = () => { if (document.visibilityState === 'visible') syncChic(); };
