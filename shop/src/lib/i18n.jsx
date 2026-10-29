@@ -103,9 +103,11 @@ const remisePalier = (lang, pourcent, rang) => lang === 'ar'
 
 /** "🎁 2 pour 499 DH au lieu de 580 DH" — l'offre en prix, plus parlante
     qu'un pourcentage (surtout à virgule, ex. −27,93 %). */
+// Sens de lecture forcé sur toute la phrase : sur une carte produit (bloc
+// en LTR), la version arabe s'affichait mots dans le désordre.
 const offreLot = (lang, n, total, brut) => lang === 'ar'
-  ? <>🎁 <Ltr>{n === 2 ? 'جوج' : `${n} قطع`}</Ltr> ب <Ltr>{total}</Ltr> بلاصة <span className="line-through opacity-70">{brut}</span></>
-  : <>🎁 <Ltr>{n} pour {total}</Ltr> au lieu de <span className="line-through opacity-70">{brut}</span></>;
+  ? <bdi dir="rtl">🎁 {n === 2 ? 'جوج' : `${n} قطع`} ب <b className="font-bold">{total}</b> بلاصة <span className="line-through opacity-70">{brut}</span></bdi>
+  : <bdi dir="ltr">🎁 <Ltr>{n} pour {total}</Ltr> au lieu de <span className="line-through opacity-70">{brut}</span></bdi>;
 
 /** "Encore 1 article et −20% sur toute la commande" / version arabe — le
     coup de pouce affiché dans le panier quand un palier de remise est à
