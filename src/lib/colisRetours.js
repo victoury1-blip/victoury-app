@@ -40,8 +40,10 @@ export function dateAjout(o) {
  * échanges plus anciens sont rentrés depuis longtemps sans avoir jamais été
  * pointés, ils auraient noyé la liste sous des « Non-reçu » qui n'en sont pas. */
 export const DEBUT_ECHANGES_A_RECEVOIR = new Date(2026, 9, 1).getTime();
+/* Seulement une fois l'échange fait (statut « Changé » / « Échange ») : une
+   commande marquée échange mais encore « Expédié » n'a rien rapporté. */
 const STATUTS_ECHANGE = new Set(['change', 'echange_recu']);
-export const estEchange = (o) => !!o?.echange || STATUTS_ECHANGE.has(o?.status);
+export const estEchange = (o) => STATUTS_ECHANGE.has(o?.status);
 export const estEchangeARecevoir = (o) =>
   estEchange(o) && estDansColis(o) && !estImportSheet(o) && dateAjout(o) >= DEBUT_ECHANGES_A_RECEVOIR;
 
