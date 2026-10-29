@@ -33,4 +33,15 @@ describe('colis retours', () => {
     expect(estImportSheet({ id: 'VI00400', trackingNumber: 'OZ123456' })).toBe(false);
     expect(estColisRetour({ id: 'VI00435', trackingNumber: 'VI00435', status: 'refuse' })).toBe(true);
   });
+
+  it('garde les échanges du circuit colis jusqu’à ce qu’ils soient reçus', () => {
+    const echange = { id: 'VI00510', trackingNumber: 'VI00510', status: 'livre', echange: true, dateAdded: '24/10/2026 21:11:49' };
+    expect(estColisRetour(echange)).toBe(true);
+    expect(estRecu({ ...echange, recu: true }, new Set())).toBe(true);
+    // pas encore dans le circuit colis (À confirmer)
+    expect(estColisRetour({ ...echange, status: 'nouveau', validated: false, trackingNumber: '' })).toBe(false);
+    // échanges d'avant octobre 2026 : rentrés depuis longtemps, jamais pointés
+    expect(estColisRetour({ ...echange, dateAdded: '20/09/2026 10:00:00' })).toBe(false);
+    expect(estColisRetour({ ...echange, echange: false })).toBe(false);
+  });
 });

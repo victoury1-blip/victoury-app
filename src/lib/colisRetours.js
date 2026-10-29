@@ -27,8 +27,26 @@ export function estImportSheet(o) {
   return true;
 }
 
-/** Colis refusé / annulé / en retour, issu de la Liste des Colis (hors import Google Sheets). */
-export const estColisRetour = (o) => RETOUR_SET.has(o?.status) && estDansColis(o) && !estImportSheet(o);
+/** Date d'ajout (« JJ/MM/AAAA HH:mm:ss ») en millisecondes, 0 si illisible. */
+export function dateAjout(o) {
+  const t = String(o?.dateAdded || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (t) return new Date(+t[3], +t[2] - 1, +t[1], +(t[4] || 0), +(t[5] || 0), +(t[6] || 0)).getTime();
+  const d = Date.parse(o?.createdAt || o?.dateAdded || '');
+  return Number.isFinite(d) ? d : 0;
+}
+
+/* Échange : le livreur rapporte l'ancien article, qui doit lui aussi être
+ * pointé « reçu » au local. Seulement à partir du 1ᵉʳ octobre 2026 : les
+ * échanges plus anciens sont rentrés depuis longtemps sans avoir jamais été
+ * pointés, ils auraient noyé la liste sous des « Non-reçu » qui n'en sont pas. */
+export const DEBUT_ECHANGES_A_RECEVOIR = new Date(2026, 9, 1).getTime();
+export const estEchangeARecevoir = (o) =>
+  !!o?.echange && estDansColis(o) && !estImportSheet(o) && dateAjout(o) >= DEBUT_ECHANGES_A_RECEVOIR;
+
+/** Colis refusé / annulé / en retour, ou échange dont l'ancien article revient,
+    issu de la Liste des Colis (hors import Google Sheets). */
+export const estColisRetour = (o) =>
+  (RETOUR_SET.has(o?.status) && estDansColis(o) && !estImportSheet(o)) || estEchangeARecevoir(o);
 
 /** Liste locale héritée des colis cochés « reçu » avant la colonne orders.recu. */
 export function lireRecuIdsLocal() {

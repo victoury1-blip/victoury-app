@@ -1381,7 +1381,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                       )
                     )}
                     {/* Sous-statut Reçu / Non-reçu — menu déroulant */}
-                    {(o.status === 'refuse' || o.status === 'annule' || o.status === 'retour_recu') && (
+                    {/* Échange : l'ancien article revient aussi au local, à pointer pareil. */}
+                    {(o.status === 'refuse' || o.status === 'annule' || o.status === 'retour_recu' || o.echange) && (
                       <SubStatusDropdown
                         active={o.recu || recuIds.has(o.id)}
                         onChange={() => toggleRecu(o.id)}

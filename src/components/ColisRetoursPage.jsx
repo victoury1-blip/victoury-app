@@ -8,7 +8,7 @@ import useSearchShortcut from '../hooks/useSearchShortcut';
 import useDebounce from '../hooks/useDebounce';
 import Pagination, { paginate } from './Pagination';
 import PhoneChip, { normalizePhone } from './PhoneChip';
-import { estColisRetour, estRecu, lireRecuIdsLocal } from '../lib/colisRetours';
+import { estColisRetour, estRecu, lireRecuIdsLocal, dateAjout } from '../lib/colisRetours';
 import DeliveryStatusModal from './colis/DeliveryStatusModal';
 import { COLIS_PIPELINE } from '../data/colisPipeline';
 import { now } from '../lib/dateUtils';
@@ -30,13 +30,6 @@ const FILTRES = [
 
 /* Couleur du dernier statut Ozon — mêmes teintes que la Liste des Colis. */
 /** Date d'ajout en millisecondes (« jj/mm/aaaa hh:mm:ss », ISO, ou created_at). */
-function dateAjout(o) {
-  const t = String(o?.dateAdded || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (t) return new Date(+t[3], +t[2] - 1, +t[1], +(t[4] || 0), +(t[5] || 0), +(t[6] || 0)).getTime();
-  const d = Date.parse(o?.createdAt || o?.dateAdded || '');
-  return Number.isFinite(d) ? d : 0;
-}
-
 function couleurOzon(statut) {
   const ls = (statut || '').toLowerCase();
   if (ls.includes('livr')) return 'bg-green-100 text-green-700';
@@ -288,7 +281,15 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                       {note || <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{o.recipient?.delivery || '—'}</td>
-                    <td className="px-4 py-3"><StatutBadge status={o.status} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <StatutBadge status={o.status} />
+                        {/* Échange : c'est l'ancien article rapporté par le livreur qu'on attend. */}
+                        {o.echange && (
+                          <span className="text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5 whitespace-nowrap">🔄 Échange</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{o.dateUpdated || o.dateAdded}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">
