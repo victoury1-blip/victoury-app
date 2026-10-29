@@ -9,6 +9,7 @@ import useDebounce from '../hooks/useDebounce';
 import Pagination, { paginate } from './Pagination';
 import PhoneChip, { normalizePhone } from './PhoneChip';
 import { estColisRetour, estRecu, estEchange, lireRecuIdsLocal, dateAjout } from '../lib/colisRetours';
+import { couleurProduit } from '../lib/couleurProduit';
 import DeliveryStatusModal from './colis/DeliveryStatusModal';
 import { COLIS_PIPELINE } from '../data/colisPipeline';
 import { now } from '../lib/dateUtils';
@@ -271,7 +272,7 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                     <td className="px-4 py-3 text-gray-700 text-sm">
                       {prods.map((p, i) => (
                         <div key={i} className="whitespace-nowrap">
-                          <span className="font-semibold">{p?.name}</span>
+                          <span className="font-semibold" style={{ color: couleurProduit(p?.name) }}>{p?.name}</span>
                           {p?.size && <span className="ml-1 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">{p.size}</span>}
                           {p?.qty > 1 && <span className="ml-1 text-xs text-gray-500">×{p.qty}</span>}
                         </div>

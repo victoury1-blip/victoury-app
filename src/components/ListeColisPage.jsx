@@ -18,6 +18,7 @@ import { findOrderByCode } from '../lib/scanUtils';
 import DeliveryStatusModal, { DELIVERY_STATUSES } from './colis/DeliveryStatusModal';
 import ScanModal from './colis/ScanModal';
 import { estRecu, estEchange } from '../lib/colisRetours';
+import { couleurProduit } from '../lib/couleurProduit';
 function isLight(hex) {
   if (!hex || hex.length < 7) return true;
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
@@ -1292,7 +1293,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   <td className="px-4 py-3 min-w-[200px] max-w-[280px]">
                     {(o.products?.length > 0 ? o.products : [o.product]).map((p, i) => p && (
                       <div key={i} className="text-sm leading-snug mb-1 break-words">
-                        <span className="font-medium text-gray-800">{p.name}</span>
+                        <span className="font-semibold" style={{ color: couleurProduit(p.name) }}>{p.name}</span>
                         {p.size && <span className="ml-1 text-xs text-gray-500 whitespace-nowrap">/ {p.size}</span>}
                         <span className="ml-1 text-xs text-gray-400 whitespace-nowrap">×{p.qty || 1}</span>
                       </div>

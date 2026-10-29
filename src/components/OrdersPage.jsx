@@ -35,6 +35,7 @@ import PhoneChip from './PhoneChip';
 import OzoneModal from './OzoneModal';
 import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
+import { couleurProduit } from '../lib/couleurProduit';
 import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -1114,7 +1115,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                 <td className="px-4 py-4 min-w-[180px]">
                   {(order.products?.length > 0 ? order.products : [order.product]).map((p, i) => p && (
                     <div key={i} className="text-sm leading-relaxed mb-0.5 break-words">
-                      <span className="font-semibold text-gray-800">{p.name}</span>
+                      <span className="font-semibold" style={{ color: couleurProduit(p.name) }}>{p.name}</span>
                       {p.color && <span className="ml-1 text-sm font-semibold text-blue-600">{p.color}</span>}
                       {p.size && <span className="ml-1 text-sm text-gray-600">- {p.size}</span>}
                       <div className="text-sm text-gray-500">({p.qty || 1}x)</div>
