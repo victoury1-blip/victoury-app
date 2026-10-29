@@ -23,7 +23,9 @@ export const ORDER_COLUMNS =
 /* Colonnes suffisantes pour détecter un changement. `is_deleted` est inclus :
    la liste noire des suppressions se déduit de la même requête, ce qui supprime
    l'ancienne requête séparée sur les commandes supprimées. */
-const FP_COLUMNS = 'id, status, date_updated, tracking_number, validated, recu, is_deleted';
+// ozone_last_status : posé par le webhook Ozon (api/ozon-webhook.js) sans
+// toucher à date_updated — sans lui ici, le cache n'en verrait rien.
+const FP_COLUMNS = 'id, status, date_updated, tracking_number, validated, recu, ozone_last_status, is_deleted';
 
 const PAGE = 1000;
 
@@ -35,12 +37,12 @@ const b = (v) => (v ? '1' : '0');
 
 /** Empreinte d'une ligne telle que renvoyée par la base. */
 export function fpRow(r) {
-  return `${s(r.status)}|${s(r.date_updated)}|${s(r.tracking_number)}|${b(r.validated)}|${b(r.recu)}`;
+  return `${s(r.status)}|${s(r.date_updated)}|${s(r.tracking_number)}|${b(r.validated)}|${b(r.recu)}|${s(r.ozone_last_status)}`;
 }
 
 /** Empreinte d'une commande telle que stockée dans le cache local. */
 export function fpCached(o) {
-  return `${s(o.status)}|${s(o.dateUpdated)}|${s(o.trackingNumber)}|${b(o.validated)}|${b(o.recu)}`;
+  return `${s(o.status)}|${s(o.dateUpdated)}|${s(o.trackingNumber)}|${b(o.validated)}|${b(o.recu)}|${s(o.ozoneLastStatus)}`;
 }
 
 /* Pagination : Supabase plafonne chaque requête à 1000 lignes. Le tri porte sur
