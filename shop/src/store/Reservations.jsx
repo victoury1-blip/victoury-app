@@ -26,6 +26,14 @@ function offrePour(o, produits, remises) {
   return `${n === 2 ? 'جوج' : `${n} قطع`} ب ${fmtMontant(total, 'ar')} بلاصة ${fmtMontant(brut, 'ar')}`;
 }
 
+/** Stock actuel de la taille réservée — une taille réapprovisionnée entre-temps
+    peut partir tout de suite, sans attendre la date d'arrivage. */
+function stockActuel(o, produits) {
+  const ligne = o.products?.[0] || o.product;
+  const p = produits.find(x => x.name === ligne?.name);
+  return p?.sizes?.find(t => t.size === (ligne?.size || ''))?.stock ?? null;
+}
+
 export default function Reservations() {
   const [commandes, setCommandes] = useState(null);
   const [produits, setProduits] = useState([]);
@@ -132,6 +140,12 @@ export default function Reservations() {
                   ))}
                   <p className="text-xs text-gray-400 mt-0.5">{o.id} · {o.date_added} · {Number(o.price || 0).toLocaleString('fr-FR')} DH</p>
                 </div>
+                {stockActuel(o, produits) > 0 && (
+                  <span className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-1"
+                    title="La taille est de nouveau en stock : la commande peut partir maintenant">
+                    ✓ En stock ({stockActuel(o, produits)}) — prête à confirmer
+                  </span>
+                )}
                 {date && (
                   <span className="flex items-center gap-1 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-1">
                     <Clock size={12} /> Arrivage {dateDispo(date)}
