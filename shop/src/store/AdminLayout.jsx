@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3, Heart, Rocket, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -251,7 +251,20 @@ export default function AdminLayout() {
         </div>
         {Nav}
       </aside>
-      <main className="flex-1 min-w-0 p-5 pt-20 sm:p-8"><Outlet /></main>
+      {/* Une limite de chargement par page (clé = adresse) : au clic sur le
+          menu, le squelette s'affiche tout de suite au lieu de laisser
+          l'ancienne page figée pendant que la nouvelle se charge. */}
+      <main className="flex-1 min-w-0 p-5 pt-20 sm:p-8">
+        <Suspense key={pathname} fallback={
+          <div className="animate-pulse space-y-3">
+            <div className="h-6 w-48 bg-gray-200 rounded" />
+            <div className="h-4 w-80 bg-gray-100 rounded" />
+            <div className="h-40 bg-gray-100 rounded-xl" />
+          </div>
+        }>
+          <Outlet />
+        </Suspense>
+      </main>
 
       {clocheOuverte && (
         <>

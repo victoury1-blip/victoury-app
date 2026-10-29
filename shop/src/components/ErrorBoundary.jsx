@@ -1,4 +1,5 @@
 import React from 'react';
+import { estErreurDeChargement, rechargerSiPossible } from '../lib/chargementPage';
 
 // Chaque page (Accueil, Collection, Commander...) est chargée en chunk séparé
 // (lazy + Suspense, voir App.jsx) — un chunk d'une ANCIENNE build peut ne
@@ -18,13 +19,11 @@ export default class ErrorBoundary extends React.Component {
     return { erreur };
   }
 
+  // Rechargement limité à un toutes les 20 s (voir src/lib/chargementPage.js),
+  // et non plus une seule fois par session : chaque mise en ligne doit pouvoir
+  // se rattraper, pas seulement la première de la journée.
   componentDidCatch(erreur) {
-    const estErreurDeChunk = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(erreur?.message || '');
-    if (!estErreurDeChunk) return;
-    const cle = 'reload-apres-erreur-chunk';
-    if (sessionStorage.getItem(cle)) return; // déjà tenté une fois, on n'insiste pas
-    sessionStorage.setItem(cle, '1');
-    window.location.reload();
+    if (estErreurDeChargement(erreur)) rechargerSiPossible();
   }
 
   render() {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useState, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import AnnonceBar from './components/AnnonceBar';
@@ -9,6 +9,7 @@ import WhatsAppBulle from './components/WhatsAppBulle';
 import BulleCustom from './components/BulleCustom';
 import ExitIntentModal from './components/ExitIntentModal';
 import ErrorBoundary from './components/ErrorBoundary';
+import { page } from './lib/chargementPage';
 import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEFAUT, GA4_DEFAUT } from './lib/catalogDefaults';
 
 /* Un visiteur qui atterrit sur l'accueil (le cas des clics publicitaires)
@@ -23,39 +24,46 @@ import { REGLAGES_DEFAUT, PIXEL_DEFAUT, THEME_DEFAUT, CLARITY_DEFAUT, TIKTOK_DEF
    rendu React, même pour un visiteur qui n'ouvre jamais /store. Les
    constantes par défaut ci-dessus viennent de catalogDefaults.js, qui lui
    n'importe PAS Supabase, pour que ce fichier-ci reste léger. */
-const Accueil = lazy(() => import('./pages/Accueil'));
-const Collection = lazy(() => import('./pages/Collection'));
-const Produit = lazy(() => import('./pages/Produit'));
-const Favoris = lazy(() => import('./pages/Favoris'));
-const Commander = lazy(() => import('./pages/Commander'));
-const Merci = lazy(() => import('./pages/Merci'));
-const PageStatique = lazy(() => import('./pages/PageStatique'));
-const SlugRouter = lazy(() => import('./pages/SlugRouter'));
-const AdminAuth = lazy(() => import('./store/AdminAuth'));
-const AdminLayout = lazy(() => import('./store/AdminLayout'));
-const Dashboard = lazy(() => import('./store/Dashboard'));
-const ProduitsListe = lazy(() => import('./store/ProduitsListe'));
-const ProduitForm = lazy(() => import('./store/ProduitForm'));
-const LandingPagesListe = lazy(() => import('./store/LandingPagesListe'));
-const LandingPageForm = lazy(() => import('./store/LandingPageForm'));
-const CollectionsListe = lazy(() => import('./store/CollectionsListe'));
-const MediaListe = lazy(() => import('./store/MediaListe'));
-const ImportWoo = lazy(() => import('./store/ImportWoo'));
-const AvisListe = lazy(() => import('./store/AvisListe'));
-const AvisProduitsListe = lazy(() => import('./store/AvisProduitsListe'));
-const PagesListe = lazy(() => import('./store/PagesListe'));
-const CodesPromo = lazy(() => import('./store/CodesPromo'));
-const MetaPixel = lazy(() => import('./store/MetaPixel'));
-const EditTheme = lazy(() => import('./store/EditTheme'));
-const CommandesListe = lazy(() => import('./store/CommandesListe'));
-const PaniersAbandonnesListe = lazy(() => import('./store/PaniersAbandonnesListe'));
-const Reservations = lazy(() => import('./store/Reservations'));
-const ClientsFideles = lazy(() => import('./store/ClientsFideles'));
-const MicrosoftClarity = lazy(() => import('./store/MicrosoftClarity'));
-const TikTokPixel = lazy(() => import('./store/TikTokPixel'));
-const GoogleAnalytics = lazy(() => import('./store/GoogleAnalytics'));
-const RemisesListe = lazy(() => import('./store/RemisesListe'));
-const Reglages = lazy(() => import('./store/Reglages'));
+const Accueil = page(() => import('./pages/Accueil'));
+const Collection = page(() => import('./pages/Collection'));
+const Produit = page(() => import('./pages/Produit'));
+const Favoris = page(() => import('./pages/Favoris'));
+const Commander = page(() => import('./pages/Commander'));
+const Merci = page(() => import('./pages/Merci'));
+const PageStatique = page(() => import('./pages/PageStatique'));
+const SlugRouter = page(() => import('./pages/SlugRouter'));
+const AdminAuth = page(() => import('./store/AdminAuth'));
+const AdminLayout = page(() => import('./store/AdminLayout'));
+const Dashboard = page(() => import('./store/Dashboard'));
+const ProduitsListe = page(() => import('./store/ProduitsListe'));
+const ProduitForm = page(() => import('./store/ProduitForm'));
+const LandingPagesListe = page(() => import('./store/LandingPagesListe'));
+const LandingPageForm = page(() => import('./store/LandingPageForm'));
+const CollectionsListe = page(() => import('./store/CollectionsListe'));
+const MediaListe = page(() => import('./store/MediaListe'));
+const ImportWoo = page(() => import('./store/ImportWoo'));
+const AvisListe = page(() => import('./store/AvisListe'));
+const AvisProduitsListe = page(() => import('./store/AvisProduitsListe'));
+const PagesListe = page(() => import('./store/PagesListe'));
+const CodesPromo = page(() => import('./store/CodesPromo'));
+const MetaPixel = page(() => import('./store/MetaPixel'));
+const EditTheme = page(() => import('./store/EditTheme'));
+const CommandesListe = page(() => import('./store/CommandesListe'));
+const PaniersAbandonnesListe = page(() => import('./store/PaniersAbandonnesListe'));
+const Reservations = page(() => import('./store/Reservations'));
+const ClientsFideles = page(() => import('./store/ClientsFideles'));
+const MicrosoftClarity = page(() => import('./store/MicrosoftClarity'));
+const TikTokPixel = page(() => import('./store/TikTokPixel'));
+const GoogleAnalytics = page(() => import('./store/GoogleAnalytics'));
+const RemisesListe = page(() => import('./store/RemisesListe'));
+const Reglages = page(() => import('./store/Reglages'));
+
+/* Fichiers de l'administration récupérés en arrière-plan dès qu'elle s'ouvre
+   (voir src/lib/chargementPage.js) : chaque clic du menu s'affiche aussitôt. */
+const PAGES_ADMIN = [Dashboard, ProduitsListe, ProduitForm, LandingPagesListe, LandingPageForm, CollectionsListe,
+  MediaListe, ImportWoo, AvisListe, AvisProduitsListe, PagesListe, CodesPromo, MetaPixel, EditTheme, CommandesListe,
+  PaniersAbandonnesListe, Reservations, ClientsFideles, MicrosoftClarity, TikTokPixel, GoogleAnalytics, RemisesListe, Reglages];
+const prechargerAdmin = () => PAGES_ADMIN.forEach(P => P.precharger());
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok, chargerGA4, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from './lib/pixel';
@@ -432,6 +440,10 @@ function Vitrine() {
 }
 
 function Administration() {
+  useEffect(() => {
+    const t = setTimeout(prechargerAdmin, 1200);
+    return () => clearTimeout(t);
+  }, []);
   return (
     <Suspense fallback={null}>
       <AdminAuth>
