@@ -17,6 +17,7 @@ import Toggle from './Toggle';
 import { findOrderByCode } from '../lib/scanUtils';
 import DeliveryStatusModal, { DELIVERY_STATUSES } from './colis/DeliveryStatusModal';
 import ScanModal from './colis/ScanModal';
+import { estRecu, estEchange } from '../lib/colisRetours';
 function isLight(hex) {
   if (!hex || hex.length < 7) return true;
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
@@ -680,7 +681,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
 
   function toggleRecu(orderId) {
     const current = orders.find(o => o.id === orderId);
-    const removing = (current?.recu || recuIds.has(orderId));
+    const removing = estRecu(current, recuIds);
     const next = new Set(recuIds);
     if (removing) { next.delete(orderId); } else { next.add(orderId); }
     setRecuIds(next);
@@ -830,8 +831,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
          sur la seule colonne laisserait de côté les colis cochés avant qu'elle
          existe. */
       if (af.recu) {
-        const estRecu = !!o.recu || recuIds.has(o.id);
-        if (af.recu === 'oui' ? !estRecu : estRecu) return false;
+        const recu = estRecu(o, recuIds);
+        if (af.recu === 'oui' ? !recu : recu) return false;
       }
       if (af.livreur && !(o.recipient?.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
       if (af.ville && !(o.recipient?.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
@@ -1382,9 +1383,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     )}
                     {/* Sous-statut Reçu / Non-reçu — menu déroulant */}
                     {/* Échange : l'ancien article revient aussi au local, à pointer pareil. */}
-                    {(o.status === 'refuse' || o.status === 'annule' || o.status === 'retour_recu' || o.echange) && (
+                    {(o.status === 'refuse' || o.status === 'annule' || o.status === 'retour_recu' || estEchange(o)) && (
                       <SubStatusDropdown
-                        active={o.recu || recuIds.has(o.id)}
+                        active={estRecu(o, recuIds)}
                         onChange={() => toggleRecu(o.id)}
                         activeText="Reçu"
                         inactiveText="Non-reçu"

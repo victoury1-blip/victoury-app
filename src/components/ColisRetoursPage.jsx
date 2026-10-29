@@ -8,7 +8,7 @@ import useSearchShortcut from '../hooks/useSearchShortcut';
 import useDebounce from '../hooks/useDebounce';
 import Pagination, { paginate } from './Pagination';
 import PhoneChip, { normalizePhone } from './PhoneChip';
-import { estColisRetour, estRecu, lireRecuIdsLocal, dateAjout } from '../lib/colisRetours';
+import { estColisRetour, estRecu, estEchange, lireRecuIdsLocal, dateAjout } from '../lib/colisRetours';
 import DeliveryStatusModal from './colis/DeliveryStatusModal';
 import { COLIS_PIPELINE } from '../data/colisPipeline';
 import { now } from '../lib/dateUtils';
@@ -285,7 +285,7 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                       <div className="flex flex-col items-start gap-1">
                         <StatutBadge status={o.status} />
                         {/* Échange : c'est l'ancien article rapporté par le livreur qu'on attend. */}
-                        {o.echange && (
+                        {estEchange(o) && (
                           <span className="text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5 whitespace-nowrap">🔄 Échange</span>
                         )}
                       </div>

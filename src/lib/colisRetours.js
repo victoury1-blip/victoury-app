@@ -40,8 +40,10 @@ export function dateAjout(o) {
  * échanges plus anciens sont rentrés depuis longtemps sans avoir jamais été
  * pointés, ils auraient noyé la liste sous des « Non-reçu » qui n'en sont pas. */
 export const DEBUT_ECHANGES_A_RECEVOIR = new Date(2026, 9, 1).getTime();
+const STATUTS_ECHANGE = new Set(['change', 'echange_recu']);
+export const estEchange = (o) => !!o?.echange || STATUTS_ECHANGE.has(o?.status);
 export const estEchangeARecevoir = (o) =>
-  !!o?.echange && estDansColis(o) && !estImportSheet(o) && dateAjout(o) >= DEBUT_ECHANGES_A_RECEVOIR;
+  estEchange(o) && estDansColis(o) && !estImportSheet(o) && dateAjout(o) >= DEBUT_ECHANGES_A_RECEVOIR;
 
 /** Colis refusé / annulé / en retour, ou échange dont l'ancien article revient,
     issu de la Liste des Colis (hors import Google Sheets). */
@@ -53,5 +55,8 @@ export function lireRecuIdsLocal() {
   try { return new Set(JSON.parse(localStorage.getItem(RECU_KEY) || '[]')); } catch { return new Set(); }
 }
 
-/** Reçu au local : colonne de la commande, ou ancienne liste locale. */
-export const estRecu = (o, recuIds) => !!o?.recu || !!recuIds?.has(o?.id);
+/** Reçu au local : colonne de la commande, ou ancienne liste locale. Le
+    statut « Échange » (echange_recu, posé par le scan des retours) vaut reçu
+    tant qu'il n'a pas été explicitement décoché. */
+export const estRecu = (o, recuIds) => !!o?.recu || !!recuIds?.has(o?.id)
+  || (o?.status === 'echange_recu' && o?.recu !== false);

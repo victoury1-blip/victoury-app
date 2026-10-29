@@ -44,4 +44,12 @@ describe('colis retours', () => {
     expect(estColisRetour({ ...echange, dateAdded: '20/09/2026 10:00:00' })).toBe(false);
     expect(estColisRetour({ ...echange, echange: false })).toBe(false);
   });
+
+  it('« Échange » (echange_recu) vaut reçu sauf décoché, « Changé » attend le retour', () => {
+    const base = { id: 'VI00504', trackingNumber: 'VI00504', dateAdded: '25/10/2026 14:47:31' };
+    expect(estRecu({ ...base, status: 'echange_recu' }, new Set())).toBe(true);
+    expect(estRecu({ ...base, status: 'echange_recu', recu: false }, new Set())).toBe(false);
+    expect(estColisRetour({ ...base, status: 'change' })).toBe(true);
+    expect(estRecu({ ...base, status: 'change' }, new Set())).toBe(false);
+  });
 });

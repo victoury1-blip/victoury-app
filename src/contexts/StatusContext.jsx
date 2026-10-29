@@ -10,6 +10,9 @@ function migrate(list) {
     const merged = { showInCommandes: true, showInColis: true, ...s };
     // migration: Annulé passe de l'orange au rouge (style Volcano)
     if (merged.value === 'annule' && merged.color === '#F97316') merged.color = '#DC2626';
+    // migration : « Échange Reçu » devient « Échange » — le reçu se lit désormais
+    // à part, sur le badge Reçu / Non-reçu (voir src/lib/colisRetours.js).
+    if (merged.value === 'echange_recu' && merged.label === 'Échange Reçu') merged.label = 'Échange';
     return merged;
   });
 }
