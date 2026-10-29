@@ -152,6 +152,21 @@ export function totalPanier(lignes, { paliers = [], remises = null, promo = null
     partout, comme sur la plupart des sites marchands. `lang` ('ar') passe la
     devise en toutes lettres ("درهم") — le sigle latin "DH" mélangé au milieu
     d'une phrase arabe se lisait dans le mauvais sens (algorithme bidi). */
+/** Prix de `n` exemplaires d'un même article une fois la remise par quantité
+    appliquée (même calcul que le panier) — pour annoncer « 2 pour 499 DH »
+    plutôt qu'un pourcentage à virgule. */
+export function prixLot(prix, paliers, n) {
+  const brut = arrondi((Number(prix) || 0) * n);
+  return { brut, total: arrondi(brut - remiseQuantite([{ price: Number(prix) || 0, qty: n }], paliers)) };
+}
+
+/** Montant lisible : sans décimales quand il tombe juste (499 DH, pas 499,00 DH). */
+export const fmtMontant = (n, lang) => {
+  const v = Number(n || 0);
+  const entier = Math.abs(v - Math.round(v)) < 0.005;
+  return `${v.toLocaleString('fr-MA', { minimumFractionDigits: entier ? 0 : 2, maximumFractionDigits: entier ? 0 : 2 })} ${lang === 'ar' ? 'درهم' : 'DH'}`;
+};
+
 export const fmtPrix = (n, lang) => `${Number(n || 0).toLocaleString('fr-MA', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,

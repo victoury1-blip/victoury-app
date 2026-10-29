@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { fmtPrix } from '../lib/pricing';
+import { fmtPrix, fmtMontant, prixLot } from '../lib/pricing';
 import { paliersEffectifs } from '../lib/remises';
 import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
@@ -11,7 +11,7 @@ import { ResumeAvis } from './AvisProduit';
    liste : c'est la première question du client, et la lui épargner évite
    d'ouvrir une fiche pour rien. */
 function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
-  const { t, remisePalier, lang } = useLang();
+  const { t, offreLot, lang } = useLang();
   // Règles globales + celles ciblant justement la collection de CE produit —
   // une remise réglée pour une autre collection ne doit pas s'afficher ici.
   const paliers = paliersEffectifs(remises, produit.collection_id);
@@ -112,7 +112,10 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
         <div className="mt-1 min-h-[20px]">
           {paliers?.length > 0 && (
             <p className="inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
-              {remisePalier(paliers[0].pourcent, paliers[0].rang)}
+              {(() => {
+                const { brut, total } = prixLot(produit.price, paliers, paliers[0].rang);
+                return offreLot(paliers[0].rang, fmtMontant(total, lang), fmtMontant(brut, lang));
+              })()}
             </p>
           )}
         </div>

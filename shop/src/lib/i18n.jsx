@@ -101,19 +101,25 @@ const remisePalier = (lang, pourcent, rang) => lang === 'ar'
   ? <><Ltr>−{pourcent}%</Ltr> ابتداءً من المنتج {ordinalAr(rang)}</>
   : <>−<Ltr>{pourcent}%</Ltr> dès le {ordinalFr(rang)} article</>;
 
+/** "🎁 2 pour 499 DH au lieu de 580 DH" — l'offre en prix, plus parlante
+    qu'un pourcentage (surtout à virgule, ex. −27,93 %). */
+const offreLot = (lang, n, total, brut) => lang === 'ar'
+  ? <>🎁 <Ltr>{n === 2 ? 'جوج' : `${n} قطع`}</Ltr> ب <Ltr>{total}</Ltr> بلاصة <span className="line-through opacity-70">{brut}</span></>
+  : <>🎁 <Ltr>{n} pour {total}</Ltr> au lieu de <span className="line-through opacity-70">{brut}</span></>;
+
 /** "Encore 1 article et −20% sur toute la commande" / version arabe — le
     coup de pouce affiché dans le panier quand un palier de remise est à
     portée. */
 const encoreEtRemise = (lang, manque, pourcent) => lang === 'ar'
-  ? <>أضف <Ltr>{manque}</Ltr> {manque > 1 ? 'قطع أخرى' : 'قطعة أخرى'} واستفد من خصم <Ltr>{pourcent}%</Ltr></>
-  : <>Encore <Ltr>{manque}</Ltr> article{manque > 1 ? 's' : ''} et −<Ltr>{pourcent}%</Ltr> sur toute la commande</>;
+  ? <>أضف <Ltr>{manque}</Ltr> {manque > 1 ? 'قطع أخرى' : 'قطعة أخرى'} واستفد من خصم <Ltr>{Math.floor(pourcent)}%</Ltr></>
+  : <>Encore <Ltr>{manque}</Ltr> article{manque > 1 ? 's' : ''} et −<Ltr>{Math.floor(pourcent)}%</Ltr> sur toute la commande</>;
 
 /** Ajouté au message précédent SEULEMENT si la livraison est vraiment déjà
     gratuite (le composant sait, lui, si le seuil est atteint) — sans quoi
     "livraison gratuite" serait une fausse promesse. */
 const etLivraisonGratuite = (lang) => lang === 'ar' ? ' والتوصيل مجانا 🔥' : ', livraison gratuite 🔥';
 
-const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k, remisePalier: () => '', encoreEtRemise: () => '' });
+const LangContext = createContext({ lang: 'fr', setLang: () => {}, t: (k) => k, remisePalier: () => '', offreLot: () => '', encoreEtRemise: () => '' });
 
 export function LangProvider({ children }) {
   const [lang, setLang] = useState(() => {
@@ -141,6 +147,7 @@ export function LangProvider({ children }) {
     lang, setLang,
     t: (cle) => DICT[lang]?.[cle] ?? DICT.fr[cle] ?? cle,
     remisePalier: (pourcent, rang) => remisePalier(lang, pourcent, rang),
+    offreLot: (n, total, brut) => offreLot(lang, n, total, brut),
     encoreEtRemise: (manque, pourcent) => encoreEtRemise(lang, manque, pourcent),
     etLivraisonGratuite: () => etLivraisonGratuite(lang),
   }), [lang]);

@@ -170,3 +170,15 @@ describe('remise répartie par ligne', () => {
     expect(lignesAvecRemise([ligne(450, 1)], [])).toEqual([{ price: 450, qty: 1, collectionId: undefined, remiseDh: 0, remisePourcent: 0 }]);
   });
 });
+
+import { prixLot, fmtMontant } from '../lib/pricing';
+describe('offre en lot', () => {
+  it('2 Ensemble Hijab Sport à −27,93 % = 499 DH', () => {
+    expect(prixLot(290, [{ rang: 2, pourcent: 27.93 }], 2)).toEqual({ brut: 580, total: 499 });
+    expect(prixLot(249, [{ rang: 2, pourcent: 20.08 }], 2)).toEqual({ brut: 498, total: 448 });
+  });
+  it('montant sans décimales inutiles', () => {
+    expect(fmtMontant(499, 'fr')).toBe('499 DH');
+    expect(fmtMontant(498.8, 'ar')).toBe('498,80 درهم');
+  });
+});

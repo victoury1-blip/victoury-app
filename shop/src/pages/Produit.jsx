@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
-import { fmtPrix, remiseQuantiteGroupee } from '../lib/pricing';
+import { fmtPrix, fmtMontant, prixLot, remiseQuantiteGroupee } from '../lib/pricing';
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel, trackTikTok, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from '../lib/pixel';
@@ -36,7 +36,7 @@ function Accordeon({ titre, children }) {
 }
 
 export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapide, lignes, reglages, onQuantite, onRetirer, onVider, onLandingDetectee }) {
-  const { t, remisePalier, lang } = useLang();
+  const { t, offreLot, lang } = useLang();
   const ar = lang === 'ar';
   const { slug } = useParams();
   const [produit, setProduit] = useState(null);
@@ -341,8 +341,11 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           {promo && <bdi><span className="ms-3 text-sm text-red-500 line-through">{fmtPrix(produit.compare_at, lang)}</span></bdi>}
         </p>
         {paliers?.length > 0 && (
-          <p className="mt-2 inline-flex items-center gap-1.5 bg-red-50 text-red-600 text-xs font-medium px-2.5 py-1 rounded-full">
-            {remisePalier(paliers[0].pourcent, paliers[0].rang)}
+          <p className="mt-2 inline-flex items-center gap-1.5 bg-red-50 text-red-600 text-sm font-semibold px-3 py-1.5 rounded-full">
+            {(() => {
+              const { brut, total } = prixLot(produit.price, paliers, paliers[0].rang);
+              return offreLot(paliers[0].rang, fmtMontant(total, lang), fmtMontant(brut, lang));
+            })()}
           </p>
         )}
         {promo && <OffreTimer className="mt-2" />}
