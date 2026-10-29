@@ -456,7 +456,9 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                 size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
                 stock: stockTaille, collectionId: produit.collection_id,
                 ...(reserveTaille ? { precommande: resa } : {}),
-              });
+              // Pas de tiroir panier : la commande s'ouvre directement, et le
+              // tiroir restait affiché derrière une fois la fenêtre fermée.
+              }, { ouvrirTiroir: false });
               onAchatRapide?.();
             }}
             className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
