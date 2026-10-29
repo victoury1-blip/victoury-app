@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, Send, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { listerProduits } from '../lib/admin';
-import { numeroWhatsApp } from '../lib/commande';
+import { numeroWhatsApp, horodatage } from '../lib/commande';
 import { paliersEffectifs } from '../lib/remises';
 import { prixLot, fmtMontant } from '../lib/pricing';
 import { reservationEnAttente, dateReservation, dateDispo, messageReservation } from '../lib/precommande';
@@ -44,11 +44,12 @@ export default function Reservations() {
 
   function charger() {
     supabase.from('orders')
-      .select('id, recipient, product, products, price, note, status, is_deleted, date_added')
+      .select('id, recipient, product, products, price, note, status, is_deleted, date_added, date_updated')
       .like('id', 'VS-%').eq('status', 'nouveau')
       .then(({ data, error }) => {
         if (error) throw error;
         setCommandes((data || []).filter(reservationEnAttente));
+        rattraperEnvoisInvisibles(data || []);
       })
       .catch(() => setCommandes([]));
   }
@@ -65,6 +66,21 @@ export default function Reservations() {
     String(dateReservation(a) || '').localeCompare(String(dateReservation(b) || ''))
     || String(a.id).localeCompare(String(b.id))), [commandes]);
 
+  /* L'application ne relit une commande que si sa date de mise à jour change :
+     les premiers envois (qui ne la touchaient pas) restaient invisibles dans
+     « À Confirmer ». Une commande envoyée dont la date est antérieure à l'envoi
+     est re-datée, ce qui la fait remonter dans l'application. */
+  function rattraperEnvoisInvisibles(lignes) {
+    for (const o of lignes) {
+      const r = o.recipient?.reservation;
+      if (!r?.envoyee || !r.envoyeeLe || r.redatee) continue;
+      supabase.from('orders').update({
+        date_updated: horodatage(),
+        recipient: { ...o.recipient, reservation: { ...r, redatee: true } },
+      }).eq('id', o.id).then(() => {});
+    }
+  }
+
   async function envoyerAConfirmer(ids) {
     if (!ids.length) return;
     if (!confirm(`Envoyer ${ids.length} commande${ids.length > 1 ? 's' : ''} dans « À Confirmer » de l'application ?`)) return;
@@ -73,8 +89,12 @@ export default function Reservations() {
     for (const id of ids) {
       const o = commandes.find(c => c.id === id);
       if (!o) continue;
-      const reservation = { ...(o.recipient?.reservation || { date: dateReservation(o) }), envoyee: true, envoyeeLe: new Date().toISOString() };
-      const { error } = await supabase.from('orders').update({ recipient: { ...o.recipient, reservation } }).eq('id', id);
+      const reservation = { ...(o.recipient?.reservation || { date: dateReservation(o) }), envoyee: true, envoyeeLe: new Date().toISOString(), redatee: true };
+      // date_updated : sans elle, l'application ne voit pas le changement (elle
+      // ne relit que les commandes dont cette date a bougé) et la commande
+      // n'apparaît jamais dans « À Confirmer ».
+      const { error } = await supabase.from('orders')
+        .update({ recipient: { ...o.recipient, reservation }, date_updated: horodatage() }).eq('id', id);
       if (!error) ok++;
     }
     setEnvoi(false);
