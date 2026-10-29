@@ -9,6 +9,7 @@ import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
 import { lireCodeAuto, oublierCodeAuto } from '../lib/promoAuto';
 import { dateDispo } from '../lib/precommande';
+import OffreLot from '../components/OffreLot';
 import { trackPixel, trackTikTok, sha256, telephonePourMeta, envoyerCAPI, envoyerTikTokCAPI, idEvenement, cookiesFbPourMeta, cookieTtpPourTikTok, correspondanceAvancee, trackGA4 } from '../lib/pixel';
 import { useLang } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
@@ -22,7 +23,7 @@ const champ = 'w-full border-2 border-ink px-3 py-3 text-sm focus:outline-none t
 
 const normPourMeta = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]/g, '');
 
-export default function Commander({ lignes, reglages, onQuantite, onRetirer, onVider }) {
+export default function Commander({ lignes, reglages, onQuantite, onRetirer, onVider, onAjouter }) {
   const { t: tr, lang } = useLang();
   const navigate = useNavigate();
   const [form, setForm] = useState(() => {
@@ -452,6 +453,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
               </div>
             ))}
           </div>
+
+          {/* Offre par quantité à une pièce près : se complète ici même. */}
+          <OffreLot lignes={lignes} remises={remisesEffectives} onQuantite={onQuantite} onAjouter={onAjouter} />
 
           {/* dir={dirTexte} ici : la ligne "libellé — montant" doit se lire
               dans le même sens que la langue (libellé côté départ de

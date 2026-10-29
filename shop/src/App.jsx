@@ -394,7 +394,7 @@ function Vitrine() {
             <Route path="/product/:slug" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onLandingDetectee={onLandingDetectee} />} />
             <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onLandingDetectee={onLandingDetectee} />} />
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
-            <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />} />
+            <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onAjouter={onAjouter} />} />
             <Route path="/merci/:id" element={<Merci />} />
             {/* Adresse racine partagée entre pages statiques ET landing pages
                 de produits "non listés" (voir SlugRouter.jsx) — une landing
@@ -425,7 +425,7 @@ function Vitrine() {
               <X size={18} />
             </button>
             <Suspense fallback={<div className="p-10 text-center text-sm text-gray-400">…</div>}>
-              <Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} />
+              <Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onAjouter={onAjouter} />
             </Suspense>
           </div>
         </div>

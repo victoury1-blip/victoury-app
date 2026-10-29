@@ -115,6 +115,18 @@ export async function chargerCouleurs(groupId) {
   return (data || []).map(p => ({ ...p, images: (p.images || []).sort((a, b) => a.position - b.position) }));
 }
 
+/** Couleurs d'un modèle AVEC leurs tailles et stocks — pour proposer, à la
+    caisse, d'ajouter une 2ᵉ couleur dans la même taille. */
+export async function chargerCouleursAvecTailles(groupId) {
+  if (!groupId) return [];
+  const { data, error } = await supabase
+    .from('shop_products')
+    .select('id, slug, name, color_name, color_hex, price, collection_id, images:shop_product_images(url, position), sizes:shop_product_sizes(size, stock, position)')
+    .eq('group_id', groupId).eq('status', 'Actif').order('position');
+  if (error) throw error;
+  return (data || []).map(trier);
+}
+
 /** Autres produits de la même collection — pour la fiche produit, la
     suggestion la plus pertinente reste "ce qui ressemble à ce que je regarde". */
 export async function chargerProduitsLies(collectionId, produitIdAExclure, limite = 4) {
