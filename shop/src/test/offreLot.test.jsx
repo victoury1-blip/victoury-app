@@ -4,7 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 
 vi.mock('../lib/catalog', () => ({
-  chargerProduit: vi.fn(async () => ({ group_id: 'g1' })),
+  chargerProduit: vi.fn(async () => ({ group_id: 'g1', collection_id: 'h' })),
+  chargerCollectionAvecTailles: vi.fn(async () => []),
   chargerCouleursAvecTailles: vi.fn(async () => [
     { id: 'c1', slug: 'noir', name: 'Hijab Noir', color_name: 'Noir', price: 290, collection_id: 'h', images: [], sizes: [{ size: 'L', stock: 3 }] },
     { id: 'c2', slug: 'gris', name: 'Hijab Gris', color_name: 'Gris', price: 290, collection_id: 'h', images: [], sizes: [{ size: 'L', stock: 0 }] },
@@ -40,5 +41,18 @@ describe('offre en lot à la caisse', () => {
   it('disparaît une fois l’offre atteinte', async () => {
     const div = await rendre({ lignes: [{ ...ligne, qty: 2 }], remises, onQuantite: () => {}, onAjouter: () => {} });
     expect(div.textContent).toBe('');
+  });
+});
+
+import * as catalog from '../lib/catalog';
+describe('offre en lot sans groupe de couleurs', () => {
+  it('propose les autres articles de la collection dans la même taille', async () => {
+    catalog.chargerProduit.mockResolvedValueOnce({ group_id: null, collection_id: 'h' });
+    catalog.chargerCollectionAvecTailles.mockResolvedValueOnce([
+      { id: 'r', slug: 'rouge', name: 'Ensemble Sport Rouge', color_name: null, price: 249, collection_id: 'h', images: [{ url: 'https://x/r.jpg' }], sizes: [{ size: 'L', stock: 4 }] },
+    ]);
+    const div = await rendre({ lignes: [ligne], remises, onQuantite: () => {}, onAjouter: () => {} });
+    expect(div.textContent).toContain('Ensemble Sport Rouge');
+    expect(div.querySelector('img')).not.toBeNull();
   });
 });

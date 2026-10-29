@@ -127,6 +127,18 @@ export async function chargerCouleursAvecTailles(groupId) {
   return (data || []).map(trier);
 }
 
+/** Produits d'une collection AVEC tailles et stocks — repli de la proposition
+    de la caisse quand les couleurs d'un modèle ne sont pas reliées en groupe. */
+export async function chargerCollectionAvecTailles(collectionId) {
+  if (!collectionId) return [];
+  const { data, error } = await supabase
+    .from('shop_products')
+    .select('id, slug, name, color_name, color_hex, price, collection_id, images:shop_product_images(url, position), sizes:shop_product_sizes(size, stock, position)')
+    .eq('collection_id', collectionId).eq('status', 'Actif').eq('unlisted', false).order('position').limit(30);
+  if (error) throw error;
+  return (data || []).map(trier);
+}
+
 /** Autres produits de la même collection — pour la fiche produit, la
     suggestion la plus pertinente reste "ce qui ressemble à ce que je regarde". */
 export async function chargerProduitsLies(collectionId, produitIdAExclure, limite = 4) {

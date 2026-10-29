@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { chargerProduit, chargerCouleursAvecTailles } from '../lib/catalog';
+import { chargerProduit, chargerCouleursAvecTailles, chargerCollectionAvecTailles } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
 import { prixLot, fmtMontant } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
@@ -32,10 +32,16 @@ export default function OffreLot({ lignes, remises, onQuantite, onAjouter }) {
     if (!slug || !onAjouter) return;
     let actif = true;
     chargerProduit(slug)
-      .then(p => (p?.group_id ? chargerCouleursAvecTailles(p.group_id) : []))
+      // Couleurs du même modèle ; à défaut de groupe, les autres articles de
+      // la même collection (même offre, même taille en stock).
+      .then(async p => {
+        let cs = p?.group_id ? await chargerCouleursAvecTailles(p.group_id) : [];
+        if (cs.length < 2 && p?.collection_id) cs = await chargerCollectionAvecTailles(p.collection_id);
+        return cs;
+      })
       .then(cs => {
         if (!actif) return;
-        setCouleurs(cs.filter(c => c.slug !== slug && c.sizes?.some(t => t.size === taille && t.stock > 0)));
+        setCouleurs(cs.filter(c => c.slug !== slug && c.sizes?.some(t => t.size === taille && t.stock > 0)).slice(0, 8));
       })
       .catch(() => {});
     return () => { actif = false; };
