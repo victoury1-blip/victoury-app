@@ -1399,6 +1399,11 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                   {/* Note */}
                   <td className="px-4 py-3 w-[230px] min-w-[230px] max-w-[230px] align-top break-words">
                     <div className="flex flex-col gap-3">
+                      {/^⏳\s*RÉSERVATION/im.test(o.note || '') && (
+                        <span className="block text-xs font-bold text-white bg-violet-600 rounded-lg px-2 py-1.5 shadow-sm">
+                          {(o.note.match(/^⏳\s*RÉSERVATION.*$/im) || [''])[0]}
+                        </span>
+                      )}
                       {note && <span className="block text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">Note interne:<br/>{note}</span>}
                       {o.noteLivraison && (
                         <span className={`block text-sm text-red-600 font-semibold whitespace-pre-wrap break-words ${note ? 'pt-3 border-t border-gray-200' : ''}`}>
