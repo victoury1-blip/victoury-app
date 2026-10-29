@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical, Check, Upload } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, ChevronUp, GripVertical, Check, Upload, ArrowUp, ArrowDown } from 'lucide-react';
 import { listerCollections, enregistrerCollection, supprimerCollection, listerProduits, majPosition, majCollection, majProduit, televerserPhoto } from '../lib/admin';
 import { slugifier } from '../lib/slug';
 
@@ -39,6 +39,18 @@ export default function CollectionsListe() {
     const image_url = await televerserPhoto(fichier);
     await majCollection(c.id, { image_url });
     recharger();
+  }
+
+  // Ordre des catégories = ordre du menu de la boutique (et de la grille
+  // "Nos catégories"). Toutes les positions sont réécrites 0, 1, 2… : des
+  // collections créées avec la même position ne se départageaient pas.
+  async function deplacer(index, delta) {
+    const cible = index + delta;
+    if (cible < 0 || cible >= collections.length) return;
+    const liste = [...collections];
+    [liste[index], liste[cible]] = [liste[cible], liste[index]];
+    setCollections(liste.map((c, i) => ({ ...c, position: i })));
+    await Promise.all(liste.map((c, i) => (c.position === i ? null : majCollection(c.id, { position: i }))));
   }
 
   async function retirer(c) {
@@ -120,7 +132,7 @@ export default function CollectionsListe() {
       </div>
 
       <div className="mt-5 bg-white border border-gray-200 rounded-xl divide-y divide-gray-50">
-        {collections.map(c => (
+        {collections.map((c, index) => (
           <div key={c.id}>
             <div className="w-full flex items-center justify-between px-4 py-3 text-left">
               <button onClick={() => basculer(c)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
@@ -138,6 +150,16 @@ export default function CollectionsListe() {
                 </div>
               </button>
               <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-0.5" title="Ordre dans le menu de la boutique">
+                  <button type="button" onClick={() => deplacer(index, -1)} disabled={index === 0}
+                    className="p-1 text-gray-400 hover:text-ink disabled:opacity-20" aria-label="Monter">
+                    <ArrowUp size={15} />
+                  </button>
+                  <button type="button" onClick={() => deplacer(index, 1)} disabled={index === collections.length - 1}
+                    className="p-1 text-gray-400 hover:text-ink disabled:opacity-20" aria-label="Descendre">
+                    <ArrowDown size={15} />
+                  </button>
+                </div>
                 <span onClick={() => retirer(c)} className="text-gray-300 hover:text-red-500 p-1 cursor-pointer"><Trash2 size={16} /></span>
                 <span onClick={() => basculer(c)} className="cursor-pointer">
                   {ouvert === c.id ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
