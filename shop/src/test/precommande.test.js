@@ -41,3 +41,34 @@ describe('précommande', () => {
     expect(c.note).toBe('Commande du site');
   });
 });
+
+import { infoReservation, reservationEnAttente, dateReservation, messageReservation } from '../lib/precommande';
+describe('commandes réservées', () => {
+  const ligne = { slug: 'a', name: 'Ensemble Sport Noir', size: 'XXL', qty: 1, price: 249, precommande: '2026-11-03' };
+  it('pose la réservation sur la commande', () => {
+    expect(infoReservation([ligne, { ...ligne, precommande: '2026-11-02' }])).toEqual({ date: '2026-11-03', envoyee: false });
+    expect(infoReservation([{ ...ligne, precommande: undefined }])).toBeNull();
+    const c = construireCommande({ nom: 'A', telephone: '0612345678', ville: 'Rabat', adresse: 'x' }, [ligne], 249, maintenant, 'VS-T');
+    expect(c.recipient.reservation).toEqual({ date: '2026-11-03', envoyee: false });
+    expect(reservationEnAttente(c)).toBe(true);
+  });
+  it('sort de l’attente une fois envoyée, ou si la commande a bougé', () => {
+    const o = { status: 'nouveau', recipient: { reservation: { date: '2026-11-03', envoyee: true } } };
+    expect(reservationEnAttente(o)).toBe(false);
+    expect(reservationEnAttente({ status: 'confirme', recipient: { reservation: { envoyee: false } } })).toBe(false);
+  });
+  it('reconnaît les anciennes réservations à leur note', () => {
+    const o = { status: 'nouveau', recipient: {}, note: 'Commande du site\n⏳ RÉSERVATION — Ensemble Sport Noir (XXL) : disponible le mardi 03/11' };
+    expect(reservationEnAttente(o)).toBe(true);
+    expect(dateReservation(o, maintenant)).toBe('2026-11-03');
+  });
+  it('message WhatsApp avec l’offre', () => {
+    const o = { price: 249, recipient: { name: 'Sara', reservation: { date: '2026-11-03' } }, products: [{ name: 'Ensemble Sport Noir', size: 'XXL', qty: 1 }] };
+    const m = messageReservation(o, 'جوج ب 448 درهم بلاصة 498 درهم');
+    expect(m).toContain('السلام عليكم Sara');
+    expect(m).toContain('• Ensemble Sport Noir — المقاس XXL');
+    expect(m).toContain('🎁 عرض خاص: جوج ب 448 درهم');
+    expect(m).toContain('نهار الثلاثاء 03/11');
+    expect(m).toContain('نأكدو معاك الطلب');
+  });
+});

@@ -9,7 +9,7 @@
 /* Préfixe réservé aux commandes du site. Il les distingue de VICT (saisies à
    la main) et de WC (ancienne boutique), et les règles de la base n'acceptent
    d'un visiteur que des identifiants de cette forme. */
-import { noteReservation } from './precommande.js';
+import { noteReservation, infoReservation } from './precommande.js';
 
 const PREFIXE = 'VS-';
 
@@ -93,6 +93,8 @@ export function construireCommande(form, lignes, total, now = new Date(), id = n
       email: String(form.email || '').trim() || undefined,
       delivery: null,
       source: meta.source || undefined,
+      // Réservation : tenue hors de « À Confirmer » jusqu'à l'arrivage.
+      reservation: infoReservation(lignes) || undefined,
     },
     // `product` reste la première ligne : toute l'application le lit ainsi.
     product: produits[0] || null,

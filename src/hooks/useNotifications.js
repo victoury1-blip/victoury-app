@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { reservationEnAttente } from '../lib/reservation';
 
 export function requestPermission() {
   if (!('Notification' in window)) return Promise.resolve('denied');
@@ -29,7 +30,7 @@ const NEW_STATUSES = new Set(['nouveau']);
  */
 export default function useNotifications(orders, notifPerm) {
   useEffect(() => {
-    const count = (orders || []).filter(o => NEW_STATUSES.has(o.status)).length;
+    const count = (orders || []).filter(o => NEW_STATUSES.has(o.status) && !reservationEnAttente(o)).length;
 
     // 1) Badging API
     if ('setAppBadge' in navigator) {

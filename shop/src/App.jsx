@@ -49,6 +49,7 @@ const MetaPixel = lazy(() => import('./store/MetaPixel'));
 const EditTheme = lazy(() => import('./store/EditTheme'));
 const CommandesListe = lazy(() => import('./store/CommandesListe'));
 const PaniersAbandonnesListe = lazy(() => import('./store/PaniersAbandonnesListe'));
+const Reservations = lazy(() => import('./store/Reservations'));
 const ClientsFideles = lazy(() => import('./store/ClientsFideles'));
 const MicrosoftClarity = lazy(() => import('./store/MicrosoftClarity'));
 const TikTokPixel = lazy(() => import('./store/TikTokPixel'));
@@ -453,6 +454,7 @@ function Administration() {
             <Route path="remises" element={<RemisesListe />} />
             <Route path="commandes" element={<CommandesListe />} />
             <Route path="paniers-abandonnes" element={<PaniersAbandonnesListe />} />
+            <Route path="reservations" element={<Reservations />} />
             <Route path="clients-fideles" element={<ClientsFideles />} />
             <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
             <Route path="tiktok-pixel" element={<TikTokPixel />} />

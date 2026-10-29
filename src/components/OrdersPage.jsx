@@ -36,6 +36,7 @@ import OzoneModal from './OzoneModal';
 import StatusDropdown from './StatusDropdown';
 import { useStatuses } from '../contexts/StatusContext';
 import { couleurProduit } from '../lib/couleurProduit';
+import { reservationEnAttente } from '../lib/reservation';
 import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
@@ -586,7 +587,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       // Ne détecter les doublons que parmi les commandes à confirmer (nouvelles) :
       // celles déjà dans la Liste des Colis (validées / avec suivi) sont exclues.
       const inColisPipeline = COLIS_PIPELINE_SET.has(o.status) || !!(o.trackingNumber && o.validated);
-      if (inColisPipeline) return;
+      if (inColisPipeline || reservationEnAttente(o)) return;
       const phone = o.recipient?.phone?.replace(/\s/g, '');
       const day = o.dateAdded?.split(' ')[0] || '';
       if (!phone || day !== today) return;
@@ -607,6 +608,8 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
         || !!(o.trackingNumber && o.validated);
       if (inColisPipeline) return false;
       if (!currentStatuses.includes(o.status)) return false;
+      // Réservée sur la boutique, arrivage pas encore là : gérée dans /store/reservations.
+      if (reservationEnAttente(o)) return false;
       /* Search */
       const q = debouncedSearch.toLowerCase();
       // On cherche AUSSI sur le code de suivi : c'est le numéro affiché à l'écran

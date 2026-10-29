@@ -45,3 +45,62 @@ export function noteReservation(lignes) {
     .map(l => `⏳ RÉSERVATION — ${l.name}${l.size ? ` (${l.size})` : ''} : disponible le ${dateDispo(l.precommande)}`)
     .join('\n');
 }
+
+/* ── Commandes réservées ──
+ * Une commande avec au moins un article réservé porte recipient.reservation
+ * = { date, envoyee: false } : l'application la garde hors de « À Confirmer »
+ * jusqu'à ce que l'arrivage soit là et qu'on l'y envoie depuis
+ * /store/reservations (envoyee: true). Les toutes premières réservations,
+ * passées avant ce champ, se reconnaissent à leur note « ⏳ RÉSERVATION ». */
+
+const RE_NOTE = /⏳\s*RÉSERVATION/i;
+
+/** Le jeu d'informations à poser sur la commande, ou null sans réservation. */
+export function infoReservation(lignes) {
+  const dates = (lignes || []).map(l => l.precommande).filter(Boolean).sort();
+  return dates.length ? { date: dates[dates.length - 1], envoyee: false } : null;
+}
+
+/** Commande réservée encore en attente de l'arrivage. */
+export function reservationEnAttente(o) {
+  if (!o || o.is_deleted || o.status !== 'nouveau') return false;
+  const r = o.recipient?.reservation;
+  if (r) return !r.envoyee;
+  return RE_NOTE.test(o.note || '');
+}
+
+/** Date d'arrivage ('YYYY-MM-DD') — du champ, ou relue dans la note des anciennes. */
+export function dateReservation(o, now = new Date()) {
+  if (o?.recipient?.reservation?.date) return o.recipient.reservation.date;
+  const m = /disponible le \S+ (\d{2})\/(\d{2})/i.exec(o?.note || '');
+  if (!m) return null;
+  return `${now.getFullYear()}-${m[2]}-${m[1]}`;
+}
+
+/** Message WhatsApp envoyé à la cliente : commande bien reçue, on la
+    rappelle à l'arrivage pour confirmer. `offre` = texte de l'offre en
+    cours (ex. « جوج ب 499 درهم بلاصة 580 »), facultatif. */
+export function messageReservation(o, offre = '') {
+  const nom = (o?.recipient?.name || '').trim();
+  const produits = (o?.products?.length ? o.products : [o?.product]).filter(p => p?.name);
+  const nbPieces = produits.reduce((n, p) => n + (Number(p.qty) || 1), 0);
+  const date = dateReservation(o);
+  const lignes = [
+    `السلام عليكم${nom ? ' ' + nom : ''} 😊`,
+    'معاك Victoury 🌸 توصلنا بالطلب ديالك:',
+    ...produits.map(p => `• ${p.name}${p.size ? ` — المقاس ${p.size}` : ''}${(Number(p.qty) || 1) > 1 ? ` ×${p.qty}` : ''}`),
+    `💰 الثمن: ${Number(o?.price || 0).toLocaleString('fr-FR')} درهم — التوصيل فابور، والدفع عند الاستلام`,
+  ];
+  if (offre) {
+    lignes.push(nbPieces >= 2
+      ? `🎁 استافدتي من العرض: ${offre}`
+      : `🎁 عرض خاص: ${offre} — إلا بغيتي تزيدي لون آخر قولي لينا`);
+  }
+  lignes.push(
+    date
+      ? `⏳ السلعة غتوجد نهار ${dateDispo(date, true)}، وغنعاودو نتواصلو معاك باش نأكدو معاك الطلب.`
+      : '⏳ ملي توجد السلعة غنعاودو نتواصلو معاك باش نأكدو معاك الطلب.',
+    'شكرا على الثقة ديالك 🙏',
+  );
+  return lignes.join('\n');
+}

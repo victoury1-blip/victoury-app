@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
 import { estColisRetour, estRecu, lireRecuIdsLocal } from '../lib/colisRetours';
+import { reservationEnAttente } from '../lib/reservation';
 import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
 import { ORDER_TABS, tabPath } from '../data/orderTabs';
 
@@ -374,7 +375,7 @@ export default function Sidebar({ orders = [], session }) {
                       const count = child.statuses ? orders.filter(o => {
                         const hidden = COLIS_PIPE.has(o.status)
                           || (o.trackingNumber && o.validated);
-                        if (hidden) return false;
+                        if (hidden || reservationEnAttente(o)) return false;
                         return child.statuses.includes(o.status);
                       }).length : 0;
                       const active = location.pathname === child.path;

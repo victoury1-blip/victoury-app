@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3, Heart, Rocket } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3, Heart, Rocket, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
@@ -9,6 +9,7 @@ import { activerPushCommande, pushDisponible, enregistrerServiceWorker } from '.
 import { chargerReglages } from '../lib/catalog';
 import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
 import { compterCommandesEnAttente } from '../lib/commandesSite';
+import { reservationEnAttente } from '../lib/precommande';
 import { lireCommandesNonVues, ajouterCommandeNonVue, marquerCommandesVues } from '../lib/clocheCommandes';
 import Wordmark from '../components/Wordmark';
 
@@ -20,6 +21,7 @@ const LIENS = [
   { to: '/store/import-woo', label: 'Importer WooCommerce', icon: DownloadCloud },
   { to: '/store/media', label: 'Médiathèque', icon: Image },
   { to: '/store/commandes', label: 'Commandes', icon: ShoppingCart },
+  { to: '/store/reservations', label: 'Réservations', icon: Clock },
   { to: '/store/paniers-abandonnes', label: 'Paniers abandonnés', icon: MessageCircle },
   { to: '/store/clients-fideles', label: 'Clients fidèles', icon: Heart },
   { to: '/store/pages', label: 'Pages', icon: FileText },
@@ -74,6 +76,13 @@ export default function AdminLayout() {
   const [menuOuvert, setMenuOuvert] = useState(false);
   const { pathname } = useLocation();
   useEffect(() => { setMenuOuvert(false); }, [pathname]);
+
+  // Réservations en attente d'arrivage (voir Reservations.jsx).
+  const [nbReservations, setNbReservations] = useState(0);
+  useEffect(() => {
+    supabase.from('orders').select('id, recipient, note, status, is_deleted').like('id', 'VS-%').eq('status', 'nouveau')
+      .then(({ data }) => setNbReservations((data || []).filter(reservationEnAttente).length), () => {});
+  }, [pathname]);
 
   /* Service worker enregistré dès l'ouverture de l'administration (pas
      seulement à l'activation des notifications) : Chrome Android n'installe
@@ -176,6 +185,11 @@ export default function AdminLayout() {
             {to === '/store/paniers-abandonnes' && nbPaniers > 0 && (
               <span className="ml-auto bg-red-500 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center">
                 {nbPaniers}
+              </span>
+            )}
+            {to === '/store/reservations' && nbReservations > 0 && (
+              <span className="ml-auto bg-violet-600 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center">
+                {nbReservations}
               </span>
             )}
             {to === '/store/commandes' && nbCommandes > 0 && (
