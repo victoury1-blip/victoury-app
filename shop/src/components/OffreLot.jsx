@@ -74,7 +74,7 @@ export default function OffreLot({ lignes, remises, onQuantite, onAjouter }) {
   };
 
   return (
-    <div className="mt-4 border-2 border-dashed border-red-300 bg-red-50 rounded-lg p-3" dir={ar ? 'rtl' : 'ltr'}>
+    <div className="mt-4 min-w-0 max-w-full overflow-hidden border-2 border-dashed border-red-300 bg-red-50 rounded-lg p-3" dir={ar ? 'rtl' : 'ltr'}>
       <p className="text-sm font-bold text-red-700">
         {ar
           ? <>🎁 خدي {n === 2 ? 'جوج' : `${n} قطع`} ب {fmtMontant(total, lang)} <span className="font-normal line-through opacity-70">بلاصة {fmtMontant(brut, lang)}</span></>

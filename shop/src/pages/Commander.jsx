@@ -366,7 +366,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
         {tr('coordonnees')}
       </h1>
 
-      <div className="mt-10 grid lg:grid-cols-2 gap-10">
+      <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -399,7 +399,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           </div>
         </div>
 
-        <div className="bg-sand p-5">
+        <div className="bg-sand p-5 min-w-0">
           <div className="space-y-4">
             {lignesRemisees.map(l => (
               <div key={cleLigne(l)} className="flex gap-3">
