@@ -10,4 +10,9 @@ describe('couleur produit', () => {
   it('distingue les deux ensembles', () => {
     expect(couleurProduit('Ensemble Hijab Sport gris')).not.toBe(couleurProduit('Ensemble Sport Noir'));
   });
+  it('teintes fixes des ensembles', () => {
+    expect(couleurProduit('Ensemble Sport Noir')).toBe('#111827');
+    expect(couleurProduit('Ensemble Sporte Marron')).toBe('#111827');
+    expect(couleurProduit('Ensemble Hijab Sport gris')).toBe('#0F766E');
+  });
 });

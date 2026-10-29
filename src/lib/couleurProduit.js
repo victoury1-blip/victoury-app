@@ -28,9 +28,19 @@ export function modeleProduit(nom) {
     .trim();
 }
 
+/* Teintes choisies à la main pour les modèles principaux ; les autres
+   gardent une teinte calculée. "sporte" : orthographe présente dans
+   d'anciennes commandes. */
+const FIXES = {
+  'ensemble sport': '#111827',
+  'ensemble sporte': '#111827',
+  'ensemble hijab sport': '#0F766E',
+};
+
 export function couleurProduit(nom) {
   const m = modeleProduit(nom);
   if (!m) return '#1F2937';
+  if (FIXES[m]) return FIXES[m];
   let h = 0;
   for (let i = 0; i < m.length; i++) h = (h * 31 + m.charCodeAt(i)) >>> 0;
   return PALETTE[h % PALETTE.length];
