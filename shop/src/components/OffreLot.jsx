@@ -113,7 +113,6 @@ export default function OffreLot({ lignes, remises, onQuantite, onAjouter }) {
           ))}
         </div>
       )}
-      </div>
     </div>
   );
 }
