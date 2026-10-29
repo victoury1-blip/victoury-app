@@ -12,6 +12,15 @@ import { useLang } from '../lib/i18n';
  * la même pièce une 2ᵉ fois, ou une autre couleur du même modèle dans la
  * même taille (seulement celles en stock). Disparaît une fois l'offre
  * atteinte : la ligne affiche alors sa réduction comme d'habitude. */
+/** « Ensemble Sport MOVE » à côté de « Ensemble Sport Noir » → « MOVE » :
+    seul ce qui distingue l'article reste sous la vignette. */
+function nomCourt(c, nomActuel) {
+  if (c.color_name) return c.color_name;
+  const communs = new Set(String(nomActuel || '').toLowerCase().split(/\s+/));
+  const reste = String(c.name || '').split(/\s+/).filter(m => !communs.has(m.toLowerCase())).join(' ');
+  return reste || c.name;
+}
+
 export default function OffreLot({ lignes, remises, onQuantite, onAjouter }) {
   const { lang } = useLang();
   const ar = lang === 'ar';
@@ -82,15 +91,28 @@ export default function OffreLot({ lignes, remises, onQuantite, onAjouter }) {
             <Plus size={14} /> {ar ? `زيدي نفس القطعة${taille ? ` (${taille})` : ''}` : `La même${taille ? ` (${taille})` : ''}`}
           </button>
         )}
-        {couleurs.map(c => (
-          <button key={c.id} type="button" onClick={() => ajouterCouleur(c)}
-            className="flex items-center gap-1.5 bg-white border border-red-200 hover:border-red-400 text-xs px-2 py-1.5 rounded-md">
-            {c.images?.[0]?.url
-              ? <img src={miniature(c.images[0].url)} onError={(e) => surErreurMiniature(e, c.images[0].url)} alt="" className="w-7 h-8 object-cover rounded-sm" />
-              : <span className="w-4 h-4 rounded-full border" style={{ background: c.color_hex || '#ddd' }} />}
-            <span><Plus size={11} className="inline -mt-0.5" /> {c.color_name || c.name}{taille ? ` · ${taille}` : ''}</span>
-          </button>
-        ))}
+      </div>
+
+      {/* Les autres articles en vignettes, sur une seule ligne qui défile au
+          doigt : la photo dit tout de suite de quelle couleur il s'agit. */}
+      {couleurs.length > 0 && (
+        <div className="mt-2.5 -mx-1 px-1 flex gap-2 overflow-x-auto pb-1.5 [scrollbar-width:thin]">
+          {couleurs.map(c => (
+            <button key={c.id} type="button" onClick={() => ajouterCouleur(c)} title={c.name}
+              className="shrink-0 w-[72px] text-center group">
+              <span className="relative block w-[72px] h-[88px] rounded-md overflow-hidden border border-red-200 group-hover:border-red-500 bg-white">
+                {c.images?.[0]?.url
+                  ? <img src={miniature(c.images[0].url)} onError={(e) => surErreurMiniature(e, c.images[0].url)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  : <span className="block w-full h-full" style={{ background: c.color_hex || '#eee' }} />}
+                <span className="absolute bottom-1 end-1 w-6 h-6 rounded-full bg-red-600 text-white grid place-items-center shadow">
+                  <Plus size={15} strokeWidth={3} />
+                </span>
+              </span>
+              <span className="block mt-1 text-[10px] leading-tight text-gray-700 truncate">{nomCourt(c, ligne.name)}</span>
+            </button>
+          ))}
+        </div>
+      )}
       </div>
     </div>
   );
