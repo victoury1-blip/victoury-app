@@ -20,6 +20,9 @@ const LIBELLES = {
   INVOICED: 'Facturé',
   NEW_PARCEL: 'Nouveau Colis',
   WAITING_PICKUP: 'Attente De Ramassage',
+  SCTR: 'Hors Secteur',
+  NCVRT: 'Zone Non-couverte',
+  DECLINED: 'Refusé',
 };
 
 const egal = (a, b) => {
