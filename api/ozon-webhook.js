@@ -13,16 +13,20 @@
 
 import { timingSafeEqual } from 'node:crypto';
 
-// Libellés Ozon des codes de statut (liste « Statut Colis en JSON » de leur
-// page Webhooks) ; un code inconnu est lu chez Ozon ou mis en forme.
+// Libellés Ozon des codes de statut — liste complète « Statut Colis en JSON »
+// de leur page Webhooks. Le libellé lu en direct chez Ozon reste prioritaire.
 const LIBELLES = {
-  PAID: 'Payé',
-  INVOICED: 'Facturé',
-  NEW_PARCEL: 'Nouveau Colis',
-  WAITING_PICKUP: 'Attente De Ramassage',
-  SCTR: 'Hors Secteur',
-  NCVRT: 'Zone Non-couverte',
-  DECLINED: 'Refusé',
+  PAID: 'Payé', INVOICED: 'Facturé', NEW_PARCEL: 'Nouveau Colis', WAITING_PICKUP: 'Attente De Ramassage',
+  PICKED_UP: 'Ramassé', SENT: 'Expédié', RECEIVED: 'Reçu', DISTRIBUTION: 'Mise en distribution',
+  IN_PROGRESS: 'En cours', RETURNED: 'Retourné', DELIVERED: 'Livré', POSTPONED: 'Reporté',
+  NOANSWER: 'Pas de réponse + SMS', OUT_OF_AREA: 'Hors-zone', CANCELED: 'Annulé', REFUSE: 'Refusé',
+  EN: 'Erreur Numero', INT: 'client intéressé', PROGRAMED: 'Programmé', NOT_PAID: 'Non Payé',
+  RPO: 'reporté aujourd hui', SANS_ADRE: 'sans adresse', DEPLA: 'pas réponse +déplacement',
+  REMBOURSED: 'Remboursé', SENT_TO_AGENCY: "Envoyé à l'agence", RECEIVED_IN_AGENCY: 'Reçu En Agence De Livraison',
+  NOANSWER_DAY_2: 'Pas de réponse J+2', NOANSWER_DAY_3: 'Pas de réponse J+3',
+  DEPLA_DAY_2: 'pas réponse + déplacement J+2', DEPLA_DAY_3: 'pas réponse + déplacement J+3',
+  BAM_SEIZED: 'Saisi par Barid Al-Maghrib', PRE_PICKED_UP: 'Pré ramassé', DAMAGED: 'Endommagé',
+  VLMN: 'Retard Livraison 48h-72h', SCTR: 'Hors Secteur', NCVRT: 'Zone Non-couverte', DECLINED: 'Refusé',
 };
 
 const egal = (a, b) => {
