@@ -385,7 +385,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           </div>
           {/* Réglable depuis /store/theme : la grille convient à un choix
               court (S…XL), la liste à un choix long comme des pointures. */}
-          <div className={theme?.produitAffichageTailles === 'liste' ? 'flex flex-col gap-2 mt-3 max-w-xs' : 'flex flex-wrap gap-2 mt-3'}>
+          {/* Grille : toutes les tailles sur UNE ligne (colonnes égales), même à 7 tailles sur téléphone. */}
+          <div className={theme?.produitAffichageTailles === 'liste' ? 'flex flex-col gap-2 mt-3 max-w-xs' : 'grid grid-flow-col auto-cols-fr gap-1.5 mt-3 max-w-md'}>
             {tailles.length === 0 && <p className="text-sm text-gray-400">{t('epuise')}</p>}
             {tailles.map(s => {
               // Épuisée mais réservable : même bouton qu'une taille en stock,
@@ -397,14 +398,14 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                 <button key={s.size} type="button" disabled={epuisee}
                   onClick={() => setTaille(s.size)}
                   title={epuisee ? t('epuise') : undefined}
-                  className={`${liste ? 'w-full flex items-center justify-between' : 'min-w-[3rem]'} px-3 py-2.5 text-sm border transition-colors relative
+                  className={`${liste ? 'w-full flex items-center justify-between px-3 py-2.5 text-sm' : 'min-w-0 px-0.5 py-2 text-xs sm:text-sm'} border transition-colors relative
                     ${epuisee
                       ? 'border-gray-200 text-ink cursor-not-allowed'
                       : taille === s.size ? 'border-ink bg-ink text-white' : 'border-gray-200 hover:border-gray-400'}`}>
                   {s.size}
                   {reservable && (
                     <span className={`${liste ? '' : 'block'} text-[10px] leading-tight ${taille === s.size ? 'text-amber-300' : 'text-amber-600'}`}>
-                      {ar ? 'حجز' : 'Réserver'}
+                      {ar ? 'حجز' : 'Résa'}
                     </span>
                   )}
                   {liste && epuisee && <span className="text-xs text-red-500">{t('epuise')}</span>}
