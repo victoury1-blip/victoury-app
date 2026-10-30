@@ -6,6 +6,8 @@ import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
 import BoutonFavori from './BoutonFavori';
 import { ResumeAvis } from './AvisProduit';
+import { usePrecommandes } from '../lib/precommandesContexte';
+import { precommandeActive } from '../lib/precommande';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
@@ -21,6 +23,9 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
   // Épuisé = des tailles sont réglées mais AUCUNE n'a de stock — un produit
   // qui n'a jamais eu de tailles réglées n'est pas considéré comme épuisé.
   const epuise = (produit.sizes || []).length > 0 && tailles.length === 0;
+  // En réservation : pas de tampon « épuisé », toutes les tailles se réservent.
+  const reservable = epuise && !!precommandeActive(usePrecommandes(), produit.id);
+  const taillesAffichees = reservable ? (produit.sizes || []) : tailles;
 
   return (
     <Link to={`/product/${produit.slug}/`} className="group block">
@@ -63,7 +68,13 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
         {/* Tampon façon "SOLD OUT" — un peu plus voyant qu'un simple badge
             gris, sans avoir à ouvrir la fiche pour découvrir que rien n'est
             en stock. Assombrit légèrement la photo pour se détacher dessus. */}
-        {epuise && (
+        {reservable && (
+          <span className={`absolute bottom-0 inset-x-0 text-center bg-amber-500/95 text-white font-bold pointer-events-none
+                            ${compact ? 'text-[8px] py-0.5' : 'text-xs py-1.5'}`}>
+            {lang === 'ar' ? '📅 يمكن حجز قياسك' : '📅 Réservez votre taille'}
+          </span>
+        )}
+        {epuise && !reservable && (
           <div className="absolute inset-0 bg-black/10 grid place-items-center pointer-events-none">
             <span className={`border-2 border-red-600 text-red-600 font-extrabold uppercase tracking-wider bg-white/80
                               -rotate-[18deg] whitespace-nowrap ${compact ? 'text-[7px] px-1.5 py-0.5' : 'text-xs px-3 py-1'}`}>
@@ -78,9 +89,9 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
           (carrousel étroit de la section vedette) : une carte deux fois plus
           petite qu'une carte de grille normale n'a pas la place pour tout
           montrer sans devenir illisible. */}
-      {!compact && tailles.length > 0 && (
+      {!compact && taillesAffichees.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {tailles.map(s => (
+          {taillesAffichees.map(s => (
             <span key={s.size} className="text-[10px] text-gray-500 border border-gray-200 px-1.5 py-0.5">{s.size}</span>
           ))}
         </div>

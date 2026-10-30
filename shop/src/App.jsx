@@ -68,6 +68,9 @@ import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } fr
 import { nbArticles } from './lib/pricing';
 import { chargerPixel, trackPixel, chargerClarity, chargerTikTokPixel, trackTikTok, chargerGA4, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from './lib/pixel';
 import { LangProvider } from './lib/i18n';
+import { PrecommandesContexte } from './lib/precommandesContexte';
+
+const AUCUNE_PRECOMMANDE = {};
 import { capturerCodeUrl, lireCodeAuto, oublierCodeAuto } from './lib/promoAuto';
 
 /* React Router ne remet PAS le défilement en haut tout seul en changeant de
@@ -361,6 +364,7 @@ function Vitrine() {
 
   return (
     <LangProvider>
+    <PrecommandesContexte.Provider value={reglages.precommandes || AUCUNE_PRECOMMANDE}>
     <div className="min-h-screen flex flex-col">
       <ScrollToTop />
       {chromeVisible && <AnnonceBar theme={reglages.theme} />}
@@ -435,6 +439,7 @@ function Vitrine() {
       <ExitIntentModal ouvert={exitIntentOuvert} onFermer={() => setExitIntentOuvert(false)}
         numero={reglages.theme?.footer?.contacts?.whatsapp} />
     </div>
+    </PrecommandesContexte.Provider>
     </LangProvider>
   );
 }
