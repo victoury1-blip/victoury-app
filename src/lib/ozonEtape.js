@@ -49,6 +49,23 @@ export function derniereEtape(histList) {
   };
 }
 
+/** Livreur qui a le colis, lu dans l'historique Ozon : les étapes « Mise en
+    distribution » portent « Livreur : Tawfiq Zahir | Téléphone : 0640504036 ».
+    La plus récente fait foi (le colis peut changer de livreur). */
+export function livreurDepuisHistorique(histList) {
+  const list = (Array.isArray(histList) ? histList : Object.values(histList || {})).filter(Boolean);
+  const indexees = list.map((h, i) => ({ h, i }))
+    .sort((a, b) => dateDe(b.h).localeCompare(dateDe(a.h)) || b.i - a.i);
+  for (const { h } of indexees) {
+    const texte = nettoyerCommentaire([h.LIVREUR, h.COMMENT].filter(Boolean).join(' | '));
+    const tel = /(?:\+?212|0)[5-7]\d{8}/.exec(texte.replace(/[\s.-]/g, ''))?.[0];
+    if (!tel) continue;
+    const nom = /Livreur\s*:\s*([^|:]+?)\s*(?:\||T[ée]l[ée]phone|$)/i.exec(texte)?.[1]?.trim() || '';
+    return { nom, tel: tel.replace(/^\+?212/, '0') };
+  }
+  return null;
+}
+
 export function lireEtapesCache() {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; } catch { return {}; }
 }
@@ -90,11 +107,12 @@ export async function chargerEtapeOzon(order) {
       const json = await res.json();
       const track = json?.TRACKING || json || {};
       if (String(track.RESULT || '').toUpperCase() === 'ERROR') continue;
-      const etape = derniereEtape(track.HISTORY || track['PARCEL-HISTORY'] || track.history);
+      const historique = track.HISTORY || track['PARCEL-HISTORY'] || track.history;
+      const etape = derniereEtape(historique);
       const last = track.LAST_TRACKING || track['LAST-TRACKING'] || {};
       const statut = etape?.statut || last.STATUT || last.STATUS || '';
       if (!statut && !etape) continue;
-      return { statut, commentaire: etape?.commentaire || '', date: etape?.date || '' };
+      return { statut, commentaire: etape?.commentaire || '', date: etape?.date || '', livreur: livreurDepuisHistorique(historique) };
     } catch {
       clearTimeout(t);
     }

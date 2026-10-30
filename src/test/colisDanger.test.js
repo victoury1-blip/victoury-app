@@ -51,3 +51,15 @@ describe('colis programmés / reportés', () => {
     expect(m).not.toMatch(/عافاك|عفاك/);
   });
 });
+
+import { messageLivreur } from '../lib/colisDanger';
+describe('message au livreur', () => {
+  it('donne la cliente, le téléphone et le colis', () => {
+    const m = messageLivreur({ ...base, trackingNumber: 'VI00498', ozoneLastStatus: 'Pas de réponse J+3', recipient: { ...base.recipient, city: 'Tanger', address: 'Boulvared fes' } }, { nom: 'Tawfiq', tel: '0640504036' });
+    expect(m).toContain('السلام عليكم Tawfiq');
+    expect(m).toContain('معاك فريق Victoury');
+    expect(m).toContain('👤 Sara');
+    expect(m).toContain('📞 0612345678');
+    expect(m).toContain('📦 VI00498 — Ensemble Sport Noir');
+  });
+});

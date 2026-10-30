@@ -90,6 +90,24 @@ export function messageDanger(o, type, date = extraireDate(o?.ozoneLastStatus)) 
   return `${debut}\n${corps}`;
 }
 
+/** Message WhatsApp au livreur qui a le colis : qui, où, quoi, et la demande. */
+export function messageLivreur(o, livreur) {
+  const r = o?.recipient || {};
+  const produit = nomProduit(o);
+  return [
+    `السلام عليكم${livreur?.nom ? ' ' + livreur.nom : ''} 👋`,
+    'معاك فريق Victoury، كنتواصل معاك على هاد الكوموند:',
+    `👤 ${r.name || 'الكليانة'}`,
+    r.phone ? `📞 ${r.phone}` : '',
+    r.city || r.address ? `📍 ${[r.city, r.address].filter(Boolean).join(' — ')}` : '',
+    `📦 ${o?.trackingNumber || o?.id}${produit ? ` — ${produit}` : ''}`,
+    o?.ozoneLastStatus ? `📌 الحالة: ${o.ozoneLastStatus}` : '',
+    '',
+    'الكليانة كتسنى الكولي ديالها. واش تقدر تعاود تعيط ليها وتدوز عندها اليوم؟ وإلا كان شي مشكل قولو لينا ونحلوه معاها 🙏',
+    'شكرا بزاف 🌸',
+  ].filter((l, i, a) => l !== '' || (i > 0 && a[i - 1] !== '')).join('\n');
+}
+
 export const LIBELLE_TYPE = {
   injoignable: 'Injoignable', refus: 'Refus', numero: 'Numéro faux',
   adresse: 'Adresse manquante', zone: 'Hors zone', reporte: 'Reporté', programme: 'Programmé',

@@ -6,7 +6,7 @@ import DeliveryStatusModal from './colis/DeliveryStatusModal';
 import { couleurProduit } from '../lib/couleurProduit';
 import { COLIS_PIPELINE } from '../data/colisPipeline';
 import { now } from '../lib/dateUtils';
-import { risqueColis, dejaTraite, messageDanger, LIBELLE_TYPE, extraireDate, jourMois } from '../lib/colisDanger';
+import { risqueColis, dejaTraite, messageDanger, messageLivreur, LIBELLE_TYPE, extraireDate, jourMois } from '../lib/colisDanger';
 import { chargerEtapeOzon, lireEtapesCache, ecrireEtapeCache } from '../lib/ozonEtape';
 
 /* Colis en danger : colis Ozon encore en route dont le dernier statut Ozon
@@ -61,13 +61,13 @@ export default function ColisDangerPage({ orders, setOrders }) {
      (lue à la demande, mise en cache 30 min comme dans Retours & Annulés). */
   const [etapes, setEtapes] = useState(lireEtapesCache);
   useEffect(() => {
-    const aLire = enDanger.filter(({ o, r }) =>
-      (r.type === 'reporte' || r.type === 'programme') && !extraireDate(o.ozoneLastStatus)
-      && !(etapes[o.id] && Date.now() - (etapes[o.id].at || 0) < 30 * 60 * 1000));
+    // Tous les colis : la dernière étape donne aussi le livreur (nom + téléphone).
+    const aLire = enDanger.filter(({ o }) =>
+      !(etapes[o.id] && 'livreur' in etapes[o.id] && Date.now() - (etapes[o.id].at || 0) < 30 * 60 * 1000));
     if (!aLire.length) return;
     let actif = true;
     (async () => {
-      for (const { o } of aLire.slice(0, 15)) {
+      for (const { o } of aLire.slice(0, 30)) {
         const e = await chargerEtapeOzon(o).catch(() => null);
         if (!actif) return;
         if (e) setEtapes(prev => ({ ...prev, [o.id]: ecrireEtapeCache(o.id, e) }));
@@ -131,6 +131,27 @@ export default function ColisDangerPage({ orders, setOrders }) {
                   )}
                   <span className="text-xs text-gray-400">{LIBELLE_TYPE[r.type]}</span>
                 </div>
+
+                {/* Livreur Ozon qui a le colis (lu dans l'historique Ozon). */}
+                {etapes[o.id]?.livreur && (() => {
+                  const lv = etapes[o.id].livreur;
+                  const waLv = numeroWa(lv.tel);
+                  return (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+                      <span className="text-sm text-gray-700">🛵 <b>{lv.nom || 'Livreur'}</b> · <span className="font-mono">{lv.tel}</span></span>
+                      <span className="ms-auto flex gap-1.5">
+                        <a href={`https://wa.me/${waLv}?text=${encodeURIComponent(messageLivreur(o, lv))}`} target="_blank" rel="noreferrer"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-green-600 text-green-700 hover:bg-green-50 text-xs font-semibold">
+                          <MessageCircle size={13} /> Livreur
+                        </a>
+                        <a href={`tel:${lv.tel}`} title="Appeler le livreur"
+                          className="flex items-center px-2.5 py-1.5 rounded-lg border border-blue-600 text-blue-700 hover:bg-blue-50 text-xs font-semibold">
+                          <Phone size={13} />
+                        </a>
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {wa && (

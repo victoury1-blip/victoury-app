@@ -33,3 +33,16 @@ describe('commentaire Ozon : date de report conservée', () => {
       .toBe('Livreur: X | Livreur: X Téléphone: 0640504036');
   });
 });
+
+import { livreurDepuisHistorique } from '../lib/ozonEtape';
+describe('livreur depuis l’historique Ozon', () => {
+  it('prend le livreur de l’étape la plus récente', () => {
+    const lv = livreurDepuisHistorique([
+      { STATUT: 'Mise en distribution', TIME_STR: '2026-10-24 15:34', COMMENT: '| Livreur: Mohammed chad | Commentaire: &amp;lt;b&amp;gt;Livreur: &amp;lt;/b&amp;gt;Mohammed chad &amp;lt;br /&amp;gt;&amp;lt;b&amp;gt;Téléphone: &amp;lt;/b&amp;gt;0645145342' },
+      { STATUT: 'Mise en distribution', TIME_STR: '2026-10-29 13:47', COMMENT: '| Livreur: Tawfiq Zahir | Commentaire: &lt;b&gt;Livreur: &lt;/b&gt;Tawfiq Zahir &lt;br /&gt;&lt;b&gt;Téléphone: &lt;/b&gt;0640504036' },
+      { STATUT: 'Reporté', TIME_STR: '2026-10-29 19:11', COMMENT: 'Reporté pour: 2026-10-30 | Livreur: Tawfiq Zahir | Commentaire: Pas de commentaire fourni' },
+    ]);
+    expect(lv).toEqual({ nom: 'Tawfiq Zahir', tel: '0640504036' });
+    expect(livreurDepuisHistorique([{ STATUT: 'Nouveau Colis' }])).toBeNull();
+  });
+});
