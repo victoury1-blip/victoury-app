@@ -671,7 +671,9 @@ export default function App() {
           while (file.length) {
             const o = file.shift();
             const status = await statutOzonColis(o, base);
-            if (!status || status === o.ozoneLastStatus) continue;
+            // « Programmé » lu ici et « Programmé 2026-10-31 » posé par le
+            // webhook Ozon désignent la même étape : ne pas effacer la date.
+            if (!status || status === o.ozoneLastStatus || String(o.ozoneLastStatus || '').startsWith(status + ' ')) continue;
             setOrders(prev => prev.map(x => x.id === o.id ? { ...x, ozoneLastStatus: status } : x));
             supabase.from('orders').update({ ozone_last_status: status }).eq('id', o.id)
               .then(({ error }) => { if (error) console.warn('[ozon] statut non enregistré:', o.id, error.message); });

@@ -13,7 +13,7 @@
 
 import { timingSafeEqual } from 'node:crypto';
 import { envoyerPush } from './_push.js';
-import { risqueColis, LIBELLE_TYPE } from '../src/lib/colisDanger.js';
+import { risqueColis, LIBELLE_TYPE, extraireDate, libelleAvecDate } from '../src/lib/colisDanger.js';
 
 // Libellés Ozon des codes de statut — liste complète « Statut Colis en JSON »
 // de leur page Webhooks. Le libellé lu en direct chez Ozon reste prioritaire.
@@ -65,6 +65,8 @@ async function lireChezOzon(cfg, code) {
   return {
     statut: last.STATUT || last.STATUS || infos['PARCEL-STATUS'] || infos.STATUS || track.STATUT || '',
     telephone: infos.PHONE || infos['RECIPIENT-PHONE'] || '',
+    // Date de passage prévue (Reporté / Programmé) : dans le commentaire de l'étape.
+    commentaire: [last.COMMENT, last.REPORT_DATE, last.DATE_REPORT, infos['REPORTED-DATE'], infos['POSTPONED-DATE']].filter(Boolean).join(' '),
   };
 }
 
@@ -103,7 +105,10 @@ export default async function handler(req, res) {
   if (ozon?.telephone && chiffres9(ozon.telephone) !== chiffres9(o.recipient?.phone)) {
     return res.status(200).json({ ok: false, raison: 'autre client' });
   }
-  const statut = ozon?.statut || LIBELLES[codeStatut] || enForme(codeStatut);
+  // « Programmé 2026-10-31 », « Reporté 2026-10-30 » : la date prévue, prise
+  // dans la note du webhook ou le commentaire Ozon, suit le libellé.
+  const date = extraireDate(`${b.note || ''} ${b.situation || ''}`) || extraireDate(ozon?.commentaire);
+  const statut = libelleAvecDate(ozon?.statut || LIBELLES[codeStatut] || enForme(codeStatut), date);
   if (!statut || statut === o.ozone_last_status) return res.status(200).json({ ok: true, inchange: true });
 
   const maj = await fetch(`${url}/rest/v1/orders?id=eq.${encodeURIComponent(o.id)}`, {
@@ -115,7 +120,8 @@ export default async function handler(req, res) {
   // immédiate sur les téléphones abonnés, pour rappeler la cliente le jour même.
   let notifie = false;
   const risque = maj.ok && risqueColis({ ...o, ozoneLastStatus: statut });
-  if (risque) {
+  // Reporté / Programmé restent dans la page, sans notification : rien d'urgent.
+  if (risque && risque.niveau >= 2) {
     const prods = (o.products?.length ? o.products : [o.product]).filter(p => p?.name);
     const r2 = await envoyerPush({
       title: `⚠️ Colis en danger — ${LIBELLE_TYPE[risque.type] || statut}`,

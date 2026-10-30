@@ -6,7 +6,8 @@ import DeliveryStatusModal from './colis/DeliveryStatusModal';
 import { couleurProduit } from '../lib/couleurProduit';
 import { COLIS_PIPELINE } from '../data/colisPipeline';
 import { now } from '../lib/dateUtils';
-import { risqueColis, dejaTraite, messageDanger, LIBELLE_TYPE } from '../lib/colisDanger';
+import { risqueColis, dejaTraite, messageDanger, LIBELLE_TYPE, extraireDate, jourMois } from '../lib/colisDanger';
+import { chargerEtapeOzon, lireEtapesCache, ecrireEtapeCache } from '../lib/ozonEtape';
 
 /* Colis en danger : colis Ozon encore en route dont le dernier statut Ozon
  * (reçu en temps réel par le webhook, voir api/ozon-webhook.js) annonce un
@@ -55,6 +56,28 @@ export default function ColisDangerPage({ orders, setOrders }) {
     .sort((a, b) => b.r.niveau - a.r.niveau || String(b.o.dateUpdated || '').localeCompare(String(a.o.dateUpdated || ''))),
   [orders]);
 
+  /* Date prévue d'un colis Reporté / Programmé : dans le libellé quand le
+     webhook l'y a mise, sinon dans le commentaire de la dernière étape Ozon
+     (lue à la demande, mise en cache 30 min comme dans Retours & Annulés). */
+  const [etapes, setEtapes] = useState(lireEtapesCache);
+  useEffect(() => {
+    const aLire = enDanger.filter(({ o, r }) =>
+      (r.type === 'reporte' || r.type === 'programme') && !extraireDate(o.ozoneLastStatus)
+      && !(etapes[o.id] && Date.now() - (etapes[o.id].at || 0) < 30 * 60 * 1000));
+    if (!aLire.length) return;
+    let actif = true;
+    (async () => {
+      for (const { o } of aLire.slice(0, 15)) {
+        const e = await chargerEtapeOzon(o).catch(() => null);
+        if (!actif) return;
+        if (e) setEtapes(prev => ({ ...prev, [o.id]: ecrireEtapeCache(o.id, e) }));
+      }
+    })();
+    return () => { actif = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enDanger]);
+  const datePrevue = (o) => extraireDate(o.ozoneLastStatus) || extraireDate(etapes[o.id]?.commentaire);
+
   const aTraiter = enDanger.filter(x => !dejaTraite(x.o, traites));
   const liste = voirTraites ? enDanger : aTraiter;
 
@@ -101,14 +124,17 @@ export default function ColisDangerPage({ orders, setOrders }) {
                     {p.size && <span className="text-gray-500"> - {p.size}</span>}
                   </p>
                 ))}
-                <div className="mt-2 flex items-center gap-2 text-sm">
-                  <span className="font-bold text-red-700 bg-red-50 rounded-md px-2 py-1">{o.ozoneLastStatus}</span>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  <span className={`font-bold rounded-md px-2 py-1 ${r.niveau === 1 ? 'text-blue-700 bg-blue-50' : 'text-red-700 bg-red-50'}`}>{o.ozoneLastStatus}</span>
+                  {datePrevue(o) && !extraireDate(o.ozoneLastStatus) && (
+                    <span className="font-bold text-blue-700 bg-blue-50 rounded-md px-2 py-1">📅 {jourMois(datePrevue(o))}</span>
+                  )}
                   <span className="text-xs text-gray-400">{LIBELLE_TYPE[r.type]}</span>
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {wa && (
-                    <a href={`https://wa.me/${wa}?text=${encodeURIComponent(messageDanger(o, r.type))}`} target="_blank" rel="noreferrer"
+                    <a href={`https://wa.me/${wa}?text=${encodeURIComponent(messageDanger(o, r.type, datePrevue(o)))}`} target="_blank" rel="noreferrer"
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold">
                       <MessageCircle size={15} /> WhatsApp
                     </a>

@@ -34,3 +34,20 @@ describe('colis en danger', () => {
     expect(m).toContain('يدوز اليوم');
   });
 });
+
+import { extraireDate, libelleAvecDate } from '../lib/colisDanger';
+describe('colis programmés / reportés', () => {
+  it('lit la date et l’ajoute au libellé', () => {
+    expect(extraireDate('Programmé pour le 2026-10-31')).toBe('2026-10-31');
+    expect(extraireDate('reporté au 30/10/2026')).toBe('2026-10-30');
+    expect(libelleAvecDate('Programmé', '2026-10-31')).toBe('Programmé 2026-10-31');
+    expect(libelleAvecDate('Programmé 2026-10-31', '2026-11-02')).toBe('Programmé 2026-10-31');
+    expect(libelleAvecDate('Livré', '2026-10-31')).toBe('Livré');
+  });
+  it('Programmé apparaît, avec la date dans le message', () => {
+    expect(risqueStatut('Programmé 2026-10-31')).toMatchObject({ type: 'programme', niveau: 1 });
+    const m = messageDanger({ ...base, ozoneLastStatus: 'Programmé 2026-10-31' }, 'programme');
+    expect(m).toContain('نهار 31/10');
+    expect(m).not.toMatch(/عافاك|عفاك/);
+  });
+});
