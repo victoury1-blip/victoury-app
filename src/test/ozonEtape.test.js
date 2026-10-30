@@ -22,3 +22,14 @@ describe('dernière étape Ozon', () => {
     expect(derniereEtape([])).toBeNull();
   });
 });
+
+describe('commentaire Ozon : date de report conservée', () => {
+  it('garde « Reporté pour » malgré « Pas de commentaire fourni »', () => {
+    expect(nettoyerCommentaire('Reporté pour: 2026-10-30 | Livreur: Tawfiq Zahir | Commentaire: Pas de commentaire fourni'))
+      .toBe('Reporté pour: 2026-10-30 | Livreur: Tawfiq Zahir');
+  });
+  it('décode le HTML échappé deux fois', () => {
+    expect(nettoyerCommentaire('| Livreur: X | Commentaire: &amp;lt;b&amp;gt;Livreur: &amp;lt;/b&amp;gt;X &amp;lt;br /&amp;gt;&amp;lt;b&amp;gt;Téléphone: &amp;lt;/b&amp;gt;0640504036'))
+      .toBe('Livreur: X | Livreur: X Téléphone: 0640504036');
+  });
+});

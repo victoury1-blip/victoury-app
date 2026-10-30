@@ -8,16 +8,25 @@
 /* Chargé à la demande : le module reste testable sans client Supabase. */
 const cloud = () => import('./cloudSettings');
 
-const CACHE_KEY = 'ozon_etapes';
+// v2 : les anciennes entrées avaient perdu « Reporté pour : <date> » (voir plus bas).
+const CACHE_KEY = 'ozon_etapes_v2';
 
 /** Commentaire Ozon lisible : sans HTML, sans « | Commentaire : ». */
 export function nettoyerCommentaire(raw) {
-  return String(raw || '')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+  let t = String(raw || '');
+  // Ozon échappe parfois deux fois (« &amp;lt;b&amp;gt; ») : on décode &amp; d'abord.
+  for (let i = 0; i < 3 && /&amp;/.test(t); i++) t = t.replace(/&amp;/g, '&');
+  return t
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
     .replace(/<[^>]*>/g, ' ')
-    .replace(/^\s*\|\s*/, '')
+    // « Pas de commentaire fourni » ne dit rien, mais il ne doit pas effacer le
+    // reste de la ligne (« Reporté pour : 2026-10-30 | Livreur : … »).
+    .replace(/Commentaire\s*:\s*Pas de commentaire fourni\.?/gi, '')
+    .replace(/Pas de commentaire fourni\.?/gi, '')
     .replace(/Commentaire\s*:\s*/gi, '')
     .replace(/\s+/g, ' ')
+    .replace(/(\s*\|\s*)+/g, ' | ')
+    .replace(/^\s*\|\s*|\s*\|\s*$/g, '')
     .trim();
 }
 
@@ -35,7 +44,7 @@ export function derniereEtape(histList) {
   const commentaire = nettoyerCommentaire(h.COMMENT);
   return {
     statut: statutDe(h),
-    commentaire: /pas de commentaire/i.test(commentaire) ? '' : commentaire,
+    commentaire,
     date: dateDe(h),
   };
 }

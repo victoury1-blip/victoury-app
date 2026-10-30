@@ -18,6 +18,7 @@ export const DELIVERY_STATUSES = [
 ];
 
 import { ozonDpPayload } from '../../lib/ozonDp';
+import { nettoyerCommentaire } from '../../lib/ozonEtape';
 
 export default function DeliveryStatusModal({ order, onClose, onSave }) {
   // Le code AFFICHÉ (trackingNumber) prime : s'il a été corrigé à la main, c'est
@@ -250,7 +251,7 @@ export default function DeliveryStatusModal({ order, onClose, onSave }) {
                               style={{ backgroundColor: i === 0 ? '#f59e0b' : '#d1d5db' }} />
                             <p className="text-[11px] font-semibold text-gray-700 pl-1">{h['STATUT'] || h['STATUS'] || h['status'] || ''}</p>
                             {(h['TIME_STR'] || h['DATE'] || h['date']) && <p className="text-[10px] text-gray-400 pl-1">{h['TIME_STR'] || h['DATE'] || h['date']}</p>}
-                            {h['COMMENT'] && <p className="text-[10px] text-gray-400 pl-1">{h['COMMENT']}</p>}
+                            {nettoyerCommentaire(h['COMMENT']) && <p className="text-[10px] text-gray-400 pl-1">{nettoyerCommentaire(h['COMMENT'])}</p>}
                           </div>
                         ))}
                       </div>
