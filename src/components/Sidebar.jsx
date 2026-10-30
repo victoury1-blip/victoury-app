@@ -23,6 +23,15 @@ import { ORDER_TABS, tabPath } from '../data/orderTabs';
  * imports) suivent. Le menu se lit du plus courant au plus rare, sans faire
  * défiler pour atteindre ce qu'on ouvre vingt fois par jour.
  */
+/* Couleur du compteur de chaque onglet de commandes : on reconnaît l'onglet
+   d'un coup d'œil (rouge par défaut pour les autres). */
+const COULEUR_BADGE_ONGLET = {
+  a_confirmer: 'bg-blue-600',
+  en_suivi: 'bg-amber-500',
+  reporter: 'bg-violet-600',
+  confirme: 'bg-green-600',
+};
+
 const NAV_ITEMS = [
   { path: '/dashboard',   label: 'Tableau de bord', icon: LayoutDashboard },
   {
@@ -32,7 +41,7 @@ const NAV_ITEMS = [
     children: [
       /* Déduits des onglets : la liste recopiée ici divergeait de la page, et le
          compteur du menu ne montrait alors pas les mêmes commandes. */
-      ...ORDER_TABS.map(t => ({ path: tabPath(t.id), label: t.label, statuses: t.noBadge ? null : t.statuses })),
+      ...ORDER_TABS.map(t => ({ path: tabPath(t.id), label: t.label, statuses: t.noBadge ? null : t.statuses, couleurBadge: COULEUR_BADGE_ONGLET[t.id] })),
     ],
   },
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
@@ -398,7 +407,7 @@ export default function Sidebar({ orders = [], session }) {
                         >
                           <span>{child.label}</span>
                           {count > 0 && (
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${active ? 'bg-white text-blue-600' : 'bg-red-500 text-white'}`}>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${active ? 'bg-white text-blue-600' : `${child.couleurBadge || 'bg-red-500'} text-white`}`}>
                               {count}
                             </span>
                           )}
