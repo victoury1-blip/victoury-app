@@ -5,6 +5,7 @@ import { TrendingUp, RefreshCw, ShoppingBag, Percent, Truck, DollarSign, Downloa
 import useProducts from '../hooks/useProducts';
 import { loadFactures } from '../data/factures';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import { groupeProduit, libelleGroupe } from '../lib/groupeProduit';
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -167,13 +168,14 @@ export default function ProfitPage({ orders = [], setOrders }) {
   // les cas où le coût d'achat est le même pour tout le lot du moment, sans
   // avoir à cliquer "OK" ligne par ligne. Ne touche jamais une ligne qui a
   // déjà un prix (manuel ou trouvé via le Stock), et ignore les échanges.
-  function remplirPrixManquants(prixParDefaut) {
+  function remplirPrixManquants(prixParDefaut, groupe = '') {
     const v = parseFloat(prixParDefaut);
     if (!v || v <= 0) return;
     const next = { ...manualCost };
     for (const c of livresColis) {
       for (const it of getProductCostDetail(c)) {
         if (it.echange || it.unitCost > 0) continue;
+        if (groupe && groupeProduit(it.name) !== groupe) continue;
         next[cleCout(c.orderId, it.index)] = v;
       }
     }
@@ -183,6 +185,12 @@ export default function ProfitPage({ orders = [], setOrders }) {
   }
 
   const [remplissageVal, setRemplissageVal] = useState('');
+  // Détail du coût : par défaut seules les lignes SANS prix (le travail qui
+  // reste), filtrables par groupe de produits (Ensemble Sport à 100 DH,
+  // Ensemble Hijab Sport à 125 DH…) : on remplit un groupe, ses lignes
+  // disparaissent, on passe au suivant. Les échanges ne bougent pas (0 DH).
+  const [groupeCout, setGroupeCout] = useState('');
+  const [voirChiffrees, setVoirChiffrees] = useState(false);
 
   const [adTransfers, setAdTransfers] = useState(() => {
     try { return JSON.parse(localStorage.getItem('ad_transfers') || '[]'); } catch { return []; }
@@ -413,6 +421,15 @@ export default function ProfitPage({ orders = [], setOrders }) {
       items.push({ index: idx, name: p.name, matched: isManual ? 'Prix manuel' : (sp?.name || null), manual: isManual, unitCost, qty, cost: unitCost * qty });
     }
     return items;
+  }
+
+  /** Lignes du détail à afficher pour un colis, selon les filtres ci-dessus. */
+  function lignesCoutAffichees(c) {
+    return getProductCostDetail(c).filter(it => {
+      if (!voirChiffrees && (it.echange || it.unitCost > 0)) return false;
+      if (groupeCout && groupeProduit(it.name) !== groupeCout) return false;
+      return true;
+    });
   }
 
   // Calculations
@@ -934,18 +951,49 @@ export default function ProfitPage({ orders = [], setOrders }) {
               </div>
               <button onClick={() => setShowCost(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">✕</button>
             </div>
-            <div className="px-5 pt-3 flex items-center gap-2">
-              <span className="text-xs text-gray-500">Remplir les lignes sans prix (0) à :</span>
-              <input type="number" min="0" step="0.01" placeholder="100" value={remplissageVal}
-                onChange={(e) => setRemplissageVal(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { remplirPrixManquants(remplissageVal); setRemplissageVal(''); } }}
-                className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300" />
-              <button type="button"
-                onClick={() => { remplirPrixManquants(remplissageVal); setRemplissageVal(''); }}
-                className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
-                Remplir tout
-              </button>
-            </div>
+            {(() => {
+              // Lignes encore sans prix, par groupe — le compteur de chaque bouton.
+              const parGroupe = new Map();
+              for (const c of livresColis) for (const it of getProductCostDetail(c)) {
+                if (it.echange || it.unitCost > 0) continue;
+                const g = groupeProduit(it.name);
+                parGroupe.set(g, (parGroupe.get(g) || 0) + 1);
+              }
+              const total = [...parGroupe.values()].reduce((a, b) => a + b, 0);
+              const groupes = [...parGroupe.entries()].sort((a, b) => b[1] - a[1]);
+              const puce = (actif) => `px-2.5 py-1 rounded-full text-xs font-semibold border ${actif ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'}`;
+              return (
+                <div className="px-5 pt-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-gray-500 me-1">Groupe :</span>
+                    <button type="button" onClick={() => setGroupeCout('')} className={puce(!groupeCout)}>Tous ({total})</button>
+                    {groupes.map(([g, n]) => (
+                      <button key={g} type="button" onClick={() => setGroupeCout(g)} className={puce(groupeCout === g)}>
+                        {libelleGroupe(g)} ({n})
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-gray-500">
+                      Prix d'achat des lignes sans prix {groupeCout ? <>du groupe <b>{libelleGroupe(groupeCout)}</b></> : '(tous les groupes)'} :
+                    </span>
+                    <input type="number" min="0" step="0.01" placeholder="100" value={remplissageVal}
+                      onChange={(e) => setRemplissageVal(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { remplirPrixManquants(remplissageVal, groupeCout); setRemplissageVal(''); } }}
+                      className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    <button type="button"
+                      onClick={() => { remplirPrixManquants(remplissageVal, groupeCout); setRemplissageVal(''); }}
+                      className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+                      Valider
+                    </button>
+                    <label className="ms-auto flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                      <input type="checkbox" checked={voirChiffrees} onChange={(e) => setVoirChiffrees(e.target.checked)} />
+                      Afficher aussi les lignes déjà chiffrées
+                    </label>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="overflow-auto p-3">
               <p className="text-xs text-gray-500 px-2 pb-2">
                 Le coût d'achat vient du <b>Prix d'achat</b> (Stock) × quantité, pour les commandes livrées.
@@ -970,8 +1018,14 @@ export default function ProfitPage({ orders = [], setOrders }) {
                   </tr>
                 </thead>
                 <tbody>
+                  {livresColis.every(c => lignesCoutAffichees(c).length === 0) && (
+                    <tr><td colSpan={7} className="px-2 py-8 text-center text-sm text-green-700 font-semibold">
+                      ✅ {groupeCout ? `Tout le groupe ${libelleGroupe(groupeCout)} a un prix d'achat.` : 'Toutes les lignes ont un prix d\'achat.'}
+                    </td></tr>
+                  )}
                   {livresColis.flatMap((c) => {
-                    const items = getProductCostDetail(c);
+                    const items = lignesCoutAffichees(c);
+                    if (!items.length) return [];
                     // Une seule ligne de produit : rien à replier, comme avant.
                     if (items.length <= 1) {
                       return items.map((it, j) => (
