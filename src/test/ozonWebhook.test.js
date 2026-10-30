@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+vi.mock('../../api/_push.js', () => ({ envoyerPush: vi.fn(async () => ({ envoyes: 2 })) }));
 import handler from '../../api/ozon-webhook.js';
+import { envoyerPush } from '../../api/_push.js';
 
 function res() {
   const r = { code: 0, json: null };
@@ -31,7 +33,7 @@ describe('webhook Ozon', () => {
     });
     const r = res();
     await handler({ method: 'POST', query: { token: 'sekret' }, body: { orderId: 'VI00555', orderStatus: 'WAITING_PICKUP' } }, r);
-    expect(r.body).toEqual({ ok: true, statut: 'Attente De Ramassage' });
+    expect(r.body).toEqual({ ok: true, statut: 'Attente De Ramassage', notifie: false });
     const patch = appels.find(a => a.opt.method === 'PATCH');
     expect(patch.url).toContain('id=eq.VS-1');
     expect(JSON.parse(patch.opt.body)).toEqual({ ozone_last_status: 'Attente De Ramassage' });
@@ -45,5 +47,17 @@ describe('webhook Ozon', () => {
     const r2 = res();
     await handler({ method: 'POST', query: { token: 'sekret' }, body: { orderId: 'x),id.neq.(', orderStatus: 'DELIVERED' } }, r2);
     expect(r2.body.raison).toBe('code invalide');
+  });
+
+  it('notifie quand Ozon signale un colis en danger', async () => {
+    global.fetch = vi.fn(async (url, opt = {}) => {
+      if (String(url).includes('/orders?select=')) return { ok: true, json: async () => [{ id: 'VS-2', status: 'expedier', tracking_number: 'VI00600', recipient: { name: 'Sara', city: 'Rabat', phone: '0612345678', delivery: 'Ozon Express' }, products: [{ name: 'Ensemble Sport Noir' }], ozone_last_status: 'Mise en distribution' }] };
+      if (String(url).includes('/settings?')) return { ok: true, json: async () => [] };
+      return { ok: true, json: async () => ({}) };
+    });
+    const r = res();
+    await handler({ method: 'POST', query: { token: 'sekret' }, body: { orderId: 'VI00600', orderStatus: 'NOANSWER' } }, r);
+    expect(r.body).toEqual({ ok: true, statut: 'Pas de réponse + SMS', notifie: true });
+    expect(envoyerPush.mock.calls.at(-1)[0]).toMatchObject({ url: '/colis-danger', tag: 'danger-VS-2' });
   });
 });

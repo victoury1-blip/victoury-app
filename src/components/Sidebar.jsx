@@ -8,11 +8,12 @@ import {
   LayoutDashboard, ShoppingCart, Package, Archive, Store,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown, Activity,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
-  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet, Car, PackageX,
+  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet, Car, PackageX, AlertTriangle,
 } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
 import { estColisRetour, estRecu, lireRecuIdsLocal } from '../lib/colisRetours';
 import { reservationEnAttente } from '../lib/reservation';
+import { risqueColis, dejaTraite } from '../lib/colisDanger';
 import { AFFILIATE_LIST } from '../lib/affiliatePlatforms';
 import { ORDER_TABS, tabPath } from '../data/orderTabs';
 
@@ -37,6 +38,8 @@ const NAV_ITEMS = [
   { path: '/liste-colis', label: 'Liste des Colis', icon: Package, perm: 'liste_colis' },
   /* Juste sous la Liste des Colis : les colis refusés / annulés, pour suivre
      ceux que la société de livraison n'a pas encore rendus (badge = non reçus). */
+  /* Colis qu'Ozon signale en difficulté (injoignable, refus…) : à rappeler le jour même. */
+  { path: '/colis-danger', label: 'Colis en danger', icon: AlertTriangle, perm: 'liste_colis', badge: 'colisDanger' },
   { path: '/colis-retours', label: 'Retours & Annulés', icon: PackageX, perm: 'liste_colis', badge: 'retoursNonRecus' },
   { path: '/factures',    label: 'Factures',        icon: FileText, perm: 'factures' },
   { path: '/profit',      label: 'Profit',          icon: TrendingUp, perm: 'profit' },
@@ -291,6 +294,13 @@ export default function Sidebar({ orders = [], session }) {
     return (orders || []).filter(o => estColisRetour(o) && !estRecu(o, recuIds)).length;
   }, [orders]);
 
+  // Colis en danger pas encore traités (badge du menu, voir ColisDangerPage).
+  const colisDanger = React.useMemo(() => {
+    let traites = {};
+    try { traites = JSON.parse(localStorage.getItem('victoury_colis_danger_traites') || '{}'); } catch { /* vide */ }
+    return (orders || []).filter(o => risqueColis(o) && !dejaTraite(o, traites)).length;
+  }, [orders]);
+
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   const visibleItems = NAV_ITEMS.filter(item => {
@@ -402,7 +412,7 @@ export default function Sidebar({ orders = [], session }) {
           }
 
           const active = isActive(item.path);
-          const itemBadge = item.badge === 'retoursNonRecus' ? retoursNonRecus : 0;
+          const itemBadge = item.badge === 'retoursNonRecus' ? retoursNonRecus : item.badge === 'colisDanger' ? colisDanger : 0;
           return (
             <a
               key={item.path}

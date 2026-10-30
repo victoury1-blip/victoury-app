@@ -12,6 +12,8 @@
 // Variables Vercel : OZON_WEBHOOK_SECRET, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL.
 
 import { timingSafeEqual } from 'node:crypto';
+import { envoyerPush } from './_push.js';
+import { risqueColis, LIBELLE_TYPE } from '../src/lib/colisDanger.js';
 
 // Libellés Ozon des codes de statut — liste complète « Statut Colis en JSON »
 // de leur page Webhooks. Le libellé lu en direct chez Ozon reste prioritaire.
@@ -85,7 +87,7 @@ export default async function handler(req, res) {
 
   const h = { apikey: cle, Authorization: `Bearer ${cle}` };
   const r = await fetch(
-    `${url}/rest/v1/orders?select=id,recipient,ozone_last_status&or=(ozone_tracking.eq.${code},tracking_number.eq.${code})&is_deleted=not.is.true`,
+    `${url}/rest/v1/orders?select=id,recipient,ozone_last_status,status,product,products,tracking_number&or=(ozone_tracking.eq.${code},tracking_number.eq.${code})&is_deleted=not.is.true`,
     { headers: h },
   );
   const commandes = r.ok ? await r.json() : [];
@@ -109,5 +111,23 @@ export default async function handler(req, res) {
     headers: { ...h, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ ozone_last_status: statut }),
   });
-  return res.status(200).json({ ok: maj.ok, statut });
+  // Colis en danger (client injoignable, refus, numéro faux…) : notification
+  // immédiate sur les téléphones abonnés, pour rappeler la cliente le jour même.
+  let notifie = false;
+  const risque = maj.ok && risqueColis({ ...o, ozoneLastStatus: statut });
+  if (risque) {
+    const prods = (o.products?.length ? o.products : [o.product]).filter(p => p?.name);
+    const r2 = await envoyerPush({
+      title: `⚠️ Colis en danger — ${LIBELLE_TYPE[risque.type] || statut}`,
+      body: [
+        `${o.recipient?.name || 'Client'}${o.recipient?.city ? ` · ${o.recipient.city}` : ''}`,
+        prods[0] ? `📦 ${prods.map(p => p.name).join(' + ')}` : '',
+        `Ozon : ${statut} (${o.tracking_number || code})`,
+      ].filter(Boolean).join('\n'),
+      tag: `danger-${o.id}`,
+      url: '/colis-danger',
+    }).catch(() => ({}));
+    notifie = (r2?.envoyes || 0) > 0;
+  }
+  return res.status(200).json({ ok: maj.ok, statut, notifie });
 }
