@@ -8,7 +8,6 @@ import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
 const STORAGE_KEY = 'victoury_fournisseur_factures';
 const LEGACY_KEY = 'victoury_fournisseur'; // ancienne liste plate d'articles
 
-const SIZE_OPTIONS = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
 
 /* Statuts « sortis » : la pièce a quitté le stock (expédiée / livrée / échangée). */
 
@@ -248,29 +247,39 @@ function RetourModal({ facture, onClose, onSave }) {
   );
 }
 
+/* Modèles achetés chez le fournisseur, avec leur prix d'achat habituel :
+   un clic remplit le nom et le prix (modifiable). */
+const MODELES_FOURNISSEUR = [
+  { modele: 'Ensemble Sport', prix: 100 },
+  { modele: 'Ensemble Hijab Sport', prix: 125 },
+];
+
 function ItemModal({ item, onClose, onSave }) {
-  const [form, setForm] = useState(() => item || { modele: '', couleur: '', prix: '', sizes: [{ taille: 'M', qte: '' }] });
+  /* Plus de détail par taille : seulement la quantité totale prise chez le
+     fournisseur. Elle est enregistrée comme une seule ligne « Total » de
+     `sizes`, que le reste de la page sait déjà additionner (itemQty). */
+  const [form, setForm] = useState(() => item
+    ? { modele: item.modele || '', couleur: item.couleur || '', prix: item.prix ?? '', qte: itemQty(item) || '' }
+    : { modele: '', couleur: '', prix: '', qte: '' });
   const u = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const choisi = MODELES_FOURNISSEUR.find(m => m.modele === form.modele);
+  const [autre, setAutre] = useState(() => !!item && !MODELES_FOURNISSEUR.some(m => m.modele === item.modele));
 
-  const setSize = (idx, k, v) => setForm(p => ({ ...p, sizes: p.sizes.map((s, i) => i === idx ? { ...s, [k]: v } : s) }));
-  const addSize = () => setForm(p => ({ ...p, sizes: [...p.sizes, { taille: '', qte: '' }] }));
-  const removeSize = (idx) => setForm(p => ({ ...p, sizes: p.sizes.filter((_, i) => i !== idx) }));
-
-  const qty = (form.sizes || []).reduce((n, s) => n + (parseInt(s.qte, 10) || 0), 0);
+  const qty = parseInt(form.qte, 10) || 0;
   const total = (parseFloat(form.prix) || 0) * qty;
 
   function save() {
-    if (!form.modele.trim()) return;
+    if (!form.modele.trim() || qty <= 0) return;
     onSave({
       id: item?.id || `F${Date.now()}${Math.floor(Math.random() * 1000)}`,
       modele: form.modele.trim(),
       couleur: form.couleur.trim(),
       prix: parseFloat(form.prix) || 0,
-      sizes: (form.sizes || [])
-        .filter(s => s.taille && (parseInt(s.qte, 10) || 0) > 0)
-        .map(s => ({ taille: s.taille.trim(), qte: parseInt(s.qte, 10) || 0 })),
+      sizes: [{ taille: 'Total', qte: qty }],
     });
   }
+
+  const puce = (actif) => `flex-1 rounded-xl border-2 px-3 py-3 text-left transition-colors ${actif ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`;
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
@@ -284,59 +293,53 @@ function ItemModal({ item, onClose, onSave }) {
 
         <div className="p-6 space-y-4 overflow-y-auto">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Modèle</label>
-            <input value={form.modele} onChange={e => u('modele', e.target.value)} className={inputCls} placeholder="Ex: Ensemble Sporte" autoFocus />
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Modèle</label>
+            <div className="flex gap-2">
+              {MODELES_FOURNISSEUR.map(m => (
+                <button key={m.modele} type="button"
+                  onClick={() => { setAutre(false); setForm(p => ({ ...p, modele: m.modele, prix: m.prix })); }}
+                  className={puce(!autre && choisi?.modele === m.modele)}>
+                  <span className="block text-sm font-bold text-gray-800">{m.modele}</span>
+                  <span className="block text-xs text-gray-500">{m.prix} DH la pièce</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => { setAutre(true); setForm(p => ({ ...p, modele: choisi ? '' : p.modele })); }}
+              className={`mt-2 text-xs font-semibold ${autre ? 'text-blue-700' : 'text-gray-500 hover:text-blue-600'}`}>
+              + Autre modèle
+            </button>
+            {autre && (
+              <input value={form.modele} onChange={e => u('modele', e.target.value)} className={`${inputCls} mt-2`} placeholder="Nom du modèle" autoFocus />
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">
-              Couleur(s) <span className="text-gray-400 font-normal">— séparées par virgule</span>
+              Couleur(s) <span className="text-gray-400 font-normal">— facultatif</span>
             </label>
             <input value={form.couleur} onChange={e => u('couleur', e.target.value)} className={inputCls} placeholder="Ex: bleu, noir" />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Prix unitaire (DH)</label>
-            <input type="number" inputMode="decimal" value={form.prix} onChange={e => u('prix', e.target.value)} className={inputCls} placeholder="0" />
-          </div>
-
-          {/* Tailles + quantité par taille */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold text-gray-500">Tailles &amp; quantités</label>
-              <button onClick={addSize} className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                <Plus size={13} /> Ajouter une taille
-              </button>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Quantité totale</label>
+              <input type="number" inputMode="numeric" min="1" value={form.qte} onChange={e => u('qte', e.target.value)}
+                className={`${inputCls} text-lg font-bold`} placeholder="0" />
             </div>
-            <div className="space-y-2">
-              {(form.sizes || []).map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  {/* Le sélecteur de taille doit être LARGE pour que la taille reste lisible. */}
-                  <select value={s.taille} onChange={e => setSize(i, 'taille', e.target.value)}
-                    className={`${fieldCls} flex-1 min-w-0 font-semibold text-gray-800 bg-white`}>
-                    <option value="">Taille…</option>
-                    {SIZE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <input type="number" inputMode="numeric" value={s.qte} onChange={e => setSize(i, 'qte', e.target.value)}
-                    className={`${fieldCls} w-20 shrink-0 text-center`} placeholder="Qté" />
-                  <button onClick={() => removeSize(i)} className="p-2 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Retirer">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              ))}
-              {(form.sizes || []).length === 0 && (
-                <p className="text-xs text-gray-400">Aucune taille — cliquez « Ajouter une taille ».</p>
-              )}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Prix unitaire (DH)</label>
+              <input type="number" inputMode="decimal" value={form.prix} onChange={e => u('prix', e.target.value)} className={`${inputCls} text-lg`} placeholder="0" />
             </div>
           </div>
 
           <div className="bg-gray-50 rounded-lg px-3 py-2 flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-semibold">Quantité totale : <span className="text-blue-600 font-bold">{qty}</span></span>
+            <span className="text-xs text-gray-500 font-semibold">{qty} pièce{qty > 1 ? 's' : ''} × {parseFloat(form.prix) || 0} DH</span>
             <span className="text-lg font-bold text-gray-800">{total.toLocaleString('fr-FR')} DH</span>
           </div>
         </div>
 
         <div className="flex gap-2 px-6 py-4 border-t border-gray-100 shrink-0">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200">Annuler</button>
-          <button onClick={save} className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700">Enregistrer</button>
+          <button onClick={save} disabled={!form.modele.trim() || qty <= 0}
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40">Enregistrer</button>
         </div>
       </div>
     </div>
