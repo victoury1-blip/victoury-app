@@ -2,8 +2,10 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
-import { MemoryRouter } from 'react-router-dom';
 
+// Lien simplifié : pas de routeur (lancé aussi depuis la racine du dépôt, où
+// react-router-dom viendrait d'une autre copie de React).
+vi.mock('react-router-dom', () => ({ Link: ({ children, to, ...p }) => <a href={to} {...p}>{children}</a> }));
 vi.mock('../components/AvisProduit', () => ({ ResumeAvis: () => null }));
 vi.mock('../components/BoutonFavori', () => ({ default: () => null }));
 import CarteProduit from '../components/CarteProduit';
@@ -15,7 +17,7 @@ async function rendre(precommandes) {
   const div = document.createElement('div');
   await act(async () => {
     createRoot(div).render(
-      <MemoryRouter><PrecommandesContexte.Provider value={precommandes}><CarteProduit produit={produit} /></PrecommandesContexte.Provider></MemoryRouter>);
+      <PrecommandesContexte.Provider value={precommandes}><CarteProduit produit={produit} /></PrecommandesContexte.Provider>);
   });
   return div.textContent;
 }
