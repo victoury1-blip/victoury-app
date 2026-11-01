@@ -953,23 +953,29 @@ export default function ProfitPage({ orders = [], setOrders }) {
             </div>
             {(() => {
               // Lignes encore sans prix, par groupe — le compteur de chaque bouton.
+              // Tous les groupes de produits livrés (boutons toujours là), avec
+              // pour chacun le nombre de lignes encore sans prix.
               const parGroupe = new Map();
               for (const c of livresColis) for (const it of getProductCostDetail(c)) {
-                if (it.echange || it.unitCost > 0) continue;
+                if (it.echange) continue;
                 const g = groupeProduit(it.name);
-                parGroupe.set(g, (parGroupe.get(g) || 0) + 1);
+                const e = parGroupe.get(g) || { sansPrix: 0, lignes: 0 };
+                e.lignes += 1;
+                if (!(it.unitCost > 0)) e.sansPrix += 1;
+                parGroupe.set(g, e);
               }
-              const total = [...parGroupe.values()].reduce((a, b) => a + b, 0);
-              const groupes = [...parGroupe.entries()].sort((a, b) => b[1] - a[1]);
+              const total = [...parGroupe.values()].reduce((a, e) => a + (voirChiffrees ? e.lignes : e.sansPrix), 0);
+              const groupes = [...parGroupe.entries()].sort((a, b) => b[1].lignes - a[1].lignes);
               const puce = (actif) => `px-2.5 py-1 rounded-full text-xs font-semibold border ${actif ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'}`;
               return (
                 <div className="px-5 pt-3 space-y-2">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-xs text-gray-500 me-1">Groupe :</span>
                     <button type="button" onClick={() => setGroupeCout('')} className={puce(!groupeCout)}>Tous ({total})</button>
-                    {groupes.map(([g, n]) => (
-                      <button key={g} type="button" onClick={() => setGroupeCout(g)} className={puce(groupeCout === g)}>
-                        {libelleGroupe(g)} ({n})
+                    {groupes.map(([g, e]) => (
+                      <button key={g} type="button" onClick={() => setGroupeCout(g)} className={puce(groupeCout === g)}
+                        title={`${e.sansPrix} sans prix sur ${e.lignes}`}>
+                        {libelleGroupe(g)} ({voirChiffrees ? e.lignes : e.sansPrix})
                       </button>
                     ))}
                   </div>
