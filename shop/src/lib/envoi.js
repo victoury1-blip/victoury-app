@@ -1,5 +1,5 @@
 import { champsManquants } from './commande';
-import { detecterSource } from './source';
+import { sourceVisite } from './source';
 
 /* L'envoi transite par un relais serveur plutôt que d'écrire directement dans
  * Supabase depuis le navigateur : c'est le serveur qui connaît l'IP du
@@ -18,7 +18,9 @@ export async function envoyerCommande(form, lignes, total, code, geoGPS) {
   const manque = champsManquants(form, lignes);
   if (manque.length) return { ok: false, manque };
 
-  const source = typeof window !== 'undefined' ? detecterSource(window.location.search, document.referrer) : 'Direct';
+  const source = typeof window !== 'undefined'
+    ? sourceVisite(window.location.search, document.referrer, navigator.userAgent)
+    : 'Direct';
 
   try {
     const res = await fetch('/api/commande', {
