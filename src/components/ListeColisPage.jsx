@@ -1402,7 +1402,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     <div className="flex flex-col gap-3">
                       {/^⏳\s*RÉSERVATION/im.test(o.note || '') && (
                         <span className="block text-xs font-bold text-white bg-violet-600 rounded-lg px-2 py-1.5 shadow-sm">
-                          {(o.note.match(/^⏳\s*RÉSERVATION.*$/im) || [''])[0]}
+                          ⏳ RÉSERVATION
                         </span>
                       )}
                       {note && <span className="block text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">Note interne:<br/>{note}</span>}

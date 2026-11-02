@@ -37,13 +37,10 @@ export function dateDispo(date, ar = false) {
   return `${jour} ${deuxChiffres(j)}/${deuxChiffres(m)}`;
 }
 
-/** Ligne ajoutée à la note de la commande pour chaque article réservé. */
+/** Ligne ajoutée à la note quand la commande contient un article réservé :
+    juste « ⏳ RÉSERVATION » (le produit, la taille et la date sont ailleurs). */
 export function noteReservation(lignes) {
-  const reservees = (lignes || []).filter(l => l.precommande);
-  if (!reservees.length) return '';
-  return reservees
-    .map(l => `⏳ RÉSERVATION — ${l.name}${l.size ? ` (${l.size})` : ''} : disponible le ${dateDispo(l.precommande)}`)
-    .join('\n');
+  return (lignes || []).some(l => l.precommande) ? '⏳ RÉSERVATION' : '';
 }
 
 /* ── Commandes réservées ──

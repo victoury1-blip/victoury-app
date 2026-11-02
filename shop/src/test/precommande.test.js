@@ -29,9 +29,10 @@ describe('précommande', () => {
       { slug: 'a', name: 'Ensemble Hijab Sport Noir', size: 'L', qty: 1, price: 290, precommande: '2026-11-02' },
       { slug: 'b', name: 'Ensemble Hijab Sport Gris', size: 'M', qty: 1, price: 290 },
     ];
-    expect(noteReservation(lignes)).toBe('⏳ RÉSERVATION — Ensemble Hijab Sport Noir (L) : disponible le lundi 02/11');
+    expect(noteReservation(lignes)).toBe('⏳ RÉSERVATION');
+    expect(noteReservation([lignes[1]])).toBe('');
     const c = construireCommande({ nom: 'A', telephone: '0612345678', ville: 'Rabat', adresse: 'x' }, lignes, 580, maintenant, 'VS-T');
-    expect(c.note).toBe('Commande du site\n⏳ RÉSERVATION — Ensemble Hijab Sport Noir (L) : disponible le lundi 02/11');
+    expect(c.note).toBe('Commande du site\n⏳ RÉSERVATION');
     expect(c.products[0]).toEqual({ name: 'Ensemble Hijab Sport Noir', size: 'L', qty: 1 });
   });
 

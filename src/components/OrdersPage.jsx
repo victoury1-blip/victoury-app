@@ -1171,11 +1171,11 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                         const autres = lignes.filter(l => !/^note interne\s*:/i.test(l) && !/^⏳\s*RÉSERVATION/i.test(l));
                         return (
                           <>
-                            {reservations.map((t, i) => (
-                              <p key={`r${i}`} className="text-xs font-bold text-white bg-violet-600 rounded-lg px-2 py-1.5 leading-relaxed shadow-sm">
-                                {t}
+                            {reservations.length > 0 && (
+                              <p className="text-xs font-bold text-white bg-violet-600 rounded-lg px-2 py-1.5 leading-relaxed shadow-sm">
+                                ⏳ RÉSERVATION
                               </p>
-                            ))}
+                            )}
                             {autres.length > 0 && (
                               <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">{autres.join('\n')}</p>
                             )}
