@@ -6,6 +6,7 @@ import useProducts from '../hooks/useProducts';
 import { loadFactures } from '../data/factures';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { groupeProduit, libelleGroupe } from '../lib/groupeProduit';
+import DepensesModal from './profit/DepensesModal';
 
 function fmt(n) { return Number(n || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -195,7 +196,6 @@ export default function ProfitPage({ orders = [], setOrders }) {
   const [adTransfers, setAdTransfers] = useState(() => {
     try { return JSON.parse(localStorage.getItem('ad_transfers') || '[]'); } catch { return []; }
   });
-  const [newTransfer, setNewTransfer] = useState({ label: '', amount: '', category: 'facebook' });
   const [showAdModal, setShowAdModal] = useState(false);
 
   const [factures, setFactures] = useState(() => loadFactures());
@@ -232,18 +232,6 @@ export default function ProfitPage({ orders = [], setOrders }) {
     setAdTransfers(list);
     localStorage.setItem('ad_transfers', JSON.stringify(list));
     cloudSet('ad_transfers', list);
-  }
-
-  function addTransfer() {
-    if (!newTransfer.amount) return;
-    saveAdTransfers([...adTransfers, {
-      id: Date.now(),
-      label: newTransfer.label || EXPENSE_CATS.find(c => c.value === newTransfer.category)?.label || 'Dépense',
-      amount: parseFloat(newTransfer.amount) || 0,
-      category: newTransfer.category || 'facebook',
-      date: new Date().toISOString().slice(0, 10),
-    }]);
-    setNewTransfer({ label: '', amount: '', category: 'facebook' });
   }
 
   function removeTransfer(id) { saveAdTransfers(adTransfers.filter(t => t.id !== id)); }
@@ -1122,74 +1110,15 @@ export default function ProfitPage({ orders = [], setOrders }) {
         </div>
       )}
 
-      {/* Ad Transfers Modal */}
+      {/* Dépenses, mois par mois */}
       {showAdModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => setShowAdModal(false)}>
-          <div className="fixed inset-0 bg-black/40" />
-          <div className="relative bg-white rounded-t-xl sm:rounded-xl w-full sm:max-w-md max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-xl z-10">
-              <h2 className="text-lg font-bold text-gray-800">Gestion des dépenses</h2>
-              <button onClick={() => setShowAdModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 text-xl">&times;</button>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-gray-500">Ajoutez vos dépenses par catégorie. Le total sera déduit du sous-total pour calculer le profit net.</p>
-
-              {EXPENSE_CATS.map(cat => {
-                const items = adTransfers.filter(t => (t.category || 'facebook') === cat.value);
-                if (!items.length) return null;
-                const catTotal = items.reduce((s, t) => s + (t.amount || 0), 0);
-                return (
-                  <div key={cat.value}>
-                    <div className={`text-xs font-bold ${cat.color} mb-1`}>{cat.label}</div>
-                    <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
-                      {items.map(t => (
-                        <div key={t.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
-                          <div>
-                            <div className="text-sm font-semibold text-gray-800">{t.label}</div>
-                            <div className="text-xs text-gray-400">{t.date}</div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`text-sm font-black ${cat.color}`}>{fmt(t.amount)} MAD</span>
-                            <button onClick={() => removeTransfer(t.id)} className="p-1 rounded bg-red-50 text-red-500 hover:bg-red-100">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      <div className={`px-4 py-2 ${cat.bg} flex items-center justify-between`}>
-                        <span className="text-xs font-bold text-gray-600">Sous-total</span>
-                        <span className={`font-black ${cat.color}`}>{fmt(catTotal)} MAD</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {adTransfers.length > 0 && (
-                <div className="px-4 py-2.5 bg-purple-50 rounded-xl flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-600">TOTAL DÉPENSES</span>
-                  <span className="font-black text-purple-700">{fmt(totalPub)} MAD</span>
-                </div>
-              )}
-
-              <div className="border border-dashed border-gray-300 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Plus size={12} /> Nouvelle dépense</p>
-                <select value={newTransfer.category} onChange={e => setNewTransfer(p => ({ ...p, category: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
-                  {EXPENSE_CATS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-                <input value={newTransfer.label} onChange={e => setNewTransfer(p => ({ ...p, label: e.target.value }))}
-                  placeholder="Description (ex: Facebook Ads Juin)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
-                <input type="number" value={newTransfer.amount} onChange={e => setNewTransfer(p => ({ ...p, amount: e.target.value }))}
-                  placeholder="Montant en MAD" min={0} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
-                <button onClick={addTransfer} disabled={!newTransfer.amount}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-40 transition">
-                  <Plus size={14} /> Ajouter
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <DepensesModal
+          depenses={adTransfers}
+          categories={EXPENSE_CATS}
+          onAjouter={(d) => saveAdTransfers([...adTransfers, { id: Date.now(), ...d }])}
+          onSupprimer={removeTransfer}
+          onClose={() => setShowAdModal(false)}
+        />
       )}
     </div>
   );
