@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { enregistrerVueProduit } from '../lib/visites';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
 import { fmtPrix, fmtMontant, prixLot, remiseQuantiteGroupee } from '../lib/pricing';
@@ -91,6 +92,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
         setInclurePartenaire(true);
         setTailleBundle(lies[0]?.sizes?.find(s => s.stock > 0)?.size || '');
         if (p) {
+          enregistrerVueProduit(p.name);
           trackPixel('ViewContent', {
             content_name: p.name, content_ids: [p.slug], content_type: 'product',
             value: p.price, currency: 'MAD',

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { enregistrerDebutCommande } from '../lib/visites';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
@@ -82,6 +83,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // Une seule fois à l'arrivée sur la page : la publicité doit voir un panier
   // qui entre en commande, pas chaque changement de quantité qui le précède.
   useEffect(() => {
+    enregistrerDebutCommande();
     const eventID = idEvenement('checkout');
     trackPixel('InitiateCheckout', {
       value: t.total, currency: 'MAD', num_items: t.articles,

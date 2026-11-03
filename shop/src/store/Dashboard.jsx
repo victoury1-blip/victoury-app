@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Package, Layers, AlertTriangle, Archive, Users, ShoppingCart, ShoppingBag, Wallet, Percent, RefreshCw } from 'lucide-react';
+import { BarChart, Bar } from 'recharts';
 import { supabase } from '../lib/supabase';
+import { periodePrecedente, variation, issuesCommandes, topProduits, commandesParHeure } from '../lib/statsBoutique';
 
 const PERIODES = [
   { cle: 'auj', label: 'Auj.', jours: 0 },
@@ -87,25 +89,42 @@ const SERIES = {
   sessions: { label: 'Sessions', titre: 'Sessions', trait: '#3b82f6', onglet: 'bg-blue-50 text-blue-600' },
 };
 
-function Carte({ icon: Icon, label, valeur, sous, teinte = 'gris' }) {
+/** « ▲ +18% » vert / « ▼ -12% » rouge par rapport à la période précédente. */
+function Evolution({ pct, inverse = false, libelle }) {
+  if (pct == null) return null;
+  const bon = inverse ? pct < 0 : pct > 0;
+  const cls = pct === 0 ? 'text-gray-400 bg-gray-50' : bon ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50';
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold rounded-full px-1.5 py-0.5 ${cls}`} title={libelle}>
+      {pct > 0 ? '▲' : pct < 0 ? '▼' : '='} {pct > 0 ? '+' : ''}{pct}%
+    </span>
+  );
+}
+
+function Carte({ icon: Icon, label, valeur, sous, teinte = 'gris', evolution, libelleEvolution }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-5">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm text-gray-600">{label}</p>
         {Icon && <span className={`shrink-0 w-9 h-9 rounded-lg grid place-items-center ${TEINTES[teinte] || TEINTES.gris}`}><Icon size={17} /></span>}
       </div>
-      <p className="text-[26px] leading-tight font-semibold text-gray-900 mt-2 tabular-nums">{valeur}</p>
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <p className="text-[26px] leading-tight font-semibold text-gray-900 tabular-nums">{valeur}</p>
+        <Evolution pct={evolution} libelle={libelleEvolution} />
+      </div>
       {sous && <p className="text-xs text-gray-400 mt-1">{sous}</p>}
     </div>
   );
 }
 
 /** Liste classée avec barre proportionnelle (sources, produits). */
-function Classement({ titre, lignes, total }) {
+function Classement({ titre, lignes, total, couleur = 'bg-green-500', sous, children }) {
   const max = Math.max(1, ...lignes.map(l => l[1]));
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5">
-      <p className="text-sm font-medium mb-3">{titre}</p>
+      <p className="text-sm font-medium">{titre}</p>
+      {sous && <p className="text-xs text-gray-400 mt-0.5">{sous}</p>}
+      <div className="mb-3" />
       {lignes.length === 0 && <p className="text-xs text-gray-400">Pas encore de données.</p>}
       <div className="space-y-2.5">
         {lignes.map(([nom, n]) => (
@@ -115,11 +134,12 @@ function Classement({ titre, lignes, total }) {
               <span className="text-gray-500 tabular-nums shrink-0">{n.toLocaleString('fr-MA')}{total ? ` · ${Math.round((n / total) * 100)}%` : ''}</span>
             </div>
             <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 rounded-full" style={{ width: `${(n / max) * 100}%` }} />
+              <div className={`h-full rounded-full ${couleur}`} style={{ width: `${(n / max) * 100}%` }} />
             </div>
           </div>
         ))}
       </div>
+      {children}
     </div>
   );
 }
@@ -132,6 +152,7 @@ export default function Dashboard() {
   const [commandes, setCommandes] = useState(null);
   const [ga4, setGa4] = useState(null);
   const [visites, setVisites] = useState(null);
+  const [visitesPrec, setVisitesPrec] = useState(null);
   const [chargement, setChargement] = useState(false);
 
   const { start, end } = useMemo(() => plageDePeriode(periode, custom), [periode, custom]);
@@ -164,17 +185,31 @@ export default function Dashboard() {
 
   /* Commandes du site sur la période — mêmes règles que le reste de
      l'administration (préfixe VS-, non supprimées). */
+  const prec = useMemo(() => periodePrecedente(start, end), [start, end]);
+  const [commandesPrec, setCommandesPrec] = useState(null);
   const chargerCommandes = useCallback(async () => {
-    const { data } = await supabase.from('orders')
-      .select('id, price, date_added, created_at, is_deleted')
-      .like('id', 'VS-%');
-    const dans = (data || []).filter(o => {
+    // Par pages de 1000 (limite Supabase), depuis le début de la période précédente.
+    const depuis = new Date(prec.start); depuis.setDate(depuis.getDate() - 2);
+    const toutes = [];
+    for (let de = 0; de < 50000; de += 1000) {
+      const { data, error } = await supabase.from('orders')
+        .select('id, price, date_added, created_at, is_deleted, status, products, product')
+        .like('id', 'VS-%')
+        .gte('created_at', depuis.toISOString())
+        .order('created_at', { ascending: true })
+        .range(de, de + 999);
+      if (error || !data?.length) break;
+      toutes.push(...data);
+      if (data.length < 1000) break;
+    }
+    const entre = (a, b) => toutes.filter(o => {
       if (o.is_deleted) return false;
       const d = parseDateAdded(o.date_added);
-      return d && d >= start && d <= end;
+      return d && d >= a && d <= b;
     });
-    setCommandes(dans);
-  }, [start, end]);
+    setCommandes(entre(start, end));
+    setCommandesPrec(entre(prec.start, prec.end));
+  }, [start, end, prec]);
 
   const chargerGa4 = useCallback(async () => {
     try {
@@ -205,9 +240,13 @@ export default function Dashboard() {
 
   const chargerVisites = useCallback(async () => {
     const fin = new Date(end); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1);
-    const { data, error } = await supabase.rpc('shop_stats_visites', { p_debut: start.toISOString(), p_fin: fin.toISOString() });
-    setVisites(!error && data ? data : null);
-  }, [start, end]);
+    const [act, avant] = await Promise.all([
+      supabase.rpc('shop_stats_visites', { p_debut: start.toISOString(), p_fin: fin.toISOString() }),
+      supabase.rpc('shop_stats_visites', { p_debut: prec.start.toISOString(), p_fin: start.toISOString() }),
+    ]);
+    setVisites(!act.error && act.data ? act.data : null);
+    setVisitesPrec(!avant.error && avant.data ? avant.data : null);
+  }, [start, end, prec]);
 
   useEffect(() => { chargerStock(); }, [chargerStock]);
 
@@ -233,6 +272,39 @@ export default function Dashboard() {
     return commandes.filter(o => { const d = lireHorodatage(o.created_at) || parseDateHeure(o.date_added); return d && d >= debutSuivi; }).length;
   }, [commandes, suiviPartiel, debutSuivi]);
   const tauxConversion = sessions ? (commandesSuivies / sessions) * 100 : null;
+
+  /* Comparaison avec la période précédente (même durée). Les visites ne
+     comparent que si le suivi existait déjà pendant toute la période d'avant. */
+  const caPrec = useMemo(() => (commandesPrec || []).reduce((s, o) => s + (Number(o.price) || 0), 0), [commandesPrec]);
+  const visitesComparables = !!(visitesPrec && debutSuivi && debutSuivi <= prec.start);
+  const evol = {
+    sessions: visitesComparables ? variation(sessions, visitesPrec.sessions) : null,
+    paniers: visitesComparables ? variation(paniers, visitesPrec.paniers) : null,
+    commandes: commandesPrec ? variation(nbCommandes, commandesPrec.length) : null,
+    ca: commandesPrec ? variation(ca, caPrec) : null,
+    conversion: visitesComparables && visitesPrec.sessions && sessions
+      ? variation(tauxConversion, ((commandesPrec?.length || 0) / visitesPrec.sessions) * 100) : null,
+  };
+  const libelleEvol = periode === 'auj' ? 'par rapport à hier' : `par rapport aux ${prec.jours} jours d'avant`;
+
+  /* Entonnoir : visiteurs différents à chaque étape, puis commandes passées
+     depuis le début du suivi (même période). */
+  const etapes = useMemo(() => {
+    const e = visites?.entonnoir;
+    if (!e) return null;
+    return [
+      ['Visiteurs', Number(e.visite) || 0],
+      ['Ont vu un produit', Number(e.produit) || 0],
+      ['Ont ajouté au panier', Number(e.panier) || 0],
+      ['Ont commencé la commande', Number(e.checkout) || 0],
+      ['Ont commandé', commandesSuivies],
+    ];
+  }, [visites, commandesSuivies]);
+
+  const issues = useMemo(() => issuesCommandes(commandes), [commandes]);
+  const classement = useMemo(() => topProduits(commandes), [commandes]);
+  const heures = useMemo(() => commandesParHeure(commandes, o => lireHorodatage(o.created_at) || parseDateHeure(o.date_added)), [commandes]);
+  const heurePic = heures.reduce((m, h) => (h.commandes > m.commandes ? h : m), { commandes: 0 });
 
   /* Série journalière pour le graphique — un point par jour de la période,
      même les jours sans commande (sinon la courbe « saute » les trous). */
@@ -317,14 +389,14 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-5 grid sm:grid-cols-5 gap-4">
-        <Carte icon={Users} teinte="bleu" label="Sessions" valeur={sessions != null ? compact(sessions) : '—'}
+        <Carte icon={Users} teinte="bleu" label="Sessions" valeur={sessions != null ? compact(sessions) : '—'} evolution={evol.sessions} libelleEvolution={libelleEvol}
           sous={visiteurs != null ? `${visiteurs.toLocaleString('fr-MA')} visiteurs uniques` : (ga4 && !ga4.configured ? 'Statistiques non activées (visites.sql)' : undefined)} />
-        <Carte icon={ShoppingBag} teinte="orange" label="Commandes" valeur={compact(nbCommandes)}
+        <Carte icon={ShoppingBag} teinte="orange" label="Commandes" valeur={compact(nbCommandes)} evolution={evol.commandes} libelleEvolution={libelleEvol}
           sous={nbCommandes ? `${Math.round(ca / nbCommandes).toLocaleString('fr-MA')} DH moy.` : undefined} />
-        <Carte icon={ShoppingCart} teinte="rose" label="Ajouter au panier" valeur={paniers != null ? compact(paniers) : '—'}
+        <Carte icon={ShoppingCart} teinte="rose" label="Ajouter au panier" valeur={paniers != null ? compact(paniers) : '—'} evolution={evol.paniers} libelleEvolution={libelleEvol}
           sous={paniers ? `${((commandesSuivies / paniers) * 100).toFixed(1)}% convertis` : undefined} />
-        <Carte icon={Wallet} teinte="vert" label="Chiffre d'affaires" valeur={`${compact(Math.round(ca))} DH`} sous={`${nbCommandes.toLocaleString('fr-MA')} commandes`} />
-        <Carte icon={Percent} teinte="violet" label="Taux de conversion" valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
+        <Carte icon={Wallet} teinte="vert" label="Chiffre d'affaires" valeur={`${compact(Math.round(ca))} DH`} evolution={evol.ca} libelleEvolution={libelleEvol} sous={`${nbCommandes.toLocaleString('fr-MA')} commandes`} />
+        <Carte icon={Percent} teinte="violet" label="Taux de conversion" evolution={evol.conversion} libelleEvolution={libelleEvol} valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
           sous={tauxConversion != null
             ? `${commandesSuivies} / ${sessions} sessions${suiviPartiel ? ` · depuis le ${heureMaroc(debutSuivi)}` : ''}`
             : undefined} />
@@ -356,10 +428,111 @@ export default function Dashboard() {
         </ResponsiveContainer>
       </div>
 
-      {visites && (visites.par_source?.length > 0 || visites.produits?.length > 0) && (
-        <div className="mt-6 grid md:grid-cols-2 gap-4">
+      {/* Entonnoir : où les visiteurs s'arrêtent */}
+      {etapes && etapes[0][1] > 0 && (
+        <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+          <p className="text-base font-semibold text-gray-900">Parcours des visiteurs</p>
+          <p className="text-xs text-gray-400 mt-0.5">Combien de personnes différentes passent chaque étape — la plus grosse chute montre ce qu'il faut améliorer.</p>
+          <div className="mt-4 space-y-3">
+            {etapes.map(([nom, n], i) => {
+              const base = etapes[0][1] || 1;
+              const avant = i ? etapes[i - 1][1] : null;
+              const garde = avant ? Math.round((n / avant) * 100) : null;
+              return (
+                <div key={nom}>
+                  <div className="flex items-baseline justify-between text-sm gap-3">
+                    <span className="text-gray-700">{i + 1}. {nom}</span>
+                    <span className="tabular-nums text-gray-900 font-semibold shrink-0">
+                      {n.toLocaleString('fr-MA')}
+                      <span className="ml-2 text-xs font-normal text-gray-400">{Math.round((n / base) * 100)}%</span>
+                    </span>
+                  </div>
+                  <div className="mt-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500" style={{ width: `${Math.max(1, (n / base) * 100)}%` }} />
+                  </div>
+                  {garde != null && (
+                    <p className={`text-[11px] mt-0.5 ${garde < 30 ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
+                      {garde}% de l'étape d'avant{garde < 30 ? ' — grosse perte ici' : ''}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {!(visites.entonnoir.produit > 0) && (
+            <p className="mt-3 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">Les étapes 2 et 4 se remplissent une fois la mise à jour de visites.sql exécutée dans Supabase.</p>
+          )}
+        </div>
+      )}
+
+      {/* Ce que deviennent les commandes du site */}
+      {nbCommandes > 0 && (
+        <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+          <p className="text-base font-semibold text-gray-900">Que deviennent les commandes du site ?</p>
+          <p className="text-xs text-gray-400 mt-0.5">Statut actuel dans l'application des {nbCommandes} commandes de la période.</p>
+          <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              ['attente', 'À confirmer', 'bg-indigo-50 text-indigo-700 border-indigo-100'],
+              ['confirmees', 'Confirmées / en route', 'bg-sky-50 text-sky-700 border-sky-100'],
+              ['livrees', 'Livrées', 'bg-green-50 text-green-700 border-green-100'],
+              ['perdues', 'Annulées / refusées', 'bg-red-50 text-red-600 border-red-100'],
+            ].map(([k, nom, cls]) => (
+              <div key={k} className={`rounded-xl border p-4 ${cls}`}>
+                <p className="text-xs font-medium opacity-80">{nom}</p>
+                <p className="text-2xl font-semibold mt-1 tabular-nums">{issues[k]}</p>
+                <p className="text-xs opacity-70">{Math.round((issues[k] / nbCommandes) * 100)}%{k === 'livrees' && issues.caLivre ? ` · ${compact(Math.round(issues.caLivre))} DH encaissés` : ''}</p>
+              </div>
+            ))}
+          </div>
+          {issues.livrees + issues.perdues > 0 && (
+            <p className="mt-3 text-xs text-gray-500">
+              Taux de livraison des commandes terminées : <b className="text-gray-800">{Math.round((issues.livrees / (issues.livrees + issues.perdues)) * 100)}%</b>
+            </p>
+          )}
+        </div>
+      )}
+
+      {nbCommandes > 0 && (
+        <div className="mt-6 grid lg:grid-cols-2 gap-4">
+          <Classement titre="Produits les plus commandés" sous="Quantités commandées sur le site" couleur="bg-orange-400"
+            lignes={classement.produits}>
+            {classement.tailles.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-2">Tailles les plus demandées</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {classement.tailles.map(([t, n]) => (
+                    <span key={t} className="text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-1">
+                      <b>{t}</b> <span className="text-gray-500">{n}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Classement>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <p className="text-sm font-medium">Heures des commandes</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {heurePic.commandes ? <>Le plus de commandes vers <b className="text-gray-700">{heurePic.heure}</b> — soyez disponibles pour confirmer à ce moment-là.</> : 'Heure du Maroc'}
+            </p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={heures} margin={{ top: 12, right: 0, left: -24, bottom: 0 }}>
+                <XAxis dataKey="heure" tick={{ fontSize: 10, fill: '#9ca3af' }} interval={2} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={v => [v, 'Commandes']} cursor={{ fill: '#f9fafb' }} />
+                <Bar dataKey="commandes" fill="#f97316" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {visites && (
+        <div className="mt-6 grid md:grid-cols-3 gap-4">
           <Classement titre="Sources des visites" lignes={(visites.par_source || []).map(x => [x.source, Number(x.sessions) || 0])} total={sessions} />
-          <Classement titre="Produits ajoutés au panier" lignes={(visites.produits || []).map(x => [x.produit, Number(x.ajouts) || 0])} />
+          <Classement titre="Appareils" couleur="bg-blue-500"
+            lignes={(visites.appareils || []).filter(x => x.appareil !== 'inconnu').map(x => [{ mobile: '📱 Téléphone', tablette: '📲 Tablette', ordinateur: '💻 Ordinateur' }[x.appareil] || x.appareil, Number(x.sessions) || 0])}
+            total={(visites.appareils || []).filter(x => x.appareil !== 'inconnu').reduce((t, x) => t + (Number(x.sessions) || 0), 0)} />
+          <Classement titre="Produits ajoutés au panier" couleur="bg-pink-500" lignes={(visites.produits || []).map(x => [x.produit, Number(x.ajouts) || 0])} />
         </div>
       )}
 

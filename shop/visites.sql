@@ -16,8 +16,11 @@ create table if not exists shop_visites (
   type       text not null,
   source     text,
   page       text,
-  produit    text
+  produit    text,
+  appareil   text
 );
+-- Mise à jour (v2) : appareil + étapes « produit » et « checkout ».
+alter table shop_visites add column if not exists appareil text;
 create index if not exists shop_visites_date_idx on shop_visites(created_at);
 alter table shop_visites enable row level security;
 
@@ -25,11 +28,12 @@ drop policy if exists "creation depuis la boutique" on shop_visites;
 create policy "creation depuis la boutique" on shop_visites
   for insert to anon, authenticated
   with check (
-    type in ('visite', 'panier')
+    type in ('visite', 'produit', 'panier', 'checkout')
     and length(visiteur) between 8 and 64
     and coalesce(length(source), 0) <= 40
     and coalesce(length(page), 0) <= 200
     and coalesce(length(produit), 0) <= 200
+    and coalesce(length(appareil), 0) <= 20
   );
 
 drop policy if exists "lecture admin boutique" on shop_visites;
@@ -64,7 +68,16 @@ as $$
     'produits',  coalesce((select json_agg(x order by x.ajouts desc) from (
                    select produit, count(*) as ajouts
                    from v where type = 'panier' and produit is not null
-                   group by produit order by count(*) desc limit 8) x), '[]'::json)
+                   group by produit order by count(*) desc limit 8) x), '[]'::json),
+    -- Entonnoir : visiteurs DIFFÉRENTS arrivés à chaque étape.
+    'entonnoir', json_build_object(
+      'visite',   (select count(distinct visiteur) from v where type = 'visite'),
+      'produit',  (select count(distinct visiteur) from v where type = 'produit'),
+      'panier',   (select count(distinct visiteur) from v where type = 'panier'),
+      'checkout', (select count(distinct visiteur) from v where type = 'checkout')),
+    'appareils', coalesce((select json_agg(x order by x.sessions desc) from (
+                   select coalesce(appareil, 'inconnu') as appareil, count(*) as sessions
+                   from v where type = 'visite' group by 1) x), '[]'::json)
   ) end;
 $$;
 grant execute on function shop_stats_visites(timestamptz, timestamptz) to authenticated;
