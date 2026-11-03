@@ -22,6 +22,13 @@ function parseDateAdded(s) {
 
 /** Jour LOCAL 'AAAA-MM-JJ' (toISOString passait en UTC : minuit au Maroc
     devenait la veille à 23 h, et tous les jours glissaient d'un cran). */
+/** Date ET heure de date_added (JJ/MM/AAAA HH:MM:SS), pour comparer à l'instant précis du début du suivi. */
+function parseDateHeure(s) {
+  const m = String(s || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+}
+
 function isoJour(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -155,6 +162,13 @@ export default function Dashboard() {
 
   /* Statistiques maison (table shop_visites, voir visites.sql) : null si la
      table n'a pas encore été créée — on retombe alors sur Google Analytics. */
+  // Premier instant enregistré : avant, aucune visite n'était comptée.
+  const [debutSuivi, setDebutSuivi] = useState(null);
+  useEffect(() => {
+    supabase.from('shop_visites').select('created_at').order('created_at', { ascending: true }).limit(1)
+      .then(({ data }) => { if (data?.[0]?.created_at) setDebutSuivi(new Date(data[0].created_at)); }, () => {});
+  }, []);
+
   const chargerVisites = useCallback(async () => {
     const fin = new Date(end); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1);
     const { data, error } = await supabase.rpc('shop_stats_visites', { p_debut: start.toISOString(), p_fin: fin.toISOString() });
@@ -176,7 +190,15 @@ export default function Dashboard() {
   const sessions = visites ? visites.sessions : (ga4?.sessions ?? null);
   const visiteurs = visites ? visites.visiteurs : (ga4?.totalUsers ?? null);
   const paniers = visites ? visites.paniers : (ga4?.ajoutsPanier ?? null);
-  const tauxConversion = sessions ? (nbCommandes / sessions) * 100 : null;
+  /* Conversion : seulement les commandes arrivées depuis le début du suivi des
+     visites — sinon 100 commandes de la semaine ÷ 2 visites du jour = 5000 %. */
+  const suiviPartiel = !!(visites && debutSuivi && debutSuivi > start);
+  const commandesSuivies = useMemo(() => {
+    if (!commandes) return 0;
+    if (!suiviPartiel) return commandes.length;
+    return commandes.filter(o => { const d = parseDateHeure(o.date_added); return d && d >= debutSuivi; }).length;
+  }, [commandes, suiviPartiel, debutSuivi]);
+  const tauxConversion = sessions ? (commandesSuivies / sessions) * 100 : null;
 
   /* Série journalière pour le graphique — un point par jour de la période,
      même les jours sans commande (sinon la courbe « saute » les trous). */
@@ -266,10 +288,12 @@ export default function Dashboard() {
         <Carte icon={ShoppingBag} label="Commandes" valeur={nbCommandes.toLocaleString('fr-MA')}
           sous={nbCommandes ? `${Math.round(ca / nbCommandes).toLocaleString('fr-MA')} DH moy.` : undefined} />
         <Carte icon={ShoppingCart} label="Ajouter au panier" valeur={paniers != null ? paniers.toLocaleString('fr-MA') : '—'}
-          sous={paniers ? `${((nbCommandes / paniers) * 100).toFixed(1)}% convertis` : undefined} />
+          sous={paniers ? `${((commandesSuivies / paniers) * 100).toFixed(1)}% convertis` : undefined} />
         <Carte icon={Wallet} label="Chiffre d'affaires" valeur={`${ca.toLocaleString('fr-MA')} DH`} />
         <Carte icon={Percent} label="Taux de conversion" valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
-          sous={tauxConversion != null ? `${nbCommandes} / ${sessions} sessions` : undefined} />
+          sous={tauxConversion != null
+            ? `${commandesSuivies} / ${sessions} sessions${suiviPartiel ? ` · depuis le ${debutSuivi.toLocaleDateString('fr-MA')} ${debutSuivi.toLocaleTimeString('fr-MA', { hour: '2-digit', minute: '2-digit' })}` : ''}`
+            : undefined} />
       </div>
 
       <div className="mt-6 bg-white border border-gray-200 rounded-xl p-5">
