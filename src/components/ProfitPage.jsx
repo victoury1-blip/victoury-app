@@ -507,8 +507,6 @@ export default function ProfitPage({ orders = [], setOrders }) {
   /* Coût par commande LIVRÉE, et retour sur dépense calculé sur l'argent
      réellement encaissé — pas sur les commandes passées. */
   const cpaReel = adKpis.livre ? totalPub / adKpis.livre : 0;
-  // Coût d'acquisition brut : ce que coûte chaque commande reçue, livrée ou non.
-  const coutParCommande = adKpis.total ? totalPub / adKpis.total : 0;
   const roasReel = totalPub ? ca / totalPub : 0;
 
   const totalRefuse = allFactureColis.filter(c => c.status === 'refuse').length;
@@ -687,7 +685,7 @@ export default function ProfitPage({ orders = [], setOrders }) {
             <h3 className="font-bold text-gray-800 text-sm">Indicateurs publicitaires</h3>
             <span className="text-[11px] text-gray-400">— {applied.dateFrom} → {applied.dateTo}</span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
               <div className="text-[10px] font-semibold text-gray-500 uppercase">Commandes reçues</div>
               <div className="text-lg font-black text-gray-800">{adKpis.total}</div>
@@ -705,13 +703,8 @@ export default function ProfitPage({ orders = [], setOrders }) {
               </div>
               <div className="text-[10px] text-gray-500 mt-0.5">annulé · injoignable · refusé</div>
             </div>
-            <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût par commande</div>
-              <div className="text-lg font-black text-violet-700">{fmt(coutParCommande)} <span className="text-xs font-semibold">DH</span></div>
-              <div className="text-[10px] text-gray-500 mt-0.5">pub {fmt(totalPub)} DH ÷ {adKpis.total} commandes</div>
-            </div>
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût par livraison</div>
+              <div className="text-[10px] font-semibold text-gray-500 uppercase">Coût par commande livrée</div>
               <div className="text-lg font-black text-orange-600">{fmt(cpaReel)} <span className="text-xs font-semibold">DH</span></div>
               <div className="text-[10px] text-gray-500 mt-0.5">pub {fmt(totalPub)} DH ÷ {adKpis.livre} livrées</div>
             </div>
