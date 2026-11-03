@@ -343,7 +343,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
         {paliers?.length > 0 && (
           <p className="mt-2 inline-flex items-center gap-1.5 bg-red-50 text-red-600 text-sm font-semibold px-3 py-1.5 rounded-full">
             {(() => {
-              const { brut, total } = prixLot(produit.price, paliers, paliers[0].rang);
+              const { brutAffiche: brut, total } = prixLot(produit.price, paliers, paliers[0].rang);
               return offreLot(paliers[0].rang, fmtMontant(total, lang), fmtMontant(brut, lang));
             })()}
           </p>

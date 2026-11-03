@@ -124,7 +124,7 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
           {paliers?.length > 0 && (
             <p className="inline-flex items-center bg-red-50 text-red-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
               {(() => {
-                const { brut, total } = prixLot(produit.price, paliers, paliers[0].rang);
+                const { brutAffiche: brut, total } = prixLot(produit.price, paliers, paliers[0].rang);
                 return offreLot(paliers[0].rang, fmtMontant(total, lang), fmtMontant(brut, lang));
               })()}
             </p>

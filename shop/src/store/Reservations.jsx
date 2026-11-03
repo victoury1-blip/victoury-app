@@ -22,7 +22,7 @@ function offrePour(o, produits, remises) {
   const paliers = paliersEffectifs(remises, p.collection_id);
   if (!paliers.length) return '';
   const n = paliers[0].rang;
-  const { brut, total } = prixLot(p.price, paliers, n);
+  const { brutAffiche: brut, total } = prixLot(p.price, paliers, n);
   return `${n === 2 ? 'جوج' : `${n} قطع`} ب ${fmtMontant(total, 'ar')} بلاصة ${fmtMontant(brut, 'ar')}`;
 }
 

@@ -174,8 +174,8 @@ describe('remise répartie par ligne', () => {
 import { prixLot, fmtMontant } from '../lib/pricing';
 describe('offre en lot', () => {
   it('2 Ensemble Hijab Sport à −27,93 % = 499 DH', () => {
-    expect(prixLot(290, [{ rang: 2, pourcent: 27.93 }], 2)).toEqual({ brut: 580, total: 499 });
-    expect(prixLot(249, [{ rang: 2, pourcent: 20.08 }], 2)).toEqual({ brut: 498, total: 448 });
+    expect(prixLot(290, [{ rang: 2, pourcent: 27.93 }], 2)).toEqual({ brut: 580, brutAffiche: 580, total: 499 });
+    expect(prixLot(249, [{ rang: 2, pourcent: 20.08 }], 2)).toEqual({ brut: 498, brutAffiche: 500, total: 448 });
   });
   it('montant sans décimales inutiles', () => {
     expect(fmtMontant(499, 'fr')).toBe('499 DH');

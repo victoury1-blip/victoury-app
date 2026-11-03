@@ -157,7 +157,12 @@ export function totalPanier(lignes, { paliers = [], remises = null, promo = null
     plutôt qu'un pourcentage à virgule. */
 export function prixLot(prix, paliers, n) {
   const brut = arrondi((Number(prix) || 0) * n);
-  return { brut, total: arrondi(brut - remiseQuantite([{ price: Number(prix) || 0, qty: n }], paliers)) };
+  return {
+    brut,
+    // Prix barré affiché, arrondi à la dizaine supérieure (2 × 249 = 498 → « بلاصة 500 »).
+    brutAffiche: Math.ceil(brut / 10) * 10,
+    total: arrondi(brut - remiseQuantite([{ price: Number(prix) || 0, qty: n }], paliers)),
+  };
 }
 
 /** Montant lisible : sans décimales quand il tombe juste (499 DH, pas 499,00 DH). */

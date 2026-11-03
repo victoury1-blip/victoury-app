@@ -59,7 +59,7 @@ export default function OffreLot({ lignes, remises, onQuantite, onAjouter }) {
   if (!cible) return null;
   const { ligne, paliers, manque } = cible;
   const n = paliers[0].rang;
-  const { brut, total } = prixLot(ligne.price, paliers, n);
+  const { brutAffiche: brut, total } = prixLot(ligne.price, paliers, n);
   const stockMeme = Number.isFinite(ligne.stock) ? ligne.stock : null;
   // La même pièce une fois de plus : seulement si le stock le permet (ou si
   // elle est en réservation, où le stock à zéro est attendu).
