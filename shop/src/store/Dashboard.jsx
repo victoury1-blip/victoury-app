@@ -63,15 +63,39 @@ function plageDePeriode(cle, custom) {
   return { start, end };
 }
 
-function Carte({ icon: Icon, label, valeur, sous }) {
+/* Pastille de couleur de chaque indicateur (fond clair + icône). */
+const TEINTES = {
+  bleu: 'bg-blue-50 text-blue-600', orange: 'bg-orange-50 text-orange-500', rose: 'bg-pink-50 text-pink-500',
+  vert: 'bg-green-50 text-green-600', violet: 'bg-purple-50 text-purple-500', gris: 'bg-gray-50 text-gray-400',
+};
+
+/** 10 234 → « 10.2K », 983 500 → « 983.5K », 1 250 000 → « 1.25M » ; tel quel sous 10 000. */
+function compact(n) {
+  const v = Number(n) || 0;
+  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(2).replace(/\.?0+$/, '')}M`;
+  if (Math.abs(v) >= 1e4) return `${(v / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
+  return v.toLocaleString('fr-MA');
+}
+
+const MOIS_COURTS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+const jourCourt = (iso) => `${Number(iso.slice(8, 10))} ${MOIS_COURTS[Number(iso.slice(5, 7)) - 1] || ''}`;
+
+/* Couleur de la courbe et de l'onglet actif, selon la série affichée. */
+const SERIES = {
+  revenu: { label: 'Revenue', titre: "Chiffre d'affaires", trait: '#22c55e', onglet: 'bg-green-50 text-green-700' },
+  commandes: { label: 'Commandes', titre: 'Commandes', trait: '#f97316', onglet: 'bg-orange-50 text-orange-600' },
+  sessions: { label: 'Sessions', titre: 'Sessions', trait: '#3b82f6', onglet: 'bg-blue-50 text-blue-600' },
+};
+
+function Carte({ icon: Icon, label, valeur, sous, teinte = 'gris' }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-500">{label}</p>
-        {Icon && <Icon size={16} className="text-gray-300" />}
+    <div className="bg-white border border-gray-200 rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm text-gray-600">{label}</p>
+        {Icon && <span className={`shrink-0 w-9 h-9 rounded-lg grid place-items-center ${TEINTES[teinte] || TEINTES.gris}`}><Icon size={17} /></span>}
       </div>
-      <p className="text-2xl font-medium mt-1">{valeur}</p>
-      {sous && <p className="text-xs text-gray-400 mt-0.5">{sous}</p>}
+      <p className="text-[26px] leading-tight font-semibold text-gray-900 mt-2 tabular-nums">{valeur}</p>
+      {sous && <p className="text-xs text-gray-400 mt-1">{sous}</p>}
     </div>
   );
 }
@@ -243,10 +267,10 @@ export default function Dashboard() {
     <div>
       {/* Inventaire */}
       <div className="grid sm:grid-cols-4 gap-4">
-        <Carte icon={Package} label="Produits actifs" valeur={stock ? stock.actifs : '…'} />
-        <Carte icon={Layers} label="Stock total" valeur={stock ? stock.stockTotal.toLocaleString('fr-MA') : '…'} />
-        <Carte icon={AlertTriangle} label="Rupture de stock" valeur={stock ? stock.rupture : '…'} />
-        <Carte icon={Archive} label="Archivés" valeur={stock ? stock.archives : '…'} />
+        <Carte icon={Package} teinte="bleu" label="Produits actifs" valeur={stock ? stock.actifs : '…'} />
+        <Carte icon={Layers} teinte="vert" label="Stock total" valeur={stock ? stock.stockTotal.toLocaleString('fr-MA') : '…'} />
+        <Carte icon={AlertTriangle} teinte="orange" label="Rupture de stock" valeur={stock ? stock.rupture : '…'} />
+        <Carte icon={Archive} teinte="gris" label="Archivés" valeur={stock ? stock.archives : '…'} />
       </div>
 
       {parCollection?.length > 0 && (
@@ -293,30 +317,30 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-5 grid sm:grid-cols-5 gap-4">
-        <Carte icon={Users} label="Sessions" valeur={sessions != null ? sessions.toLocaleString('fr-MA') : '—'}
+        <Carte icon={Users} teinte="bleu" label="Sessions" valeur={sessions != null ? compact(sessions) : '—'}
           sous={visiteurs != null ? `${visiteurs.toLocaleString('fr-MA')} visiteurs uniques` : (ga4 && !ga4.configured ? 'Statistiques non activées (visites.sql)' : undefined)} />
-        <Carte icon={ShoppingBag} label="Commandes" valeur={nbCommandes.toLocaleString('fr-MA')}
+        <Carte icon={ShoppingBag} teinte="orange" label="Commandes" valeur={compact(nbCommandes)}
           sous={nbCommandes ? `${Math.round(ca / nbCommandes).toLocaleString('fr-MA')} DH moy.` : undefined} />
-        <Carte icon={ShoppingCart} label="Ajouter au panier" valeur={paniers != null ? paniers.toLocaleString('fr-MA') : '—'}
+        <Carte icon={ShoppingCart} teinte="rose" label="Ajouter au panier" valeur={paniers != null ? compact(paniers) : '—'}
           sous={paniers ? `${((commandesSuivies / paniers) * 100).toFixed(1)}% convertis` : undefined} />
-        <Carte icon={Wallet} label="Chiffre d'affaires" valeur={`${ca.toLocaleString('fr-MA')} DH`} />
-        <Carte icon={Percent} label="Taux de conversion" valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
+        <Carte icon={Wallet} teinte="vert" label="Chiffre d'affaires" valeur={`${compact(Math.round(ca))} DH`} sous={`${nbCommandes.toLocaleString('fr-MA')} commandes`} />
+        <Carte icon={Percent} teinte="violet" label="Taux de conversion" valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
           sous={tauxConversion != null
             ? `${commandesSuivies} / ${sessions} sessions${suiviPartiel ? ` · depuis le ${heureMaroc(debutSuivi)}` : ''}`
             : undefined} />
       </div>
 
-      <div className="mt-6 bg-white border border-gray-200 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
           <div>
-            <p className="text-sm font-medium">{{ revenu: "Chiffre d'affaires", commandes: 'Commandes', sessions: 'Sessions' }[vueGraph]} dans le temps</p>
-            <p className="text-xs text-gray-400 mt-0.5">{isoJour(start)} — {isoJour(end)}</p>
+            <p className="text-base font-semibold text-gray-900">{SERIES[vueGraph].titre} dans le temps</p>
+            <p className="text-xs text-gray-400 mt-0.5">{jourCourt(isoJour(start))} — {jourCourt(isoJour(end))}</p>
           </div>
-          <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
-            {[['revenu', 'Revenu'], ['commandes', 'Commandes'], ...(visites ? [['sessions', 'Sessions']] : [])].map(([v, l]) => (
+          <div className="flex gap-1">
+            {['revenu', 'commandes', ...(visites ? ['sessions'] : [])].map(v => (
               <button key={v} onClick={() => setVueGraph(v)}
-                className={`px-3 py-1 text-xs rounded-md ${vueGraph === v ? 'bg-white shadow-sm font-medium' : 'text-gray-500'}`}>
-                {l}
+                className={`px-3 py-1.5 text-sm rounded-lg ${vueGraph === v ? `${SERIES[v].onglet} font-medium` : 'text-gray-500 hover:bg-gray-50'}`}>
+                {SERIES[v].label}
               </button>
             ))}
           </div>
@@ -324,10 +348,10 @@ export default function Dashboard() {
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={serie}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip formatter={v => vueGraph === 'revenu' ? `${v.toLocaleString('fr-MA')} DH` : v} labelFormatter={l => l} />
-            <Line type="monotone" dataKey={vueGraph} stroke="#22c55e" strokeWidth={2} dot={false} />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={jourCourt} minTickGap={40} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={compact} axisLine={false} tickLine={false} width={44} />
+            <Tooltip formatter={v => [vueGraph === 'revenu' ? `${v.toLocaleString('fr-MA')} DH` : v.toLocaleString('fr-MA'), SERIES[vueGraph].label]} labelFormatter={jourCourt} />
+            <Line type="monotone" dataKey={vueGraph} stroke={SERIES[vueGraph].trait} strokeWidth={2} dot={serie.length <= 2} />
           </LineChart>
         </ResponsiveContainer>
       </div>
