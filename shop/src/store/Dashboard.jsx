@@ -20,8 +20,10 @@ function parseDateAdded(s) {
   return new Date(+m[3], +m[2] - 1, +m[1]);
 }
 
+/** Jour LOCAL 'AAAA-MM-JJ' (toISOString passait en UTC : minuit au Maroc
+    devenait la veille à 23 h, et tous les jours glissaient d'un cran). */
 function isoJour(d) {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function plageDePeriode(cle, custom) {
@@ -38,7 +40,8 @@ function plageDePeriode(cle, custom) {
     return { start: d, end: fin };
   }
   const spec = PERIODES.find(p => p.cle === cle) || PERIODES[3];
-  const start = new Date(auj); start.setDate(start.getDate() - spec.jours + 1);
+  // « Auj. » (0 jour) commence aujourd'hui — la formule N-1 le mettait à demain.
+  const start = new Date(auj); start.setDate(start.getDate() - Math.max(0, spec.jours - 1));
   const end = new Date(); end.setHours(23, 59, 59, 999);
   return { start, end };
 }
@@ -56,6 +59,30 @@ function Carte({ icon: Icon, label, valeur, sous }) {
   );
 }
 
+/** Liste classée avec barre proportionnelle (sources, produits). */
+function Classement({ titre, lignes, total }) {
+  const max = Math.max(1, ...lignes.map(l => l[1]));
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <p className="text-sm font-medium mb-3">{titre}</p>
+      {lignes.length === 0 && <p className="text-xs text-gray-400">Pas encore de données.</p>}
+      <div className="space-y-2.5">
+        {lignes.map(([nom, n]) => (
+          <div key={nom}>
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-700 truncate pr-3">{nom}</span>
+              <span className="text-gray-500 tabular-nums shrink-0">{n.toLocaleString('fr-MA')}{total ? ` · ${Math.round((n / total) * 100)}%` : ''}</span>
+            </div>
+            <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-green-500 rounded-full" style={{ width: `${(n / max) * 100}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [stock, setStock] = useState(null);
   const [parCollection, setParCollection] = useState(null);
@@ -63,6 +90,7 @@ export default function Dashboard() {
   const [custom, setCustom] = useState({ start: '', end: '' });
   const [commandes, setCommandes] = useState(null);
   const [ga4, setGa4] = useState(null);
+  const [visites, setVisites] = useState(null);
   const [chargement, setChargement] = useState(false);
 
   const { start, end } = useMemo(() => plageDePeriode(periode, custom), [periode, custom]);
@@ -125,19 +153,29 @@ export default function Dashboard() {
     }
   }, [start, end]);
 
+  /* Statistiques maison (table shop_visites, voir visites.sql) : null si la
+     table n'a pas encore été créée — on retombe alors sur Google Analytics. */
+  const chargerVisites = useCallback(async () => {
+    const fin = new Date(end); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1);
+    const { data, error } = await supabase.rpc('shop_stats_visites', { p_debut: start.toISOString(), p_fin: fin.toISOString() });
+    setVisites(!error && data ? data : null);
+  }, [start, end]);
+
   useEffect(() => { chargerStock(); }, [chargerStock]);
 
   const toutRecharger = useCallback(async () => {
     setChargement(true);
-    await Promise.all([chargerCommandes(), chargerGa4()]);
+    await Promise.all([chargerCommandes(), chargerGa4(), chargerVisites()]);
     setChargement(false);
-  }, [chargerCommandes, chargerGa4]);
+  }, [chargerCommandes, chargerGa4, chargerVisites]);
 
   useEffect(() => { toutRecharger(); }, [toutRecharger]);
 
   const ca = useMemo(() => (commandes || []).reduce((s, o) => s + (Number(o.price) || 0), 0), [commandes]);
   const nbCommandes = commandes?.length ?? 0;
-  const sessions = ga4?.sessions ?? null;
+  const sessions = visites ? visites.sessions : (ga4?.sessions ?? null);
+  const visiteurs = visites ? visites.visiteurs : (ga4?.totalUsers ?? null);
+  const paniers = visites ? visites.paniers : (ga4?.ajoutsPanier ?? null);
   const tauxConversion = sessions ? (nbCommandes / sessions) * 100 : null;
 
   /* Série journalière pour le graphique — un point par jour de la période,
@@ -145,11 +183,14 @@ export default function Dashboard() {
   const serie = useMemo(() => {
     if (!commandes) return [];
     const parJour = new Map();
+    for (const v of visites?.par_jour || []) {
+      parJour.set(v.jour, { date: v.jour, revenu: 0, commandes: 0, sessions: Number(v.sessions) || 0 });
+    }
     for (const o of commandes) {
       const d = parseDateAdded(o.date_added);
       if (!d) continue;
       const cle = isoJour(d);
-      const e = parJour.get(cle) || { date: cle, revenu: 0, commandes: 0 };
+      const e = parJour.get(cle) || { date: cle, revenu: 0, commandes: 0, sessions: 0 };
       e.revenu += Number(o.price) || 0;
       e.commandes += 1;
       parJour.set(cle, e);
@@ -158,11 +199,11 @@ export default function Dashboard() {
     const cur = new Date(start);
     while (cur <= end) {
       const cle = isoJour(cur);
-      jours.push(parJour.get(cle) || { date: cle, revenu: 0, commandes: 0 });
+      jours.push(parJour.get(cle) || { date: cle, revenu: 0, commandes: 0, sessions: 0 });
       cur.setDate(cur.getDate() + 1);
     }
     return jours;
-  }, [commandes, start, end]);
+  }, [commandes, visites, start, end]);
 
   const [vueGraph, setVueGraph] = useState('revenu');
 
@@ -221,10 +262,11 @@ export default function Dashboard() {
 
       <div className="mt-5 grid sm:grid-cols-5 gap-4">
         <Carte icon={Users} label="Sessions" valeur={sessions != null ? sessions.toLocaleString('fr-MA') : '—'}
-          sous={ga4?.totalUsers != null ? `${ga4.totalUsers.toLocaleString('fr-MA')} visiteurs uniques` : (ga4 && !ga4.configured ? 'Google Analytics non configuré' : undefined)} />
+          sous={visiteurs != null ? `${visiteurs.toLocaleString('fr-MA')} visiteurs uniques` : (ga4 && !ga4.configured ? 'Statistiques non activées (visites.sql)' : undefined)} />
         <Carte icon={ShoppingBag} label="Commandes" valeur={nbCommandes.toLocaleString('fr-MA')}
           sous={nbCommandes ? `${Math.round(ca / nbCommandes).toLocaleString('fr-MA')} DH moy.` : undefined} />
-        <Carte icon={ShoppingCart} label="Ajouter au panier" valeur={ga4?.ajoutsPanier != null ? ga4.ajoutsPanier.toLocaleString('fr-MA') : '—'} />
+        <Carte icon={ShoppingCart} label="Ajouter au panier" valeur={paniers != null ? paniers.toLocaleString('fr-MA') : '—'}
+          sous={paniers ? `${((nbCommandes / paniers) * 100).toFixed(1)}% convertis` : undefined} />
         <Carte icon={Wallet} label="Chiffre d'affaires" valeur={`${ca.toLocaleString('fr-MA')} DH`} />
         <Carte icon={Percent} label="Taux de conversion" valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
           sous={tauxConversion != null ? `${nbCommandes} / ${sessions} sessions` : undefined} />
@@ -233,11 +275,11 @@ export default function Dashboard() {
       <div className="mt-6 bg-white border border-gray-200 rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm font-medium">{vueGraph === 'revenu' ? "Chiffre d'affaires" : 'Commandes'} dans le temps</p>
+            <p className="text-sm font-medium">{{ revenu: "Chiffre d'affaires", commandes: 'Commandes', sessions: 'Sessions' }[vueGraph]} dans le temps</p>
             <p className="text-xs text-gray-400 mt-0.5">{isoJour(start)} — {isoJour(end)}</p>
           </div>
           <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
-            {[['revenu', 'Revenu'], ['commandes', 'Commandes']].map(([v, l]) => (
+            {[['revenu', 'Revenu'], ['commandes', 'Commandes'], ...(visites ? [['sessions', 'Sessions']] : [])].map(([v, l]) => (
               <button key={v} onClick={() => setVueGraph(v)}
                 className={`px-3 py-1 text-xs rounded-md ${vueGraph === v ? 'bg-white shadow-sm font-medium' : 'text-gray-500'}`}>
                 {l}
@@ -255,6 +297,13 @@ export default function Dashboard() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {visites && (visites.par_source?.length > 0 || visites.produits?.length > 0) && (
+        <div className="mt-6 grid md:grid-cols-2 gap-4">
+          <Classement titre="Sources des visites" lignes={(visites.par_source || []).map(x => [x.source, Number(x.sessions) || 0])} total={sessions} />
+          <Classement titre="Produits ajoutés au panier" lignes={(visites.produits || []).map(x => [x.produit, Number(x.ajouts) || 0])} />
+        </div>
+      )}
 
       <p className="mt-4 text-xs text-gray-400">
         Les commandes passées sur le site apparaissent directement dans l'application, onglet « À Confirmer ».

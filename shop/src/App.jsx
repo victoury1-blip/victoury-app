@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { enregistrerVisite, enregistrerAjoutPanier } from './lib/visites';
 import { X } from 'lucide-react';
 import AnnonceBar from './components/AnnonceBar';
 import Header from './components/Header';
@@ -283,6 +284,8 @@ function Vitrine() {
   // Produit…), pas une seule visite figée.
   useEffect(() => {
     trackGA4('page_view', { page_path: pathname, page_location: window.location.href });
+    // Statistiques maison du tableau de bord : une visite par onglet et par jour.
+    enregistrerVisite();
   }, [pathname]);
 
   // La couleur principale (texte, boutons, bordures actives) est une variable
@@ -322,6 +325,7 @@ function Vitrine() {
     // faire surgir le tiroir panier — le formulaire de commande est déjà
     // affiché en place dans la page, le tiroir ferait doublon par-dessus.
     if (ouvrirTiroir) setPanierOuvert(true);
+    enregistrerAjoutPanier(ligne.name);
     trackPixel('AddToCart', {
       content_name: ligne.name, content_ids: [ligne.slug], content_type: 'product',
       value: ligne.price, currency: 'MAD',
