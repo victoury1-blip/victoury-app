@@ -29,6 +29,16 @@ function parseDateHeure(s) {
   return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
 }
 
+/** Horodatage Supabase → Date. Sans fuseau dans la chaîne, c'est de l'UTC
+    (sinon le navigateur le lirait en heure locale et décalerait d'1 h ou plus). */
+function lireHorodatage(t) {
+  if (!t) return null;
+  const s = String(t).replace(' ', 'T');
+  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}Z`);
+  return isNaN(d) ? null : d;
+}
+const heureMaroc = (d) => `${d.toLocaleDateString('fr-MA', { timeZone: 'Africa/Casablanca' })} ${d.toLocaleTimeString('fr-MA', { timeZone: 'Africa/Casablanca', hour: '2-digit', minute: '2-digit' })}`;
+
 function isoJour(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -132,7 +142,7 @@ export default function Dashboard() {
      l'administration (préfixe VS-, non supprimées). */
   const chargerCommandes = useCallback(async () => {
     const { data } = await supabase.from('orders')
-      .select('id, price, date_added, is_deleted')
+      .select('id, price, date_added, created_at, is_deleted')
       .like('id', 'VS-%');
     const dans = (data || []).filter(o => {
       if (o.is_deleted) return false;
@@ -166,7 +176,7 @@ export default function Dashboard() {
   const [debutSuivi, setDebutSuivi] = useState(null);
   useEffect(() => {
     supabase.from('shop_visites').select('created_at').order('created_at', { ascending: true }).limit(1)
-      .then(({ data }) => { if (data?.[0]?.created_at) setDebutSuivi(new Date(data[0].created_at)); }, () => {});
+      .then(({ data }) => { const d = lireHorodatage(data?.[0]?.created_at); if (d) setDebutSuivi(d); }, () => {});
   }, []);
 
   const chargerVisites = useCallback(async () => {
@@ -196,7 +206,7 @@ export default function Dashboard() {
   const commandesSuivies = useMemo(() => {
     if (!commandes) return 0;
     if (!suiviPartiel) return commandes.length;
-    return commandes.filter(o => { const d = parseDateHeure(o.date_added); return d && d >= debutSuivi; }).length;
+    return commandes.filter(o => { const d = lireHorodatage(o.created_at) || parseDateHeure(o.date_added); return d && d >= debutSuivi; }).length;
   }, [commandes, suiviPartiel, debutSuivi]);
   const tauxConversion = sessions ? (commandesSuivies / sessions) * 100 : null;
 
@@ -292,7 +302,7 @@ export default function Dashboard() {
         <Carte icon={Wallet} label="Chiffre d'affaires" valeur={`${ca.toLocaleString('fr-MA')} DH`} />
         <Carte icon={Percent} label="Taux de conversion" valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
           sous={tauxConversion != null
-            ? `${commandesSuivies} / ${sessions} sessions${suiviPartiel ? ` · depuis le ${debutSuivi.toLocaleDateString('fr-MA')} ${debutSuivi.toLocaleTimeString('fr-MA', { hour: '2-digit', minute: '2-digit' })}` : ''}`
+            ? `${commandesSuivies} / ${sessions} sessions${suiviPartiel ? ` · depuis le ${heureMaroc(debutSuivi)}` : ''}`
             : undefined} />
       </div>
 
