@@ -12,7 +12,7 @@ import { A_CONFIRMER_STATUSES, EN_SUIVI_STATUSES, ANNULE_STATUSES } from './coli
 
 export const ORDER_TABS = [
   { id: 'a_confirmer', label: 'À Confirmer', statuses: A_CONFIRMER_STATUSES },
-  { id: 'en_suivi', label: 'En Suivi', statuses: EN_SUIVI_STATUSES },
+  { id: 'en_suivi', label: 'En Suivi', statuses: EN_SUIVI_STATUSES, noBadge: true }, // compteur masqué à la demande (trop gros pour aider)
   { id: 'reporter', label: 'Reporté', statuses: ['reporter'] },
   { id: 'confirme', label: 'Confirmé', statuses: ['confirme'] },
   /* Sans compteur : une commande annulée est close, il n'y a rien à traiter.

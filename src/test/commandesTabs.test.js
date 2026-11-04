@@ -56,9 +56,8 @@ describe('adresses des onglets', () => {
 
 /* Une commande annulée est close : un badge rouge la ferait passer pour du
    travail en attente. */
-it('« Annulé » n’affiche pas de compteur', () => {
-  const annule = ORDER_TABS.find(t => t.id === 'annule');
-  expect(annule.noBadge).toBe(true);
-  // Les onglets à traiter gardent le leur.
-  for (const t of ORDER_TABS.filter(x => x.id !== 'annule')) expect(t.noBadge).toBeFalsy();
+it('« Annulé » et « En Suivi » n’affichent pas de compteur', () => {
+  for (const id of ['annule', 'en_suivi']) expect(ORDER_TABS.find(t => t.id === id).noBadge).toBe(true);
+  // Les autres onglets à traiter gardent le leur.
+  for (const t of ORDER_TABS.filter(x => !['annule', 'en_suivi'].includes(x.id))) expect(t.noBadge).toBeFalsy();
 });
