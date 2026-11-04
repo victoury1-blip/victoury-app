@@ -66,8 +66,8 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
   const invalide = montant <= 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[88vh] overflow-y-auto animate-fade-in">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h2 className="font-bold text-gray-900">Ajouter un versement</h2>
@@ -173,8 +173,8 @@ function RetourModal({ facture, onClose, onSave }) {
   const article = items.find(i => i.id === form.itemId);
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[88vh] overflow-y-auto animate-fade-in">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h2 className="font-bold text-gray-900">Retour au fournisseur</h2>
@@ -282,8 +282,8 @@ function ItemModal({ item, onClose, onSave }) {
   const puce = (actif) => `flex-1 rounded-xl border-2 px-3 py-3 text-left transition-colors ${actif ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`;
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[88vh] flex flex-col overflow-hidden animate-fade-in" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-900 rounded-t-2xl shrink-0">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <Truck size={16} /> {item ? 'Modifier' : 'Nouvel'} article fournisseur
