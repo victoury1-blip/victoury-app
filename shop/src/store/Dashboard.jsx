@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { FUSEAU } from '../lib/fuseau';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Package, Layers, AlertTriangle, Archive, Users, ShoppingCart, ShoppingBag, Wallet, Percent, RefreshCw } from 'lucide-react';
 import { BarChart, Bar } from 'recharts';
@@ -39,7 +40,7 @@ function lireHorodatage(t) {
   const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}Z`);
   return isNaN(d) ? null : d;
 }
-const heureMaroc = (d) => `${d.toLocaleDateString('fr-MA', { timeZone: 'Africa/Casablanca' })} ${d.toLocaleTimeString('fr-MA', { timeZone: 'Africa/Casablanca', hour: '2-digit', minute: '2-digit' })}`;
+const heureMaroc = (d) => `${d.toLocaleDateString('fr-MA', { timeZone: FUSEAU })} ${d.toLocaleTimeString('fr-MA', { timeZone: FUSEAU, hour: '2-digit', minute: '2-digit' })}`;
 
 function isoJour(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

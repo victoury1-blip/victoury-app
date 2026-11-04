@@ -1,3 +1,4 @@
+import { FUSEAU } from './fuseau';
 /* Calculs du tableau de bord de la boutique (/store) à partir des commandes
  * du site — séparés de l'affichage pour être testés. */
 
@@ -67,7 +68,7 @@ export function topProduits(commandes, limite = 8) {
 
 /** Heure du Maroc (0–23) d'un horodatage. */
 export function heureMaroc(d) {
-  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Casablanca', hour: '2-digit', hour12: false }).format(d));
+  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: FUSEAU, hour: '2-digit', hour12: false }).format(d));
   return h === 24 ? 0 : h;
 }
 

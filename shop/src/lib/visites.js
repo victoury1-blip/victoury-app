@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { FUSEAU } from './fuseau';
 import { sourceVisite } from './source';
 
 /* Statistiques de visites maison (table shop_visites, voir visites.sql) :
@@ -10,7 +11,7 @@ import { sourceVisite } from './source';
 const ROBOT = /bot|crawl|spider|slurp|headless|lighthouse|facebookexternalhit|preview|pingdom|vercel/i;
 const CLE_VISITEUR = 'victoury_visiteur';
 
-const jourLocal = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });
+const jourLocal = () => new Date().toLocaleDateString('en-CA', { timeZone: FUSEAU });
 
 export function estRobot(ua = '') { return !ua || ROBOT.test(ua); }
 

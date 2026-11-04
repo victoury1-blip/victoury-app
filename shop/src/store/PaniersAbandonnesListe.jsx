@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FUSEAU } from '../lib/fuseau';
 import { MessageCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
@@ -83,7 +84,7 @@ export default function PaniersAbandonnesListe() {
                   </p>
                 )}
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {fmtPrix(p.total)} · {new Date(p.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  {fmtPrix(p.total)} · {new Date(p.created_at).toLocaleString('fr-FR', { timeZone: FUSEAU, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
               <a href={`https://wa.me/${numeroWhatsApp(p.telephone)}?text=${encodeURIComponent(messageRelance(p))}`}

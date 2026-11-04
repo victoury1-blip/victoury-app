@@ -16,14 +16,14 @@ import { A_CONFIRMER_STATUSES } from '../data/colisPipeline';
 import { getMetaConfig, saveMetaConfig, loadMetaConfigRemote, buildEvent, sendEvents } from '../lib/metaCapi';
 
 const TIMEZONES = [
+  { value: 'UTC',                label: 'Maroc — heure GMT (UTC+0)' },
   { value: 'Africa/Casablanca',  label: 'Maroc (Casablanca) — UTC+1' },
   { value: 'Europe/Paris',       label: 'France (Paris) — UTC+2' },
-  { value: 'Europe/London',      label: 'Royaume-Uni (Londres) — UTC+1' },
+  { value: 'Europe/London',      label: "Royaume-Uni (Londres) — UTC+0, +1 l'été" },
   { value: 'Africa/Cairo',       label: 'Égypte (Le Caire) — UTC+3' },
   { value: 'Asia/Riyadh',        label: 'Arabie Saoudite (Riyad) — UTC+3' },
   { value: 'Asia/Dubai',         label: 'EAU (Dubaï) — UTC+4' },
   { value: 'America/New_York',   label: 'USA Est (New York) — UTC-4' },
-  { value: 'UTC',                label: 'UTC — UTC+0' },
 ];
 
 function InputField({ label, type = 'text', value, onChange, placeholder, show, onToggleShow }) {

@@ -40,7 +40,7 @@ describe('tableau de bord boutique', () => {
   });
 
   it('compte les commandes par heure du Maroc', () => {
-    const d = new Date('2026-11-03T19:30:00Z'); // 20h30 au Maroc (UTC+1)
+    const d = new Date('2026-11-03T20:30:00Z'); // 20h30, heure GMT de l'équipe
     expect(heureMaroc(d)).toBe(20);
     const r = commandesParHeure([{ t: d }, { t: d }], o => o.t);
     expect(r).toHaveLength(24);
