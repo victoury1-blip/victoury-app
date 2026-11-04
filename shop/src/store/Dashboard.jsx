@@ -500,6 +500,12 @@ export default function Dashboard() {
       )}
 
       {/* Dans le formulaire de commande */}
+      {visites && !formulaire && (
+        <div className="mt-6 bg-white border border-dashed border-gray-300 rounded-2xl p-5 text-sm">
+          <p className="font-semibold text-gray-900">Dans le formulaire de commande</p>
+          <p className="text-xs text-gray-400 mt-1">Suivi actif — les chiffres apparaîtront dès que des visiteurs rempliront le formulaire de commande sur cette période.</p>
+        </div>
+      )}
       {formulaire && (
         <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
           <p className="text-base font-semibold text-gray-900">Dans le formulaire de commande</p>
