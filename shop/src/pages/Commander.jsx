@@ -45,9 +45,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // Une seule LIGNE par visite (pas un insert à chaque perte de focus), mais
   // mise à jour à chaque nouvel appel : la ville et l'adresse ne sont
   // connues qu'après le téléphone (premier déclencheur), donc un simple
-  // insert-une-fois les ratait toujours. L'id de la ligne créée permet de la
-  // compléter au lieu d'en semer une nouvelle par champ rempli.
-  const panierAbandonneId = useRef(null);
+  // insert-une-fois les ratait toujours. Dernière version envoyée : on ne
+  // réinsère que si quelque chose a changé (voir noterPanierAbandonne).
+  const derniereSignature = useRef('');
   const panierEnCours = useRef(false);
   // Un seul envoi par visite, même chose : Meta a déjà ce qui était rempli
   // dès le premier envoi, pas besoin de le renvoyer à chaque champ suivant.
@@ -149,13 +149,18 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
         paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
       }).total,
     };
-    const requete = panierAbandonneId.current
-      ? supabase.from('shop_paniers_abandonnes').update(donnees).eq('id', panierAbandonneId.current)
-      : supabase.from('shop_paniers_abandonnes').insert(donnees).select('id').single();
-    requete.then(({ data, error }) => {
+    /* Toujours une INSERTION, sans relecture : un visiteur n'a le droit ni
+       de relire ni de modifier une ligne (lecture réservée à l'administration),
+       et « insert().select() » échouait donc en silence pour tous les vrais
+       clients — seuls les tests faits connecté à /store s'enregistraient.
+       Chaque nouvelle info (adresse…) ajoute une ligne ; la page de relance
+       ne garde que la plus récente par téléphone. */
+    const signature = JSON.stringify(donnees);
+    if (signature === derniereSignature.current) { panierEnCours.current = false; return; }
+    supabase.from('shop_paniers_abandonnes').insert(donnees).then(({ error }) => {
       panierEnCours.current = false;
-      if (!error && data?.id) panierAbandonneId.current = data.id;
-    });
+      if (!error) derniereSignature.current = signature;
+    }, () => { panierEnCours.current = false; });
   }
 
   // Meta recommande d'envoyer e-mail/ville/prénom/nom dès qu'ils sont connus

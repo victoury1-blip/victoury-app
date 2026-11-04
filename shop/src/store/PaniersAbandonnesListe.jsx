@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MessageCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
-import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
+import { chargerPaniersActifs, cleTel } from '../lib/paniersAbandonnes';
 
 /* Un client qui a tapé son téléphone à la caisse (Commander.jsx, onBlur) mais
    n'a jamais validé — capturé côté client dans shop_paniers_abandonnes, à
@@ -30,9 +30,15 @@ export default function PaniersAbandonnesListe() {
 
   useEffect(() => { chargerPaniersActifs().then(setVisibles).catch(() => setVisibles([])); }, []);
 
+  /* Retire TOUTES les lignes de ce téléphone (une par info ajoutée par le
+     client), sinon la précédente réapparaissait à la place. */
   async function supprimer(id) {
-    setVisibles(list => list.filter(p => p.id !== id));
-    await supabase.from('shop_paniers_abandonnes').delete().eq('id', id);
+    const p = (visibles || []).find(x => x.id === id);
+    setVisibles(list => list.filter(x => x.id !== id));
+    if (!p) return;
+    const { data } = await supabase.from('shop_paniers_abandonnes').select('id, telephone');
+    const ids = (data || []).filter(x => cleTel(x.telephone) === cleTel(p.telephone)).map(x => x.id);
+    await supabase.from('shop_paniers_abandonnes').delete().in('id', ids.length ? ids : [id]);
   }
 
   // Marque le panier "déjà relancé" dès le clic sur WhatsApp — sans bloquer

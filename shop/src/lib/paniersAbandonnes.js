@@ -8,23 +8,30 @@ const chiffres = (s) => (s || '').replace(/\D/g, '');
 // liste de relance.
 export const cleTel = (s) => chiffres(s).slice(-9);
 
-/** Paniers actifs à relancer : un seul par téléphone (le plus récent), sans
-    ceux dont le client est déjà revenu commander tout seul (même règle et
-    même source utilisées par la page et par le badge du menu — un chiffre
-    affiché à deux endroits ne doit jamais pouvoir diverger). */
+/** Paniers à relancer : un seul par téléphone (le plus récent), sans ceux
+    dont le client a commandé APRÈS avoir laissé ce panier. Une commande plus
+    ancienne (client fidèle, numéro de test de l'équipe) ne masque plus rien. */
+export function filtrerPaniersActifs(paniers, commandes) {
+  const derniereCommande = new Map();
+  for (const o of commandes || []) {
+    const cle = cleTel(o.recipient?.phone);
+    if (!cle) continue;
+    const t = Date.parse(o.created_at) || 0;
+    if (t > (derniereCommande.get(cle) || 0)) derniereCommande.set(cle, t);
+  }
+  const parTel = new Map();
+  for (const p of [...(paniers || [])].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))) {
+    const cle = cleTel(p.telephone);
+    if (cle && !parTel.has(cle)) parTel.set(cle, p);
+  }
+  return [...parTel.values()].filter(p => !((derniereCommande.get(cleTel(p.telephone)) || 0) >= (Date.parse(p.created_at) || 0)));
+}
+
+/** (même règle pour la page et pour le badge du menu) */
 export async function chargerPaniersActifs() {
   const [{ data: paniers }, { data: commandes }] = await Promise.all([
-    supabase.from('shop_paniers_abandonnes').select('*').order('created_at', { ascending: false }).limit(200),
-    // Pas de filtre sur `date_added` : la colonne est un texte
-    // "JJ/MM/AAAA HH:MM:SS", pas une vraie date.
-    supabase.from('orders').select('recipient').like('id', 'VS-%'),
+    supabase.from('shop_paniers_abandonnes').select('*').order('created_at', { ascending: false }).limit(300),
+    supabase.from('orders').select('recipient, created_at').like('id', 'VS-%').order('created_at', { ascending: false }).limit(1000),
   ]);
-  const telsConvertis = new Set((commandes || []).map(o => cleTel(o.recipient?.phone)).filter(Boolean));
-
-  const parTel = new Map();
-  for (const p of paniers || []) {
-    const cle = cleTel(p.telephone);
-    if (!parTel.has(cle)) parTel.set(cle, p);
-  }
-  return [...parTel.values()].filter(p => !telsConvertis.has(cleTel(p.telephone)));
+  return filtrerPaniersActifs(paniers, commandes);
 }
