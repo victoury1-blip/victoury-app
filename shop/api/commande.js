@@ -121,21 +121,35 @@ async function interroger(url, ac) {
   return r.json();
 }
 
+/* Ville approximative d'après l'IP — un « plus », jamais une raison de faire
+   attendre la cliente : les deux services sont interrogés EN MÊME TEMPS et on
+   abandonne au bout de 1,2 s (avant : l'un après l'autre, jusqu'à 3,5 s). */
 async function localiser(ip) {
   if (!ip || ip === '127.0.0.1' || ip.startsWith('::')) return null;
   const ac = new AbortController();
-  const to = setTimeout(() => ac.abort(), 3500);
+  const to = setTimeout(() => ac.abort(), 1200);
   try {
-    const d = await interroger(`https://ipapi.co/${ip}/json/`, ac).catch(() => null);
+    const [a, b] = await Promise.allSettled([
+      interroger(`https://ipapi.co/${ip}/json/`, ac),
+      interroger(`https://ipwho.is/${ip}`, ac),
+    ]);
+    const d = a.status === 'fulfilled' ? a.value : null;
     if (d && !d.error && d.city) return { ville: d.city, pays: d.country_name || null };
-
-    const d2 = await interroger(`https://ipwho.is/${ip}`, ac).catch(() => null);
+    const d2 = b.status === 'fulfilled' ? b.value : null;
     if (d2?.success && d2.city) return { ville: d2.city, pays: d2.country || null };
-
     return null;
   } finally {
     clearTimeout(to);
   }
+}
+
+/* Travail à finir APRÈS la réponse à la cliente (copie Google Sheets) :
+   Vercel le laisse aboutir via waitUntil (même mécanisme que le paquet
+   @vercel/functions). Hors Vercel, on l'attend comme avant. */
+function apresReponse(promesse) {
+  const ctx = globalThis[Symbol.for('@vercel/request-context')]?.get?.();
+  if (typeof ctx?.waitUntil === 'function') { ctx.waitUntil(promesse); return Promise.resolve(); }
+  return promesse;
 }
 
 /* Filet de secours : une copie de chaque commande part vers une feuille
@@ -311,6 +325,9 @@ export default async function handler(req, res) {
   // En même temps que la copie vers la feuille (elle aussi attendue, voir son
   // commentaire) plutôt qu'après : les deux sont indépendantes, les
   // enchaîner ajoutait leur durée l'une à l'autre pour rien.
+  // La copie vers la feuille Google part en arrière-plan : un Apps Script
+  // lent (jusqu'à 7 s) ne retient plus la cliente sur « Envoi en cours ».
+  const copie = apresReponse(copierVersSheet(url, key, commande));
   await Promise.all([
     ...serverLignes.map(l =>
       fetch(`${url}/rest/v1/rpc/shop_decrement_stock`, {
@@ -319,10 +336,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ p_slug: l.slug, p_size: l.size || '', p_qty: l.qty || 1 }),
       }).catch(() => {})
     ),
-    // Attendue (pas laissée en arrière-plan) : une fois la réponse envoyée,
-    // Vercel peut geler la fonction avant qu'un appel encore en vol n'ait eu
-    // le temps d'aboutir — la copie vers la feuille ne partirait alors jamais.
-    copierVersSheet(url, key, commande),
+    copie,
   ]);
 
   return res.status(200).json({ ok: true, id: commande.id });

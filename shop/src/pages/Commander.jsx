@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { enregistrerDebutCommande, enregistrerEtapeFormulaire } from '../lib/visites';
 import { Link, useNavigate } from 'react-router-dom';
-import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck } from 'lucide-react';
+import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck, Loader2 } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { champsManquants } from '../lib/commande';
@@ -533,7 +533,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
               lenteur au moment précis où le client clique pour de bon. */}
           <button onClick={valider} disabled={envoi}
             className="mt-5 w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase disabled:opacity-60 transition-colors shadow-lg shadow-orange-600/30">
-            {envoi ? tr('envoiEnCours') : tr('validerCommande')}
+            {envoi
+              ? <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> {tr('envoiEnCours')}</span>
+              : tr('validerCommande')}
           </button>
           <OffreTimer className="mt-2 justify-center" />
 
