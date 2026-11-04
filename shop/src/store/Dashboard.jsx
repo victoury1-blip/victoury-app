@@ -185,7 +185,15 @@ export default function Dashboard() {
 
   /* Commandes du site sur la période — mêmes règles que le reste de
      l'administration (préfixe VS-, non supprimées). */
-  const prec = useMemo(() => periodePrecedente(start, end), [start, end]);
+  /* Période d'avant de même durée. Si la période en cours n'est pas finie
+     (« Auj. » à 10 h), on la coupe au même moment : aujourd'hui jusqu'à 10 h
+     contre hier jusqu'à 10 h — pas contre toute la journée d'hier. */
+  const prec = useMemo(() => {
+    const p = periodePrecedente(start, end);
+    const maintenant = new Date();
+    const finComparable = maintenant < end ? new Date(p.start.getTime() + (maintenant - start)) : p.end;
+    return { ...p, fin: finComparable };
+  }, [start, end]);
   const [commandesPrec, setCommandesPrec] = useState(null);
   const chargerCommandes = useCallback(async () => {
     // Par pages de 1000 (limite Supabase), depuis le début de la période précédente.
@@ -208,7 +216,10 @@ export default function Dashboard() {
       return d && d >= a && d <= b;
     });
     setCommandes(entre(start, end));
-    setCommandesPrec(entre(prec.start, prec.end));
+    setCommandesPrec(entre(prec.start, prec.end).filter(o => {
+      const d = lireHorodatage(o.created_at) || parseDateHeure(o.date_added);
+      return !d || d <= prec.fin;
+    }));
   }, [start, end, prec]);
 
   const chargerGa4 = useCallback(async () => {
@@ -242,7 +253,7 @@ export default function Dashboard() {
     const fin = new Date(end); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1);
     const [act, avant] = await Promise.all([
       supabase.rpc('shop_stats_visites', { p_debut: start.toISOString(), p_fin: fin.toISOString() }),
-      supabase.rpc('shop_stats_visites', { p_debut: prec.start.toISOString(), p_fin: start.toISOString() }),
+      supabase.rpc('shop_stats_visites', { p_debut: prec.start.toISOString(), p_fin: prec.fin.toISOString() }),
     ]);
     setVisites(!act.error && act.data ? act.data : null);
     setVisitesPrec(!avant.error && avant.data ? avant.data : null);
@@ -285,7 +296,7 @@ export default function Dashboard() {
     conversion: visitesComparables && visitesPrec.sessions && sessions
       ? variation(tauxConversion, ((commandesPrec?.length || 0) / visitesPrec.sessions) * 100) : null,
   };
-  const libelleEvol = periode === 'auj' ? 'par rapport à hier' : `par rapport aux ${prec.jours} jours d'avant`;
+  const libelleEvol = periode === 'auj' ? "par rapport à hier à la même heure" : `par rapport aux ${prec.jours} jours d'avant (au même moment)`;
 
   /* Entonnoir : visiteurs différents à chaque étape, puis commandes passées
      depuis le début du suivi (même période). */
