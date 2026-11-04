@@ -12,6 +12,7 @@ import { compterCommandesEnAttente } from '../lib/commandesSite';
 import { reservationEnAttente } from '../lib/precommande';
 import { lireCommandesNonVues, ajouterCommandeNonVue, marquerCommandesVues } from '../lib/clocheCommandes';
 import Wordmark from '../components/Wordmark';
+import AlertesStock from './AlertesStock';
 
 const LIENS = [
   { to: '/store', label: 'Tableau de bord', icon: LayoutGrid, fin: true },
@@ -255,6 +256,7 @@ export default function AdminLayout() {
           menu, le squelette s'affiche tout de suite au lieu de laisser
           l'ancienne page figée pendant que la nouvelle se charge. */}
       <main className="flex-1 min-w-0 p-5 pt-20 sm:p-8">
+        <AlertesStock />
         <Suspense key={pathname} fallback={
           <div className="animate-pulse space-y-3">
             <div className="h-6 w-48 bg-gray-200 rounded" />
