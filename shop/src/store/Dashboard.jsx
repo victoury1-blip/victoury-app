@@ -312,6 +312,29 @@ export default function Dashboard() {
     ];
   }, [visites, commandesSuivies]);
 
+  /* Dans le formulaire : jusqu'où vont les gens, et pourquoi l'envoi est refusé. */
+  const formulaire = useMemo(() => {
+    const lignes = visites?.formulaire;
+    if (!lignes?.length) return null;
+    const n = (d) => Number(lignes.find(x => x.detail === d)?.n) || 0;
+    const champs = { nom: 'Nom', telephone: 'Téléphone', ville: 'Ville', adresse: 'Adresse' };
+    const manques = {};
+    for (const x of lignes) {
+      if (!x.detail.startsWith('manque:')) continue;
+      for (const c of x.detail.slice(7).split(',')) manques[c] = (manques[c] || 0) + (Number(x.n) || 0);
+    }
+    return {
+      etapes: [
+        ['Ont ouvert le formulaire', Number(visites.entonnoir?.checkout) || 0],
+        ...Object.entries(champs).map(([k, l]) => [`Ont rempli « ${l} »`, n(`champ:${k}`)]),
+        ['Ont cliqué « Envoyer »', n('envoi')],
+        ['Commande enregistrée', commandesSuivies],
+      ],
+      manques: Object.entries(manques).sort((a, b) => b[1] - a[1]).map(([c, v]) => [champs[c] || c, v]),
+      erreurs: lignes.filter(x => x.detail.startsWith('erreur:')).map(x => [x.detail.slice(7), Number(x.n) || 0]),
+    };
+  }, [visites, commandesSuivies]);
+
   const issues = useMemo(() => issuesCommandes(commandes), [commandes]);
   const classement = useMemo(() => topProduits(commandes), [commandes]);
   const heures = useMemo(() => commandesParHeure(commandes, o => lireHorodatage(o.created_at) || parseDateHeure(o.date_added)), [commandes]);
@@ -473,6 +496,51 @@ export default function Dashboard() {
           {!(visites.entonnoir.produit > 0) && (
             <p className="mt-3 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">Les étapes 2 et 4 se remplissent une fois la mise à jour de visites.sql exécutée dans Supabase.</p>
           )}
+        </div>
+      )}
+
+      {/* Dans le formulaire de commande */}
+      {formulaire && (
+        <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+          <p className="text-base font-semibold text-gray-900">Dans le formulaire de commande</p>
+          <p className="text-xs text-gray-400 mt-0.5">Jusqu'où vont ceux qui ouvrent le formulaire, et ce qui bloque l'envoi.</p>
+          <div className="mt-4 grid lg:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              {formulaire.etapes.map(([nom, v], i) => {
+                const base = formulaire.etapes[0][1] || 1;
+                const chute = i && formulaire.etapes[i - 1][1] - v;
+                return (
+                  <div key={nom} className="flex items-center gap-3 text-sm">
+                    <span className="w-56 shrink-0 text-gray-700 truncate">{nom}</span>
+                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, (v / base) * 100)}%` }} />
+                    </div>
+                    <span className="w-8 text-right tabular-nums font-semibold">{v}</span>
+                    <span className={`w-16 text-[11px] ${chute > 0 ? 'text-red-600' : 'text-transparent'}`}>{chute > 0 ? `−${chute} ici` : '·'}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1.5">Envoi refusé : case vide ou invalide</p>
+                {formulaire.manques.length
+                  ? <div className="flex flex-wrap gap-1.5">{formulaire.manques.map(([c, v]) => (
+                      <span key={c} className="text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-full px-2.5 py-1"><b>{c}</b> · {v} personne{v > 1 ? 's' : ''}</span>
+                    ))}</div>
+                  : <p className="text-xs text-gray-400">Aucun pour le moment.</p>}
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1.5">Envoi refusé par le site (message affiché)</p>
+                {formulaire.erreurs.length
+                  ? <ul className="space-y-1">{formulaire.erreurs.map(([m, v]) => (
+                      <li key={m} className="text-xs bg-red-50 text-red-700 rounded-lg px-2.5 py-1.5">{m} <span className="opacity-70">· {v}</span></li>
+                    ))}</ul>
+                  : <p className="text-xs text-gray-400">Aucun pour le moment.</p>}
+              </div>
+              <p className="text-[11px] text-gray-400">Ceux qui ont rempli leur téléphone sans finir sont dans « Paniers abandonnés » — à rappeler.</p>
+            </div>
+          </div>
         </div>
       )}
 

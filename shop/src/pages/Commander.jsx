@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { enregistrerDebutCommande } from '../lib/visites';
+import { enregistrerDebutCommande, enregistrerEtapeFormulaire } from '../lib/visites';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
@@ -78,7 +78,11 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   const t = totalPanier(lignes, {
     paliers: reglages?.paliers, remises: reglages?.remises, promo, livraison: reglages?.livraison, seuilGratuit: reglages?.seuilGratuit,
   });
-  const u = (k, v) => { setForm(f => ({ ...f, [k]: v })); setManque(m => m.filter(x => x !== k)); };
+  const u = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+    setManque(m => m.filter(x => x !== k));
+    if (String(v || '').trim()) enregistrerEtapeFormulaire(`champ:${k}`);
+  };
 
   // Une seule fois à l'arrivée sur la page : la publicité doit voir un panier
   // qui entre en commande, pas chaque changement de quantité qui le précède.
@@ -241,12 +245,17 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
 
   async function valider() {
     setErreur('');
+    enregistrerEtapeFormulaire('envoi');
     const m = champsManquants(form, lignes);
-    if (m.length) { setManque(m); return; }
+    if (m.length) { setManque(m); enregistrerEtapeFormulaire(`manque:${m.join(',')}`); return; }
     setEnvoi(true);
     const r = await envoyerCommande(form, lignes, t.total, promo ? code : undefined, geoGPS.current);
     setEnvoi(false);
-    if (!r.ok) { setErreur(r.error || 'Envoi impossible. Réessayez.'); return; }
+    if (!r.ok) {
+      setErreur(r.error || 'Envoi impossible. Réessayez.');
+      enregistrerEtapeFormulaire(`erreur:${r.manque?.length ? `manque ${r.manque.join(',')}` : (r.error || 'inconnue')}`);
+      return;
+    }
     /* Identifiant STABLE (pas idEvenement, qui est aléatoire) : `useMetaCapi`
        (admin, voir src/hooks/useMetaCapi.js) renvoie un second évènement
        "Purchase" à Meta plus tard, quand la commande passe "Livré" — avec le

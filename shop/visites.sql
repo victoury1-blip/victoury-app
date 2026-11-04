@@ -28,7 +28,7 @@ drop policy if exists "creation depuis la boutique" on shop_visites;
 create policy "creation depuis la boutique" on shop_visites
   for insert to anon, authenticated
   with check (
-    type in ('visite', 'produit', 'panier', 'checkout')
+    type in ('visite', 'produit', 'panier', 'checkout', 'formulaire')
     and length(visiteur) between 8 and 64
     and coalesce(length(source), 0) <= 40
     and coalesce(length(page), 0) <= 200
@@ -77,7 +77,12 @@ as $$
       'checkout', (select count(distinct visiteur) from v where type = 'checkout')),
     'appareils', coalesce((select json_agg(x order by x.sessions desc) from (
                    select coalesce(appareil, 'inconnu') as appareil, count(*) as sessions
-                   from v where type = 'visite' group by 1) x), '[]'::json)
+                   from v where type = 'visite' group by 1) x), '[]'::json),
+    -- Formulaire de commande : cases remplies, envois, refus (personnes différentes).
+    'formulaire', coalesce((select json_agg(x order by x.n desc) from (
+                   select produit as detail, count(distinct visiteur) as n
+                   from v where type = 'formulaire' and produit is not null
+                   group by produit) x), '[]'::json)
   ) end;
 $$;
 grant execute on function shop_stats_visites(timestamptz, timestamptz) to authenticated;

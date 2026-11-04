@@ -95,3 +95,14 @@ export function enregistrerDebutCommande() {
   if (!c || !premiereFois('checkout')) return;
   envoyer({ visiteur: c.visiteur, type: 'checkout', source: c.source, appareil: c.appareil, page: window.location.pathname.slice(0, 200) });
 }
+
+/** Ce qui se passe DANS le formulaire de commande (une fois par détail et par
+    onglet) : « champ:telephone » (case remplie), « envoi » (bouton cliqué),
+    « manque:telephone,adresse » (refusé : cases vides/invalides),
+    « erreur:… » (refusé par le serveur). Sert à voir où les gens abandonnent. */
+export function enregistrerEtapeFormulaire(detail) {
+  const c = contexte();
+  const d = String(detail || '').slice(0, 120);
+  if (!c || !d || !premiereFois(`form_${d.slice(0, 60)}`)) return;
+  envoyer({ visiteur: c.visiteur, type: 'formulaire', source: c.source, appareil: c.appareil, produit: d });
+}
