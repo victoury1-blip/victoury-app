@@ -306,8 +306,8 @@ export default function Dashboard() {
     return [
       ['Visiteurs', Number(e.visite) || 0],
       ['Ont vu un produit', Number(e.produit) || 0],
-      ['Ont ajouté au panier', Number(e.panier) || 0],
-      ['Ont commencé la commande', Number(e.checkout) || 0],
+      ['Ont cliqué « اشتري الآن »', Number(e.panier) || 0],
+      ['Ont ouvert le formulaire de commande', Number(e.checkout) || 0],
       ['Ont commandé', commandesSuivies],
     ];
   }, [visites, commandesSuivies]);
@@ -404,7 +404,7 @@ export default function Dashboard() {
           sous={visiteurs != null ? `${visiteurs.toLocaleString('fr-MA')} visiteurs uniques` : (ga4 && !ga4.configured ? 'Statistiques non activées (visites.sql)' : undefined)} />
         <Carte icon={ShoppingBag} teinte="orange" label="Commandes" valeur={compact(nbCommandes)} evolution={evol.commandes} libelleEvolution={libelleEvol}
           sous={nbCommandes ? `${Math.round(ca / nbCommandes).toLocaleString('fr-MA')} DH moy.` : undefined} />
-        <Carte icon={ShoppingCart} teinte="rose" label="Ajouter au panier" valeur={paniers != null ? compact(paniers) : '—'} evolution={evol.paniers} libelleEvolution={libelleEvol}
+        <Carte icon={ShoppingCart} teinte="rose" label="Clics « Acheter »" valeur={paniers != null ? compact(paniers) : '—'} evolution={evol.paniers} libelleEvolution={libelleEvol}
           sous={paniers ? `${((commandesSuivies / paniers) * 100).toFixed(1)}% convertis` : undefined} />
         <Carte icon={Wallet} teinte="vert" label="Chiffre d'affaires" valeur={`${compact(Math.round(ca))} DH`} evolution={evol.ca} libelleEvolution={libelleEvol} sous={`${nbCommandes.toLocaleString('fr-MA')} commandes`} />
         <Carte icon={Percent} teinte="violet" label="Taux de conversion" evolution={evol.conversion} libelleEvolution={libelleEvol} valeur={tauxConversion != null ? `${tauxConversion.toFixed(2)}%` : '—'}
@@ -543,7 +543,7 @@ export default function Dashboard() {
           <Classement titre="Appareils" couleur="bg-blue-500"
             lignes={(visites.appareils || []).filter(x => x.appareil !== 'inconnu').map(x => [{ mobile: '📱 Téléphone', tablette: '📲 Tablette', ordinateur: '💻 Ordinateur' }[x.appareil] || x.appareil, Number(x.sessions) || 0])}
             total={(visites.appareils || []).filter(x => x.appareil !== 'inconnu').reduce((t, x) => t + (Number(x.sessions) || 0), 0)} />
-          <Classement titre="Produits ajoutés au panier" couleur="bg-pink-500" lignes={(visites.produits || []).map(x => [x.produit, Number(x.ajouts) || 0])} />
+          <Classement titre="Produits cliqués « Acheter »" couleur="bg-pink-500" lignes={(visites.produits || []).map(x => [x.produit, Number(x.ajouts) || 0])} />
         </div>
       )}
 
