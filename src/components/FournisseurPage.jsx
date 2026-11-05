@@ -527,9 +527,18 @@ export default function FournisseurPage() {
        montant fixé en dur : le jour où le fournisseur change son tarif, le
        compte suit tout seul. */
     const prixPiece = qte > 0 ? cout / qte : 0;
-    /* Pièces que la somme encore due représente : c'est en pièces qu'on
-       raisonne face au fournisseur, pas en dirhams. */
-    const piecesDues = prixPiece > 0 ? Math.round(du / prixPiece) : 0;
+    /* Pièces que la somme encore due représente, facture par facture, au
+       prix de CETTE facture : avec un prix moyen global, les factures
+       Ensemble Sport (100 DH) et Hijab (125 DH) se mélangeaient et le compte
+       était faux d'une dizaine de pièces. */
+    let piecesDues = 0;
+    for (const f of factures) {
+      const q = (f.items || []).reduce((n, it) => n + itemQty(it), 0) - retoursQtyOf(f);
+      const net = factureNet(f);
+      const reste = net - paidOf(f);
+      if (q > 0 && net > 0 && reste > 0) piecesDues += reste / (net / q);
+    }
+    piecesDues = Math.round(piecesDues);
     return { cout, qte, paye, du, prixPiece, piecesDues, retQte, retMontant };
   }, [factures]);
 
@@ -563,7 +572,7 @@ export default function FournisseurPage() {
           color={totals.du > 0 ? 'text-red-600' : 'text-emerald-700'} />
         <SummaryCard label="Pièces non payées" value={totals.piecesDues}
           color={totals.piecesDues > 0 ? 'text-amber-600' : 'text-emerald-700'}
-          hint={totals.prixPiece > 0 ? `à ${Math.round(totals.prixPiece).toLocaleString('fr-FR')} DH la pièce` : undefined} />
+          hint={totals.prixPiece > 0 ? `au prix de chaque facture · moyenne ${Math.round(totals.prixPiece).toLocaleString('fr-FR')} DH` : undefined} />
         <SummaryCard label="Retours" value={`${totals.retQte} pcs`} color={totals.retQte > 0 ? 'text-orange-600' : 'text-gray-400'}
           hint={totals.retMontant > 0 ? `−${totals.retMontant.toLocaleString('fr-FR')} DH déduits` : 'Pièces défectueuses rendues'} />
         <SummaryCard label="Stock au local" value={stockManuel} color="text-indigo-600"
