@@ -87,6 +87,9 @@ export default function MaMarchandisePage({ orders }) {
               </span>
             ))}
           </div>
+          {p.enLivraison.anciensIgnores > 0 && (
+            <div className="mt-1.5 text-[11px] opacity-70">{p.enLivraison.anciensIgnores} ancien(s) colis ignoré(s) : même statut depuis plus de 45 jours</div>
+          )}
         </Carte>
         <Carte icon={XCircle} titre="Retours à récupérer" pieces={p.refuses.aRecuperer + p.echanges.aRecuperer}
           sous={`refusés${p.echanges.aRecuperer ? ` + ${fmt(p.echanges.aRecuperer)} d'échanges` : ''} · ${fmt(p.refuses.recus + p.echanges.recus)} déjà rentrées au local`} cls="bg-red-50 border-red-200 text-red-800" />

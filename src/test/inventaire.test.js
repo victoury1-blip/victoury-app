@@ -18,8 +18,8 @@ describe('où sont mes pièces', () => {
       cmd('VI5', 'annule'),
       cmd('VI6', 'livre'),
       cmd('VI7', 'expedier', { isDeleted: true }),
-    ], new Set());
-    expect(r.enLivraison).toEqual({ pieces: 3, colis: 2, parStatut: { expedier: 1, recu_livreur: 1 } });
+    ], new Set(), new Date(2026, 10, 5).getTime());
+    expect(r.enLivraison).toEqual({ pieces: 3, colis: 2, parStatut: { expedier: 1, recu_livreur: 1 }, anciensIgnores: 0 });
     expect(r.refuses).toEqual({ aRecuperer: 1, recus: 1 });
     expect(r.annules).toEqual({ aRecuperer: 1, recus: 0 });
     expect(r.aRecuperer).toBe(2);
@@ -41,7 +41,7 @@ describe('valeur de la marchandise', () => {
       cmd('VI1', 'expedier', { price: 250 }),
       cmd('VI2', 'expedier', { price: 290, products: [{ name: 'Ensemble Hijab Sport Noir', qty: 1 }] }),
       cmd('VI3', 'refuse'),
-    ], new Set(), 100);
+    ], new Set(), 100, new Date(2026, 10, 5).getTime());
     expect(v.livreur).toEqual({ achat: 225, vente: 540 });
     expect(v.aRecuperer.achat).toBe(100);
   });
@@ -63,13 +63,16 @@ describe('valeur de la marchandise', () => {
   });
 });
 
-describe('commandes importées de Google Sheets', () => {
-  it('ne sont pas comptées', () => {
+describe('commandes importées de Google Sheets et colis figés', () => {
+  it('ne sont pas comptés', () => {
     const r = inventaire([
       { id: 'MIMA3002', trackingNumber: 'MIMA3002', status: 'expedier', products: [{ name: 'A', qty: 1 }] },
       { id: 'VI9', status: 'expedier', recipient: { importe: 'sheet' }, products: [{ name: 'A', qty: 1 }] },
+      { id: 'MIMA1699', trackingNumber: '', status: 'att_ramassage', products: [{ name: 'A', qty: 1 }] },
       cmd('VI10', 'expedier'),
-    ], new Set());
+      cmd('VI70', 'att_ramassage', { dateAdded: '31/08/2026 18:34:32' }),
+    ], new Set(), new Date(2026, 10, 5).getTime());
     expect(r.enLivraison.pieces).toBe(1);
+    expect(r.enLivraison.anciensIgnores).toBe(1);
   });
 });

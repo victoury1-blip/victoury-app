@@ -21,6 +21,8 @@ export const estDansColis = (o) => COLIS_PIPELINE_SET.has(o?.status) || (!!o?.tr
 export function estImportSheet(o) {
   if (o?.recipient?.importe === 'sheet') return true;
   const id = String(o?.id || '');
+  // Codes du tableur (MIMA1699…) : importés même quand le code de suivi diffère.
+  if (/^MIMA\d+$/i.test(id)) return true;
   if (!id || id !== String(o?.trackingNumber || '')) return false;
   if (/^VI\d+$/i.test(id)) return false;
   if (/^(VS|EXT|WC)-/i.test(id)) return false;

@@ -13,10 +13,18 @@ export function piecesDe(o) {
   return l.reduce((n, p) => n + (Number(p?.qty) || 1), 0);
 }
 
+/* Un colis « chez le livreur » depuis plus de 45 jours sans bouger n'y est
+   plus vraiment (statut jamais mis à jour) : on ne le compte pas. */
+export const AGE_MAX_LIVRAISON_JOURS = 45;
+const tropAncien = (o, maintenant) => {
+  const t = dateAjout(o);
+  return t > 0 && maintenant - t > AGE_MAX_LIVRAISON_JOURS * 864e5;
+};
+
 /** Comptes en pièces (et en colis) à partir des commandes. */
-export function inventaire(orders, recuIds) {
+export function inventaire(orders, recuIds, maintenant = Date.now()) {
   const r = {
-    enLivraison: { pieces: 0, colis: 0, parStatut: {} },
+    enLivraison: { pieces: 0, colis: 0, parStatut: {}, anciensIgnores: 0 },
     refuses: { aRecuperer: 0, recus: 0 },
     annules: { aRecuperer: 0, recus: 0 },
     echanges: { aRecuperer: 0, recus: 0 },
@@ -27,6 +35,7 @@ export function inventaire(orders, recuIds) {
     if (o?.isDeleted || estImportSheet(o)) continue;
     const n = piecesDe(o);
     if (EN_LIVRAISON.has(o.status)) {
+      if (tropAncien(o, maintenant)) { r.enLivraison.anciensIgnores += 1; continue; }
       r.enLivraison.pieces += n; r.enLivraison.colis += 1;
       r.enLivraison.parStatut[o.status] = (r.enLivraison.parStatut[o.status] || 0) + 1;
       continue;
@@ -56,12 +65,15 @@ export function coutCommande(o, prixMoyen) {
 }
 
 /** Valeur (achat et vente) de la marchandise hors du local. */
-export function valeurs(orders, recuIds, prixMoyen) {
+export function valeurs(orders, recuIds, prixMoyen, maintenant = Date.now()) {
   const v = { livreur: { achat: 0, vente: 0 }, aRecuperer: { achat: 0 } };
   for (const o of orders || []) {
     // Les commandes importées de Google Sheets (historique d'avant le système) ne comptent pas.
     if (o?.isDeleted || estImportSheet(o)) continue;
-    if (EN_LIVRAISON.has(o.status)) { v.livreur.achat += coutCommande(o, prixMoyen); v.livreur.vente += Number(o.price) || 0; continue; }
+    if (EN_LIVRAISON.has(o.status)) {
+      if (tropAncien(o, maintenant)) continue;
+      v.livreur.achat += coutCommande(o, prixMoyen); v.livreur.vente += Number(o.price) || 0; continue;
+    }
     if (estColisRetour(o) && !estRecu(o, recuIds)) v.aRecuperer.achat += coutCommande(o, prixMoyen);
   }
   return v;
