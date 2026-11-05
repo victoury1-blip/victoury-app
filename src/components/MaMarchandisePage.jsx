@@ -11,6 +11,7 @@ import { cloudGet, cloudSet, localGet } from '../lib/cloudSettings';
  * Les colis livrés n'y figurent pas : ils ne sont plus de la marchandise. */
 
 const CLE_DEFAUT = 'stock_defectueux';
+const LIBELLE_STATUT = { expedier: 'Expédié', recu_livreur: 'Reçu par livreur', att_ramassage: 'Attente ramassage', pas_rep_lv: 'Pas de réponse LV', en_suivi: 'En suivi' };
 const fmt = (n) => Math.round(Number(n || 0)).toLocaleString('fr-FR');
 const PRIX_MOYEN = Math.round((PRIX_ACHAT['ensemble sport'] + PRIX_ACHAT['ensemble hijab sport']) / 2);
 
@@ -76,8 +77,17 @@ export default function MaMarchandisePage({ orders }) {
       <h2 className="mt-8 text-sm font-bold text-gray-700">Où sont les pièces</h2>
       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <Carte icon={Truck} titre="Expédiés (chez le livreur)" pieces={p.enLivraison.pieces} dh={v.livreur.achat}
-          sous={`${p.enLivraison.colis} colis en route · ${fmt(v.livreur.vente)} DH à encaisser s'ils sont livrés`}
-          cls="bg-sky-50 border-sky-200 text-sky-900" />
+          sous={`${p.enLivraison.colis} colis · ${fmt(v.livreur.vente)} DH à encaisser s'ils sont livrés`}
+          cls="bg-sky-50 border-sky-200 text-sky-900">
+          {/* Même découpage que les filtres de la Liste des Colis, pour comparer. */}
+          <div className="mt-2 flex flex-wrap gap-1">
+            {Object.entries(p.enLivraison.parStatut).sort((a, b) => b[1] - a[1]).map(([st, n]) => (
+              <span key={st} className="text-[11px] bg-white/70 border border-sky-200 rounded-full px-2 py-0.5">
+                {LIBELLE_STATUT[st] || st} <b>{n}</b>
+              </span>
+            ))}
+          </div>
+        </Carte>
         <Carte icon={XCircle} titre="Retours à récupérer" pieces={p.refuses.aRecuperer + p.echanges.aRecuperer}
           sous={`refusés${p.echanges.aRecuperer ? ` + ${fmt(p.echanges.aRecuperer)} d'échanges` : ''} · ${fmt(p.refuses.recus + p.echanges.recus)} déjà rentrées au local`} cls="bg-red-50 border-red-200 text-red-800" />
         <Carte icon={Ban} titre="Annulés à récupérer" pieces={p.annules.aRecuperer}

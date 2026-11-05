@@ -16,7 +16,7 @@ export function piecesDe(o) {
 /** Comptes en pièces (et en colis) à partir des commandes. */
 export function inventaire(orders, recuIds) {
   const r = {
-    enLivraison: { pieces: 0, colis: 0 },
+    enLivraison: { pieces: 0, colis: 0, parStatut: {} },
     refuses: { aRecuperer: 0, recus: 0 },
     annules: { aRecuperer: 0, recus: 0 },
     echanges: { aRecuperer: 0, recus: 0 },
@@ -26,7 +26,11 @@ export function inventaire(orders, recuIds) {
     // Les commandes importées de Google Sheets (historique d'avant le système) ne comptent pas.
     if (o?.isDeleted || estImportSheet(o)) continue;
     const n = piecesDe(o);
-    if (EN_LIVRAISON.has(o.status)) { r.enLivraison.pieces += n; r.enLivraison.colis += 1; continue; }
+    if (EN_LIVRAISON.has(o.status)) {
+      r.enLivraison.pieces += n; r.enLivraison.colis += 1;
+      r.enLivraison.parStatut[o.status] = (r.enLivraison.parStatut[o.status] || 0) + 1;
+      continue;
+    }
     if (!estColisRetour(o)) continue;
     const famille = estEchangeARecevoir(o) && !['refuse', 'annule', 'pret_retour', 'retour_recu'].includes(o.status)
       ? r.echanges : o.status === 'annule' ? r.annules : r.refuses;

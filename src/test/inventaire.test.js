@@ -19,7 +19,7 @@ describe('où sont mes pièces', () => {
       cmd('VI6', 'livre'),
       cmd('VI7', 'expedier', { isDeleted: true }),
     ], new Set());
-    expect(r.enLivraison).toEqual({ pieces: 3, colis: 2 });
+    expect(r.enLivraison).toEqual({ pieces: 3, colis: 2, parStatut: { expedier: 1, recu_livreur: 1 } });
     expect(r.refuses).toEqual({ aRecuperer: 1, recus: 1 });
     expect(r.annules).toEqual({ aRecuperer: 1, recus: 0 });
     expect(r.aRecuperer).toBe(2);
