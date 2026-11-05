@@ -55,6 +55,7 @@ import HistoryModal from './orders/HistoryModal';
 import CustomerHistoryModal from './orders/CustomerHistoryModal';
 import StatusChangeModal from './orders/StatusChangeModal';
 import NewOrderModal from './orders/NewOrderModal';
+import { retirerDuStockBoutique } from '../lib/stockBoutique';
 
 
 
@@ -1486,6 +1487,13 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             for (const o of ordersList) {
               if (o.status === 'confirme') decrementerStockManuel(o);
             }
+            // Stock du SITE (boutique en ligne) : une commande saisie ici ne
+            // passe pas par la boutique, qui ne savait donc pas que la taille
+            // était vendue. On la retire tout de suite, comme le fait le site.
+            retirerDuStockBoutique(ordersList).then(r => {
+              if (r.retirees) addToast('success', `Stock du site : −${r.retirees} pièce(s)`);
+              if (r.introuvables?.length) addToast('warning', 'Pas trouvé sur le site (stock du site inchangé)', r.introuvables.join(', '));
+            }).catch(() => {});
             setNewOrderOpen(false);
             addToast('success', `${ordersList.length} commande(s) créée(s)`, ordersList[0]?.recipient.name);
             // Vérification DIFFÉRÉE : l'enregistrement réel vers Supabase (avec
