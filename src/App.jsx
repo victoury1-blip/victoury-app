@@ -52,6 +52,7 @@ import { ToastProvider } from './components/Toast';
 import { generateVictId, isVictCode, formatVictId, setNextNumber } from './lib/victId';
 import { statutOzonColis } from './lib/ozonStatut';
 import { now, fmtDate } from './lib/dateUtils';
+import { estErreurReseau } from './lib/erreurReseau';
 
 /** Attribue un code VICTxxxx aux commandes fraîchement importées, pour qu'une
  *  nouvelle commande porte son numéro dès son entrée dans À Confirmer. L'id interne
@@ -173,6 +174,11 @@ export default function App() {
   // re-synchro (focus) ou un événement Realtime ne doit PAS écraser une commande
   // modifiée localement mais pas encore confirmée en base (sinon l'édition « revient »).
   const recentEditsRef = useRef(new Map());
+  // Commandes créées pendant une coupure, en file d'attente, pas encore en base.
+  const pendingIdsRef = useRef(new Set());
+  const saveNewRef = useRef(null);
+  const syncNowRef = useRef(null);
+  const [enAttente, setEnAttente] = useState(0);
   const notifConfigRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const ordersRef = useRef(orders);
@@ -226,24 +232,66 @@ export default function App() {
 
   /* ── Process sync queue when back online ── */
   useEffect(() => {
+    let enCours = false;
+    let premierPassage = true;
     async function processSyncQueue() {
+      if (enCours) return;
+      enCours = true;
       try {
         const pending = await getPendingSync();
-        if (!pending.length) return;
+        // Commandes créées sans réseau lors d'une session précédente : elles
+        // doivent rester visibles dans la liste tant qu'elles ne sont pas en base.
+        if (premierPassage) {
+          premierPassage = false;
+          const creees = pending.filter(i => i.action === 'create' && i.data?.id).map(i => i.data);
+          creees.forEach(o => pendingIdsRef.current.add(o.id));
+          if (creees.length) setOrders(prev => {
+            const ids = new Set(prev.map(o => o.id));
+            const manquantes = creees.filter(o => !ids.has(o.id) && !deletedIdsRef.current.has(o.id));
+            return manquantes.length ? [...manquantes, ...prev] : prev;
+          });
+        }
+        setEnAttente(pending.length);
+        if (!pending.length || !navigator.onLine) return;
         // Purge des éléments trop anciens (> 24 h) : ils ne représentent plus l'état
-        // voulu et ne feraient que ressusciter d'anciennes valeurs.
+        // voulu et ne feraient que ressusciter d'anciennes valeurs. JAMAIS une
+        // commande créée : elle n'existe nulle part ailleurs, la jeter = la perdre.
         const DAY = 24 * 60 * 60 * 1000;
         const fresh = [];
         for (const item of pending) {
           const t = Number(item.timestamp || 0);
-          if (t && Date.now() - t > DAY) { try { await deleteSyncItem(item.id); } catch {} }
+          if (item.action !== 'create' && t && Date.now() - t > DAY) { try { await deleteSyncItem(item.id); } catch {} }
           else fresh.push(item);
         }
         for (const item of fresh) {
           try {
             let error = null;
-            if (item.action === 'update') {
+            if (item.action === 'create') {
+              // Même chemin qu'une création en ligne (collision de numéro VIxxxxx
+              // comprise) ; une nouvelle coupure lève une erreur → l'élément reste.
               const o = item.data;
+              // Avec une connexion faible, un envoi précédent a pu arriver en base
+              // sans que la réponse revienne : la même commande (même date de
+              // création) déjà présente = c'est fait, surtout pas un doublon.
+              const { data: deja, error: errLecture } = await supabase.from('orders')
+                .select('id, date_added').eq('id', o.id).maybeSingle();
+              if (errLecture) throw errLecture;
+              if (deja && deja.date_added === o.dateAdded) {
+                pendingIdsRef.current.delete(o.id);
+                await deleteSyncItem(item.id);
+                continue;
+              }
+              const renumerotees = await saveNewRef.current([o], { depuisFile: true });
+              if (renumerotees && renumerotees.length) {
+                const map = new Map(renumerotees.map(r => [r.oldId, r.newId]));
+                setOrders(cur => cur.map(x => map.has(x.id) ? { ...x, id: map.get(x.id) } : x));
+              }
+              pendingIdsRef.current.delete(o.id);
+            } else if (item.action === 'update') {
+              const o = item.data;
+              // Sa création n'est pas encore passée : la modification attend son tour
+              // (sinon elle créerait la ligne, et la création deviendrait un doublon).
+              if (pendingIdsRef.current.has(o.id)) continue;
               // GARDE-FOU : ne pas rejouer un instantané PÉRIMÉ. Si la ligne en base a
               // été modifiée après cet élément de file, le rejouer écraserait la valeur
               // récente par une ancienne (c'est ainsi que d'anciens codes de suivi
@@ -286,15 +334,28 @@ export default function App() {
             console.error('Sync queue item failed:', e);
           }
         }
+        try { setEnAttente((await getPendingSync()).length); } catch {}
       } catch (e) {
         console.error('Failed to process sync queue:', e);
+      } finally {
+        enCours = false;
       }
     }
+    syncNowRef.current = processSyncQueue;
     const handler = () => processSyncQueue();
+    const onVisible = () => { if (document.visibilityState === 'visible') processSyncQueue(); };
     window.addEventListener('online', handler);
+    document.addEventListener('visibilitychange', onVisible);
+    // Une connexion faible ne déclenche jamais l'évènement « online » (le
+    // téléphone se croit connecté) : on retente donc aussi régulièrement.
+    const intervalle = setInterval(processSyncQueue, 30_000);
     // rejouer aussi au démarrage si des mutations sont restées en attente d'une session précédente
-    if (navigator.onLine) processSyncQueue();
-    return () => window.removeEventListener('online', handler);
+    processSyncQueue();
+    return () => {
+      window.removeEventListener('online', handler);
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(intervalle);
+    };
   }, []);
 
   /* ── Auth ── */
@@ -407,6 +468,8 @@ export default function App() {
         // (créées localement, pas encore en base) pour ne pas les perdre.
         const localOnly = prev.filter(o => {
           if (fetchedIds.has(o.id) || deletedIdsRef.current.has(o.id)) return false;
+          // Créée pendant une coupure, encore en file : à garder, quel que soit son âge.
+          if (pendingIdsRef.current.has(o.id)) return true;
           const editedAt = recentEditsRef.current.get(o.id);
           return editedAt && nowTs - editedAt < GRACE;
         });
@@ -705,7 +768,18 @@ export default function App() {
   if (session === null) return <LoginPage />;
 
   /* ── Supabase helpers ── */
-  async function saveOrdersToSupabase(newOrders) {
+  /* Commandes créées pendant une coupure : gardées sur l'appareil et dans la
+     liste, renvoyées automatiquement (voir processSyncQueue) — jamais perdues. */
+  async function mettreEnFile(commandes) {
+    await saveOrdersOffline(commandes);
+    for (const o of commandes) {
+      await queueSync('create', o);
+      pendingIdsRef.current.add(o.id);
+    }
+    setEnAttente(n => n + commandes.length);
+  }
+
+  async function saveOrdersToSupabase(newOrders, { depuisFile = false } = {}) {
     // Les commandes supprimées (liste noire) restent supprimées : un ré-import ne doit PAS
     // les recréer. La restauration se fait uniquement via la Corbeille (restoreOrder).
     newOrders = newOrders.filter(o => !deletedIdsRef.current.has(o.id));
@@ -729,9 +803,9 @@ export default function App() {
     });
     // Hors ligne : mettre les nouvelles commandes en file d'attente (rejouées au retour du réseau)
     if (!navigator.onLine) {
-      await saveOrdersOffline(newOrders);
-      for (const o of newOrders) await queueSync('update', o);
-      return;
+      if (depuisFile) throw new Error('Hors ligne');
+      await mettreEnFile(newOrders);
+      return [];
     }
     // ignoreDuplicates protège une éventuelle commande active existante (statuts, etc.) —
     // mais silencieusement : si l'id généré (VIxxxxx) entre en collision avec une
@@ -741,9 +815,18 @@ export default function App() {
     // puis disparaissait au rechargement suivant, sans aucune trace. `select('id')`
     // dit quelles lignes ont RÉELLEMENT été insérées ou mises à jour : celles qui
     // manquent à l'appel sont celles qu'ignoreDuplicates a passées sous silence.
-    const { data, error } = await supabase.from('orders')
-      .upsert(newOrders.map(toRow), { onConflict: 'id', ignoreDuplicates: true }).select('id');
-    if (error) throw new Error(error.message);
+    // Connexion coupée ou trop faible alors que le téléphone se croit en ligne :
+    // l'ancienne version levait l'erreur, et la commande était RETIRÉE de la
+    // liste — elle disparaissait pour de bon. Elle part maintenant en file.
+    let data, error;
+    try {
+      ({ data, error } = await supabase.from('orders')
+        .upsert(newOrders.map(toRow), { onConflict: 'id', ignoreDuplicates: true }).select('id'));
+    } catch (e) { error = e; }
+    if (error) {
+      if (!depuisFile && estErreurReseau(error)) { await mettreEnFile(newOrders); return []; }
+      throw new Error(error.message);
+    }
     const revenues = new Set((data || []).map(r => r.id));
     let ignorees = newOrders.filter(o => !revenues.has(o.id));
     if (!ignorees.length) return [];
@@ -779,6 +862,7 @@ export default function App() {
     setNextNumber(maxVu + 1);
     return renumerotees;
   }
+  saveNewRef.current = saveOrdersToSupabase;
 
   async function deleteOrderFromSupabase(orderId) {
     deletedIdsRef.current.add(orderId);
@@ -973,6 +1057,12 @@ export default function App() {
         {offline && (
           <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 flex items-center gap-2 text-xs text-yellow-800 shrink-0">
             <span>📡 وضع بدون إنترنت — التغييرات غادي تتزامن ملي ترجع الشبكة</span>
+          </div>
+        )}
+        {enAttente > 0 && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-xs text-amber-800 shrink-0">
+            <span>⏳ {enAttente} تبديل/كوموند مازال ما تصيفطوش — محفوظين فالتيليفون وغادي يتصيفطو بوحدهم ملي ترجع الكونيكسيون</span>
+            <button onClick={() => syncNowRef.current?.()} className="ml-auto px-2 py-0.5 bg-amber-600 text-white rounded text-xs font-semibold hover:bg-amber-700 shrink-0">صيفط دابا</button>
           </div>
         )}
         {dbError && (
