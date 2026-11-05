@@ -33,6 +33,8 @@ describe('valeur de la marchandise', () => {
   it('prix d’achat par modèle', () => {
     expect(coutPiece('Ensemble Hijab Vert sauge')).toBe(125);
     expect(coutPiece('Ensemble Sport Noir')).toBe(100);
+    expect(coutPiece('Ensemble Sport MOVE')).toBe(100);
+    expect(coutPiece('Ensemble Sporte Rose')).toBe(100);
     expect(coutPiece('Robe Tie-Dye', 90)).toBe(90);
   });
 
@@ -43,7 +45,7 @@ describe('valeur de la marchandise', () => {
       cmd('VI3', 'refuse'),
     ], new Set(), 100, new Date(2026, 10, 5).getTime());
     expect(v.livreur).toEqual({ achat: 225, vente: 540 });
-    expect(v.aRecuperer.achat).toBe(100);
+    expect(v.aRecuperer).toEqual({ achat: 100, annules: 0, retours: 100 });
   });
 
   it('argent chez le livreur : livrés pas encore versés, depuis la 1re facture', () => {

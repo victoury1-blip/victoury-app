@@ -91,9 +91,9 @@ export default function MaMarchandisePage({ orders }) {
             <div className="mt-1.5 text-[11px] opacity-70">{p.enLivraison.anciensIgnores} ancien(s) colis ignoré(s) : même statut depuis plus de 45 jours</div>
           )}
         </Carte>
-        <Carte icon={XCircle} titre="Retours à récupérer" pieces={p.refuses.aRecuperer + p.echanges.aRecuperer}
+        <Carte icon={XCircle} titre="Retours à récupérer" pieces={p.refuses.aRecuperer + p.echanges.aRecuperer} dh={v.aRecuperer.retours}
           sous={`refusés${p.echanges.aRecuperer ? ` + ${fmt(p.echanges.aRecuperer)} d'échanges` : ''} · ${fmt(p.refuses.recus + p.echanges.recus)} déjà rentrées au local`} cls="bg-red-50 border-red-200 text-red-800" />
-        <Carte icon={Ban} titre="Annulés à récupérer" pieces={p.annules.aRecuperer}
+        <Carte icon={Ban} titre="Annulés à récupérer" pieces={p.annules.aRecuperer} dh={v.aRecuperer.annules}
           sous={`${fmt(p.annules.recus)} pièces déjà rentrées au local`} cls="bg-orange-50 border-orange-200 text-orange-800" />
         <Carte icon={Warehouse} titre="Stock au local" pieces={stockLocal} dh={valeurLocal}
           cls="bg-indigo-50 border-indigo-200 text-indigo-900">

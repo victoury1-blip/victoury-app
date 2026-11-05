@@ -57,6 +57,10 @@ export function inventaire(orders, recuIds, maintenant = Date.now()) {
  * le prix moyen réellement payé chez le fournisseur. */
 export const PRIX_ACHAT = { 'ensemble hijab sport': 125, 'ensemble sport': 100 };
 export function coutPiece(nom, prixMoyen = 100) {
+  const n = String(nom || '').toLowerCase();
+  // Par mot-clé : « Ensemble Sport MOVE », « Ensemble Sporte Rose », « Ensemble Hijab Vert sauge »…
+  if (/hijab/.test(n)) return PRIX_ACHAT['ensemble hijab sport'];
+  if (/\bsporte?\b/.test(n)) return PRIX_ACHAT['ensemble sport'];
   return PRIX_ACHAT[groupeProduit(nom)] ?? prixMoyen;
 }
 export function coutCommande(o, prixMoyen) {
@@ -66,7 +70,7 @@ export function coutCommande(o, prixMoyen) {
 
 /** Valeur (achat et vente) de la marchandise hors du local. */
 export function valeurs(orders, recuIds, prixMoyen, maintenant = Date.now()) {
-  const v = { livreur: { achat: 0, vente: 0 }, aRecuperer: { achat: 0 } };
+  const v = { livreur: { achat: 0, vente: 0 }, aRecuperer: { achat: 0, annules: 0, retours: 0 } };
   for (const o of orders || []) {
     // Les commandes importées de Google Sheets (historique d'avant le système) ne comptent pas.
     if (o?.isDeleted || estImportSheet(o)) continue;
@@ -74,7 +78,11 @@ export function valeurs(orders, recuIds, prixMoyen, maintenant = Date.now()) {
       if (tropAncien(o, maintenant)) continue;
       v.livreur.achat += coutCommande(o, prixMoyen); v.livreur.vente += Number(o.price) || 0; continue;
     }
-    if (estColisRetour(o) && !estRecu(o, recuIds)) v.aRecuperer.achat += coutCommande(o, prixMoyen);
+    if (estColisRetour(o) && !estRecu(o, recuIds)) {
+      const c = coutCommande(o, prixMoyen);
+      v.aRecuperer.achat += c;
+      if (o.status === 'annule') v.aRecuperer.annules += c; else v.aRecuperer.retours += c;
+    }
   }
   return v;
 }
