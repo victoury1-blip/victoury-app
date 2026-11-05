@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
 import { supabase } from '../lib/supabase';
-import { historiqueClient, niveauClient } from '../lib/historiqueClient';
 
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' },
@@ -37,17 +36,8 @@ async function getConfigRemote() {
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300';
 const labelCls = 'block text-xs font-semibold text-gray-600 mb-1';
 
-const STYLE_NIVEAU = {
-  nouveau: ['bg-gray-50 border-gray-200 text-gray-600', 'Nouveau client — aucune commande terminée avant'],
-  fiable: ['bg-green-50 border-green-200 text-green-800', 'Client fiable'],
-  mitige: ['bg-amber-50 border-amber-200 text-amber-800', 'Attention — a déjà refusé / annulé'],
-  risque: ['bg-red-50 border-red-200 text-red-700', 'Risqué — jamais livré, déjà refusé / annulé'],
-};
-
-export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
+export default function OzoneModal({ order, onClose, onSuccess }) {
   const cfg = getConfig();
-  const histo = historiqueClient(orders, order?.recipient?.phone, order?.id);
-  const [clsNiveau, texteNiveau] = STYLE_NIVEAU[niveauClient(histo)];
 
   const [cities, setCities] = useState([]);
   const [citiesLoading, setCitiesLoading] = useState(true);
@@ -418,17 +408,6 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
                   </div>
                 </div>
               )}
-
-              {/* Passé du client (même numéro) : livré ou refusé avant ? */}
-              <div className={`border rounded-lg px-3 py-2 text-xs ${clsNiveau}`}>
-                <div className="font-semibold">{texteNiveau}</div>
-                <div className="mt-0.5 flex flex-wrap gap-x-3">
-                  <span>✅ Livrées <b>{histo.livres}</b></span>
-                  <span>❌ Refusées <b>{histo.refuses}</b></span>
-                  <span>🚫 Annulées <b>{histo.annules}</b></span>
-                  {histo.autres > 0 && <span>⏳ En cours <b>{histo.autres}</b></span>}
-                </div>
-              </div>
 
               {/* Recipient */}
               <div className="grid grid-cols-2 gap-3">
