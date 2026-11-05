@@ -50,6 +50,7 @@ export function nbPieces(order) {
 export function decrementerStockManuel(order) {
   const qte = nbPieces(order);
   if (!qte) return;
+  decrementerStockHijab(order);
   return definirStockManuel(lireStockManuelCache() - qte);
 }
 
@@ -60,7 +61,58 @@ export function decrementerStockManuel(order) {
  * remonte, si des pièces sont retirées) QUE de la différence. */
 export function ajusterStockManuelSiConfirmeeModifiee(avant, apres) {
   if (avant?.status !== 'confirme' || apres?.status !== 'confirme') return;
+  ajusterStockHijabSiConfirmeeModifiee(avant, apres);
   const delta = nbPieces(apres) - nbPieces(avant);
   if (!delta) return;
   return definirStockManuel(lireStockManuelCache() - delta);
+}
+
+/* ── Répartition Sport / Hijab ──
+ * Le total reste LA référence (page Stock, baisse à chaque confirmation) ;
+ * on garde en plus la part « Hijab » — la part Sport s'en déduit (total −
+ * hijab). Chaque confirmation baisse le total de toutes ses pièces ET la
+ * part hijab de ses pièces hijab : les deux restent cohérents. */
+const CLE_HIJAB = 'stock_manuel_hijab';
+
+export function piecesHijab(order) {
+  const prods = order?.products?.length ? order.products : [order?.product].filter(Boolean);
+  return prods.filter(p => /hijab/i.test(p?.name || '')).reduce((n, p) => n + (p?.qty || 1), 0);
+}
+
+export function lireStockHijabCache() {
+  const v = localGet(CLE_HIJAB);
+  return typeof v === 'number' ? v : 0;
+}
+
+export async function chargerStockHijab() {
+  const v = await cloudGet(CLE_HIJAB);
+  return typeof v === 'number' ? v : 0;
+}
+
+async function definirStockHijab(n) {
+  const propre = Math.max(0, Math.round(n) || 0);
+  await cloudSet(CLE_HIJAB, propre);
+  return propre;
+}
+
+/** Saisie par modèle : le total devient sport + hijab. */
+export async function definirStockParModele({ sport, hijab }) {
+  const h = Math.max(0, Math.round(hijab) || 0);
+  const s = Math.max(0, Math.round(sport) || 0);
+  await Promise.all([definirStockHijab(h), definirStockManuel(s + h)]);
+  return { sport: s, hijab: h };
+}
+
+/** Part hijab à retirer quand une commande est confirmée (appelée avec le total). */
+export function decrementerStockHijab(order) {
+  const q = piecesHijab(order);
+  if (!q) return;
+  return definirStockHijab(lireStockHijabCache() - q);
+}
+
+export function ajusterStockHijabSiConfirmeeModifiee(avant, apres) {
+  if (avant?.status !== 'confirme' || apres?.status !== 'confirme') return;
+  const delta = piecesHijab(apres) - piecesHijab(avant);
+  if (!delta) return;
+  return definirStockHijab(lireStockHijabCache() - delta);
 }
