@@ -62,3 +62,14 @@ describe('valeur de la marchandise', () => {
     expect(r.dontFacture).toBe(290);
   });
 });
+
+describe('commandes importées de Google Sheets', () => {
+  it('ne sont pas comptées', () => {
+    const r = inventaire([
+      { id: 'MIMA3002', trackingNumber: 'MIMA3002', status: 'expedier', products: [{ name: 'A', qty: 1 }] },
+      { id: 'VI9', status: 'expedier', recipient: { importe: 'sheet' }, products: [{ name: 'A', qty: 1 }] },
+      cmd('VI10', 'expedier'),
+    ], new Set());
+    expect(r.enLivraison.pieces).toBe(1);
+  });
+});

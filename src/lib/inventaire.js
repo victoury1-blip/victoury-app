@@ -2,7 +2,7 @@
  * livreur, retours (refusés / annulés / échanges) encore à récupérer ou déjà
  * rentrés, stock au local et pièces défectueuses, et le total.
  * On compte des PIÈCES (quantités des articles), pas des commandes. */
-import { estColisRetour, estRecu, estEchangeARecevoir, dateAjout } from './colisRetours';
+import { estColisRetour, estRecu, estEchangeARecevoir, dateAjout, estImportSheet } from './colisRetours';
 import { groupeProduit } from './groupeProduit';
 
 /** Statuts où le colis est chez la société de livraison, en route vers la cliente. */
@@ -23,7 +23,8 @@ export function inventaire(orders, recuIds) {
     retoursColisARecuperer: 0,
   };
   for (const o of orders || []) {
-    if (o?.isDeleted) continue;
+    // Les commandes importées de Google Sheets (historique d'avant le système) ne comptent pas.
+    if (o?.isDeleted || estImportSheet(o)) continue;
     const n = piecesDe(o);
     if (EN_LIVRAISON.has(o.status)) { r.enLivraison.pieces += n; r.enLivraison.colis += 1; continue; }
     if (!estColisRetour(o)) continue;
@@ -54,7 +55,8 @@ export function coutCommande(o, prixMoyen) {
 export function valeurs(orders, recuIds, prixMoyen) {
   const v = { livreur: { achat: 0, vente: 0 }, aRecuperer: { achat: 0 } };
   for (const o of orders || []) {
-    if (o?.isDeleted) continue;
+    // Les commandes importées de Google Sheets (historique d'avant le système) ne comptent pas.
+    if (o?.isDeleted || estImportSheet(o)) continue;
     if (EN_LIVRAISON.has(o.status)) { v.livreur.achat += coutCommande(o, prixMoyen); v.livreur.vente += Number(o.price) || 0; continue; }
     if (estColisRetour(o) && !estRecu(o, recuIds)) v.aRecuperer.achat += coutCommande(o, prixMoyen);
   }
