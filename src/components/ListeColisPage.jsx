@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import InventaireColis from './colis/InventaireColis';
 import useDebounce from '../hooks/useDebounce';
 import { supabase } from '../lib/supabase';
 import Pagination, { paginate } from './Pagination';

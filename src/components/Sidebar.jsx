@@ -8,8 +8,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Archive, Store,
   Truck, RotateCcw, BarChart2, MapPin, ChevronDown, Activity,
   ChevronRight, Menu, Settings, FileText, TrendingUp, Shield, X,
-  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet, Car, PackageX, AlertTriangle,
-} from 'lucide-react';
+  Camera, Mail, Lock, Eye, EyeOff, Save, CheckCircle2, User, FileSpreadsheet, Car, PackageX, AlertTriangle, Boxes } from 'lucide-react';
 import { COLIS_PIPELINE_SET as COLIS_PIPE } from '../data/colisPipeline';
 import { estColisRetour, estRecu, lireRecuIdsLocal } from '../lib/colisRetours';
 import { reservationEnAttente } from '../lib/reservation';
@@ -77,6 +76,8 @@ const NAV_ITEMS = [
 
   /* ── Consultées ponctuellement ── */
   { path: '/stock',       label: 'Stock',           icon: Archive, perm: 'stock' },
+  /* Où sont les pièces et l'argent : livreur, retours, local, défectueux. */
+  { path: '/ma-marchandise', label: 'Ma marchandise', icon: Boxes, perm: 'stock' },
   /* Une seule entrée pour toutes les plateformes d'affiliation : une ligne par
      plateforme allongeait le menu à chaque ajout, alors qu'elles font le même
      travail. Les sous-entrées se déduisent de la liste des plateformes. */

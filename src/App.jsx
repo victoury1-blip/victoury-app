@@ -17,6 +17,7 @@ const StockPage = React.lazy(() => import('./components/StockPage'));
 const FournisseurPage = React.lazy(() => import('./components/FournisseurPage'));
 const ColisRetoursPage = React.lazy(() => import('./components/ColisRetoursPage'));
 const ColisDangerPage = React.lazy(() => import('./components/ColisDangerPage'));
+const MaMarchandisePage = React.lazy(() => import('./components/MaMarchandisePage'));
 const VoiturePage = React.lazy(() => import('./components/VoiturePage'));
 const ChicAffiliatePage = React.lazy(() => import('./components/ChicAffiliatePage'));
 const FacturesPage = React.lazy(() => import('./components/FacturesPage'));
@@ -997,6 +998,7 @@ export default function App() {
           <Route path="/stock" element={<PermGate perm="stock"><StockPage /></PermGate>} />
           <Route path="/colis-retours" element={<PermGate perm="liste_colis"><ColisRetoursPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
           <Route path="/colis-danger" element={<PermGate perm="liste_colis"><ColisDangerPage orders={orders} setOrders={setOrdersWithSync} /></PermGate>} />
+          <Route path="/ma-marchandise" element={<PermGate perm="stock"><MaMarchandisePage orders={orders} /></PermGate>} />
           <Route path="/fournisseur" element={<PermGate perm="stock"><FournisseurPage /></PermGate>} />
           <Route path="/voiture" element={<PermGate perm="voiture"><VoiturePage /></PermGate>} />
           {/* Une route par plateforme d'affiliation : la page est la même, seule

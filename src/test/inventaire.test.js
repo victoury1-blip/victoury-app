@@ -26,3 +26,39 @@ describe('où sont mes pièces', () => {
     expect(r.recus).toBe(1);
   });
 });
+
+import { coutPiece, valeurs, argentChezLivreur } from '../lib/inventaire';
+
+describe('valeur de la marchandise', () => {
+  it('prix d’achat par modèle', () => {
+    expect(coutPiece('Ensemble Hijab Vert sauge')).toBe(125);
+    expect(coutPiece('Ensemble Sport Noir')).toBe(100);
+    expect(coutPiece('Robe Tie-Dye', 90)).toBe(90);
+  });
+
+  it('valeur chez le livreur et à récupérer', () => {
+    const v = valeurs([
+      cmd('VI1', 'expedier', { price: 250 }),
+      cmd('VI2', 'expedier', { price: 290, products: [{ name: 'Ensemble Hijab Sport Noir', qty: 1 }] }),
+      cmd('VI3', 'refuse'),
+    ], new Set(), 100);
+    expect(v.livreur).toEqual({ achat: 225, vente: 540 });
+    expect(v.aRecuperer.achat).toBe(100);
+  });
+
+  it('argent chez le livreur : livrés pas encore versés, depuis la 1re facture', () => {
+    const factures = [
+      { statut: 'paye', dateCreation: '01/11/2026 10:00:00', colis: [{ orderId: 'VI1' }] },
+      { statut: 'en_attente', dateCreation: '04/11/2026 10:00:00', colis: [{ orderId: 'VI2' }] },
+    ];
+    const r = argentChezLivreur([
+      cmd('VI1', 'livre', { price: 250 }),
+      cmd('VI2', 'livre', { price: 290 }),
+      cmd('VI3', 'livre', { price: 448 }),
+      cmd('VI0', 'livre', { price: 999, dateAdded: '01/09/2026 10:00:00' }),
+    ], factures);
+    expect(r.montant).toBe(738);
+    expect(r.colis).toBe(2);
+    expect(r.dontFacture).toBe(290);
+  });
+});
