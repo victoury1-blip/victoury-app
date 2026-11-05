@@ -1,4 +1,5 @@
 import React from 'react';
+import { avisCommandeActif } from '../lib/avisCommande';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
@@ -12,11 +13,17 @@ import { miniature, surErreurMiniature } from '../lib/img';
    quel client à qui devine/partage son numéro. Un accès direct à cette
    page (lien rouvert, page rafraîchie) retombe donc sur le message générique
    d'origine, sans détail. */
-export default function Merci() {
+export default function Merci({ reglages }) {
   const { id } = useParams();
   const { state } = useLocation();
   const { t, lang } = useLang();
   const ar = lang === 'ar';
+  const avis = avisCommandeActif(reglages?.avisCommande);
+  const encart = avis && (
+    <div dir={ar ? 'rtl' : 'ltr'} className="mt-6 text-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 leading-relaxed">
+            {ar ? avis.texteAr : avis.texteFr}
+          </div>
+  );
 
   if (!state) {
     return (
@@ -27,6 +34,7 @@ export default function Merci() {
           {ar ? 'شكرًا لكم! سنتصل بكم قريبًا لتأكيد طلبكم.' : 'Merci ! Nous vous appelons très vite pour confirmer votre commande.'}
         </p>
         {id && <p className="mt-4 text-xs text-gray-400">{t('numeroCommande')} : <span className="font-mono">{id}</span></p>}
+        {encart}
         <Link to="/" className="inline-block mt-8 border border-ink px-8 py-3 text-[11px] tracking-widest uppercase">
           {t('retourBoutique')}
         </Link>
@@ -42,6 +50,7 @@ export default function Merci() {
         <div className="w-14 h-14 rounded-full bg-green-600 text-white grid place-items-center mx-auto"><Check size={26} /></div>
         <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{ar ? 'تم تأكيد الطلب' : 'Commande confirmée'}</h1>
         {id && <p className="mt-1 text-xs text-gray-400 font-mono">{ar ? 'رقم' : 'Numéro'} #{id}</p>}
+        {encart}
       </div>
 
       <div className="mt-8 border-t border-gray-100 pt-5">

@@ -403,7 +403,7 @@ function Vitrine() {
             <Route path="/product/:slug/" element={<Produit onAjouter={onAjouter} theme={reglages.theme} remises={reglages.remises} tiktok={reglages.tiktok} onAchatRapide={() => setAchatRapideOuvert(true)} lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onLandingDetectee={onLandingDetectee} />} />
             <Route path="/favoris" element={<Favoris remises={reglages.remises} />} />
             <Route path="/commander" element={<Commander lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider} onAjouter={onAjouter} />} />
-            <Route path="/merci/:id" element={<Merci />} />
+            <Route path="/merci/:id" element={<Merci reglages={reglages} />} />
             {/* Adresse racine partagée entre pages statiques ET landing pages
                 de produits "non listés" (voir SlugRouter.jsx) — une landing
                 page garde ainsi le même lien court "victoury-maroc.com/<nom>"

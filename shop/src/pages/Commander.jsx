@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { avisCommandeActif } from '../lib/avisCommande';
 import { enregistrerDebutCommande, enregistrerEtapeFormulaire } from '../lib/visites';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck, Loader2 } from 'lucide-react';
@@ -373,6 +374,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // gauche. L'alignement du texte suit la langue, indépendamment du sens de
   // la mise en page.
   const ar = lang === 'ar';
+  const avis = avisCommandeActif(reglages?.avisCommande);
   const alignTexte = ar ? 'text-right' : 'text-left';
   const dirTexte = ar ? 'rtl' : 'ltr';
 
@@ -522,6 +524,13 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
           )}
 
           {erreur && <p className="mt-4 text-xs text-red-600 bg-red-50 p-3">{erreur}</p>}
+
+          {/* Absence (voyage…) : prévenir AVANT l'envoi que la confirmation viendra plus tard. */}
+          {avis && (
+            <div dir={ar ? 'rtl' : 'ltr'} className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 leading-relaxed">
+            {ar ? avis.texteAr : avis.texteFr}
+          </div>
+          )}
 
           {/* Vert vif plutôt que le noir de marque (bg-ink) : c'est le
               dernier geste avant l'achat, il doit sauter aux yeux au milieu

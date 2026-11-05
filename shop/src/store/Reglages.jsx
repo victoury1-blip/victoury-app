@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AVIS_DEFAUT } from '../lib/avisCommande';
 import { supabase } from '../lib/supabase';
 import { enregistrerReglages } from '../lib/admin';
 import { REGLAGES_DEFAUT } from '../lib/catalog';
@@ -49,6 +50,8 @@ export default function Reglages() {
   }, []);
 
   const u = (k, v) => setR(x => ({ ...x, [k]: v }));
+  const avis = { ...AVIS_DEFAUT, ...(r.avisCommande || {}) };
+  const ua = (k, v) => setR(x => ({ ...x, avisCommande: { ...AVIS_DEFAUT, ...(x.avisCommande || {}), [k]: v } }));
 
   async function enregistrer() {
     setEnregistrement(true);
@@ -74,6 +77,35 @@ export default function Reglages() {
           (/store/theme), les remises par quantité aussi (/store/remises) —
           avec, pour les deux, un aperçu en temps réel. */}
       <div className="mt-5 space-y-6">
+        {/* Absence : message à la caisse et après la commande, entre deux dates. */}
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xs tracking-widest uppercase text-gray-500">Message d'absence (caisse)</h2>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={!!avis.actif} onChange={e => ua('actif', e.target.checked)} /> Activé
+            </label>
+          </div>
+          <p className="mt-1 text-[11px] text-gray-400">Affiché au-dessus du bouton de commande et sur la page de remerciement, seulement entre ces dates (incluses).</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <label className={label}>Du</label>
+              <input type="date" value={avis.debut || ''} onChange={e => ua('debut', e.target.value)} className={champ} />
+            </div>
+            <div>
+              <label className={label}>Au</label>
+              <input type="date" value={avis.fin || ''} onChange={e => ua('fin', e.target.value)} className={champ} />
+            </div>
+            <div className="col-span-2">
+              <label className={label}>Texte arabe</label>
+              <textarea dir="rtl" rows={2} value={avis.texteAr || ''} onChange={e => ua('texteAr', e.target.value)} className={champ} />
+            </div>
+            <div className="col-span-2">
+              <label className={label}>Texte français</label>
+              <textarea rows={2} value={avis.texteFr || ''} onChange={e => ua('texteFr', e.target.value)} className={champ} />
+            </div>
+          </div>
+        </section>
+
         <section className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-xs tracking-widest uppercase text-gray-500 mb-3">Livraison & contact</h2>
           <div className="grid grid-cols-2 gap-3">
