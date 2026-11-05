@@ -1408,6 +1408,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
       {ozoneOpen && ozoneOrder && (
         <OzoneModal
           order={ozoneOrder}
+          orders={externalOrders}
           onClose={() => setOzoneOpen(false)}
           onSuccess={handleOzoneSuccess}
         />
