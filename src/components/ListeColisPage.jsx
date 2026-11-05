@@ -1031,8 +1031,6 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
         </>)}
       </div>
 
-      {/* Où sont mes pièces : livreur, retours, local, défectueux, total */}
-      {!showArchived && <InventaireColis orders={orders} recuIds={recuIds} />}
 
       {/* Advanced Filter Panel */}
       {filterOpen && tab === 'colis' && (() => {
