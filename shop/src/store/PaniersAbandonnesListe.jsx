@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { FUSEAU } from '../lib/fuseau';
-import { MessageCircle, Trash2 } from 'lucide-react';
+import { MessageCircle, Trash2, Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fmtPrix } from '../lib/pricing';
-import { chargerPaniersActifs, cleTel } from '../lib/paniersAbandonnes';
+import { chargerPaniersActifs, cleTel, envoyerPanierAConfirmer } from '../lib/paniersAbandonnes';
+import { construireCommande } from '../lib/commande';
 
 /* Un client qui a tapé son téléphone à la caisse (Commander.jsx, onBlur) mais
    n'a jamais validé — capturé côté client dans shop_paniers_abandonnes, à
@@ -40,6 +41,15 @@ export default function PaniersAbandonnesListe() {
     const { data } = await supabase.from('shop_paniers_abandonnes').select('id, telephone');
     const ids = (data || []).filter(x => cleTel(x.telephone) === cleTel(p.telephone)).map(x => x.id);
     await supabase.from('shop_paniers_abandonnes').delete().in('id', ids.length ? ids : [id]);
+  }
+
+  const [envoi, setEnvoi] = useState({}); // { [id]: 'en cours' | 'ok' | message d'erreur }
+  async function versAConfirmer(p) {
+    if (!confirm(`Créer la commande de ${p.nom || 'ce client'} (${p.telephone}) dans « À Confirmer » de l'application ?`)) return;
+    setEnvoi(e => ({ ...e, [p.id]: 'en cours' }));
+    const r = await envoyerPanierAConfirmer(p, { construireCommande });
+    setEnvoi(e => ({ ...e, [p.id]: r.ok ? 'ok' : (r.error || 'Échec') }));
+    if (r.ok) setTimeout(() => setVisibles(list => list.filter(x => x.id !== p.id)), 1500);
   }
 
   // Marque le panier "déjà relancé" dès le clic sur WhatsApp — sans bloquer
@@ -94,6 +104,15 @@ export default function PaniersAbandonnesListe() {
                 }`}>
                 <MessageCircle size={14} /> WhatsApp
               </a>
+              {envoi[p.id] === 'ok' ? (
+                <span className="px-3 py-2 text-xs rounded-lg bg-blue-50 text-blue-700 font-semibold shrink-0">✓ Dans À Confirmer</span>
+              ) : (
+                <button onClick={() => versAConfirmer(p)} disabled={envoi[p.id] === 'en cours'}
+                  title={envoi[p.id] && envoi[p.id] !== 'en cours' ? `Erreur : ${envoi[p.id]}` : 'Créer la commande dans « À Confirmer » (après accord de la cliente)'}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg shrink-0 text-white disabled:opacity-50 ${envoi[p.id] && envoi[p.id] !== 'en cours' ? 'bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                  <Send size={14} /> {envoi[p.id] === 'en cours' ? 'Envoi…' : envoi[p.id] ? 'Réessayer' : 'À Confirmer'}
+                </button>
+              )}
               <button onClick={() => supprimer(p.id)} title="Retirer de la liste"
                 className="p-2 text-gray-300 hover:text-red-500 shrink-0"><Trash2 size={14} /></button>
             </div>

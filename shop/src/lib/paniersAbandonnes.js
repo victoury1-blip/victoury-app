@@ -35,3 +35,39 @@ export async function chargerPaniersActifs() {
   ]);
   return filtrerPaniersActifs(paniers, commandes);
 }
+
+/* Client « visiteur » (clé publique, sans session) : la règle d'accès de la
+   table orders n'autorise la création d'une commande du site qu'à ce rôle —
+   exactement comme une commande passée sur la boutique. */
+let anonyme = null;
+async function clientAnonyme() {
+  if (!anonyme) {
+    const { createClient } = await import('@supabase/supabase-js');
+    anonyme = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, storageKey: 'victoury-relance' },
+    });
+  }
+  return anonyme;
+}
+
+/** Transforme un panier abandonné en commande « nouveau » (onglet À Confirmer
+    de l'application), après accord de la cliente au téléphone / WhatsApp. */
+export async function envoyerPanierAConfirmer(panier, { construireCommande }) {
+  const lignes = (panier.lignes || []).filter(l => l?.name);
+  if (!lignes.length) return { ok: false, error: 'Panier vide' };
+  const commande = construireCommande(
+    { nom: panier.nom || 'Client', telephone: panier.telephone, ville: panier.ville || '', adresse: panier.adresse || '' },
+    lignes, Number(panier.total) || 0, new Date(), undefined, { source: 'Relance' },
+  );
+  commande.note = 'Commande du site — relance panier abandonné';
+  const client = await clientAnonyme();
+  const { error } = await client.from('orders').insert(commande);
+  if (error) return { ok: false, error: error.message };
+
+  // Le stock baisse comme pour une commande passée sur le site.
+  const { data: produits } = await supabase.from('shop_products').select('slug, name').in('name', [...new Set(lignes.map(l => l.name))]);
+  const slugDe = new Map((produits || []).map(p => [p.name, p.slug]));
+  await Promise.all(lignes.filter(l => slugDe.get(l.name)).map(l =>
+    client.rpc('shop_decrement_stock', { p_slug: slugDe.get(l.name), p_size: l.size || '', p_qty: l.qty || 1 }).then(() => {}, () => {})));
+  return { ok: true, id: commande.id };
+}
