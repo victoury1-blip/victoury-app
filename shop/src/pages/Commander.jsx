@@ -527,7 +527,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
 
           {/* Absence (voyage…) : prévenir AVANT l'envoi que la confirmation viendra plus tard. */}
           {avis && (
-            <div dir={ar ? 'rtl' : 'ltr'} className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 leading-relaxed">
+            <div dir={ar ? 'rtl' : 'ltr'} className="mt-4 rounded-2xl border border-pink-200 border-s-4 border-s-pink-400 bg-gradient-to-br from-pink-50 to-rose-50 shadow-sm shadow-pink-100 px-4 py-3 text-sm font-medium text-pink-900 leading-relaxed">
             {ar ? avis.texteAr : avis.texteFr}
           </div>
           )}
