@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { avisCommandeActif } from '../lib/avisCommande';
 import { enregistrerDebutCommande, enregistrerEtapeFormulaire } from '../lib/visites';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck, Loader2 } from 'lucide-react';
@@ -374,7 +373,6 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   // gauche. L'alignement du texte suit la langue, indépendamment du sens de
   // la mise en page.
   const ar = lang === 'ar';
-  const avis = avisCommandeActif(reglages?.avisCommande);
   const alignTexte = ar ? 'text-right' : 'text-left';
   const dirTexte = ar ? 'rtl' : 'ltr';
 
@@ -525,12 +523,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
 
           {erreur && <p className="mt-4 text-xs text-red-600 bg-red-50 p-3">{erreur}</p>}
 
-          {/* Absence (voyage…) : prévenir AVANT l'envoi que la confirmation viendra plus tard. */}
-          {avis && (
-            <div dir={ar ? 'rtl' : 'ltr'} className="mt-4 rounded-2xl border border-pink-200 border-s-4 border-s-pink-400 bg-gradient-to-br from-pink-50 to-rose-50 shadow-sm shadow-pink-100 px-4 py-3 text-sm font-medium text-pink-900 leading-relaxed">
-            {ar ? avis.texteAr : avis.texteFr}
-          </div>
-          )}
+          {/* Message d'absence : volontairement PAS ici — avant l'envoi, il
+              pourrait décourager la cliente. Il s'affiche une fois la
+              commande validée, en fenêtre sur la page Merci. */}
 
           {/* Vert vif plutôt que le noir de marque (bg-ink) : c'est le
               dernier geste avant l'achat, il doit sauter aux yeux au milieu

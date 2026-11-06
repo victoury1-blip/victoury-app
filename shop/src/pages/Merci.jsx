@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { avisCommandeActif } from '../lib/avisCommande';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
@@ -19,15 +19,34 @@ export default function Merci({ reglages }) {
   const { t, lang } = useLang();
   const ar = lang === 'ar';
   const avis = avisCommandeActif(reglages?.avisCommande);
+  const [fenetre, setFenetre] = useState(true);
+  const texte = avis && (ar ? avis.texteAr : avis.texteFr);
   const encart = avis && (
     <div dir={ar ? 'rtl' : 'ltr'} className="mt-6 text-center rounded-2xl border border-pink-200 border-s-4 border-s-pink-400 bg-gradient-to-br from-pink-50 to-rose-50 shadow-sm shadow-pink-100 px-4 py-3 text-sm font-medium text-pink-900 leading-relaxed">
-            {ar ? avis.texteAr : avis.texteFr}
-          </div>
+      {texte}
+    </div>
+  );
+  /* Fenêtre douce juste après la validation : la cliente la voit avant de
+     quitter le site, sans l'avoir vue avant de commander. */
+  const popup = avis && fenetre && (
+    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center px-6" onClick={() => setFenetre(false)}>
+      <div dir={ar ? 'rtl' : 'ltr'} onClick={e => e.stopPropagation()}
+        className="w-full max-w-sm rounded-3xl bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-200 shadow-xl px-6 py-6 text-center">
+        <div className="w-12 h-12 rounded-full bg-green-600 text-white grid place-items-center mx-auto"><Check size={22} /></div>
+        <p className="mt-3 text-sm font-semibold text-gray-900">{ar ? 'تم تسجيل طلبك بنجاح 🎉' : 'Commande bien enregistrée 🎉'}</p>
+        <p className="mt-3 text-sm font-medium text-pink-900 leading-relaxed">{texte}</p>
+        <button type="button" onClick={() => setFenetre(false)}
+          className="mt-5 w-full rounded-xl bg-pink-500 hover:bg-pink-600 text-white py-3 text-sm font-semibold">
+          {ar ? 'مفهوم ❤️' : 'Compris ❤️'}
+        </button>
+      </div>
+    </div>
   );
 
   if (!state) {
     return (
       <div className="max-w-2xl mx-auto px-6 py-24 text-center">
+        {popup}
         <div className="w-14 h-14 rounded-full bg-green-600 text-white grid place-items-center mx-auto"><Check size={26} /></div>
         <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{ar ? 'تم تسجيل الطلب' : 'Commande enregistrée'}</h1>
         <p className="mt-3 text-sm text-gray-600">
@@ -46,6 +65,7 @@ export default function Merci({ reglages }) {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
+      {popup}
       <div className="text-center">
         <div className="w-14 h-14 rounded-full bg-green-600 text-white grid place-items-center mx-auto"><Check size={26} /></div>
         <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{ar ? 'تم تأكيد الطلب' : 'Commande confirmée'}</h1>
