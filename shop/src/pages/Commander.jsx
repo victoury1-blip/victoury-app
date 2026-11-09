@@ -163,6 +163,26 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     }, () => { panierEnCours.current = false; });
   }
 
+  /* Commande refusée par le serveur : une ligne de plus dans les paniers
+     abandonnés, avec la raison. Sans la colonne `refus` (SQL pas encore
+     passé), la ligne s'enregistre quand même, sans la raison. */
+  function noterRefus(raison) {
+    const f = etatActuel.current.form, l = etatActuel.current.lignes;
+    if (!l.length || f.telephone.replace(/\D/g, '').length < 9) return;
+    const donnees = {
+      nom: f.nom || null, telephone: f.telephone, ville: f.ville || null, adresse: f.adresse || null,
+      lignes: l.map(x => ({ name: x.name, size: x.size, color: x.color, qty: x.qty, price: x.price })),
+      total: t.total,
+      refus: String(raison).slice(0, 300),
+    };
+    supabase.from('shop_paniers_abandonnes').insert(donnees).then(({ error }) => {
+      if (error && /refus/i.test(error.message || '')) {
+        const { refus, ...sans } = donnees; // eslint-disable-line no-unused-vars
+        supabase.from('shop_paniers_abandonnes').insert(sans).then(() => {}, () => {});
+      }
+    }, () => {});
+  }
+
   // Meta recommande d'envoyer e-mail/ville/prénom/nom dès qu'ils sont connus
   // pour l'évènement "Paiement initié" (Gestionnaire d'évènements →
   // Optimisez les performances — +22,31 % de conversions supplémentaires
@@ -258,6 +278,9 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     setEnvoi(false);
     if (!r.ok) {
       setErreur(r.error || 'Envoi impossible. Réessayez.');
+      // La cliente A cliqué « تأكيد الطلب » et le site a refusé : le panier
+      // garde la raison, visible dans « Paniers abandonnés » de /store.
+      if (!r.manque?.length) noterRefus(r.error || 'Envoi impossible (raison inconnue)');
       enregistrerEtapeFormulaire(`erreur:${r.manque?.length ? `manque ${r.manque.join(',')}` : (r.error || 'inconnue')}`);
       return;
     }

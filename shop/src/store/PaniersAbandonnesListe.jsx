@@ -75,8 +75,8 @@ export default function PaniersAbandonnesListe() {
       ) : (
         <div className="mt-5 bg-white border border-gray-200 rounded-xl divide-y divide-gray-50">
           {visibles.map(p => (
-            <div key={p.id} className="flex items-center gap-4 p-4">
-              <div className="flex-1 min-w-0">
+            <div key={p.id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-3 p-4">
+              <div className="basis-full sm:basis-auto flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-800">
                   {p.nom || 'Client'} · {p.telephone}
                   {p.envoye && (
@@ -85,12 +85,17 @@ export default function PaniersAbandonnesListe() {
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                <p className="text-xs text-gray-500 mt-0.5 break-words">
                   {(p.lignes || []).map(l => `${l.name}${l.size ? ` (${l.size})` : ''} ×${l.qty}`).join(', ')}
                 </p>
                 {(p.ville || p.adresse) && (
                   <p className="text-xs text-gray-500 mt-0.5 truncate">
                     📍 {[p.ville, p.adresse].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                {p.refus && (
+                  <p className="mt-1 text-xs font-semibold text-red-700 bg-red-50 border border-red-100 rounded px-2 py-1">
+                    ⚠️ A cliqué « Confirmer » mais le site a refusé : {p.refus}
                   </p>
                 )}
                 <p className="text-xs text-gray-400 mt-0.5">

@@ -34,6 +34,13 @@ describe('remise par quantité', () => {
     expect(remiseQuantite([ligne(759, 2)], PALIERS)).toBe(759 * 0.2);
   });
 
+  it('répète l’offre par lot : 3 pièces = plein + remisée + plein', () => {
+    const P = [{ rang: 2, pourcent: 20 }];
+    expect(remiseQuantite([ligne(250, 3)], P)).toBe(50);          // 250 + 200 + 250
+    expect(remiseQuantite([ligne(250, 4)], P)).toBe(100);         // deux lots
+    expect(remiseQuantite([ligne(250), ligne(250), ligne(250)], P)).toBe(50);
+  });
+
   it('sans palier configuré, aucune remise', () => {
     expect(remiseQuantite([ligne(759), ligne(759)], [])).toBe(0);
   });

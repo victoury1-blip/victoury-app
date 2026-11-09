@@ -11,6 +11,17 @@ export const nbArticles = (lignes) => lignes.reduce((n, l) => n + (l.qty || 0), 
 
 export const sousTotal = (lignes) => lignes.reduce((s, l) => s + (l.price || 0) * (l.qty || 0), 0);
 
+/* Palier d'un article selon son rang (1er, 2ᵉ, 3ᵉ…). L'offre se RÉPÈTE par
+ * lot : avec « la 2ᵉ à −20 % », 3 pièces = plein + remisée + plein
+ * (250 + 200 + 250), 4 pièces = deux lots. Au-delà du plus grand palier, on
+ * repart au 1er rang — jamais la remise appliquée à toutes les pièces suivantes. */
+export function palierPourRang(paliers, rang) {
+  if (!paliers?.length) return null;
+  const taille = Math.max(...paliers.map(p => p.rang));
+  const r = ((rang - 1) % taille) + 1;
+  return paliers.filter(x => r >= x.rang).sort((a, b) => b.rang - a.rang)[0] || null;
+}
+
 /* Remise par quantité : « la 2ᵉ paire à −20 %, la 3ᵉ à −30 % ».
  *
  * Elle porte sur les articles les MOINS chers. C'est la règle du commerce, et
@@ -25,8 +36,7 @@ export function remiseQuantite(lignes, paliers = []) {
   prix.sort((a, b) => b - a); // du plus cher au moins cher
   let remise = 0;
   for (let rang = 2; rang <= prix.length; rang++) {
-    // Le palier applicable est le plus élevé dont le rang est atteint.
-    const p = paliers.filter(x => rang >= x.rang).sort((a, b) => b.rang - a.rang)[0];
+    const p = palierPourRang(paliers, rang);
     if (p) remise += prix[rang - 1] * (p.pourcent / 100);
   }
   return arrondi(remise);
@@ -89,7 +99,7 @@ export function lignesAvecRemise(lignes, remises = []) {
     unites.sort((a, b) => b.prix - a.prix);
     unites.forEach((u, i) => {
       const rang = i + 1;
-      const p = paliers.filter(x => rang >= x.rang).sort((a, b) => b.rang - a.rang)[0];
+      const p = palierPourRang(paliers, rang);
       if (p) remiseParIndex[u.index] += u.prix * (p.pourcent / 100);
     });
   }

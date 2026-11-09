@@ -729,3 +729,7 @@ as $$
   ) end;
 $$;
 grant execute on function shop_stats_visites(timestamptz, timestamptz) to authenticated;
+
+-- Raison d'un refus du site (stock, produit retiré, IP bloquée…) quand la
+-- cliente a cliqué « تأكيد الطلب » sans que la commande passe.
+alter table shop_paniers_abandonnes add column if not exists refus text;
