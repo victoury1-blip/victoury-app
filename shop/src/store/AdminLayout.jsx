@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3, Heart, Rocket, Clock } from 'lucide-react';
+import { LayoutGrid, Package, Layers, FileText, Ticket, Settings, Radio, Palette, ShoppingCart, Activity, Music2, Percent, LogOut, DownloadCloud, MessageSquareQuote, Image, Menu, X, MessageCircle, Star, Bell, BarChart3, Heart, Rocket, Clock, ShieldOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { jouerSonCommande } from '../lib/sonCommande';
@@ -25,6 +25,7 @@ const LIENS = [
   { to: '/store/reservations', label: 'Réservations', icon: Clock },
   { to: '/store/paniers-abandonnes', label: 'Paniers abandonnés', icon: MessageCircle },
   { to: '/store/clients-fideles', label: 'Clients fidèles', icon: Heart },
+  { to: '/store/bloques', label: 'Bloqués', icon: ShieldOff },
   { to: '/store/pages', label: 'Pages', icon: FileText },
   { to: '/store/avis', label: 'Avis clients', icon: MessageSquareQuote },
   { to: '/store/avis-produits', label: 'Avis produits', icon: Star },

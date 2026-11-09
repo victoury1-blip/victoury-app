@@ -51,6 +51,7 @@ const MetaPixel = page(() => import('./store/MetaPixel'));
 const EditTheme = page(() => import('./store/EditTheme'));
 const CommandesListe = page(() => import('./store/CommandesListe'));
 const PaniersAbandonnesListe = page(() => import('./store/PaniersAbandonnesListe'));
+const Bloques = page(() => import('./store/Bloques'));
 const Reservations = page(() => import('./store/Reservations'));
 const ClientsFideles = page(() => import('./store/ClientsFideles'));
 const MicrosoftClarity = page(() => import('./store/MicrosoftClarity'));
@@ -63,7 +64,7 @@ const Reglages = page(() => import('./store/Reglages'));
    (voir src/lib/chargementPage.js) : chaque clic du menu s'affiche aussitôt. */
 const PAGES_ADMIN = [Dashboard, ProduitsListe, ProduitForm, LandingPagesListe, LandingPageForm, CollectionsListe,
   MediaListe, ImportWoo, AvisListe, AvisProduitsListe, PagesListe, CodesPromo, MetaPixel, EditTheme, CommandesListe,
-  PaniersAbandonnesListe, Reservations, ClientsFideles, MicrosoftClarity, TikTokPixel, GoogleAnalytics, RemisesListe, Reglages];
+  PaniersAbandonnesListe, Bloques, Reservations, ClientsFideles, MicrosoftClarity, TikTokPixel, GoogleAnalytics, RemisesListe, Reglages];
 const prechargerAdmin = () => PAGES_ADMIN.forEach(P => P.precharger());
 import { lirePanier, ecrirePanier, ajouter, changerQuantite, retirer, vider } from './lib/panier';
 import { nbArticles } from './lib/pricing';
@@ -475,6 +476,7 @@ function Administration() {
             <Route path="remises" element={<RemisesListe />} />
             <Route path="commandes" element={<CommandesListe />} />
             <Route path="paniers-abandonnes" element={<PaniersAbandonnesListe />} />
+            <Route path="bloques" element={<Bloques />} />
             <Route path="reservations" element={<Reservations />} />
             <Route path="clients-fideles" element={<ClientsFideles />} />
             <Route path="microsoft-clarity" element={<MicrosoftClarity />} />
