@@ -41,13 +41,45 @@ export default function WhatsAppBulle({ numero, icone }) {
     };
   }, []);
 
+  /* Jamais par-dessus le choix de taille ni le bouton d'achat (marqués
+     data-cache-whatsapp, voir Produit.jsx) : la bulle occupait le coin bas
+     droit et cachait XL / XXL / 3XL et le bouton « Acheter ». Elle se retire
+     quand l'un d'eux passe dans sa zone, et revient quand il est plus haut
+     ou plus bas sur l'écran. */
+  const [masquee, setMasquee] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const verifier = () => {
+      raf = 0;
+      const haut = window.innerHeight - 150; // zone de la bulle : 150 px du bas
+      const gene = [...document.querySelectorAll('[data-cache-whatsapp]')].some(el => {
+        const r = el.getBoundingClientRect();
+        return r.height > 0 && r.bottom > haut && r.top < window.innerHeight;
+      });
+      setMasquee(gene);
+    };
+    const planifier = () => { if (!raf) raf = requestAnimationFrame(verifier); };
+    window.addEventListener('scroll', planifier, { passive: true });
+    window.addEventListener('resize', planifier);
+    const intervalle = setInterval(planifier, 700); // changement de page, chargement des tailles
+    planifier();
+    return () => {
+      window.removeEventListener('scroll', planifier);
+      window.removeEventListener('resize', planifier);
+      clearInterval(intervalle);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   if (!digits) return null;
   const message = (ar ? 'السلام، بغيت نسولك على...' : "Bonjour, j'ai une question sur...") + lignePromoWhatsApp(ar);
   const href = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 
   return (
     <a href={href} target="_blank" rel="noreferrer"
-      className="fixed bottom-5 right-5 z-30 flex flex-col items-center gap-1.5">
+      aria-hidden={masquee || undefined} tabIndex={masquee ? -1 : undefined}
+      className={`fixed bottom-5 right-5 z-30 flex flex-col items-center gap-1.5 transition-all duration-300 ${
+        masquee ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100'}`}>
       {/* Bulle de chat façon "assistant" (Ozzy d'Ozone Express, etc.) : un
           message d'accueil chaleureux avec une petite pointe qui redescend
           vers l'icône, plutôt qu'une simple étiquette "Contactez-nous".

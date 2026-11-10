@@ -372,7 +372,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             "achetés ensemble" plus bas) restait toujours de gauche à droite
             même en arabe — S en tête à gauche au lieu de démarrer à droite
             comme le reste de la page en RTL. */}
-        <div className="mt-6" dir={ar ? 'rtl' : 'ltr'}>
+        <div className="mt-6" dir={ar ? 'rtl' : 'ltr'} data-cache-whatsapp>
           <div className="flex items-center justify-between">
             <p className="text-[13px] tracking-normal text-ink font-medium">{t('tailleLabel')}</p>
             {/* Réglé (photo + activation) depuis /store/edit-theme — absent
@@ -464,6 +464,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               }, { ouvrirTiroir: false });
               onAchatRapide?.();
             }}
+            data-cache-whatsapp
             className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-sm font-semibold tracking-widest uppercase
                        disabled:bg-gray-200 disabled:text-gray-400 disabled:animate-none transition-colors shadow-lg shadow-orange-600/30"
             style={taille ? { animation: 'bouton-pulse 1.8s ease-in-out infinite' } : undefined}>
