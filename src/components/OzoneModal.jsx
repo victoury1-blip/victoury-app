@@ -440,11 +440,17 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
                 </div>
               </div>
 
-              {(phoneHistoryLoading || phoneHistory) && (() => {
-                // Tout de suite : DERNIER STATUT OZON des colis envoyés par
-                // Ozon depuis l'appli (même numéro) ; remplacé par les chiffres
-                // du site Ozon dès qu'ils arrivent (s'ils arrivent).
-                const local = (phoneHistoryLoading || phoneHistory?.erreur) ? historiqueOzon(orders, form.phone, order?.id) : null;
+              {phoneHistoryLoading && (
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <Loader2 size={12} className="animate-spin" />
+                  <span>Vérification du numéro sur Ozon…</span>
+                </div>
+              )}
+              {phoneHistory && !phoneHistoryLoading && (() => {
+                // Pas de résultat provisoire : on attend la réponse du site
+                // Ozon. Seulement s'il échoue, repli sur le DERNIER STATUT
+                // OZON des colis envoyés depuis l'appli (même numéro).
+                const local = phoneHistory.erreur ? historiqueOzon(orders, form.phone, order?.id) : null;
                 const h = local
                   ? { exists: local.total > 0, delivered: local.livres, returned: local.retournes, total: local.total }
                   : phoneHistory;
@@ -466,12 +472,9 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
                       </p>
                     )}
                     <p className="text-[11px] font-normal opacity-60 mt-1 flex items-center gap-1">
-                      {phoneHistoryLoading && <Loader2 size={10} className="animate-spin shrink-0" />}
-                      {phoneHistoryLoading
-                        ? "D'après les colis Ozon de l'appli — vérification sur le site Ozon…"
-                        : local
-                          ? `Source : statuts Ozon des colis de l'appli — ${raisonEchecOzon(phoneHistory.erreur)}.`
-                          : 'Source : site Ozon Express.'}
+                      {local
+                        ? `Source : statuts Ozon des colis de l'appli — ${raisonEchecOzon(phoneHistory.erreur)}.`
+                        : 'Source : site Ozon Express.'}
                     </p>
                   </div>
                 );
