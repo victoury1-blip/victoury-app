@@ -40,12 +40,12 @@ const labelCls = 'block text-xs font-semibold text-gray-600 mb-1';
 /* Raison lisible quand la vérification sur le site d'Ozon échoue. */
 function raisonEchecOzon(e) {
   const s = String(e || '');
-  if (/credentials/i.test(s)) return 'الإيميل والموديباس ديال Ozon ما محطوطينش فـ Vercel (OZONE_EMAIL / OZONE_PASS)';
-  if (/login_failed/i.test(s)) return 'Ozon رفض الدخول (الإيميل ولا الموديباس تبدل؟)';
-  if (/autoris/i.test(s)) return 'السيسيون سالات، عاود دخل للتطبيق';
-  if (/trop de/i.test(s)) return 'بزاف ديال التحقق، تسنى دقيقة';
-  if (/trop lent/i.test(s)) return 'السيت ديال Ozon طول بزاف باش يجاوب';
-  return s ? `السيت ديال Ozon ما جاوبش (${s})` : 'السيت ديال Ozon ما جاوبش';
+  if (/credentials/i.test(s)) return 'identifiants du site Ozon absents (OZONE_EMAIL / OZONE_PASS dans Vercel)';
+  if (/login_failed/i.test(s)) return 'connexion au site Ozon refusée (e-mail ou mot de passe changé ?)';
+  if (/autoris/i.test(s)) return 'session expirée, reconnectez-vous';
+  if (/trop de/i.test(s)) return 'trop de vérifications, réessayez dans une minute';
+  if (/trop lent/i.test(s)) return 'le site Ozon a mis trop de temps à répondre';
+  return s ? `le site Ozon n'a pas répondu (${s})` : "le site Ozon n'a pas répondu";
 }
 
 export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
@@ -450,28 +450,28 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
                   : phoneHistory;
                 const risque = h.exists && h.returned > 0 && h.delivered === 0;
                 return (
-                  <div dir="rtl" className={`text-right rounded-lg px-4 py-3 text-sm font-medium ${
+                  <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
                     risque ? 'bg-red-50 border border-red-200 text-red-700'
                       : h.exists ? 'bg-gray-50 border border-gray-200 text-gray-800'
                       : 'bg-green-50 border border-green-100 text-green-700'
                   }`}>
                     {h.exists ? (
-                      <p>هاد النمرة ديجا كاينة: ✅ تليفرات <strong>{h.delivered}</strong> مرة · ↩️ رجعات <strong>{h.returned}</strong> مرة{local && local.encours > 0 ? ` · ⏳ فالطريق ${local.encours}` : ''}</p>
+                      <p>Ce numéro existe déjà. ( Livré : <strong>{h.delivered}</strong> ) ( Retourné : <strong>{h.returned}</strong> ) fois.{local && local.encours > 0 ? ` En cours : ${local.encours}.` : ''}</p>
                     ) : (
-                      <p>✅ نمرة جديدة — حتى كولي ما تصيفط ليها بـ Ozon.</p>
+                      <p>✅ Nouveau numéro — aucun colis Ozon trouvé.</p>
                     )}
                     {risque && (
                       <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                        <AlertTriangle size={12} /> رد البال: حتى كولي ما تليفرا ليها، و {h.returned} رجعات!
+                        <AlertTriangle size={12} /> Attention : aucun colis livré, {h.returned} retour{h.returned > 1 ? 's' : ''} !
                       </p>
                     )}
                     <p className="text-[11px] font-normal opacity-60 mt-1 flex items-center gap-1">
                       {phoneHistoryLoading && <Loader2 size={10} className="animate-spin shrink-0" />}
                       {phoneHistoryLoading
-                        ? 'من الكولي ديال Ozon لي فالتطبيق — كنتحقق فالسيت ديال Ozon…'
+                        ? "D'après les colis Ozon de l'appli — vérification sur le site Ozon…"
                         : local
-                          ? `المصدر: الستاتو ديال Ozon فالتطبيق — ${raisonEchecOzon(phoneHistory.erreur)}`
-                          : 'المصدر: السيت ديال Ozon Express'}
+                          ? `Source : statuts Ozon des colis de l'appli — ${raisonEchecOzon(phoneHistory.erreur)}.`
+                          : 'Source : site Ozon Express.'}
                     </p>
                   </div>
                 );
