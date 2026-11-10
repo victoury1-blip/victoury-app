@@ -35,3 +35,19 @@ export function historiqueOzon(orders, telephone, exclureId) {
   }
   return r;
 }
+
+/* Couleur du client d'après son passé (livré / retourné), pour décider
+ * d'un coup d'œil avant d'expédier :
+ *  - vert   : il se fait livrer (aucun retour, ou au moins 75 % livrés) ;
+ *  - rouge  : il renvoie (jamais livré, ou plus de retours que de livrés) ;
+ *  - orange : entre les deux (des retours, mais il se fait livrer aussi) ;
+ *  - neutre : nouveau numéro, rien à juger. */
+export function niveauClientOzon(livres, retournes) {
+  const l = Number(livres) || 0, r = Number(retournes) || 0;
+  const total = l + r;
+  if (!total) return { niveau: 'nouveau', taux: null };
+  const taux = Math.round((l / total) * 100);
+  if (r === 0 || taux >= 75) return { niveau: 'vert', taux };
+  if (l === 0 || r > l) return { niveau: 'rouge', taux };
+  return { niveau: 'orange', taux };
+}

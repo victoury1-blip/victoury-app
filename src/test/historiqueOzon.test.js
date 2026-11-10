@@ -29,3 +29,16 @@ describe('historique Ozon d’un numéro', () => {
     expect(historiqueOzon(orders, '0663372556', 'D')).toEqual({ livres: 2, retournes: 1, encours: 0, total: 3 });
   });
 });
+
+import { niveauClientOzon } from '../lib/historiqueOzon';
+describe('couleur du client', () => {
+  it('vert / orange / rouge / nouveau', () => {
+    expect(niveauClientOzon(0, 0).niveau).toBe('nouveau');
+    expect(niveauClientOzon(2, 0)).toEqual({ niveau: 'vert', taux: 100 });
+    expect(niveauClientOzon(3, 1)).toEqual({ niveau: 'vert', taux: 75 });
+    expect(niveauClientOzon(1, 1)).toEqual({ niveau: 'orange', taux: 50 });
+    expect(niveauClientOzon(2, 1).niveau).toBe('orange');
+    expect(niveauClientOzon(0, 1)).toEqual({ niveau: 'rouge', taux: 0 });
+    expect(niveauClientOzon(1, 2).niveau).toBe('rouge');
+  });
+});

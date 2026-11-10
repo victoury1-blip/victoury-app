@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
 import { supabase } from '../lib/supabase';
-import { historiqueOzon } from '../lib/historiqueOzon';
+import { historiqueOzon, niveauClientOzon } from '../lib/historiqueOzon';
 
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' },
@@ -454,21 +454,21 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
                 const h = local
                   ? { exists: local.total > 0, delivered: local.livres, returned: local.retournes, total: local.total }
                   : phoneHistory;
-                const risque = h.exists && h.returned > 0 && h.delivered === 0;
+                const { niveau, taux } = niveauClientOzon(h.delivered, h.returned);
+                const STYLE = {
+                  vert: ['bg-green-50 border border-green-300 text-green-800', '✅ Client fiable — il se fait livrer'],
+                  orange: ['bg-amber-50 border border-amber-300 text-amber-800', '⚠️ Client moyen — il a déjà renvoyé des colis'],
+                  rouge: ['bg-red-50 border border-red-300 text-red-700', '⛔ Client à risque — il renvoie ses colis'],
+                  nouveau: ['bg-gray-50 border border-gray-200 text-gray-700', '🆕 Nouveau numéro — aucun colis chez Ozon'],
+                };
+                const [cls, titre] = STYLE[niveau];
                 return (
-                  <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
-                    risque ? 'bg-red-50 border border-red-200 text-red-700'
-                      : h.exists ? 'bg-gray-50 border border-gray-200 text-gray-800'
-                      : 'bg-green-50 border border-green-100 text-green-700'
-                  }`}>
-                    {h.exists ? (
-                      <p>Ce numéro existe déjà. ( Livré : <strong>{h.delivered}</strong> ) ( Retourné : <strong>{h.returned}</strong> ) fois.{local && local.encours > 0 ? ` En cours : ${local.encours}.` : ''}</p>
-                    ) : (
-                      <p>✅ Nouveau numéro — aucun colis Ozon trouvé.</p>
-                    )}
-                    {risque && (
-                      <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                        <AlertTriangle size={12} /> Attention : aucun colis livré, {h.returned} retour{h.returned > 1 ? 's' : ''} !
+                  <div className={`rounded-lg px-4 py-3 text-sm font-medium ${cls}`}>
+                    <p className="font-bold">{titre}</p>
+                    {niveau !== 'nouveau' && (
+                      <p className="mt-0.5">
+                        Livré : <strong>{h.delivered}</strong> · Retourné : <strong>{h.returned}</strong> · Taux de livraison : <strong>{taux} %</strong>
+                        {local && local.encours > 0 ? ` · En cours : ${local.encours}` : ''}
                       </p>
                     )}
                     <p className="text-[11px] font-normal opacity-60 mt-1 flex items-center gap-1">
