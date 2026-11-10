@@ -6,7 +6,6 @@ import { fmtPrix, fmtMontant, prixLot, remiseQuantiteGroupee } from '../lib/pric
 import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel, trackTikTok, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from '../lib/pixel';
-import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
 import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
 import GarantiesGrid from '../components/GarantiesGrid';
@@ -583,14 +582,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
 
       <AvisProduit productId={produit.id} />
 
-      {produitsLies.length > 0 && (
-        <div className="mt-6 border-t border-gray-100 pt-10">
-          <h2 className="text-sm tracking-[0.2em] uppercase text-gray-500">{t('produitsSimilaires')}</h2>
-          <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10">
-            {produitsLies.map(p => <CarteProduit key={p.id} produit={p} remises={remises} />)}
-          </div>
-        </div>
-      )}
+      {/* « Produits similaires » : affichés en carrousel sous le bouton
+          WhatsApp (CarrouselProduits), plus en grille en bas de page. */}
 
       {guideOuvert && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setGuideOuvert(false)}>
