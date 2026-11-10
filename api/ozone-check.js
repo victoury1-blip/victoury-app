@@ -199,6 +199,6 @@ export default async function handler(req, res) {
 
     return res.status(401).json({ error: 'login_failed' });
   } catch (e) {
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: `Erreur serveur : ${e?.message || 'inconnue'}` });
   }
 }

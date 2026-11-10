@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Truck, CheckCircle2, XCircle, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { cloudGet } from '../lib/cloudSettings';
 import { supabase } from '../lib/supabase';
+import { historiqueOzon } from '../lib/historiqueOzon';
 
 const FALLBACK_CITIES = [
   { id: '1', name: 'Casablanca' }, { id: '2', name: 'Rabat' },
@@ -36,7 +37,17 @@ async function getConfigRemote() {
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300';
 const labelCls = 'block text-xs font-semibold text-gray-600 mb-1';
 
-export default function OzoneModal({ order, onClose, onSuccess }) {
+/* Raison lisible quand la vérification sur le site d'Ozon échoue. */
+function raisonEchecOzon(e) {
+  const s = String(e || '');
+  if (/credentials/i.test(s)) return "identifiants du site Ozon absents (OZONE_EMAIL / OZONE_PASS dans Vercel)";
+  if (/login_failed/i.test(s)) return 'connexion au site Ozon refusée (e-mail ou mot de passe changé ?)';
+  if (/autoris/i.test(s)) return 'session expirée, reconnectez-vous';
+  if (/trop de/i.test(s)) return 'trop de vérifications, réessayez dans une minute';
+  return s ? `le site Ozon n'a pas répondu (${s})` : "le site Ozon n'a pas répondu";
+}
+
+export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
   const cfg = getConfig();
 
   const [cities, setCities] = useState([]);
@@ -106,15 +117,15 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
     })
-      .then(r => r.json())
+      .then(r => r.json().catch(() => ({ error: `HTTP ${r.status}` })))
       .then(data => {
-        if (data.error) { setPhoneHistory(null); }
+        if (data.error) { setPhoneHistory({ erreur: data.error }); }
         else if (data.exists) { setPhoneHistory({ exists: true, delivered: data.delivered, returned: data.returned, total: data.total }); }
         else { setPhoneHistory({ exists: false }); }
         setPhoneHistoryLoading(false);
       })
       .catch(e => {
-        if (e.name !== 'AbortError') { setPhoneHistory(null); setPhoneHistoryLoading(false); }
+        if (e.name !== 'AbortError') { setPhoneHistory({ erreur: e.message || 'réseau' }); setPhoneHistoryLoading(false); }
       });
 
     return () => ctrl.abort();
@@ -420,22 +431,6 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                   <label className={labelCls}>Téléphone <span className="text-red-500">*</span></label>
                   <input value={form.phone} onChange={(e) => f('phone', e.target.value)}
                     className={inputCls} />
-                  {phoneHistoryLoading && <span className="text-xs text-gray-400 flex items-center gap-1 mt-1"><Loader2 size={10} className="animate-spin" /> Vérification...</span>}
-                  {phoneHistory && !phoneHistoryLoading && (
-                    phoneHistory.exists ? (
-                      phoneHistory.delivered > 0 ? (
-                        <span className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                          <AlertTriangle size={12} /> Existant — {phoneHistory.delivered} livré{phoneHistory.delivered > 1 ? 's' : ''}{phoneHistory.returned > 0 ? `, ${phoneHistory.returned} retour` : ''}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-red-600 flex items-center gap-1 mt-1">
-                          <AlertTriangle size={12} /> ⚠ {phoneHistory.returned} retour{phoneHistory.returned > 1 ? 's' : ''}, 0 livré
-                        </span>
-                      )
-                    ) : (
-                      <span className="text-xs text-green-600 mt-1">✓ Nouveau numéro</span>
-                    )
-                  )}
                 </div>
               </div>
 
@@ -445,29 +440,38 @@ export default function OzoneModal({ order, onClose, onSuccess }) {
                   <span>Vérification du numéro...</span>
                 </div>
               )}
-              {phoneHistory && !phoneHistoryLoading && (
-                <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
-                  phoneHistory.exists
-                    ? phoneHistory.returned > 0 && phoneHistory.delivered === 0
-                      ? 'bg-red-50 border border-red-200 text-red-700'
-                      : 'bg-gray-50 border border-gray-200 text-gray-800'
-                    : 'bg-green-50 border border-green-100 text-green-700'
-                }`}>
-                  {phoneHistory.exists ? (
-                    <>
-                      <p>Ce numéro existe déjà. ( Livré : <strong>{phoneHistory.delivered}</strong> ) ( Retourné : <strong>{phoneHistory.returned}</strong> ) fois. Total : {phoneHistory.total} colis.</p>
-                      {phoneHistory.returned > 0 && phoneHistory.delivered === 0 && (
-                        <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                          <AlertTriangle size={12} />
-                          ⚠ Attention : aucun colis livré, {phoneHistory.returned} retour{phoneHistory.returned > 1 ? 's' : ''} !
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p>✅ Nouveau numéro — aucun historique trouvé.</p>
-                  )}
-                </div>
-              )}
+              {phoneHistory && !phoneHistoryLoading && (() => {
+                // Site Ozon injoignable : repli sur le DERNIER STATUT OZON des
+                // colis envoyés par Ozon depuis l'appli (même numéro).
+                const local = phoneHistory.erreur ? historiqueOzon(orders, form.phone, order?.id) : null;
+                const h = local
+                  ? { exists: local.total > 0, delivered: local.livres, returned: local.retournes, total: local.total }
+                  : phoneHistory;
+                const risque = h.exists && h.returned > 0 && h.delivered === 0;
+                return (
+                  <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
+                    risque ? 'bg-red-50 border border-red-200 text-red-700'
+                      : h.exists ? 'bg-gray-50 border border-gray-200 text-gray-800'
+                      : 'bg-green-50 border border-green-100 text-green-700'
+                  }`}>
+                    {h.exists ? (
+                      <p>Ce numéro existe déjà. ( Livré : <strong>{h.delivered}</strong> ) ( Retourné : <strong>{h.returned}</strong> ) fois.{local && local.encours > 0 ? ` En cours : ${local.encours}.` : ''}</p>
+                    ) : (
+                      <p>✅ Nouveau numéro — aucun colis Ozon trouvé.</p>
+                    )}
+                    {risque && (
+                      <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                        <AlertTriangle size={12} /> Attention : aucun colis livré, {h.returned} retour{h.returned > 1 ? 's' : ''} !
+                      </p>
+                    )}
+                    <p className="text-[11px] font-normal opacity-60 mt-1">
+                      {local
+                        ? `Source : statuts Ozon des colis envoyés depuis l'appli — ${raisonEchecOzon(phoneHistory.erreur)}.`
+                        : 'Source : site Ozon Express.'}
+                    </p>
+                  </div>
+                );
+              })()}
 
               <div ref={cityRef} className="relative">
                 <label className={labelCls}>
