@@ -40,11 +40,12 @@ const labelCls = 'block text-xs font-semibold text-gray-600 mb-1';
 /* Raison lisible quand la vérification sur le site d'Ozon échoue. */
 function raisonEchecOzon(e) {
   const s = String(e || '');
-  if (/credentials/i.test(s)) return "identifiants du site Ozon absents (OZONE_EMAIL / OZONE_PASS dans Vercel)";
-  if (/login_failed/i.test(s)) return 'connexion au site Ozon refusée (e-mail ou mot de passe changé ?)';
-  if (/autoris/i.test(s)) return 'session expirée, reconnectez-vous';
-  if (/trop de/i.test(s)) return 'trop de vérifications, réessayez dans une minute';
-  return s ? `le site Ozon n'a pas répondu (${s})` : "le site Ozon n'a pas répondu";
+  if (/credentials/i.test(s)) return 'الإيميل والموديباس ديال Ozon ما محطوطينش فـ Vercel (OZONE_EMAIL / OZONE_PASS)';
+  if (/login_failed/i.test(s)) return 'Ozon رفض الدخول (الإيميل ولا الموديباس تبدل؟)';
+  if (/autoris/i.test(s)) return 'السيسيون سالات، عاود دخل للتطبيق';
+  if (/trop de/i.test(s)) return 'بزاف ديال التحقق، تسنى دقيقة';
+  if (/trop lent/i.test(s)) return 'السيت ديال Ozon طول بزاف باش يجاوب';
+  return s ? `السيت ديال Ozon ما جاوبش (${s})` : 'السيت ديال Ozon ما جاوبش';
 }
 
 export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
@@ -108,6 +109,9 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
     if (!phone || phone.length < 9) { setPhoneHistory(null); return; }
     setPhoneHistoryLoading(true);
     const ctrl = new AbortController();
+    // Jamais bloqué sur « Vérification… » : au-delà de 15 s on abandonne
+    // (les chiffres de l'appli restent affichés).
+    const limite = setTimeout(() => ctrl.abort(new DOMException('delai', 'TimeoutError')), 15000);
     const bare = phone.startsWith('+212') ? '0' + phone.slice(4) : phone.startsWith('212') ? '0' + phone.slice(3) : phone;
 
     supabase.auth.getSession().then(({ data: sess }) => {
@@ -125,10 +129,12 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
         setPhoneHistoryLoading(false);
       })
       .catch(e => {
-        if (e.name !== 'AbortError') { setPhoneHistory({ erreur: e.message || 'réseau' }); setPhoneHistoryLoading(false); }
-      });
+        if (e?.name === 'TimeoutError' || ctrl.signal.reason?.name === 'TimeoutError') { setPhoneHistory({ erreur: 'trop lent' }); setPhoneHistoryLoading(false); }
+        else if (e.name !== 'AbortError') { setPhoneHistory({ erreur: e.message || 'réseau' }); setPhoneHistoryLoading(false); }
+      })
+      .finally(() => clearTimeout(limite));
 
-    return () => ctrl.abort();
+    return () => { clearTimeout(limite); ctrl.abort(); };
   }, [form.phone]);
 
   function parseCities(data) {
@@ -434,40 +440,38 @@ export default function OzoneModal({ order, orders = [], onClose, onSuccess }) {
                 </div>
               </div>
 
-              {phoneHistoryLoading && (
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <Loader2 size={12} className="animate-spin" />
-                  <span>Vérification du numéro...</span>
-                </div>
-              )}
-              {phoneHistory && !phoneHistoryLoading && (() => {
-                // Site Ozon injoignable : repli sur le DERNIER STATUT OZON des
-                // colis envoyés par Ozon depuis l'appli (même numéro).
-                const local = phoneHistory.erreur ? historiqueOzon(orders, form.phone, order?.id) : null;
+              {(phoneHistoryLoading || phoneHistory) && (() => {
+                // Tout de suite : DERNIER STATUT OZON des colis envoyés par
+                // Ozon depuis l'appli (même numéro) ; remplacé par les chiffres
+                // du site Ozon dès qu'ils arrivent (s'ils arrivent).
+                const local = (phoneHistoryLoading || phoneHistory?.erreur) ? historiqueOzon(orders, form.phone, order?.id) : null;
                 const h = local
                   ? { exists: local.total > 0, delivered: local.livres, returned: local.retournes, total: local.total }
                   : phoneHistory;
                 const risque = h.exists && h.returned > 0 && h.delivered === 0;
                 return (
-                  <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
+                  <div dir="rtl" className={`text-right rounded-lg px-4 py-3 text-sm font-medium ${
                     risque ? 'bg-red-50 border border-red-200 text-red-700'
                       : h.exists ? 'bg-gray-50 border border-gray-200 text-gray-800'
                       : 'bg-green-50 border border-green-100 text-green-700'
                   }`}>
                     {h.exists ? (
-                      <p>Ce numéro existe déjà. ( Livré : <strong>{h.delivered}</strong> ) ( Retourné : <strong>{h.returned}</strong> ) fois.{local && local.encours > 0 ? ` En cours : ${local.encours}.` : ''}</p>
+                      <p>هاد النمرة ديجا كاينة: ✅ تليفرات <strong>{h.delivered}</strong> مرة · ↩️ رجعات <strong>{h.returned}</strong> مرة{local && local.encours > 0 ? ` · ⏳ فالطريق ${local.encours}` : ''}</p>
                     ) : (
-                      <p>✅ Nouveau numéro — aucun colis Ozon trouvé.</p>
+                      <p>✅ نمرة جديدة — حتى كولي ما تصيفط ليها بـ Ozon.</p>
                     )}
                     {risque && (
                       <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                        <AlertTriangle size={12} /> Attention : aucun colis livré, {h.returned} retour{h.returned > 1 ? 's' : ''} !
+                        <AlertTriangle size={12} /> رد البال: حتى كولي ما تليفرا ليها، و {h.returned} رجعات!
                       </p>
                     )}
-                    <p className="text-[11px] font-normal opacity-60 mt-1">
-                      {local
-                        ? `Source : statuts Ozon des colis envoyés depuis l'appli — ${raisonEchecOzon(phoneHistory.erreur)}.`
-                        : 'Source : site Ozon Express.'}
+                    <p className="text-[11px] font-normal opacity-60 mt-1 flex items-center gap-1">
+                      {phoneHistoryLoading && <Loader2 size={10} className="animate-spin shrink-0" />}
+                      {phoneHistoryLoading
+                        ? 'من الكولي ديال Ozon لي فالتطبيق — كنتحقق فالسيت ديال Ozon…'
+                        : local
+                          ? `المصدر: الستاتو ديال Ozon فالتطبيق — ${raisonEchecOzon(phoneHistory.erreur)}`
+                          : 'المصدر: السيت ديال Ozon Express'}
                     </p>
                   </div>
                 );
