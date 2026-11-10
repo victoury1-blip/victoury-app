@@ -13,7 +13,25 @@
 // Les données personnelles arrivent DÉJÀ hachées (SHA-256) : ni ce serveur ni
 // Meta ne voient un numéro en clair.
 
+import { createHash } from 'node:crypto';
 import { rateLimited, clientIp } from './_rateLimit.js';
+
+/* Pays du client, haché comme Meta le demande : la boutique ne livre qu'au
+   Maroc, donc toujours « ma ». */
+const PAYS_MA = createHash('sha256').update('ma').digest('hex');
+
+/* Qualité de correspondance (Gestionnaire d'évènements) : l'adresse IP et le
+   navigateur du client comptent parmi les clés les plus utiles à Meta, et
+   aucun évènement serveur ne les portait. Ce relais est appelé PAR le
+   navigateur du client : l'IP et l'agent utilisateur de la requête sont donc
+   bien les siens. On ne remplace jamais une valeur déjà fournie. */
+export function completerUserData(userData, { ip, ua }) {
+  const ud = { ...(userData || {}) };
+  if (!ud.client_ip_address && ip) ud.client_ip_address = ip;
+  if (!ud.client_user_agent && ua) ud.client_user_agent = ua;
+  if (!ud.country) ud.country = [PAYS_MA];
+  return ud;
+}
 
 const GRAPH_VERSION = 'v21.0';
 
@@ -57,8 +75,13 @@ export default async function handler(req, res) {
     }
   }
 
+  const ipBrute = clientIp(req);
+  const ip = ipBrute && ipBrute !== 'inconnu' ? ipBrute : null;
+  const ua = String(req.headers?.['user-agent'] || '').slice(0, 512) || null;
+  const data = events.map(e => ({ ...e, user_data: completerUserData(e.user_data, { ip, ua }) }));
+
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${pixelId}/events`;
-  const body = { data: events, access_token: token };
+  const body = { data, access_token: token };
   if (testCode) body.test_event_code = String(testCode);
 
   const ac = new AbortController();
@@ -70,14 +93,14 @@ export default async function handler(req, res) {
       body: JSON.stringify(body),
     });
     const texte = await r.text();
-    let data;
-    try { data = JSON.parse(texte); } catch { data = { raw: texte.slice(0, 400) }; }
+    let rep;
+    try { rep = JSON.parse(texte); } catch { rep = { raw: texte.slice(0, 400) }; }
     if (!r.ok) {
-      const msg = data?.error?.message || `Meta a répondu ${r.status}`;
+      const msg = rep?.error?.message || `Meta a répondu ${r.status}`;
       console.error('meta-capi:', r.status, msg);
-      return res.status(502).json({ error: msg, code: data?.error?.code });
+      return res.status(502).json({ error: msg, code: rep?.error?.code });
     }
-    return res.status(200).json({ ok: true, received: data?.events_received ?? events.length, fbtrace_id: data?.fbtrace_id });
+    return res.status(200).json({ ok: true, received: rep?.events_received ?? events.length, fbtrace_id: rep?.fbtrace_id });
   } catch (e) {
     const timeout = e?.name === 'AbortError';
     return res.status(504).json({ error: timeout ? "Meta n'a pas répondu à temps" : `Envoi impossible : ${e?.message || 'erreur réseau'}` });
