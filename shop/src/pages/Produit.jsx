@@ -10,6 +10,7 @@ import CarteProduit from '../components/CarteProduit';
 import BoutonFavori from '../components/BoutonFavori';
 import AvisProduit, { ResumeAvis } from '../components/AvisProduit';
 import GarantiesGrid from '../components/GarantiesGrid';
+import CarrouselProduits from '../components/CarrouselProduits';
 import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
 import { IconeWhatsApp } from '../components/icons';
@@ -45,6 +46,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   const [taille, setTaille] = useState('');
   const [chargement, setChargement] = useState(true);
   const [produitsLies, setProduitsLies] = useState([]);
+  const [similaires, setSimilaires] = useState([]);
   // Suggestion "achetés ensemble" : coché par défaut, le client n'a qu'à
   // décocher s'il ne veut que l'article courant — plus rapide que de devoir
   // ouvrir une seconde fiche et refaire tout le parcours d'ajout au panier.
@@ -89,6 +91,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
         setCouleurs(cs);
         const lies = p ? await chargerProduitsLies(p.collection_id, p.id) : [];
         setProduitsLies(lies);
+        // Carrousel sous le bouton WhatsApp : un peu plus large que la grille.
+        if (p) chargerProduitsLies(p.collection_id, p.id, 10).then(setSimilaires).catch(() => setSimilaires(lies));
         setInclurePartenaire(true);
         setTailleBundle(lies[0]?.sizes?.find(s => s.stock > 0)?.size || '');
         if (p) {
@@ -491,6 +495,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               </span>
             </a>
           )}
+          <CarrouselProduits produits={similaires} ar={ar} titre={t('produitsSimilaires')} />
         </div>
 
         <GarantiesGrid />
