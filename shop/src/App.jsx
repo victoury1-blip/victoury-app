@@ -387,7 +387,12 @@ function Vitrine() {
         </div>
       )}
 
-      <main className="flex-1">
+      {/* min-h : pendant le chargement (squelettes), le pied de page tenait
+          dans le premier écran puis était repoussé vers le bas à l'arrivée des
+          produits, puis des réglages — PageSpeed y relevait un décalage de mise
+          en page (CLS) de 0,7. Le contenu occupe toujours au moins l'écran : le
+          pied de page démarre hors de vue et ses déplacements ne se voient plus. */}
+      <main className="flex-1 min-h-[100svh]">
         {/* Repli vide (pas de spinner) : ces pages sont déjà découpées en
             chunks séparés, et le temps de téléchargement d'un chunk une fois
             en cache est trop court pour justifier un état de chargement
