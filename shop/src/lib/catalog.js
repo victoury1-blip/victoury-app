@@ -69,18 +69,35 @@ export async function chargerCollection(slug) {
   return data || null;
 }
 
+/* Réponse déjà demandée par index.html à la lecture de la page (voir le
+   script de préchargement) : reprise une seule fois, pour la même page. En
+   cas d'échec ou d'absence, null — la requête normale prend le relais. */
+async function prechargement(type, slug) {
+  const p = typeof window !== 'undefined' ? window.__precharge : null;
+  if (!p || p.type !== type || p.slug !== slug) return null;
+  window.__precharge = null;
+  try {
+    const d = await p.promise;
+    return Array.isArray(d) ? d : null;
+  } catch { return null; }
+}
+
 export async function chargerProduitsDeCollection(slug) {
   // Un seul aller-retour réseau (jointure) plutôt que deux requêtes
   // séquentielles (collection, puis produits) — sur un réseau mobile lent
   // ça divise par deux le temps avant que la grille n'apparaisse.
-  const { data, error } = await supabase
-    .from('shop_products')
-    .select(`${PRODUIT}, collection:shop_collections!inner(id, slug, name, description)`)
-    .eq('collection.slug', slug)
-    .eq('status', 'Actif')
-    .eq('unlisted', false)
-    .order('position');
-  if (error) throw error;
+  let data = await prechargement('collection', slug);
+  if (!data) {
+    const r = await supabase
+      .from('shop_products')
+      .select(`${PRODUIT}, collection:shop_collections!inner(id, slug, name, description)`)
+      .eq('collection.slug', slug)
+      .eq('status', 'Actif')
+      .eq('unlisted', false)
+      .order('position');
+    if (r.error) throw r.error;
+    data = r.data;
+  }
   if (!data || data.length === 0) {
     // Une collection vide donne le même résultat vide qu'un slug inexistant
     // avec la jointure ci-dessus — on ne retombe sur une requête séparée
@@ -96,6 +113,8 @@ export async function chargerProduitsDeCollection(slug) {
 // base pour l'historique des commandes — mais un lien direct (favoris,
 // ancienne pub) ne doit plus l'ouvrir, comme s'il n'existait plus.
 export async function chargerProduit(slug) {
+  const pre = await prechargement('produit', slug);
+  if (pre) return pre[0] ? trier(pre[0]) : null;
   const { data, error } = await supabase
     .from('shop_products').select(PRODUIT).eq('slug', slug).eq('status', 'Actif').maybeSingle();
   if (error) throw error;

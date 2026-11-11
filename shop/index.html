@@ -28,6 +28,65 @@
          déjà présente en clair dans le bundle JS livré au navigateur). -->
     <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
+    <!-- Préchargement (PageSpeed : « Détection de la requête LCP ») : sur une
+         page collection ou produit — celles où arrivent les pubs — la liste
+         des produits partait seulement APRÈS le téléchargement et
+         l'exécution de tout le JavaScript, et les photos encore après. Ici,
+         la requête part dès la lecture du HTML, en parallèle du JavaScript,
+         et les premières photos sont demandées dès que la liste arrive.
+         catalog.js reprend cette réponse au lieu de refaire la requête
+         (même sélection de colonnes, voir PRODUIT dans catalog.js). Clé
+         publique (anon), déjà présente en clair dans le bundle JS. -->
+    <script>
+      (function () {
+        try {
+          var U = '%VITE_SUPABASE_URL%', K = '%VITE_SUPABASE_ANON_KEY%';
+          if (U.indexOf('http') !== 0 || !window.fetch) return;
+          var H = { apikey: K, Authorization: 'Bearer ' + K };
+          var P = 'id,slug,name,description,details,price,compare_at,gender,status,unlisted,color_name,color_hex,position,group_id,collection_id,is_bestseller,video_url,created_at,images:shop_product_images(url,alt,position),sizes:shop_product_sizes(size,stock,position)';
+          var chemin = location.pathname, m;
+          function premiere(x) {
+            var im = (x.images || []).slice().sort(function (a, b) { return a.position - b.position; })[0];
+            return im && im.url;
+          }
+          function vignette(u) {
+            return u && u.indexOf('/storage/v1/object/public/boutique/') >= 0 ? u.replace(/\.[^./]+$/, '-thumb.webp') : u;
+          }
+          function precharger(u) {
+            if (!u) return;
+            var l = document.createElement('link');
+            l.rel = 'preload'; l.as = 'image'; l.href = u; l.setAttribute('fetchpriority', 'high');
+            document.head.appendChild(l);
+          }
+          function lire(q) {
+            return fetch(U + '/rest/v1/shop_products?' + q, { headers: H })
+              .then(function (r) { if (!r.ok) throw new Error('precharge'); return r.json(); });
+          }
+          if ((m = chemin.match(/^\/product-category\/([^/]+)\/?$/))) {
+            var slug = decodeURIComponent(m[1]);
+            var pr = lire('select=' + encodeURIComponent(P + ',collection:shop_collections!inner(id,slug,name,description)')
+              + '&collection.slug=eq.' + encodeURIComponent(slug) + '&status=eq.Actif&unlisted=eq.false&order=position');
+            window.__precharge = { type: 'collection', slug: slug, promise: pr };
+            // Les 2 premières cartes : le premier écran d'un téléphone (une carte par modèle).
+            pr.then(function (d) {
+              var vus = {}, n = 0;
+              for (var i = 0; i < d.length && n < 2; i++) {
+                var x = d[i];
+                if (x.group_id) { if (vus[x.group_id]) continue; vus[x.group_id] = 1; }
+                var u = premiere(x);
+                if (u) { precharger(vignette(u)); n++; }
+              }
+            }).catch(function () {});
+          } else if ((m = chemin.match(/^\/product\/([^/]+)\/?$/))) {
+            var slugP = decodeURIComponent(m[1]);
+            var pp = lire('select=' + encodeURIComponent(P) + '&slug=eq.' + encodeURIComponent(slugP) + '&status=eq.Actif');
+            window.__precharge = { type: 'produit', slug: slugP, promise: pp };
+            // Grande photo de la fiche (pas de vignette) — sauf si une vidéo passe en premier.
+            pp.then(function (d) { if (d[0] && !d[0].video_url) precharger(premiere(d[0])); }).catch(function () {});
+          }
+        } catch (e) { /* jamais bloquant : catalog.js refait la requête */ }
+      })();
+    </script>
     <!-- Cairo (Google Fonts) pour le bandeau d'annonce en arabe : Jost ne
          couvre pas les glyphes arabes, le texte y retombait sur la police
          système par défaut, moins soignée que le reste du site. Chargée à la
