@@ -35,7 +35,12 @@
          version arabe du site, pas sur toutes les visites. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet" />
+    <!-- Non bloquante : une feuille de style Google Fonts classique retardait
+         l'affichage de TOUTE la page (PageSpeed : « Requêtes de blocage du
+         rendu ») pour une police qui ne sert qu'au bandeau en arabe. Chargée
+         en « print » puis basculée sur « all » une fois arrivée. -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet" /></noscript>
     <!-- Jost est maintenant hébergée sur ce site (public/fonts, voir
          index.css) plutôt que chez Google Fonts : plus de connexion à un
          domaine tiers à établir avant de pouvoir l'afficher. Les 4 poids
