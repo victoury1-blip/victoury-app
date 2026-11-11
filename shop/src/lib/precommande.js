@@ -28,6 +28,43 @@ export function precommandeActive(precommandes, productId, now = new Date()) {
   return date >= aujourdhui(now) ? date : null;
 }
 
+/* ── Réservation AUTOMATIQUE ──
+ * Réglage { auto: true, delai: 5 } : chaque taille qui tombe à zéro devient
+ * réservable toute seule, avec un arrivage annoncé `delai` jours après le
+ * jour où elle s'est épuisée. Ce jour-là est noté par la base (table
+ * shop_ruptures, remplie par un déclencheur sur shop_product_sizes) ;
+ * `ruptures` = { 'productId|taille': 'YYYY-MM-DD' }. */
+export const DELAI_AUTO = 5;
+
+/** 'YYYY-MM-DD' + n jours. */
+export function ajouterJours(ymd, n) {
+  const [a, m, j] = String(ymd).split('-').map(Number);
+  const d = new Date(a, m - 1, j + n);
+  return aujourdhui(d);
+}
+
+export const cleRupture = (productId, taille) => `${productId}|${taille || ''}`;
+
+/** Le produit accepte-t-il des réservations (auto, ou date fixe encore à venir) ? */
+export function reservationProduit(precommandes, productId, now = new Date()) {
+  if (precommandes?.[productId]?.auto) return true;
+  return !!precommandeActive(precommandes, productId, now);
+}
+
+/** Date d'arrivage annoncée pour UNE taille épuisée, ou null si elle ne se
+    réserve pas. En automatique : jour de rupture + délai ; si ce jour est
+    déjà passé sans réassort, on annonce demain plutôt qu'une date passée. */
+export function reservationTaille(precommandes, productId, taille, ruptures, now = new Date()) {
+  const r = precommandes?.[productId];
+  if (r?.auto) {
+    const depuis = ruptures?.[cleRupture(productId, taille)] || aujourdhui(now);
+    const date = ajouterJours(depuis, Number(r.delai) > 0 ? Number(r.delai) : DELAI_AUTO);
+    const demain = ajouterJours(aujourdhui(now), 1);
+    return date >= demain ? date : demain;
+  }
+  return precommandeActive(precommandes, productId, now);
+}
+
 /** "lundi 02/11" / "الاثنين 02/11". */
 export function dateDispo(date, ar = false) {
   const [a, m, j] = String(date).split('-').map(Number);

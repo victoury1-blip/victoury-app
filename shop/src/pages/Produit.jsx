@@ -3,7 +3,7 @@ import { enregistrerVueProduit } from '../lib/visites';
 import { useParams } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
 import { fmtPrix, fmtMontant, prixLot, remiseQuantiteGroupee } from '../lib/pricing';
-import { chargerProduit, chargerCouleurs, chargerProduitsLies } from '../lib/catalog';
+import { chargerProduit, chargerCouleurs, chargerProduitsLies, chargerRuptures } from '../lib/catalog';
 import { paliersEffectifs } from '../lib/remises';
 import { trackPixel, trackTikTok, trackGA4, envoyerTikTokCAPI, cookieTtpPourTikTok, idEvenement } from '../lib/pixel';
 import BoutonFavori from '../components/BoutonFavori';
@@ -17,7 +17,7 @@ import { numeroWhatsApp } from '../lib/commande';
 import OffreTimer from '../components/OffreTimer';
 import LandingVente from '../components/LandingVente';
 import { lignePromoWhatsApp } from '../lib/promoAuto';
-import { precommandeActive, dateDispo } from '../lib/precommande';
+import { reservationProduit, reservationTaille, dateDispo } from '../lib/precommande';
 
 function Accordeon({ titre, children }) {
   const { lang } = useLang();
@@ -46,6 +46,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   const [chargement, setChargement] = useState(true);
   const [produitsLies, setProduitsLies] = useState([]);
   const [similaires, setSimilaires] = useState([]);
+  const [ruptures, setRuptures] = useState({});
   // Suggestion "achetés ensemble" : coché par défaut, le client n'a qu'à
   // décocher s'il ne veut que l'article courant — plus rapide que de devoir
   // ouvrir une seconde fiche et refaire tout le parcours d'ajout au panier.
@@ -67,7 +68,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   // Première taille en stock ; à défaut, si le produit est en réservation,
   // la première taille tout court (elle se réserve).
   const tailleParDefaut = (p) => p?.sizes?.find(s => s.stock > 0)?.size
-    || (precommandeActive(reglages?.precommandes, p?.id) ? p?.sizes?.[0]?.size : '') || '';
+    || (reservationProduit(reglages?.precommandes, p?.id) ? p?.sizes?.[0]?.size : '') || '';
 
   function irVersPhoto(i, total) {
     const cible = Math.max(0, Math.min(total - 1, i));
@@ -91,6 +92,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
         const lies = p ? await chargerProduitsLies(p.collection_id, p.id) : [];
         setProduitsLies(lies);
         // Carrousel sous le bouton WhatsApp : un peu plus large que la grille.
+        if (p) chargerRuptures([p.id]).then(setRuptures);
         if (p) chargerProduitsLies(p.collection_id, p.id, 10).then(setSimilaires).catch(() => setSimilaires(lies));
         setInclurePartenaire(true);
         setTailleBundle(lies[0]?.sizes?.find(s => s.stock > 0)?.size || '');
@@ -182,8 +184,15 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   const stockTaille = tailles.find(s => s.size === taille)?.stock;
   // Réservation (réglée dans /store/produits) : les tailles épuisées restent
   // commandables, avec la date d'arrivage annoncée.
-  const resa = precommandeActive(reglages?.precommandes, produit.id);
-  const reserveTaille = !!resa && !!taille && !(stockTaille > 0);
+  // `resa` : le produit se réserve (auto ou date fixe). `dateResa` : date
+  // d'arrivage annoncée pour la taille choisie (en automatique, propre à
+  // chaque taille : jour de rupture + 5 jours), sinon la plus proche des
+  // tailles épuisées.
+  const resa = reservationProduit(reglages?.precommandes, produit.id);
+  const reserveTaille = resa && !!taille && !(stockTaille > 0);
+  const dateResa = !resa ? null
+    : reserveTaille ? reservationTaille(reglages?.precommandes, produit.id, taille, ruptures)
+    : tailles.filter(s => !(s.stock > 0)).map(s => reservationTaille(reglages?.precommandes, produit.id, s.size, ruptures)).filter(Boolean).sort()[0] || null;
 
   // "Non listé" : page de vente longue dédiée à une pub, pas la fiche
   // produit classique (grille 2 colonnes, comparaison avec d'autres
@@ -432,10 +441,10 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
               {ar ? `⚡ غير ${stockTaille} قطع متبقية من هاد المقاس!` : `⚡ Plus que ${stockTaille} en stock dans cette taille !`}
             </p>
           )}
-          {resa && (epuise || reserveTaille) && (
+          {resa && dateResa && (epuise || reserveTaille) && (
             <div className={`mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-900 leading-relaxed ${ar ? 'text-right' : 'text-left'}`}>
               <p className="font-semibold">
-                {ar ? `⏳ السلعة جاية — غتوجد نهار ${dateDispo(resa, true)}` : `⏳ Arrivage en cours — disponible le ${dateDispo(resa)}`}
+                {ar ? `⏳ السلعة جاية — غتوجد نهار ${dateDispo(dateResa, true)}` : `⏳ Arrivage en cours — disponible le ${dateDispo(dateResa)}`}
               </p>
               <p className="mt-0.5">
                 {ar
@@ -461,7 +470,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
                 slug: produit.slug, name: produit.name, price: produit.price,
                 size: taille, color: produit.color_name, image: produit.images?.[0]?.url,
                 stock: stockTaille, collectionId: produit.collection_id,
-                ...(reserveTaille ? { precommande: resa } : {}),
+                ...(reserveTaille && dateResa ? { precommande: dateResa } : {}),
               // Pas de tiroir panier : la commande s'ouvre directement, et le
               // tiroir restait affiché derrière une fois la fenêtre fermée.
               }, { ouvrirTiroir: false });

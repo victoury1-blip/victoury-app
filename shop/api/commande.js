@@ -10,7 +10,7 @@
 import { champsManquants, construireCommande, normaliserTelephone } from '../src/lib/commande.js';
 import { totalPanier } from '../src/lib/pricing.js';
 import { rateLimited, clientIp } from './_rateLimit.js';
-import { precommandeActive } from '../src/lib/precommande.js';
+import { reservationTaille } from '../src/lib/precommande.js';
 
 const SOURCES_CONNUES = new Set(['Instagram', 'Facebook', 'TikTok', 'Google', 'WhatsApp', 'Direct']);
 
@@ -32,6 +32,9 @@ async function recalculerLignes(url, key, lignes) {
   if (!r.ok) return { erreur: 'Vérification du panier impossible. Réessayez.' };
   const produits = await r.json();
   const parSlug = new Map(produits.map(p => [p.slug, p]));
+  // Réservation automatique : jour de rupture de chaque taille.
+  const idsAuto = produits.filter(p => precommandes?.[p.id]?.auto).map(p => p.id);
+  const ruptures = idsAuto.length ? await chargerRuptures(url, key, idsAuto) : {};
 
   const serverLignes = [];
   for (const l of lignes) {
@@ -47,7 +50,7 @@ async function recalculerLignes(url, key, lignes) {
     // Réservation active (réglage relu ici, jamais celui du navigateur) : une
     // taille existante mais épuisée reste commandable, la commande portera
     // la date d'arrivage dans sa note.
-    const reservation = taille ? precommandeActive(precommandes, p.id) : null;
+    const reservation = taille ? reservationTaille(precommandes, p.id, taille.size, ruptures) : null;
     if (stock < qty && !reservation) return { erreur: `Stock insuffisant pour "${p.name}"${l.size ? ` (${l.size})` : ''}. Ajustez la quantité.` };
     serverLignes.push({
       slug: p.slug, name: p.name, price: p.price, qty, size: l.size || '',
@@ -62,6 +65,16 @@ async function recalculerLignes(url, key, lignes) {
 /* Réservations actives par produit (voir src/lib/precommande.js) — un échec
    de lecture retombe sur "aucune réservation", donc sur la règle de stock
    normale : jamais une vente acceptée par erreur sur un stock vide. */
+async function chargerRuptures(url, key, ids) {
+  try {
+    const r = await fetch(`${url}/rest/v1/shop_ruptures?select=product_id,size,depuis&product_id=in.(${ids.join(',')})`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) return {};
+    return Object.fromEntries((await r.json()).map(x => [`${x.product_id}|${x.size}`, x.depuis]));
+  } catch { return {}; }
+}
+
 async function chargerPrecommandes(url, key) {
   try {
     const r = await fetch(`${url}/rest/v1/shop_settings?select=value&key=eq.precommandes`, {

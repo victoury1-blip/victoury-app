@@ -204,6 +204,20 @@ export async function chargerPage(slug) {
   return data || null;
 }
 
+/** Jour où chaque taille s'est épuisée (réservation automatique, voir
+    src/lib/precommande.js) : { 'productId|taille': 'YYYY-MM-DD' }. Table
+    absente (SQL pas encore passé) ou erreur : {} — la réservation part
+    alors d'aujourd'hui, jamais d'erreur sur la fiche. */
+export async function chargerRuptures(productIds) {
+  const ids = (productIds || []).filter(Boolean);
+  if (!ids.length) return {};
+  try {
+    const { data, error } = await supabase.from('shop_ruptures').select('product_id, size, depuis').in('product_id', ids);
+    if (error) return {};
+    return Object.fromEntries((data || []).map(r => [`${r.product_id}|${r.size}`, r.depuis]));
+  } catch { return {}; }
+}
+
 export async function chargerReglages() {
   const { data, error } = await supabase.from('shop_settings').select('key, value');
   if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT }, tiktok: { ...TIKTOK_DEFAUT }, ga4: { ...GA4_DEFAUT } };

@@ -7,7 +7,7 @@ import { miniature, surErreurMiniature } from '../lib/img';
 import BoutonFavori from './BoutonFavori';
 import { ResumeAvis } from './AvisProduit';
 import { usePrecommandes } from '../lib/precommandesContexte';
-import { precommandeActive } from '../lib/precommande';
+import { reservationProduit } from '../lib/precommande';
 
 /* Une fiche dans une grille. Les tailles disponibles sont montrées dès la
    liste : c'est la première question du client, et la lui épargner évite
@@ -24,7 +24,7 @@ function CarteProduit({ produit, remises, categorie, compact, prioritaire }) {
   // qui n'a jamais eu de tailles réglées n'est pas considéré comme épuisé.
   const epuise = (produit.sizes || []).length > 0 && tailles.length === 0;
   // En réservation : pas de tampon « épuisé », toutes les tailles se réservent.
-  const reservable = epuise && !!precommandeActive(usePrecommandes(), produit.id);
+  const reservable = epuise && reservationProduit(usePrecommandes(), produit.id);
   const taillesAffichees = reservable ? (produit.sizes || []) : tailles;
 
   return (

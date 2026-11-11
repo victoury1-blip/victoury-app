@@ -8,6 +8,7 @@ import {
   enregistrerGroupe, remplacerTailles, remplacerImages, televerserPhoto, televerserVideo,
 } from '../lib/admin';
 import MediaPicker from './MediaPicker';
+import { DELAI_AUTO, ajouterJours, aujourdhui } from '../lib/precommande';
 
 const champ = 'w-full border border-gray-200 px-3 py-2.5 text-sm bg-white';
 const label = 'block text-xs font-medium text-gray-500 mb-1.5';
@@ -67,14 +68,15 @@ export default function ProduitForm() {
   const [erreur, setErreur] = useState('');
   // Réservation (précommande) : stockée à part, dans shop_settings — voir
   // src/lib/precommande.js pour la raison.
-  const [resaDate, setResaDate] = useState('');
+  // null (pas de réservation) | { auto: true, delai } | { date }.
+  const [resa, setResa] = useState(null);
 
   useEffect(() => {
     listerCollections().then(setCollections).catch(() => {});
     listerGroupes().then(setGroupes).catch(() => {});
     if (nouveau) return;
     supabase.from('shop_settings').select('value').eq('key', 'precommandes').maybeSingle()
-      .then(({ data }) => setResaDate(data?.value?.[id]?.date || ''));
+      .then(({ data }) => setResa(data?.value?.[id] || null));
     listerProduits().then(liste => {
       const p = liste.find(x => x.id === id);
       if (!p) return;
@@ -145,11 +147,12 @@ export default function ProduitForm() {
 
   // Relit la liste juste avant d'écrire : deux fiches enregistrées l'une après
   // l'autre ne doivent pas s'écraser leurs réservations.
-  async function enregistrerReservation(productId, date) {
+  async function enregistrerReservation(productId, reglage) {
     const { data, error } = await supabase.from('shop_settings').select('value').eq('key', 'precommandes').maybeSingle();
     if (error) throw error;
     const liste = { ...(data?.value || {}) };
-    if (date) liste[productId] = { date };
+    if (reglage?.auto) liste[productId] = { auto: true, delai: Number(reglage.delai) > 0 ? Number(reglage.delai) : DELAI_AUTO };
+    else if (reglage?.date) liste[productId] = { date: reglage.date };
     else if (liste[productId]) delete liste[productId];
     else return;
     const { error: e2 } = await supabase.from('shop_settings')
@@ -179,7 +182,7 @@ export default function ProduitForm() {
       const p = await enregistrerProduit(payload);
       await remplacerTailles(p.id, tailles);
       await remplacerImages(p.id, images);
-      await enregistrerReservation(p.id, resaDate);
+      await enregistrerReservation(p.id, resa);
       if (nouveau) effacerBrouillon();
       navigate('/store/produits');
     } catch (e) {
@@ -331,27 +334,38 @@ export default function ProduitForm() {
             <Plus size={13} /> Ajouter une taille
           </button>
 
-          {/* Réservation : les tailles à stock 0 restent commandables jusqu'à
-              la date d'arrivage (incluse), puis le réglage s'éteint seul. */}
-          <div className={`mt-4 rounded-lg border px-3 py-3 ${resaDate ? 'bg-amber-50 border-amber-200' : 'border-gray-200'}`}>
+          {/* Réservation : les tailles à stock 0 restent commandables.
+              Automatique (par défaut) : chaque taille qui s'épuise devient
+              réservable toute seule, arrivage annoncé = jour de rupture +
+              délai. Date fixe : toutes les tailles épuisées jusqu'à la date
+              (incluse), puis le réglage s'éteint seul. */}
+          <div className={`mt-4 rounded-lg border px-3 py-3 ${resa ? 'bg-amber-50 border-amber-200' : 'border-gray-200'}`}>
             <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
-              <input type="checkbox" checked={!!resaDate} className="w-4 h-4"
-                onChange={e => {
-                  if (!e.target.checked) return setResaDate('');
-                  const d = new Date(); d.setDate(d.getDate() + 5);
-                  setResaDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-                }} />
+              <input type="checkbox" checked={!!resa} className="w-4 h-4"
+                onChange={e => setResa(e.target.checked ? { auto: true, delai: DELAI_AUTO } : null)} />
               Réservation (précommande)
               <span className="text-gray-400 text-xs">— vendre les tailles en rupture avant l'arrivage</span>
             </label>
-            {resaDate && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-gray-600">Arrivage prévu le</span>
-                <input type="date" value={resaDate} onChange={e => setResaDate(e.target.value)}
-                  className="border border-gray-200 px-2 py-1.5 text-sm bg-white" />
-                <span className="text-[11px] text-gray-500 w-full">
+            {resa && (
+              <div className="mt-2 space-y-2">
+                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                  <input type="radio" checked={!!resa.auto} onChange={() => setResa({ auto: true, delai: DELAI_AUTO })} />
+                  Automatique : dès qu'une taille est épuisée, arrivage annoncé
+                  <input type="number" min={1} max={60} value={resa.auto ? resa.delai ?? DELAI_AUTO : DELAI_AUTO} disabled={!resa.auto}
+                    onChange={e => setResa({ auto: true, delai: e.target.value })}
+                    className="w-14 border border-gray-200 px-1.5 py-1 text-sm bg-white" />
+                  jours après la rupture
+                </label>
+                <label className="flex flex-wrap items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                  <input type="radio" checked={!resa.auto} onChange={() => setResa({ date: ajouterJours(aujourdhui(), DELAI_AUTO) })} />
+                  Date fixe : arrivage prévu le
+                  <input type="date" value={!resa.auto ? resa.date || '' : ''} disabled={!!resa.auto}
+                    onChange={e => setResa({ date: e.target.value })}
+                    className="border border-gray-200 px-2 py-1.5 text-sm bg-white disabled:opacity-50" />
+                </label>
+                <span className="block text-[11px] text-gray-500">
                   La fiche affiche « السلعة جاية — غتوجد نهار … » et la commande arrive avec « ⏳ RÉSERVATION » dans sa note.
-                  Se désactive tout seul après cette date.
+                  {resa.auto ? ' Chaque taille a sa propre date ; une taille revenue en stock se vend normalement.' : ' Se désactive tout seul après cette date.'}
                 </span>
               </div>
             )}
