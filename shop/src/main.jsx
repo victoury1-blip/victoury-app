@@ -4,9 +4,11 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 import { memoriserSource } from './lib/source';
+import { memoriserFbclid } from './lib/pixel';
 
 // Dès l'arrivée : l'annonce (fbclid, utm…) n'est plus dans l'adresse au moment de commander.
 memoriserSource(window.location.search, document.referrer, navigator.userAgent);
+memoriserFbclid();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

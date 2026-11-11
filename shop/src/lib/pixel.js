@@ -68,10 +68,57 @@ export function cookiesFbPourMeta() {
     if (fbclid) fbc = `fb.1.${Date.now()}.${fbclid}`;
   } catch { /* URL illisible */ }
   if (!fbc) fbc = lire('_fbc');
+  // Dernier repli : le clic mémorisé à l'arrivée (memoriserFbclid). Le pixel
+  // se charge après la page ; si la cliente a déjà changé de page entre-temps,
+  // le fbclid n'était plus dans l'URL et le cookie _fbc n'était jamais posé —
+  // Meta ne recevait le clic que pour 80 % des achats.
+  if (!fbc) fbc = fbcMemorise();
   const out = {};
   if (fbp) out.fbp = fbp;
   if (fbc) out.fbc = fbc;
   return out;
+}
+
+const CLE_FBC = 'victoury_fbc';
+const DUREE_FBC = 90 * 24 * 3600 * 1000; // durée de vie d'un _fbc chez Meta
+
+/** À l'arrivée sur le site (avant toute navigation) : garde le clic publicitaire
+    (fbclid) pour les pages suivantes et les visites des 90 jours suivants. */
+export function memoriserFbclid() {
+  try {
+    const fbclid = new URLSearchParams(window.location.search).get('fbclid');
+    if (!fbclid) return;
+    localStorage.setItem(CLE_FBC, JSON.stringify({ v: `fb.1.${Date.now()}.${fbclid}`, at: Date.now() }));
+  } catch { /* stockage indisponible */ }
+}
+
+function fbcMemorise() {
+  try {
+    const m = JSON.parse(localStorage.getItem(CLE_FBC) || 'null');
+    return m?.v && Date.now() - (m.at || 0) < DUREE_FBC ? m.v : undefined;
+  } catch { return undefined; }
+}
+
+/** Identifiant client partagé avec l'API de Conversions (Commander.jsx) et
+    l'application : SHA-256 de « victoury:<téléphone international> ». */
+export const idClientMeta = (telephone) => sha256(`victoury:${telephonePourMeta(telephone)}`);
+
+/** Données de correspondance avancée à partir de la fiche gardée sur
+    l'appareil d'une cliente qui a déjà commandé (victoury_client_info). Le
+    pixel hache lui-même ces valeurs. */
+export function clientConnuPourPixel() {
+  try {
+    const c = JSON.parse(localStorage.getItem('victoury_client_info') || 'null');
+    if (!c?.telephone) return null;
+    const [prenom, ...reste] = String(c.nom || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return {
+      ph: telephonePourMeta(c.telephone),
+      ...(prenom ? { fn: prenom } : {}),
+      ...(reste.length ? { ln: reste.join(' ') } : {}),
+      ...(c.ville ? { ct: String(c.ville).trim().toLowerCase().replace(/\s+/g, '') } : {}),
+      country: 'ma',
+    };
+  } catch { return null; }
 }
 
 /* Charge le pixel du navigateur une seule fois. Le code injecté est le
@@ -86,8 +133,14 @@ export function chargerPixel(pixelId) {
   t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
   document,'script','https://connect.facebook.net/en_US/fbevents.js');
   /* eslint-enable */
-  window.fbq('init', pixelId);
+  // Cliente déjà venue commander : reconnue dès la première page (PageView,
+  // Vue du contenu, Ajout au panier…), pas seulement à l'achat.
+  const connu = clientConnuPourPixel();
+  window.fbq('init', pixelId, connu || undefined);
   window.fbq('track', 'PageView');
+  if (connu) {
+    idClientMeta(connu.ph).then(external_id => window.fbq('init', pixelId, { ...connu, external_id })).catch(() => {});
+  }
 }
 
 /** Émet un évènement côté navigateur, sans effet si le pixel n'est pas chargé. */
@@ -103,12 +156,17 @@ export function trackPixel(nom, donnees, eventID) {
  * Conversions côté serveur) portent ces identifiants. Le pixel le hache
  * lui-même côté navigateur — on lui passe la valeur en clair, jamais
  * autrement. Sans effet si le pixel n'est pas chargé. */
-export function correspondanceAvancee(pixelId, { email, telephone } = {}) {
+export async function correspondanceAvancee(pixelId, { email, telephone } = {}) {
   if (typeof window === 'undefined' || !window.fbq || !pixelId) return;
-  const donnees = {};
+  const donnees = { country: 'ma' };
   if (email) donnees.em = email.trim().toLowerCase();
-  if (telephone) donnees.ph = telephonePourMeta(telephone);
-  if (!Object.keys(donnees).length) return;
+  if (telephone) {
+    donnees.ph = telephonePourMeta(telephone);
+    // Même identifiant client que l'API de Conversions : sans lui, les achats
+    // vus par le pixel (et le relais de Meta) n'avaient pas d'ID externe.
+    try { donnees.external_id = await idClientMeta(telephone); } catch { /* crypto indisponible */ }
+  }
+  if (!donnees.em && !donnees.ph) return;
   window.fbq('init', pixelId, donnees);
 }
 

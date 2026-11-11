@@ -300,8 +300,10 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
     // sans ça, le pixel n'associait cet achat à AUCUNE identité, seulement le
     // relais serveur ci-dessous le faisait — l'évènement navigateur (souvent
     // reçu plus vite que le relais) restait donc mal apparié chez Meta.
-    correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone });
-    trackPixel('Purchase', { value: t.total, currency: 'MAD', content_ids: lignes.map(l => l.slug), content_type: 'product' }, eventID);
+    await correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone });
+    // order_id : le numéro de commande, comme côté serveur (Meta le compte
+    // dans « Couverture de l'ID de commande »).
+    trackPixel('Purchase', { value: t.total, currency: 'MAD', content_ids: lignes.map(l => l.slug), content_type: 'product', order_id: r.id }, eventID);
     trackTikTok('CompletePayment', {
       contents: lignes.map(l => ({ content_id: l.slug, content_type: 'product', content_name: l.name, price: l.price, quantity: l.qty })),
       value: t.total, currency: 'MAD',
