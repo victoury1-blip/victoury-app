@@ -31,8 +31,12 @@ export default function AnnonceBar({ theme }) {
   );
 
   return (
+    // Hauteur FIXE (h-9) : la police arabe (Cairo) arrive après la page et
+    // ses lignes sont plus hautes, et la taille réglée dans /store/theme
+    // n'est connue qu'à l'arrivée des réglages — chaque changement faisait
+    // sauter toute la page de quelques pixels (CLS).
     <div
-      className="py-2 overflow-hidden"
+      className="h-9 flex items-center overflow-hidden leading-tight"
       style={{
         background: theme.couleurAnnonceFond || '#111111', color: theme.couleurAnnonceTexte || '#ffffff',
         fontSize: `${theme.tailleAnnonce || 11}px`, fontWeight: theme.epaisseurAnnonce || 'normal',
