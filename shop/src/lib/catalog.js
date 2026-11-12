@@ -238,14 +238,10 @@ export async function chargerRuptures(productIds) {
 }
 
 export async function chargerReglages() {
-  // Déjà demandés par index.html à la lecture de la page (une seule fois).
-  let data = null, error = null;
-  const pre = typeof window !== 'undefined' ? window.__prechargeReglages : null;
-  if (pre) {
-    window.__prechargeReglages = null;
-    try { data = await pre; if (!Array.isArray(data)) data = null; } catch { data = null; }
-  }
-  if (!data) ({ data, error } = await supabase.from('shop_settings').select('key, value'));
+  // Volontairement PAS préchargés dans index.html : tous les réglages (thème,
+  // avis, pages…) pèsent lourd, et les demander dès la première seconde
+  // retardait la photo principale sur une 4G lente (PageSpeed : LCP 3,7 → 7,2 s).
+  const { data, error } = await supabase.from('shop_settings').select('key, value');
   if (error) return { ...REGLAGES_DEFAUT, pixel: { ...PIXEL_DEFAUT }, theme: { ...THEME_DEFAUT }, clarity: { ...CLARITY_DEFAUT }, tiktok: { ...TIKTOK_DEFAUT }, ga4: { ...GA4_DEFAUT } };
   const map = Object.fromEntries((data || []).map(r => [r.key, r.value]));
   const themeSauve = map.theme || {};

@@ -45,10 +45,6 @@
           var H = { apikey: K, Authorization: 'Bearer ' + K };
           var P = 'id,slug,name,description,details,price,compare_at,gender,status,unlisted,color_name,color_hex,position,group_id,collection_id,is_bestseller,video_url,created_at,images:shop_product_images(url,alt,position),sizes:shop_product_sizes(size,stock,position)';
           var chemin = location.pathname, m;
-          // Réglages (bandeau, thème, prix) : toutes les pages en ont besoin.
-          window.__prechargeReglages = fetch(U + '/rest/v1/shop_settings?select=key,value', { headers: H })
-            .then(function (r) { if (!r.ok) throw new Error('precharge'); return r.json(); });
-          window.__prechargeReglages.catch(function () {});
           function premiere(x) {
             var im = (x.images || []).slice().sort(function (a, b) { return a.position - b.position; })[0];
             return im && im.url;
