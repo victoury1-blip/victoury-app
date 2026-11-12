@@ -75,6 +75,17 @@ function parseAppDate(str) {
    L'écho de NOTRE propre écriture est ignoré par ailleurs (< 15 s) : sans
    ceci, l'appareil qui a calculé le doublon le garderait affiché — et
    l'imprimerait — jusqu'au prochain rechargement. */
+/* Commandes de la file renumérotées à leur envoi (numéro déjà pris) :
+   ancien → nouveau numéro, gardé quelques jours pour que les modifications
+   encore en file suivent la bonne commande, même après un rechargement. */
+const CLE_IDS_RENOMMES = 'victoury_ids_renommes';
+function lireIdsRenommes() {
+  try { return JSON.parse(localStorage.getItem(CLE_IDS_RENOMMES) || '{}') || {}; } catch { return {}; }
+}
+function ecrireIdsRenommes(m) {
+  try { localStorage.setItem(CLE_IDS_RENOMMES, JSON.stringify(m)); } catch { /* quota */ }
+}
+
 function adopterCodeVictServeur(prev, row) {
   const code = row?.tracking_number;
   if (!isVictCode(code)) return prev;
@@ -233,10 +244,17 @@ export default function App() {
   /* ── Process sync queue when back online ── */
   useEffect(() => {
     let enCours = false;
+    let debutPassage = 0;
     let premierPassage = true;
+    const erreursSignalees = new Set();
     async function processSyncQueue() {
-      if (enCours) return;
+      // Une requête restée pendue (téléphone « connecté » sans données) ne
+      // doit pas bloquer la file pour toute la session : après 60 s, un
+      // nouveau passage est autorisé.
+      if (enCours && Date.now() - debutPassage < 60_000) return;
       enCours = true;
+      debutPassage = Date.now();
+      const renommes = lireIdsRenommes();
       try {
         const pending = await getPendingSync();
         // Commandes créées sans réseau lors d'une session précédente : elles
@@ -270,28 +288,59 @@ export default function App() {
               // Même chemin qu'une création en ligne (collision de numéro VIxxxxx
               // comprise) ; une nouvelle coupure lève une erreur → l'élément reste.
               const o = item.data;
+              const renommer = (oldId, newId) => {
+                if (!newId || newId === oldId) return;
+                renommes[oldId] = newId;
+                ecrireIdsRenommes(renommes);
+                setOrders(cur => cur.map(x => x.id === oldId ? { ...x, id: newId } : x));
+              };
               // Avec une connexion faible, un envoi précédent a pu arriver en base
-              // sans que la réponse revienne : la même commande (même date de
-              // création) déjà présente = c'est fait, surtout pas un doublon.
-              const { data: deja, error: errLecture } = await supabase.from('orders')
-                .select('id, date_added').eq('id', o.id).maybeSingle();
+              // sans que la réponse revienne — éventuellement SOUS UN AUTRE NUMÉRO
+              // (renumérotée après une collision). On la reconnaît à sa date de
+              // création + téléphone, pas à son numéro : déjà là = c'est fait,
+              // surtout pas un doublon.
+              // Une ligne trouvée compte comme « elle-même » si c'est son numéro
+              // (ou celui qu'on lui a déjà donné), ou un numéro qu'AUCUNE autre
+              // commande de l'appareil ne porte (sa copie renumérotée dont la
+              // réponse s'est perdue). Une commande sœur saisie à la même seconde
+              // pour le même client (champ « quantité ») porte son propre numéro
+              // localement : elle n'est jamais prise pour un doublon.
+              const tel = o.recipient?.phone;
+              let q = supabase.from('orders').select('id').eq('date_added', o.dateAdded);
+              q = tel ? q.eq('recipient->>phone', tel) : q.eq('id', o.id);
+              const { data: dejas, error: errLecture } = await q.limit(20);
               if (errLecture) throw errLecture;
-              if (deja && deja.date_added === o.dateAdded) {
+              const idsLocaux = new Set((ordersRef.current || []).map(x => x.id));
+              const deja = (dejas || []).find(d =>
+                d.id === o.id || d.id === renommes[o.id] || !idsLocaux.has(d.id));
+              if (deja) {
+                renommer(o.id, deja.id);
                 pendingIdsRef.current.delete(o.id);
                 await deleteSyncItem(item.id);
                 continue;
               }
-              const renumerotees = await saveNewRef.current([o], { depuisFile: true });
-              if (renumerotees && renumerotees.length) {
-                const map = new Map(renumerotees.map(r => [r.oldId, r.newId]));
-                setOrders(cur => cur.map(x => map.has(x.id) ? { ...x, id: map.get(x.id) } : x));
+              let renumerotees;
+              try {
+                renumerotees = await saveNewRef.current([o], { depuisFile: true });
+              } catch (e) {
+                // Refus de la base (droits, session expirée…) : ce n'est pas le
+                // réseau, le renvoyer en boucle ne changera rien — le dire une fois.
+                if (!estErreurReseau(e) && !erreursSignalees.has(o.id)) {
+                  erreursSignalees.add(o.id);
+                  setDbError(`Commande ${o.id} toujours pas enregistrée — ${e.message}`);
+                }
+                throw e;
               }
+              for (const r of renumerotees || []) renommer(r.oldId, r.newId);
               pendingIdsRef.current.delete(o.id);
             } else if (item.action === 'update') {
-              const o = item.data;
               // Sa création n'est pas encore passée : la modification attend son tour
               // (sinon elle créerait la ligne, et la création deviendrait un doublon).
-              if (pendingIdsRef.current.has(o.id)) continue;
+              if (pendingIdsRef.current.has(item.data?.id)) continue;
+              // Commande renumérotée à son envoi (numéro déjà pris par un autre
+              // appareil) : la modification suit le NOUVEAU numéro — sur l'ancien,
+              // elle écraserait la commande de l'autre appareil.
+              const o = renommes[item.data?.id] ? { ...item.data, id: renommes[item.data.id] } : item.data;
               // GARDE-FOU : ne pas rejouer un instantané PÉRIMÉ. Si la ligne en base a
               // été modifiée après cet élément de file, le rejouer écraserait la valeur
               // récente par une ancienne (c'est ainsi que d'anciens codes de suivi
@@ -938,6 +987,14 @@ export default function App() {
   }
 
   async function updateOrderInSupabase(order) {
+    // Commande créée pendant une coupure, pas encore en base : la modification
+    // passe par la file, APRÈS sa création — écrite directement, elle créerait
+    // la ligne sous un numéro que la création risque ensuite de devoir changer.
+    if (pendingIdsRef.current.has(order.id)) {
+      await queueSync('update', order);
+      await saveOrdersOffline([order]);
+      return;
+    }
     if (!navigator.onLine) {
       await queueSync('update', order);
       await saveOrdersOffline([order]);
