@@ -96,11 +96,15 @@ function noterIdRenomme(oldId, newId) {
   m[oldId] = { n: newId, t: Date.now() };
   try { localStorage.setItem(CLE_IDS_RENOMMES, JSON.stringify(m)); } catch { /* quota */ }
 }
-/** Numéro actuel d'une commande (suit les renumérotations, même en chaîne). */
-function idActuel(id) {
+/** Numéro actuel d'un élément de file mis en file à l'instant `depuis`.
+    Seuls les éléments ANTÉRIEURS à la renumérotation la suivent : ils
+    concernent forcément notre commande (elle portait ce numéro sur
+    l'appareil à ce moment-là). Après, l'ancien numéro désigne la commande
+    de l'autre appareil — jamais de redirection vers la nôtre. */
+function idActuel(id, depuis) {
   const m = lireIdsRenommes();
   let cur = id;
-  for (let i = 0; i < 5 && m[cur]; i++) cur = m[cur].n;
+  for (let i = 0; i < 5 && m[cur] && Number(depuis || 0) < m[cur].t; i++) cur = m[cur].n;
   return cur;
 }
 
@@ -262,6 +266,7 @@ export default function App() {
   /* ── Process sync queue when back online ── */
   useEffect(() => {
     let passageActif = null;
+    let aRelancer = false; // demande arrivée pendant un passage : un de plus juste après
     let debutPassage = 0;
     let premierPassage = true;
     const erreursSignalees = new Set();
@@ -273,7 +278,7 @@ export default function App() {
       // ne la libère pas pendant qu'un autre tourne). Un chevauchement reste
       // sans danger : une création déjà en base est reconnue comme telle
       // (voir saveOrdersToSupabase), jamais renumérotée en double.
-      if (passageActif && Date.now() - debutPassage < 60_000) return;
+      if (passageActif && Date.now() - debutPassage < 60_000) { aRelancer = true; return; }
       const jeton = {};
       passageActif = jeton;
       debutPassage = Date.now();
@@ -339,7 +344,7 @@ export default function App() {
               if (errLecture) throw errLecture;
               const idsLocaux = new Set((ordersRef.current || []).map(x => x.id));
               const deja = (dejas || []).find(d =>
-                d.id === o.id || d.id === idActuel(o.id) || !idsLocaux.has(d.id));
+                d.id === o.id || d.id === idActuel(o.id, item.timestamp) || !idsLocaux.has(d.id));
               if (deja) {
                 renommer(o.id, deja.id);
                 pendingIdsRef.current.delete(o.id);
@@ -367,7 +372,7 @@ export default function App() {
               // Commande renumérotée à son envoi (numéro déjà pris par un autre
               // appareil) : la modification suit le NOUVEAU numéro — sur l'ancien,
               // elle écraserait la commande de l'autre appareil.
-              const o = item.data ? { ...item.data, id: idActuel(item.data.id) } : item.data;
+              const o = item.data ? { ...item.data, id: idActuel(item.data.id, item.timestamp) } : item.data;
               // GARDE-FOU : ne pas rejouer un instantané PÉRIMÉ. Si la ligne en base a
               // été modifiée après cet élément de file, le rejouer écraserait la valeur
               // récente par une ancienne (c'est ainsi que d'anciens codes de suivi
@@ -399,7 +404,20 @@ export default function App() {
               }, { onConflict: 'id' });
               error = r.error;
             } else if (item.action === 'delete') {
-              const r = await supabase.from('orders').update({ is_deleted: true }).eq('id', idActuel(item.data.id));
+              // Suppression d'une commande créée sur cet appareil avant son envoi :
+              // attend sa création, puis ne touche la ligne QUE si c'est bien
+              // elle (même date de création et même téléphone).
+              if (pendingIdsRef.current.has(item.data?.id)) continue;
+              const cible = idActuel(item.data.id, item.timestamp);
+              if (item.data.dateAdded) {
+                const { data: row, error: e1 } = await supabase.from('orders')
+                  .select('id, date_added, recipient').eq('id', cible).maybeSingle();
+                if (e1) throw e1;
+                const nous = row && row.date_added === item.data.dateAdded
+                  && (row.recipient?.phone || '') === (item.data.phone || '');
+                if (!nous) { await deleteSyncItem(item.id); continue; }
+              }
+              const r = await supabase.from('orders').update({ is_deleted: true }).eq('id', cible);
               error = r.error;
             }
             // Ne supprimer de la file QUE les items réellement réappliqués : ceux qui
@@ -414,7 +432,10 @@ export default function App() {
       } catch (e) {
         console.error('Failed to process sync queue:', e);
       } finally {
-        if (passageActif === jeton) passageActif = null;
+        if (passageActif === jeton) {
+          passageActif = null;
+          if (aRelancer) { aRelancer = false; setTimeout(processSyncQueue, 0); }
+        }
       }
     }
     syncNowRef.current = processSyncQueue;
@@ -907,20 +928,34 @@ export default function App() {
     }
     const revenues = new Set((data || []).map(r => r.id));
     let ignorees = newOrders.filter(o => !revenues.has(o.id));
+    let retrouvees = [];
     if (!ignorees.length) return [];
     // Numéro « déjà pris »… peut-être par CETTE commande elle-même : un envoi
     // précédent arrivé en base sans que sa réponse revienne, ou un passage de
     // la file qui a chevauché celui-ci. Même date de création et même
     // téléphone = c'est elle, déjà enregistrée — surtout pas un doublon.
+    // Elle peut aussi déjà être en base SOUS UN AUTRE NUMÉRO (renumérotée par
+    // un passage de file qui a chevauché celui-ci) : une ligne de même date
+    // et même téléphone, au numéro inconnu de l'appareil, c'est elle.
     {
-      const { data: occupants } = await supabase.from('orders')
-        .select('id, date_added, recipient').in('id', ignorees.map(o => o.id));
-      const parId = new Map((occupants || []).map(r => [r.id, r]));
-      ignorees = ignorees.filter(o => {
-        const r = parId.get(o.id);
-        return !(r && r.date_added === o.dateAdded && (r.recipient?.phone || '') === (o.recipient?.phone || ''));
-      });
-      if (!ignorees.length) return [];
+      const idsLocaux = new Set((ordersRef.current || []).map(x => x.id));
+      const garder = [];
+      retrouvees = [];
+      for (const o of ignorees) {
+        const tel = o.recipient?.phone || '';
+        let q = supabase.from('orders').select('id, recipient').eq('date_added', o.dateAdded);
+        if (tel) q = q.eq('recipient->>phone', tel);
+        const { data: memes } = await q.limit(20);
+        const elle = (memes || []).find(r => (r.recipient?.phone || '') === tel
+          && (r.id === o.id || !idsLocaux.has(r.id)));
+        if (!elle) garder.push(o);
+        else if (elle.id !== o.id) {
+          noterIdRenomme(o.id, elle.id);
+          retrouvees.push({ oldId: o.id, newId: elle.id }); // l'appelant renomme la copie locale
+        }
+      }
+      ignorees = garder;
+      if (!ignorees.length) return retrouvees;
     }
     // Collision détectée : plutôt que de perdre la commande, on lui attribue un
     // nouveau numéro VIxxxxx à partir de l'état RÉEL de la base (pas la copie
@@ -955,7 +990,7 @@ export default function App() {
     // Mémorisé : une modification encore en file (ou faite pendant cet envoi)
     // doit suivre le nouveau numéro, jamais écrire sur l'ancien.
     renumerotees.forEach(r => noterIdRenomme(r.oldId, r.newId));
-    return renumerotees;
+    return [...retrouvees, ...renumerotees];
   }
   saveNewRef.current = saveOrdersToSupabase;
 
@@ -964,17 +999,23 @@ export default function App() {
     // cours) : on retire juste ce qui l'attend dans la file. Rien n'est écrit
     // en base — sous ce numéro se trouve peut-être la commande d'un autre appareil.
     if (pendingIdsRef.current.has(orderId)) {
-      pendingIdsRef.current.delete(orderId);
+      const commande = ordersRef.current.find(o => o.id === orderId);
+      deletedIdsRef.current.add(orderId);
+      try { localStorage.setItem('deleted_order_ids', JSON.stringify([...deletedIdsRef.current])); } catch {}
       try {
+        // Ses modifications en attente ne servent plus.
         for (const item of await getPendingSync()) {
-          if (item.data?.id === orderId) await deleteSyncItem(item.id);
+          if (item.action === 'update' && item.data?.id === orderId) await deleteSyncItem(item.id);
         }
+        // Son envoi est peut-être déjà parti (en ligne, ou passage de file en
+        // cours) : une suppression attend la fin de la création puis ne
+        // supprime que si la ligne trouvée est bien cette commande.
+        await queueSync('delete', { id: orderId, dateAdded: commande?.dateAdded, phone: commande?.recipient?.phone || '' });
         await deleteOrderOffline(orderId);
         setEnAttente((await getPendingSync()).length);
-      } catch { /* file indisponible : rien à défaire */ }
+      } catch { /* file indisponible */ }
       return;
     }
-    orderId = idActuel(orderId);
     deletedIdsRef.current.add(orderId);
     // Persiste immédiatement la liste noire : indispensable pour les commandes WC-xxxx
     // qui n'ont pas de ligne Supabase — sinon le polling WooCommerce les ré-ajoute.
