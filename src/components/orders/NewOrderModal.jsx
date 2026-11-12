@@ -6,6 +6,7 @@ import { orderableProducts } from '../../lib/orderProducts';
 import { now } from '../../lib/dateUtils';
 import { generateVictId } from '../../lib/victId';
 import ProductSelect from './ProductSelect';
+import { analyserMessageClient } from '../../lib/messageClient';
 
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 bg-white transition';
 
@@ -42,6 +43,55 @@ function getCitiesForLivreur(livreurName) {
     return frais.map(f => f.ville).filter(Boolean).sort();
   } catch { return []; }
 }
+/** Toutes les villes connues des livreurs (orthographe de référence). */
+function getToutesVilles() {
+  try {
+    const livreurs = JSON.parse(localStorage.getItem('livreurs') || '[]');
+    const set = new Set();
+    for (const l of livreurs) {
+      for (const f of JSON.parse(localStorage.getItem(`frais_${l.id}`) || '[]')) if (f?.ville) set.add(f.ville);
+    }
+    return [...set];
+  } catch { return []; }
+}
+
+/* « Coller depuis WhatsApp » : le message de la cliente collé tel quel
+   remplit nom, téléphone, ville, adresse, produit et taille (voir
+   src/lib/messageClient.js). Tout reste modifiable avant d'enregistrer. */
+function CollerWhatsApp({ produits, onRemplir }) {
+  const [texte, setTexte] = useState('');
+  const [trouve, setTrouve] = useState(null);
+  function analyser(t) {
+    if (!String(t || '').trim()) return;
+    const r = analyserMessageClient(t, { villes: getToutesVilles(), produits });
+    setTrouve(r);
+    onRemplir(r);
+  }
+  const libelles = trouve ? [
+    ['Nom', trouve.nom], ['Téléphone', trouve.telephone], ['Ville', trouve.ville], ['Adresse', trouve.adresse],
+    ['Produit', trouve.produit], ['Taille', trouve.taille],
+  ] : [];
+  return (
+    <div className="rounded-xl border border-green-200 bg-green-50/60 p-3">
+      <label className="block text-xs font-semibold text-green-800 mb-1.5">📋 Coller depuis WhatsApp</label>
+      <textarea value={texte} rows={3}
+        onChange={(e) => setTexte(e.target.value)}
+        onPaste={(e) => { const t = e.clipboardData.getData('text'); setTimeout(() => analyser(t), 0); }}
+        placeholder="Collez ici le message de la cliente (nom, téléphone, ville, adresse, couleur, taille)…"
+        className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-200" dir="auto" />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => analyser(texte)}
+          className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold">Remplir le formulaire</button>
+        {libelles.map(([k, v]) => (
+          <span key={k} className={`text-[11px] px-2 py-0.5 rounded-full border ${v ? 'bg-white border-green-300 text-green-800' : 'bg-white border-gray-200 text-gray-400'}`}>
+            {v ? '✓' : '—'} {k}{v ? ` : ${v}` : ''}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CityAutocomplete({ value, onChange, livreur }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -158,6 +208,23 @@ export default function NewOrderModal({ onClose, onSave, orders = [] }) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+          <CollerWhatsApp produits={stockProducts} onRemplir={(r) => setForm(p => {
+            const premier = p.products[0] || { name: '', size: '', qty: '' };
+            const produitVide = !premier.name;
+            return {
+              ...p,
+              nom: r.nom || p.nom,
+              telephone: r.telephone || p.telephone,
+              ville: r.ville || p.ville,
+              adresse: r.adresse || p.adresse,
+              products: r.produit && produitVide
+                ? [{ ...premier, name: r.produit, size: r.taille || '' }, ...p.products.slice(1)]
+                : (r.taille && premier.name && !premier.size
+                  ? [{ ...premier, size: r.taille }, ...p.products.slice(1)]
+                  : p.products),
+            };
+          })} />
 
           {/* INFORMATIONS PRINCIPALES */}
           <div>
