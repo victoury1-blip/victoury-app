@@ -938,7 +938,10 @@ export default function App() {
     // un passage de file qui a chevauché celui-ci) : une ligne de même date
     // et même téléphone, au numéro inconnu de l'appareil, c'est elle.
     {
-      const idsLocaux = new Set((ordersRef.current || []).map(x => x.id));
+      // + les commandes de ce même envoi : elles ne sont pas encore dans
+      // ordersRef (rendu pas encore fait) — sans elles, une commande sœur du
+      // même lot (champ « quantité ») passait pour la copie de celle-ci.
+      const idsLocaux = new Set([...(ordersRef.current || []).map(x => x.id), ...newOrders.map(x => x.id)]);
       const garder = [];
       retrouvees = [];
       for (const o of ignorees) {
@@ -1174,7 +1177,14 @@ export default function App() {
         // réellement enregistré, sinon les deux se désynchronisent.
         if (renumerotees && renumerotees.length) {
           const map = new Map(renumerotees.map(r => [r.oldId, r.newId]));
-          setOrders(cur => cur.map(o => map.has(o.id) ? { ...o, id: map.get(o.id) } : o));
+          // Sans doublon : si le nouveau numéro est déjà dans la liste (arrivé
+          // par Realtime), on retire simplement l'ancienne entrée.
+          setOrders(cur => {
+            const presents = new Set(cur.map(o => o.id));
+            return cur
+              .filter(o => !(map.has(o.id) && presents.has(map.get(o.id))))
+              .map(o => (map.has(o.id) ? { ...o, id: map.get(o.id) } : o));
+          });
         }
         // Modifications faites pendant l'envoi : envoyées tout de suite.
         syncNowRef.current?.();
