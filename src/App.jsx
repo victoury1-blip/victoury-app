@@ -79,11 +79,29 @@ function parseAppDate(str) {
    ancien → nouveau numéro, gardé quelques jours pour que les modifications
    encore en file suivent la bonne commande, même après un rechargement. */
 const CLE_IDS_RENOMMES = 'victoury_ids_renommes';
+const DUREE_IDS_RENOMMES = 7 * 24 * 3600 * 1000;
 function lireIdsRenommes() {
-  try { return JSON.parse(localStorage.getItem(CLE_IDS_RENOMMES) || '{}') || {}; } catch { return {}; }
+  try {
+    const brut = JSON.parse(localStorage.getItem(CLE_IDS_RENOMMES) || '{}') || {};
+    const m = {};
+    for (const [k, v] of Object.entries(brut)) {
+      if (v && typeof v === 'object' && Date.now() - (v.t || 0) < DUREE_IDS_RENOMMES) m[k] = v;
+    }
+    return m;
+  } catch { return {}; }
 }
-function ecrireIdsRenommes(m) {
+function noterIdRenomme(oldId, newId) {
+  if (!oldId || !newId || oldId === newId) return;
+  const m = lireIdsRenommes();
+  m[oldId] = { n: newId, t: Date.now() };
   try { localStorage.setItem(CLE_IDS_RENOMMES, JSON.stringify(m)); } catch { /* quota */ }
+}
+/** Numéro actuel d'une commande (suit les renumérotations, même en chaîne). */
+function idActuel(id) {
+  const m = lireIdsRenommes();
+  let cur = id;
+  for (let i = 0; i < 5 && m[cur]; i++) cur = m[cur].n;
+  return cur;
 }
 
 function adopterCodeVictServeur(prev, row) {
@@ -243,18 +261,22 @@ export default function App() {
 
   /* ── Process sync queue when back online ── */
   useEffect(() => {
-    let enCours = false;
+    let passageActif = null;
     let debutPassage = 0;
     let premierPassage = true;
     const erreursSignalees = new Set();
     async function processSyncQueue() {
       // Une requête restée pendue (téléphone « connecté » sans données) ne
       // doit pas bloquer la file pour toute la session : après 60 s, un
-      // nouveau passage est autorisé.
-      if (enCours && Date.now() - debutPassage < 60_000) return;
-      enCours = true;
+      // nouveau passage est autorisé. Chaque passage a son jeton : seul le
+      // passage en cours libère la garde (un ancien passage qui finit enfin
+      // ne la libère pas pendant qu'un autre tourne). Un chevauchement reste
+      // sans danger : une création déjà en base est reconnue comme telle
+      // (voir saveOrdersToSupabase), jamais renumérotée en double.
+      if (passageActif && Date.now() - debutPassage < 60_000) return;
+      const jeton = {};
+      passageActif = jeton;
       debutPassage = Date.now();
-      const renommes = lireIdsRenommes();
       try {
         const pending = await getPendingSync();
         // Commandes créées sans réseau lors d'une session précédente : elles
@@ -288,11 +310,16 @@ export default function App() {
               // Même chemin qu'une création en ligne (collision de numéro VIxxxxx
               // comprise) ; une nouvelle coupure lève une erreur → l'élément reste.
               const o = item.data;
+              // Au démarrage, tant que la liste des commandes n'est pas chargée,
+              // la détection de doublon ci-dessous n'a pas de quoi comparer :
+              // on attend le passage suivant.
+              if (!initialLoadDoneRef.current) continue;
               const renommer = (oldId, newId) => {
                 if (!newId || newId === oldId) return;
-                renommes[oldId] = newId;
-                ecrireIdsRenommes(renommes);
-                setOrders(cur => cur.map(x => x.id === oldId ? { ...x, id: newId } : x));
+                noterIdRenomme(oldId, newId);
+                setOrders(cur => (cur.some(x => x.id === newId)
+                  ? cur.filter(x => x.id !== oldId)
+                  : cur.map(x => (x.id === oldId ? { ...x, id: newId } : x))));
               };
               // Avec une connexion faible, un envoi précédent a pu arriver en base
               // sans que la réponse revienne — éventuellement SOUS UN AUTRE NUMÉRO
@@ -312,7 +339,7 @@ export default function App() {
               if (errLecture) throw errLecture;
               const idsLocaux = new Set((ordersRef.current || []).map(x => x.id));
               const deja = (dejas || []).find(d =>
-                d.id === o.id || d.id === renommes[o.id] || !idsLocaux.has(d.id));
+                d.id === o.id || d.id === idActuel(o.id) || !idsLocaux.has(d.id));
               if (deja) {
                 renommer(o.id, deja.id);
                 pendingIdsRef.current.delete(o.id);
@@ -340,7 +367,7 @@ export default function App() {
               // Commande renumérotée à son envoi (numéro déjà pris par un autre
               // appareil) : la modification suit le NOUVEAU numéro — sur l'ancien,
               // elle écraserait la commande de l'autre appareil.
-              const o = renommes[item.data?.id] ? { ...item.data, id: renommes[item.data.id] } : item.data;
+              const o = item.data ? { ...item.data, id: idActuel(item.data.id) } : item.data;
               // GARDE-FOU : ne pas rejouer un instantané PÉRIMÉ. Si la ligne en base a
               // été modifiée après cet élément de file, le rejouer écraserait la valeur
               // récente par une ancienne (c'est ainsi que d'anciens codes de suivi
@@ -372,7 +399,7 @@ export default function App() {
               }, { onConflict: 'id' });
               error = r.error;
             } else if (item.action === 'delete') {
-              const r = await supabase.from('orders').update({ is_deleted: true }).eq('id', item.data.id);
+              const r = await supabase.from('orders').update({ is_deleted: true }).eq('id', idActuel(item.data.id));
               error = r.error;
             }
             // Ne supprimer de la file QUE les items réellement réappliqués : ceux qui
@@ -387,7 +414,7 @@ export default function App() {
       } catch (e) {
         console.error('Failed to process sync queue:', e);
       } finally {
-        enCours = false;
+        if (passageActif === jeton) passageActif = null;
       }
     }
     syncNowRef.current = processSyncQueue;
@@ -854,7 +881,7 @@ export default function App() {
     if (!navigator.onLine) {
       if (depuisFile) throw new Error('Hors ligne');
       await mettreEnFile(newOrders);
-      return [];
+      return null;
     }
     // ignoreDuplicates protège une éventuelle commande active existante (statuts, etc.) —
     // mais silencieusement : si l'id généré (VIxxxxx) entre en collision avec une
@@ -873,12 +900,28 @@ export default function App() {
         .upsert(newOrders.map(toRow), { onConflict: 'id', ignoreDuplicates: true }).select('id'));
     } catch (e) { error = e; }
     if (error) {
-      if (!depuisFile && estErreurReseau(error)) { await mettreEnFile(newOrders); return []; }
+      // null = partie en file (pas encore en base) : l'appelant le distingue
+      // d'un enregistrement réussi ([]).
+      if (!depuisFile && estErreurReseau(error)) { await mettreEnFile(newOrders); return null; }
       throw new Error(error.message);
     }
     const revenues = new Set((data || []).map(r => r.id));
     let ignorees = newOrders.filter(o => !revenues.has(o.id));
     if (!ignorees.length) return [];
+    // Numéro « déjà pris »… peut-être par CETTE commande elle-même : un envoi
+    // précédent arrivé en base sans que sa réponse revienne, ou un passage de
+    // la file qui a chevauché celui-ci. Même date de création et même
+    // téléphone = c'est elle, déjà enregistrée — surtout pas un doublon.
+    {
+      const { data: occupants } = await supabase.from('orders')
+        .select('id, date_added, recipient').in('id', ignorees.map(o => o.id));
+      const parId = new Map((occupants || []).map(r => [r.id, r]));
+      ignorees = ignorees.filter(o => {
+        const r = parId.get(o.id);
+        return !(r && r.date_added === o.dateAdded && (r.recipient?.phone || '') === (o.recipient?.phone || ''));
+      });
+      if (!ignorees.length) return [];
+    }
     // Collision détectée : plutôt que de perdre la commande, on lui attribue un
     // nouveau numéro VIxxxxx à partir de l'état RÉEL de la base (pas la copie
     // locale, potentiellement en retard) et on retente une seule fois. `renumerotees`
@@ -909,11 +952,29 @@ export default function App() {
       throw err;
     }
     setNextNumber(maxVu + 1);
+    // Mémorisé : une modification encore en file (ou faite pendant cet envoi)
+    // doit suivre le nouveau numéro, jamais écrire sur l'ancien.
+    renumerotees.forEach(r => noterIdRenomme(r.oldId, r.newId));
     return renumerotees;
   }
   saveNewRef.current = saveOrdersToSupabase;
 
   async function deleteOrderFromSupabase(orderId) {
+    // Commande pas encore en base (créée pendant une coupure, ou envoi en
+    // cours) : on retire juste ce qui l'attend dans la file. Rien n'est écrit
+    // en base — sous ce numéro se trouve peut-être la commande d'un autre appareil.
+    if (pendingIdsRef.current.has(orderId)) {
+      pendingIdsRef.current.delete(orderId);
+      try {
+        for (const item of await getPendingSync()) {
+          if (item.data?.id === orderId) await deleteSyncItem(item.id);
+        }
+        await deleteOrderOffline(orderId);
+        setEnAttente((await getPendingSync()).length);
+      } catch { /* file indisponible : rien à défaire */ }
+      return;
+    }
+    orderId = idActuel(orderId);
     deletedIdsRef.current.add(orderId);
     // Persiste immédiatement la liste noire : indispensable pour les commandes WC-xxxx
     // qui n'ont pas de ligne Supabase — sinon le polling WooCommerce les ré-ajoute.
@@ -1060,7 +1121,13 @@ export default function App() {
           || o.reportDate !== old.reportDate || o.noteLivraison !== old.noteLivraison
           || o.recu !== old.recu || o.ozoneLastStatus !== old.ozoneLastStatus;
       });
+      // Pendant l'envoi, ces commandes sont « en attente » : une modification
+      // faite entre-temps passe par la file (updateOrderInSupabase) et suivra
+      // leur numéro définitif, au lieu d'écrire sur un numéro peut-être changé.
+      brandNew.forEach(o => pendingIdsRef.current.add(o.id));
       if (brandNew.length) saveOrdersToSupabase(brandNew).then(renumerotees => {
+        if (renumerotees === null) return; // partie en file : reste en attente
+        brandNew.forEach(o => pendingIdsRef.current.delete(o.id));
         // Collision auto-corrigée côté serveur (nouveau numéro attribué) : la
         // commande n'a pas été perdue, mais l'id local doit suivre le nouvel id
         // réellement enregistré, sinon les deux se désynchronisent.
@@ -1068,7 +1135,18 @@ export default function App() {
           const map = new Map(renumerotees.map(r => [r.oldId, r.newId]));
           setOrders(cur => cur.map(o => map.has(o.id) ? { ...o, id: map.get(o.id) } : o));
         }
+        // Modifications faites pendant l'envoi : envoyées tout de suite.
+        syncNowRef.current?.();
       }).catch(e => {
+        brandNew.forEach(o => pendingIdsRef.current.delete(o.id));
+        // Commandes refusées et retirées : leurs modifications en file ne
+        // doivent jamais partir (un upsert recréerait la ligne). Seulement
+        // celles réellement refusées (failedIds), pas leurs sœurs du même lot
+        // qui, elles, sont bien en base.
+        const refusees = new Set(e.failedIds && e.failedIds.length ? e.failedIds : brandNew.map(o => o.id));
+        getPendingSync().then(async items => {
+          for (const it of items) if (it.action === 'update' && refusees.has(it.data?.id)) await deleteSyncItem(it.id);
+        }).catch(() => {});
         // Visible, pas juste dans la console : un échec silencieux ici (ex. collision
         // de numéro VIxxxxx avec une commande déjà en base) faisait paraître une
         // commande enregistrée — un toast de succès était déjà parti — alors qu'elle
