@@ -265,6 +265,10 @@ export function chargerGA4(measurementId) {
   // à chaque changement de route, sinon gtag ne comptabiliserait que le tout
   // premier écran visité et jamais la navigation qui suit.
   window.gtag('config', measurementId, { send_page_view: false });
+  // Chargé après coup (au premier geste, voir App.jsx) : la page affichée
+  // à ce moment n'a pas encore été comptée — trackGA4 ne fait rien tant
+  // que gtag n'existe pas.
+  window.gtag('event', 'page_view', { page_path: window.location.pathname, page_location: window.location.href });
 }
 
 /** Émet un évènement GA4, sans effet si le script n'est pas chargé. */

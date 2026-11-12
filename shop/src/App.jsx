@@ -262,12 +262,32 @@ function Vitrine() {
     else window.addEventListener('load', fn, { once: true });
   };
 
+  /* Google Analytics et Clarity : outils de mesure pour nous, rien que la
+     cliente ne voie. PageSpeed les mesurait à ~800 ms de calcul (574 + 224)
+     en plein chargement sur un téléphone moyen — autant de retard pour la
+     photo principale. Chargés seulement au premier geste (doigt, défilement,
+     clavier) ou 5 s après la page au plus tard. Le pixel Meta, lui, reste
+     chargé comme avant : c'est lui qui compte les ventes des publicités. */
+  const apresGeste = (fn) => {
+    if (typeof window === 'undefined') return;
+    let fait = false;
+    const evenements = ['pointerdown', 'touchstart', 'scroll', 'keydown'];
+    const lancer = () => {
+      if (fait) return;
+      fait = true;
+      evenements.forEach(e => window.removeEventListener(e, lancer));
+      fn();
+    };
+    evenements.forEach(e => window.addEventListener(e, lancer, { once: true, passive: true }));
+    differe(() => setTimeout(lancer, 5000));
+  };
+
   useEffect(() => {
     if (reglages.pixel?.enabled && reglages.pixel?.pixelId) differe(() => chargerPixel(reglages.pixel.pixelId));
   }, [reglages.pixel?.enabled, reglages.pixel?.pixelId]);
 
   useEffect(() => {
-    if (reglages.clarity?.enabled && reglages.clarity?.projectId) differe(() => chargerClarity(reglages.clarity.projectId));
+    if (reglages.clarity?.enabled && reglages.clarity?.projectId) apresGeste(() => chargerClarity(reglages.clarity.projectId));
   }, [reglages.clarity?.enabled, reglages.clarity?.projectId]);
 
   useEffect(() => {
@@ -275,7 +295,7 @@ function Vitrine() {
   }, [reglages.tiktok?.enabled, reglages.tiktok?.pixelId]);
 
   useEffect(() => {
-    if (reglages.ga4?.enabled && reglages.ga4?.measurementId) differe(() => chargerGA4(reglages.ga4.measurementId));
+    if (reglages.ga4?.enabled && reglages.ga4?.measurementId) apresGeste(() => chargerGA4(reglages.ga4.measurementId));
   }, [reglages.ga4?.enabled, reglages.ga4?.measurementId]);
 
   // Site en une seule page (SPA) : gtag ne voit jamais de rechargement, donc
