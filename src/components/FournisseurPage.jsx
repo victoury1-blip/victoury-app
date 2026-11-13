@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff, Undo2, Camera } from 'lucide-react';
+import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff, Undo2, Camera, Upload, Receipt, Loader2 } from 'lucide-react';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
 import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
 import BonFournisseurModal from './fournisseur/BonFournisseurModal';
+import { envoyerPhotoBon, liensPhotosBon, supprimerPhotoBon } from '../lib/photosFournisseur';
 
 const STORAGE_KEY = 'victoury_fournisseur_factures';
 const LEGACY_KEY = 'victoury_fournisseur'; // ancienne liste plate d'articles
@@ -51,7 +52,45 @@ function todayFr() {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+/* Ouvre un reçu (bucket privé) : l'onglet est ouvert tout de suite, sinon le
+   navigateur le bloque, puis on y charge le lien signé. */
+function ouvrirRecu(chemin) {
+  const w = window.open('', '_blank');
+  liensPhotosBon([chemin]).then(l => {
+    if (l[chemin] && w) w.location.href = l[chemin]; else w?.close();
+  }).catch(() => w?.close());
+}
+
 function PaiementModal({ facture, reste, onClose, onSave }) {
+  const toast = useToast();
+  // Reçu du virement / chèque : envoyé dès qu'il est choisi, et retiré du
+  // stockage si on annule le versement.
+  const [recus, setRecus] = useState([]);
+  const [envoi, setEnvoi] = useState(0);
+  const refPhoto = useRef(null);
+  const refImport = useRef(null);
+  async function ajouterRecus(fichiers) {
+    const liste = [...(fichiers || [])].filter(f => f.type.startsWith('image/') || f.type === 'application/pdf');
+    for (const f of liste) {
+      setEnvoi(n => n + 1);
+      try {
+        const r = await envoyerPhotoBon(`${facture.id}/versements`, f);
+        setRecus(x => [...x, { ...r, apercu: r.type === 'image' ? URL.createObjectURL(f) : null }]);
+      } catch (e) {
+        toast.error(/bucket/i.test(e.message || '')
+          ? 'Espace photos pas encore créé : passez le SQL « fournisseur_photos » dans Supabase.'
+          : `Envoi impossible : ${e.message}`);
+      } finally { setEnvoi(n => n - 1); }
+    }
+  }
+  function retirerRecu(path) {
+    supprimerPhotoBon(path).catch(() => {});
+    setRecus(x => x.filter(r => r.path !== path));
+  }
+  function annuler() {
+    recus.forEach(r => supprimerPhotoBon(r.path).catch(() => {}));
+    onClose();
+  }
   /* Montant VIDE au départ. Pré-rempli avec le reste dû, le champ donnait à
      croire qu'un versement était déjà là — et valider sans y toucher soldait
      la facture d'un coup, alors qu'on venait souvent n'ajouter qu'un acompte.
@@ -74,7 +113,7 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
             <h2 className="font-bold text-gray-900">Ajouter un versement</h2>
             <p className="text-xs text-gray-400 mt-0.5">{facture.ref} · reste {reste.toLocaleString('fr-FR')} DH</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
+          <button onClick={annuler} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -106,6 +145,9 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
                     <span className="font-bold text-gray-700">{(parseFloat(p.montant) || 0).toLocaleString('fr-FR')} DH</span>
                     <span className="text-gray-400">{methodOf(p.methode).label}</span>
                     <span className="text-gray-400 ml-auto">{p.date}</span>
+                    {(p.recus || []).map(r => (
+                      <button key={r.path} type="button" onClick={() => ouvrirRecu(r.path)} title="Voir le reçu" className="text-blue-600"><Receipt size={13} /></button>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -137,15 +179,46 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
             <input value={form.note} onChange={(e) => setForm(p => ({ ...p, note: e.target.value }))}
               className={fieldCls + ' w-full'} placeholder="N° de chèque, référence…" />
           </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Reçu du versement (facultatif)</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => refPhoto.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-900 text-white text-xs font-semibold">
+                <Camera size={14} /> Prendre une photo
+              </button>
+              <button type="button" onClick={() => refImport.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50">
+                <Upload size={14} /> Importer
+              </button>
+              {envoi > 0 && <span className="flex items-center gap-1 text-xs text-gray-500"><Loader2 size={13} className="animate-spin" /> Envoi…</span>}
+            </div>
+            <input ref={refPhoto} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={e => { ajouterRecus(e.target.files); e.target.value = ''; }} />
+            <input ref={refImport} type="file" accept="image/*,application/pdf" multiple className="hidden"
+              onChange={e => { ajouterRecus(e.target.files); e.target.value = ''; }} />
+            {recus.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {recus.map(r => (
+                  <div key={r.path} className="relative w-16 h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
+                    {r.apercu ? <img src={r.apercu} alt={r.nom} className="w-full h-full object-cover" /> : <FileText size={22} className="text-gray-400" />}
+                    <button type="button" onClick={() => retirerRecu(r.path)} title="Retirer"
+                      className="absolute top-0.5 right-0.5 p-0.5 rounded bg-white/90 text-red-500 shadow"><X size={11} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50">Annuler</button>
+          <button onClick={annuler} className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50">Annuler</button>
           <button onClick={() => onSave({
               id: `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`,
               montant, date: form.date.trim() || todayFr(), methode: form.methode, note: form.note.trim(),
+              ...(recus.length ? { recus: recus.map(({ apercu, ...r }) => r) } : {}),
             })}
-            disabled={invalide}
+            disabled={invalide || envoi > 0}
             className="flex-1 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">
             Enregistrer
           </button>
@@ -489,6 +562,8 @@ export default function FournisseurPage() {
 
   function deletePaiement(factureId, paiementId) {
     if (!confirm('Supprimer ce versement ?')) return;
+    const p = factures.find(f => f.id === factureId)?.paiements?.find(x => x.id === paiementId);
+    (p?.recus || []).forEach(r => supprimerPhotoBon(r.path).catch(() => {}));
     persist(factures.map(f => f.id === factureId
       ? { ...f, paiements: (f.paiements || []).filter(p => p.id !== paiementId) }
       : f));
@@ -812,6 +887,12 @@ export default function FournisseurPage() {
                             </span>
                             <span className="text-xs text-gray-500 shrink-0">{p.date}</span>
                             {p.note && <span className="text-xs text-gray-400 truncate">{p.note}</span>}
+                            {(p.recus || []).map((r, k) => (
+                              <button key={r.path} onClick={() => ouvrirRecu(r.path)}
+                                className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline shrink-0" title="Voir le reçu">
+                                <Receipt size={13} /> Reçu{p.recus.length > 1 ? ` ${k + 1}` : ''}
+                              </button>
+                            ))}
                             <button onClick={() => deletePaiement(f.id, p.id)}
                               className="ml-auto p-1.5 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Supprimer ce versement">
                               <Trash2 size={13} />
