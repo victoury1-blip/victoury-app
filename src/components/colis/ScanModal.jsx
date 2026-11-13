@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ScanLine } from 'lucide-react';
 import { findOrderByCode } from '../../lib/scanUtils';
 import useBarcodeScanner from '../../hooks/useBarcodeScanner';
-import { jouerBip, debloquerAudio } from '../../lib/beep';
+import { jouerBip, jouerErreur, debloquerAudio } from '../../lib/beep';
 
 export default function ScanModal({ orders, onFound, onClose }) {
   const [msg, setMsg] = useState(null);
@@ -12,7 +12,7 @@ export default function ScanModal({ orders, onFound, onClose }) {
 
   const processCode = useCallback((code) => {
     const order = findOrderByCode(orders, code);
-    if (!order) { setMsg({ text: `Non trouvé: ${String(code || '').trim()}`, error: true }); return; }
+    if (!order) { jouerErreur(); setMsg({ text: `Non trouvé: ${String(code || '').trim()}`, error: true }); return; }
     jouerBip();
     onFound(order.id);
     setMsg({ text: `✓ ${order.recipient?.name || order.id}`, error: false });

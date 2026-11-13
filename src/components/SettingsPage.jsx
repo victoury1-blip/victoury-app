@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import {
   Settings, Link2, CheckCircle2, XCircle, Loader2,
   Eye, EyeOff, RefreshCw, Save, AlertTriangle,
-  ShoppingCart, Truck, X, Clock, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
+  ShoppingCart, Truck, X, Clock, ScanLine, Users, UserPlus, Trash2, DatabaseZap, Volume2, Play,
   Search, ArrowDownCircle, Tag, Upload, Bell, Phone, MessageCircle, FileText, TrendingUp,
 } from 'lucide-react';
 import { requestPermission } from '../hooks/useNotifications';
@@ -13,6 +13,8 @@ import { getWaTemplates, saveWaTemplates, STATUS_LABELS_AR, TEMPLATE_VARS } from
 import { fmtDate } from '../lib/dateUtils';
 import { readNextNumber, setNextNumber, peekNextVictId, formatVictId } from '../lib/victId';
 import { A_CONFIRMER_STATUSES } from '../data/colisPipeline';
+import SonScanReglages from './settings/SonScanReglages';
+import { lireReglagesSon } from '../lib/beep';
 import { getMetaConfig, saveMetaConfig, loadMetaConfigRemote, buildEvent, sendEvents } from '../lib/metaCapi';
 
 const TIMEZONES = [
@@ -766,6 +768,18 @@ export default function SettingsPage({ orders = [], setOrders }) {
       badge: notifCfg.enabled !== false ? { label: 'Activé', color: 'text-green-600 bg-green-50 border-green-200' } : null,
     },
     {
+      id: 'son_scan',
+      title: 'Son du scan',
+      desc: 'Son et vibration quand un colis est scanné (Ramassage, Retour, Liste des colis) : choix du son, volume, son personnalisé.',
+      icon: <ScanLine size={22} className="text-emerald-600" />,
+      iconBg: 'bg-emerald-100',
+      cardBg: 'from-emerald-50',
+      saved: true,
+      badge: lireReglagesSon().actif
+        ? { label: `Activé · ${lireReglagesSon().volume}%`, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' }
+        : { label: 'Coupé', color: 'text-gray-500 bg-gray-50 border-gray-200' },
+    },
+    {
       id: 'phone_colors',
       title: 'ألوان الهاتف',
       desc: 'تخصيص ألوان أرقام الهاتف (عملاء معروفين / تم التوصيل).',
@@ -1111,6 +1125,13 @@ export default function SettingsPage({ orders = [], setOrders }) {
             )}
           </div>
         </div>
+      </Modal>
+
+      {/* ── Son du scan ── */}
+      <Modal open={openModal === 'son_scan'} onClose={() => setOpenModal(null)}
+        title="Son du scan" icon={<ScanLine size={18} className="text-emerald-600" />}
+        iconBg="bg-gradient-to-r from-emerald-50 to-white">
+        <SonScanReglages />
       </Modal>
 
       {/* ── Ozon Express Modal ── */}
