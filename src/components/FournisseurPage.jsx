@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff, Undo2 } from 'lucide-react';
+import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff, Undo2, Camera } from 'lucide-react';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
 import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
+import BonFournisseurModal from './fournisseur/BonFournisseurModal';
 
 const STORAGE_KEY = 'victoury_fournisseur_factures';
 const LEGACY_KEY = 'victoury_fournisseur'; // ancienne liste plate d'articles
@@ -406,7 +407,13 @@ export default function FournisseurPage() {
     }).catch(() => {});
   }, []);
 
+  // Liste la plus récente : une photo qui finit d'envoyer après un autre
+  // changement ne doit pas écraser ce changement.
+  const facturesRef = useRef(factures);
+  facturesRef.current = factures;
+
   function persist(next) {
+    facturesRef.current = next;
     setFactures(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     cloudSet(STORAGE_KEY, next);
@@ -485,6 +492,13 @@ export default function FournisseurPage() {
     persist(factures.map(f => f.id === factureId
       ? { ...f, paiements: (f.paiements || []).filter(p => p.id !== paiementId) }
       : f));
+  }
+
+  /* ── Bon papier du fournisseur : date de prise + photos ── */
+  const [bonFactureId, setBonFactureId] = useState(null);
+  const bonFacture = factures.find(f => f.id === bonFactureId) || null;
+  function modifierFacture(factureId, changer) {
+    persist(facturesRef.current.map(f => f.id === factureId ? changer(f) : f));
   }
 
   /* ── Retours ── */
@@ -615,6 +629,11 @@ export default function FournisseurPage() {
                   <FileText size={16} className="text-gray-500 shrink-0" />
                   <span className="font-bold text-gray-800">{f.ref}</span>
                   <span className="text-xs text-gray-400">{f.date}</span>
+                  {f.datePrise && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-blue-50 text-blue-700 border-blue-200" title="Date de prise de la marchandise">
+                      📦 Prise le {f.datePrise}
+                    </span>
+                  )}
                   <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
                     ouverte ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'
                   }`}>
@@ -648,6 +667,13 @@ export default function FournisseurPage() {
                       Rouvrir
                     </button>
                   )}
+                  <button onClick={() => setBonFactureId(f.id)}
+                    title="Date de prise et photos du bon du fournisseur"
+                    className={`text-xs px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 border ${
+                      (f.photos || []).length ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                    }`}>
+                    <Camera size={13} /> Bon{(f.photos || []).length ? ` (${f.photos.length})` : ''}
+                  </button>
                   <button onClick={() => setRetourFacture(f)}
                     className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
                     <Undo2 size={13} /> Retour
@@ -810,6 +836,15 @@ export default function FournisseurPage() {
         Une pièce défectueuse rendue s'enregistre avec « Retour » : sa quantité et son prix sont déduits de la facture et du reste à payer.
       </p>
 
+      {bonFacture && (
+        <BonFournisseurModal
+          facture={bonFacture}
+          onClose={() => setBonFactureId(null)}
+          onDatePrise={(d) => modifierFacture(bonFacture.id, f => ({ ...f, datePrise: d }))}
+          onAjouterPhotos={(ps) => modifierFacture(bonFacture.id, f => ({ ...f, photos: [...(f.photos || []), ...ps] }))}
+          onRetirerPhoto={(path) => modifierFacture(bonFacture.id, f => ({ ...f, photos: (f.photos || []).filter(p => p.path !== path) }))}
+        />
+      )}
       {payFacture && (
         <PaiementModal
           facture={payFacture}
