@@ -25,7 +25,11 @@ body {
 
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  /* « none » et pas translateY(0) : l'animation garde sa dernière image
+     (fill-mode both), et tout transform — même nul — fait que les fenêtres
+     en position fixed se placent par rapport à la PAGE et non à l'écran :
+     sur une longue liste, la fenêtre s'ouvrait tout en haut, hors de vue. */
+  to   { opacity: 1; transform: none; }
 }
 .page-enter {
   animation: page-enter 0.2s ease-out both;

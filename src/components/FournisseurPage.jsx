@@ -744,10 +744,10 @@ export default function FournisseurPage() {
                   )}
                   <button onClick={() => setBonFactureId(f.id)}
                     title="Date de prise et photos du bon du fournisseur"
-                    className={`text-xs px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 border ${
-                      (f.photos || []).length ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                    className={`text-xs px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 border whitespace-nowrap ${
+                      (f.photos || []).length ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
                     }`}>
-                    <Camera size={13} /> Bon{(f.photos || []).length ? ` (${f.photos.length})` : ''}
+                    <Camera size={13} /> {(f.photos || []).length ? `Bon (${f.photos.length})` : 'Pas de bon'}
                   </button>
                   <button onClick={() => setRetourFacture(f)}
                     className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
