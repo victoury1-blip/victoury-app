@@ -55,7 +55,7 @@ function todayFr() {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
-function PaiementModal({ facture, reste, onClose, onSave, onAjouterRecu }) {
+function PaiementModal({ facture, reste, onClose, onSave, onAjouterRecu, onSupprimerRecu }) {
   const toast = useToast();
   // Reçu du virement / chèque : envoyé dès qu'il est choisi, et retiré du
   // stockage si on annule le versement.
@@ -141,7 +141,7 @@ function PaiementModal({ facture, reste, onClose, onSave, onAjouterRecu }) {
                     <span className="text-gray-400">{methodOf(p.methode).label}</span>
                     {p.note && <span className="text-gray-500 truncate min-w-0" title={p.note} dir="auto">💬 {p.note}</span>}
                     <span className="text-gray-400 ml-auto whitespace-nowrap">{p.date}</span>
-                    <RecusVersement recus={p.recus || []} />
+                    <RecusVersement recus={p.recus || []} onSupprimer={onSupprimerRecu && (path => onSupprimerRecu(p.id, path))} />
                     {onAjouterRecu && <AjoutRecu factureId={facture.id} onAjoute={rs => onAjouterRecu(p.id, rs)} />}
                   </div>
                 ))}
@@ -584,6 +584,15 @@ export default function FournisseurPage() {
     }));
   }
 
+  /* Reçu envoyé par erreur : retiré du versement et du stockage. */
+  function supprimerRecuVersement(factureId, paiementId, path) {
+    supprimerPhotoBon(path).catch(() => { /* déjà absent : on le retire quand même */ });
+    modifierFacture(factureId, f => ({
+      ...f,
+      paiements: (f.paiements || []).map(p => p.id === paiementId ? { ...p, recus: (p.recus || []).filter(r => r.path !== path) } : p),
+    }));
+  }
+
   /* ── Retours ── */
   function addRetour(factureId, retour) {
     persist(factures.map(f => f.id === factureId
@@ -954,7 +963,7 @@ export default function FournisseurPage() {
                             <div className="flex items-center gap-2 mt-1.5 min-w-0">
                               <span className="text-xs text-gray-500 whitespace-nowrap">{p.date}</span>
                               <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                                <RecusVersement recus={p.recus || []} />
+                                <RecusVersement recus={p.recus || []} onSupprimer={path => supprimerRecuVersement(f.id, p.id, path)} />
                                 <AjoutRecu factureId={f.id} onAjoute={rs => ajouterRecusVersement(f.id, p.id, rs)} />
                               </div>
                             </div>
@@ -1000,6 +1009,7 @@ export default function FournisseurPage() {
           onClose={() => setPayFacture(null)}
           onSave={(paiement) => addPaiement(payFacture.id, paiement)}
           onAjouterRecu={(paiementId, recus) => ajouterRecusVersement(payFacture.id, paiementId, recus)}
+          onSupprimerRecu={(paiementId, path) => supprimerRecuVersement(payFacture.id, paiementId, path)}
         />
       )}
 

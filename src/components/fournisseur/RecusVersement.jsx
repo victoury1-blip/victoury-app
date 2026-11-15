@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, FileText, ExternalLink } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, FileText, ExternalLink, Trash2 } from 'lucide-react';
 import { liensPhotosBon } from '../../lib/photosFournisseur';
 
 /* Vignettes des reçus d'un versement + visionneuse plein écran dans l'app
    (au lieu d'un nouvel onglet), comme pour les photos de la marchandise. */
-export default function RecusVersement({ recus = [] }) {
+export default function RecusVersement({ recus = [], onSupprimer }) {
   const [liens, setLiens] = useState({});
   const [ouvert, setOuvert] = useState(null); // index affiché
   const cle = recus.map(r => r.path).join('|');
@@ -34,13 +34,20 @@ export default function RecusVersement({ recus = [] }) {
         ))}
       </div>
       {ouvert !== null && (
-        <Visionneuse recus={recus} liens={liens} index={ouvert} onIndex={setOuvert} onFermer={() => setOuvert(null)} />
+        <Visionneuse recus={recus} liens={liens} index={ouvert} onIndex={setOuvert} onFermer={() => setOuvert(null)}
+          onSupprimer={onSupprimer && (path => {
+            if (!confirm('Supprimer ce reçu ?')) return;
+            onSupprimer(path);
+            // Reste-t-il un reçu à montrer ? Sinon on ferme.
+            const restants = recus.length - 1;
+            setOuvert(restants > 0 ? Math.min(ouvert, restants - 1) : null);
+          })} />
       )}
     </>
   );
 }
 
-function Visionneuse({ recus, liens, index, onIndex, onFermer }) {
+function Visionneuse({ recus, liens, index, onIndex, onFermer, onSupprimer }) {
   const r = recus[index];
   const url = liens[r.path];
   const n = recus.length;
@@ -59,6 +66,12 @@ function Visionneuse({ recus, liens, index, onIndex, onFermer }) {
       <div className="flex items-center justify-between px-4 py-3 text-white" onClick={e => e.stopPropagation()}>
         <span className="text-sm font-semibold">Reçu{n > 1 ? ` ${index + 1} / ${n}` : ''}</span>
         <div className="flex items-center gap-2">
+          {onSupprimer && (
+            <button type="button" onClick={() => onSupprimer(r.path)} title="Supprimer ce reçu"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-red-500/90 text-white text-xs font-semibold">
+              <Trash2 size={15} /> Supprimer
+            </button>
+          )}
           {url && (
             <a href={url} target="_blank" rel="noreferrer" title="Ouvrir / télécharger"
               className="p-2 rounded-full bg-white/10"><ExternalLink size={18} /></a>
