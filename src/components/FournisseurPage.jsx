@@ -6,6 +6,7 @@ import useSearchShortcut from '../hooks/useSearchShortcut';
 import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
 import BonFournisseurModal from './fournisseur/BonFournisseurModal';
 import CameraPhoto from './fournisseur/CameraPhoto';
+import AjoutRecu from './fournisseur/AjoutRecu';
 import { envoyerPhotoBon, liensPhotosBon, supprimerPhotoBon } from '../lib/photosFournisseur';
 
 const STORAGE_KEY = 'victoury_fournisseur_factures';
@@ -62,7 +63,7 @@ function ouvrirRecu(chemin) {
   }).catch(() => w?.close());
 }
 
-function PaiementModal({ facture, reste, onClose, onSave }) {
+function PaiementModal({ facture, reste, onClose, onSave, onAjouterRecu }) {
   const toast = useToast();
   // Reçu du virement / chèque : envoyé dès qu'il est choisi, et retiré du
   // stockage si on annule le versement.
@@ -150,6 +151,7 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
                     {(p.recus || []).map(r => (
                       <button key={r.path} type="button" onClick={() => ouvrirRecu(r.path)} title="Voir le reçu" className="text-blue-600"><Receipt size={13} /></button>
                     ))}
+                    {onAjouterRecu && <AjoutRecu factureId={facture.id} onAjoute={rs => onAjouterRecu(p.id, rs)} />}
                   </div>
                 ))}
               </div>
@@ -583,6 +585,14 @@ export default function FournisseurPage() {
     persist(facturesRef.current.map(f => f.id === factureId ? changer(f) : f));
   }
 
+  /* Reçu ajouté après coup à un versement déjà enregistré. */
+  function ajouterRecusVersement(factureId, paiementId, recus) {
+    modifierFacture(factureId, f => ({
+      ...f,
+      paiements: (f.paiements || []).map(p => p.id === paiementId ? { ...p, recus: [...(p.recus || []), ...recus] } : p),
+    }));
+  }
+
   /* ── Retours ── */
   function addRetour(factureId, retour) {
     persist(factures.map(f => f.id === factureId
@@ -900,6 +910,7 @@ export default function FournisseurPage() {
                                 <Receipt size={13} /> Reçu{p.recus.length > 1 ? ` ${k + 1}` : ''}
                               </button>
                             ))}
+                            <AjoutRecu factureId={f.id} onAjoute={rs => ajouterRecusVersement(f.id, p.id, rs)} />
                             <button onClick={() => deletePaiement(f.id, p.id)}
                               className="ml-auto p-1.5 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Supprimer ce versement">
                               <Trash2 size={13} />
@@ -935,10 +946,11 @@ export default function FournisseurPage() {
       )}
       {payFacture && (
         <PaiementModal
-          facture={payFacture}
+          facture={factures.find(x => x.id === payFacture.id) || payFacture}
           reste={factureNet(payFacture) - paidOf(payFacture)}
           onClose={() => setPayFacture(null)}
           onSave={(paiement) => addPaiement(payFacture.id, paiement)}
+          onAjouterRecu={(paiementId, recus) => ajouterRecusVersement(payFacture.id, paiementId, recus)}
         />
       )}
 
