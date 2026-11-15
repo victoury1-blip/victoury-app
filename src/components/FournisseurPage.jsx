@@ -5,6 +5,7 @@ import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
 import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
 import BonFournisseurModal from './fournisseur/BonFournisseurModal';
+import CameraPhoto from './fournisseur/CameraPhoto';
 import { envoyerPhotoBon, liensPhotosBon, supprimerPhotoBon } from '../lib/photosFournisseur';
 
 const STORAGE_KEY = 'victoury_fournisseur_factures';
@@ -67,10 +68,11 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
   // stockage si on annule le versement.
   const [recus, setRecus] = useState([]);
   const [envoi, setEnvoi] = useState(0);
+  const [camera, setCamera] = useState(false);
   const refPhoto = useRef(null);
   const refImport = useRef(null);
   async function ajouterRecus(fichiers) {
-    const liste = [...(fichiers || [])].filter(f => f.type.startsWith('image/') || f.type === 'application/pdf');
+    const liste = [...(fichiers || [])].filter(f => f.type?.startsWith('image/') || f.type === 'application/pdf');
     for (const f of liste) {
       setEnvoi(n => n + 1);
       try {
@@ -183,7 +185,7 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Reçu du versement (facultatif)</label>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => refPhoto.current?.click()}
+              <button type="button" onClick={() => setCamera(true)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-900 text-white text-xs font-semibold">
                 <Camera size={14} /> Prendre une photo
               </button>
@@ -193,6 +195,11 @@ function PaiementModal({ facture, reste, onClose, onSave }) {
               </button>
               {envoi > 0 && <span className="flex items-center gap-1 text-xs text-gray-500"><Loader2 size={13} className="animate-spin" /> Envoi…</span>}
             </div>
+            {camera && (
+              <CameraPhoto onFermer={() => setCamera(false)}
+                onPhoto={f => { setCamera(false); ajouterRecus([f]); }}
+                onIndisponible={() => { setCamera(false); refPhoto.current?.click(); }} />
+            )}
             <input ref={refPhoto} type="file" accept="image/*" capture="environment" className="hidden"
               onChange={e => { ajouterRecus(e.target.files); e.target.value = ''; }} />
             <input ref={refImport} type="file" accept="image/*,application/pdf" multiple className="hidden"

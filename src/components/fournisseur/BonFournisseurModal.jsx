@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Upload, Trash2, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '../Toast';
+import CameraPhoto from './CameraPhoto';
 import { envoyerPhotoBon, liensPhotosBon, supprimerPhotoBon, versIso, versFr } from '../../lib/photosFournisseur';
 
 /* Bon d'un fournisseur : date à laquelle la marchandise a été prise, et
@@ -10,6 +11,7 @@ export default function BonFournisseurModal({ facture, onClose, onDatePrise, onA
   const [liens, setLiens] = useState({});
   const [envoi, setEnvoi] = useState(0);
   const [agrandie, setAgrandie] = useState(null);
+  const [camera, setCamera] = useState(false);
   const refPhoto = useRef(null);
   const refImport = useRef(null);
   const photos = facture.photos || [];
@@ -23,7 +25,7 @@ export default function BonFournisseurModal({ facture, onClose, onDatePrise, onA
   }, [photos.length]);
 
   async function envoyer(fichiers) {
-    const liste = [...(fichiers || [])].filter(f => f.type.startsWith('image/') || f.type === 'application/pdf');
+    const liste = [...(fichiers || [])].filter(f => f.type?.startsWith('image/') || f.type === 'application/pdf');
     if (!liste.length) return;
     setEnvoi(n => n + liste.length);
     const ajoutees = [];
@@ -69,7 +71,7 @@ export default function BonFournisseurModal({ facture, onClose, onDatePrise, onA
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">🧾 Photos du bon du fournisseur</label>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => refPhoto.current?.click()}
+              <button type="button" onClick={() => setCamera(true)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-900 text-white text-xs font-semibold">
                 <Camera size={14} /> Prendre une photo
               </button>
@@ -79,7 +81,12 @@ export default function BonFournisseurModal({ facture, onClose, onDatePrise, onA
               </button>
               {envoi > 0 && <span className="flex items-center gap-1 text-xs text-gray-500"><Loader2 size={13} className="animate-spin" /> Envoi…</span>}
             </div>
-            {/* capture : ouvre directement l'appareil photo sur téléphone. */}
+            {camera && (
+              <CameraPhoto onFermer={() => setCamera(false)}
+                onPhoto={f => { setCamera(false); envoyer([f]); }}
+                onIndisponible={() => { setCamera(false); refPhoto.current?.click(); }} />
+            )}
+            {/* Repli si la caméra intégrée est refusée : appareil photo du téléphone. */}
             <input ref={refPhoto} type="file" accept="image/*" capture="environment" className="hidden"
               onChange={e => { envoyer(e.target.files); e.target.value = ''; }} />
             <input ref={refImport} type="file" accept="image/*,application/pdf" multiple className="hidden"
