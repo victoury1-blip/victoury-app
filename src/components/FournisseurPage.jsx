@@ -469,8 +469,8 @@ export default function FournisseurPage() {
   useEffect(() => {
     cloudGet(STOCK_LOCAL_KEY).then(v => { if (v && typeof v === 'object') setStockLocal(v); }).catch(() => {});
   }, []);
-  function enregistrerStockLocal(qte) {
-    const v = { qte, maj: todayFr() };
+  function enregistrerStockLocal(lignes) {
+    const v = { lignes, maj: todayFr() };
     setStockLocal(v);
     cloudSet(STOCK_LOCAL_KEY, v);
   }
@@ -1032,20 +1032,40 @@ export default function FournisseurPage() {
   );
 }
 
-/* Carte « Stock au local » modifiable sur place (crayon → chiffre → OK). */
+/* Carte « Stock au local » : quantités saisies à la main par modèle, et ce
+   que ce stock vaut au prix d'achat (Ensemble 100 DH, Hijab 125 DH…). */
+export function lignesStockLocal(valeur) {
+  const lignes = MODELES_FOURNISSEUR.map(m => ({ ...m, qte: 0 }));
+  if (Array.isArray(valeur?.lignes)) {
+    valeur.lignes.forEach(l => {
+      const x = lignes.find(y => y.modele === l.modele);
+      if (x) x.qte = Number(l.qte) || 0;
+    });
+  } else if (valeur?.qte != null) {
+    lignes[0].qte = Number(valeur.qte) || 0; // ancien format : un seul chiffre = ensembles
+  }
+  return lignes;
+}
+
 function StockLocalCard({ valeur, onEnregistrer }) {
   const [edition, setEdition] = useState(false);
-  const [saisie, setSaisie] = useState('');
-  const qte = valeur?.qte;
-  function ouvrir() { setSaisie(qte != null ? String(qte) : ''); setEdition(true); }
+  const [saisie, setSaisie] = useState({});
+  const lignes = lignesStockLocal(valeur);
+  const totalPcs = lignes.reduce((n, l) => n + l.qte, 0);
+  const totalDh = lignes.reduce((n, l) => n + l.qte * l.prix, 0);
+  const renseigne = !!valeur;
+
+  function ouvrir() {
+    setSaisie(Object.fromEntries(lignes.map(l => [l.modele, l.qte ? String(l.qte) : ''])));
+    setEdition(true);
+  }
   function valider() {
-    const n = parseInt(saisie, 10);
-    if (Number.isNaN(n) || n < 0) return;
-    onEnregistrer(n);
+    onEnregistrer(lignes.map(l => ({ modele: l.modele, prix: l.prix, qte: Math.max(0, parseInt(saisie[l.modele], 10) || 0) })));
     setEdition(false);
   }
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+    <div className="col-span-2 lg:col-span-1 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
       <div className="flex items-center justify-between mb-1">
         <p className="text-[11px] text-gray-400 uppercase font-semibold">Stock au local</p>
         {!edition && (
@@ -1054,21 +1074,43 @@ function StockLocalCard({ valeur, onEnregistrer }) {
           </button>
         )}
       </div>
+
       {edition ? (
-        <div className="flex items-center gap-1.5">
-          <input type="number" inputMode="numeric" min="0" autoFocus value={saisie}
-            onChange={e => setSaisie(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') valider(); if (e.key === 'Escape') setEdition(false); }}
-            className="w-full min-w-0 border border-indigo-300 rounded-lg px-2 py-1 text-lg font-bold text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
-          <button type="button" onClick={valider} className="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold">OK</button>
+        <div className="space-y-2 mt-1">
+          {lignes.map(l => (
+            <label key={l.modele} className="flex items-center gap-2">
+              <span className="flex-1 min-w-0 text-xs text-gray-600 truncate">{l.modele} <span className="text-gray-400">· {l.prix} DH</span></span>
+              <input type="number" inputMode="numeric" min="0" placeholder="0" value={saisie[l.modele] ?? ''}
+                onChange={e => setSaisie(x => ({ ...x, [l.modele]: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') valider(); if (e.key === 'Escape') setEdition(false); }}
+                className="w-24 border border-indigo-300 rounded-lg px-2 py-1 text-right font-bold text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            </label>
+          ))}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={() => setEdition(false)} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-xs font-semibold">Annuler</button>
+            <button type="button" onClick={valider} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold">Enregistrer</button>
+          </div>
         </div>
       ) : (
-        <button type="button" onClick={ouvrir} className="text-left">
-          <p className="text-lg font-bold text-indigo-600">{qte != null ? `${qte.toLocaleString('fr-FR')} pcs` : '—'}</p>
+        <button type="button" onClick={ouvrir} className="w-full text-left">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-lg font-bold text-indigo-600 whitespace-nowrap">{renseigne ? `${totalPcs.toLocaleString('fr-FR')} pcs` : '—'}</p>
+            {renseigne && <p className="text-sm font-bold text-gray-800 whitespace-nowrap">{totalDh.toLocaleString('fr-FR')} DH</p>}
+          </div>
+          {renseigne && (
+            <div className="mt-1 space-y-0.5">
+              {lignes.map(l => (
+                <p key={l.modele} className="flex justify-between text-[11px] text-gray-500">
+                  <span className="truncate">{l.modele}</span>
+                  <span className="whitespace-nowrap">{l.qte} × {l.prix} DH = <b className="text-gray-700">{(l.qte * l.prix).toLocaleString('fr-FR')} DH</b></span>
+                </p>
+              ))}
+            </div>
+          )}
         </button>
       )}
-      <p className="text-[10px] text-gray-400 mt-0.5">
-        {valeur?.maj ? `Saisi à la main · mis à jour le ${valeur.maj}` : 'Saisi à la main — touchez pour le renseigner'}
+      <p className="text-[10px] text-gray-400 mt-1">
+        {valeur?.maj ? `Saisi à la main · valeur au prix d'achat · mis à jour le ${valeur.maj}` : 'Saisi à la main — touchez pour le renseigner'}
       </p>
     </div>
   );
