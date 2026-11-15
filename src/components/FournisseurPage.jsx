@@ -139,7 +139,8 @@ function PaiementModal({ facture, reste, onClose, onSave, onAjouterRecu }) {
                   <div key={p.id} className="flex items-center gap-2 text-xs bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1.5">
                     <span className="font-bold text-gray-700">{(parseFloat(p.montant) || 0).toLocaleString('fr-FR')} DH</span>
                     <span className="text-gray-400">{methodOf(p.methode).label}</span>
-                    <span className="text-gray-400 ml-auto">{p.date}</span>
+                    {p.note && <span className="text-gray-500 truncate min-w-0" title={p.note} dir="auto">💬 {p.note}</span>}
+                    <span className="text-gray-400 ml-auto whitespace-nowrap">{p.date}</span>
                     <RecusVersement recus={p.recus || []} />
                     {onAjouterRecu && <AjoutRecu factureId={facture.id} onAjoute={rs => onAjouterRecu(p.id, rs)} />}
                   </div>
@@ -952,12 +953,17 @@ export default function FournisseurPage() {
                             </div>
                             <div className="flex items-center gap-2 mt-1.5 min-w-0">
                               <span className="text-xs text-gray-500 whitespace-nowrap">{p.date}</span>
-                              {p.note && <span className="text-xs text-gray-400 truncate min-w-0">· {p.note}</span>}
                               <div className="ml-auto flex items-center gap-1.5 shrink-0">
                                 <RecusVersement recus={p.recus || []} />
                                 <AjoutRecu factureId={f.id} onAjoute={rs => ajouterRecusVersement(f.id, p.id, rs)} />
                               </div>
                             </div>
+                            {/* Commentaire en entier (il peut être long : « reste 3000 DH… »). */}
+                            {p.note && (
+                              <p className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1.5 whitespace-pre-wrap break-words" dir="auto">
+                                💬 {p.note}
+                              </p>
+                            )}
                           </div>
                         );
                       })}
