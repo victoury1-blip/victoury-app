@@ -100,7 +100,8 @@ export default function MaMarchandisePage({ orders }) {
   const totalPieces = p.enLivraison.pieces + p.aRecuperer + stockLocal + defauts;
   const valeurLocal = localSport * P_SPORT + localHijab * P_HIJAB;
   const valeurDefauts = defSport * P_SPORT + defHijab * P_HIJAB;
-  const valeurMarchandise = v.livreur.achat + v.aRecuperer.achat + valeurLocal; // les défectueuses ne valent plus rien à la vente
+  // Les défectueuses comptent aussi, à leur prix d'achat (elles ont été payées).
+  const valeurMarchandise = v.livreur.achat + v.aRecuperer.achat + valeurLocal + valeurDefauts;
 
   async function enregistrerStock({ sport, hijab }) {
     await definirStockParModele({ sport, hijab });
@@ -126,7 +127,7 @@ export default function MaMarchandisePage({ orders }) {
         <div className="rounded-2xl bg-indigo-600 text-white p-5">
           <div className="text-xs uppercase tracking-wide text-white/70 font-semibold">Valeur de la marchandise (prix d'achat)</div>
           <div className="mt-1 text-3xl font-black tabular-nums">≈ {fmt(valeurMarchandise)} DH</div>
-          <div className="text-xs text-white/70 mt-1">hors défectueuses</div>
+          <div className="text-xs text-white/70 mt-1">livreur + à récupérer + local + défectueuses</div>
         </div>
       </div>
 
