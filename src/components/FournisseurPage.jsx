@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff, Undo2, Camera, Upload, Receipt, Loader2 } from 'lucide-react';
+import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, EyeOff, Undo2, Camera, Upload, Loader2 } from 'lucide-react';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
@@ -7,7 +7,8 @@ import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
 import BonFournisseurModal from './fournisseur/BonFournisseurModal';
 import CameraPhoto from './fournisseur/CameraPhoto';
 import AjoutRecu from './fournisseur/AjoutRecu';
-import { envoyerPhotoBon, liensPhotosBon, supprimerPhotoBon } from '../lib/photosFournisseur';
+import RecusVersement from './fournisseur/RecusVersement';
+import { envoyerPhotoBon, supprimerPhotoBon } from '../lib/photosFournisseur';
 
 const STORAGE_KEY = 'victoury_fournisseur_factures';
 const LEGACY_KEY = 'victoury_fournisseur'; // ancienne liste plate d'articles
@@ -52,15 +53,6 @@ const factureNet = (f) => factureCout(f) - retoursMontantOf(f);
 function todayFr() {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-}
-
-/* Ouvre un reçu (bucket privé) : l'onglet est ouvert tout de suite, sinon le
-   navigateur le bloque, puis on y charge le lien signé. */
-function ouvrirRecu(chemin) {
-  const w = window.open('', '_blank');
-  liensPhotosBon([chemin]).then(l => {
-    if (l[chemin] && w) w.location.href = l[chemin]; else w?.close();
-  }).catch(() => w?.close());
 }
 
 function PaiementModal({ facture, reste, onClose, onSave, onAjouterRecu }) {
@@ -148,9 +140,7 @@ function PaiementModal({ facture, reste, onClose, onSave, onAjouterRecu }) {
                     <span className="font-bold text-gray-700">{(parseFloat(p.montant) || 0).toLocaleString('fr-FR')} DH</span>
                     <span className="text-gray-400">{methodOf(p.methode).label}</span>
                     <span className="text-gray-400 ml-auto">{p.date}</span>
-                    {(p.recus || []).map(r => (
-                      <button key={r.path} type="button" onClick={() => ouvrirRecu(r.path)} title="Voir le reçu" className="text-blue-600"><Receipt size={13} /></button>
-                    ))}
+                    <RecusVersement recus={p.recus || []} />
                     {onAjouterRecu && <AjoutRecu factureId={facture.id} onAjoute={rs => onAjouterRecu(p.id, rs)} />}
                   </div>
                 ))}
@@ -710,29 +700,44 @@ export default function FournisseurPage() {
           const solde = fDu <= 0 && factureCout(f) > 0;
           return (
             <div key={f.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
-              {/* En-tête façon facture */}
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-2 justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <button onClick={() => toggleExpand(f.id)}
-                    className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 transition shrink-0"
-                    title={expanded.has(f.id) ? 'Masquer le contenu' : 'Voir le contenu'}>
-                    {expanded.has(f.id) ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                  <FileText size={16} className="text-gray-500 shrink-0" />
-                  <span className="font-bold text-gray-800">{f.ref}</span>
-                  <span className="text-xs text-gray-400">{f.date}</span>
+              {/* En-tête façon facture — empilé sur téléphone, sur une ligne à l'écran large. */}
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 space-y-2.5 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:justify-between">
+                <div className="flex items-start justify-between gap-3 sm:items-center sm:justify-start min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button onClick={() => toggleExpand(f.id)}
+                      className="p-1.5 -ml-1.5 rounded-lg text-gray-500 hover:bg-gray-200 transition shrink-0"
+                      title={expanded.has(f.id) ? 'Masquer le contenu' : 'Voir le contenu'}>
+                      {expanded.has(f.id) ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 whitespace-nowrap leading-tight">{f.ref}</p>
+                      <p className="text-[11px] text-gray-400 whitespace-nowrap leading-tight">{f.date}</p>
+                    </div>
+                  </div>
+                  {/* Total : en haut à droite sur téléphone. */}
+                  <div className="flex items-start gap-1 shrink-0 sm:hidden">
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900 leading-tight whitespace-nowrap">{fCout.toLocaleString('fr-FR')} DH</p>
+                      <p className="text-[11px] text-gray-400 leading-tight whitespace-nowrap">{fQte} pcs</p>
+                    </div>
+                    <button onClick={() => deleteFacture(f.id)} className="p-1.5 -mr-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50" title="Supprimer la facture">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 sm:mr-auto">
                   {f.datePrise && (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-blue-50 text-blue-700 border-blue-200" title="Date de prise de la marchandise">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold border bg-blue-50 text-blue-700 border-blue-200 whitespace-nowrap" title="Date de prise de la marchandise">
                       📦 Prise le {f.datePrise}
                     </span>
                   )}
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border whitespace-nowrap ${
                     ouverte ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'
                   }`}>
                     {ouverte ? 'Ouverte' : 'Clôturée'}
                   </span>
                   {/* État du règlement, visible sans ouvrir la facture. */}
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border whitespace-nowrap ${
                     solde ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           : fPaye > 0 ? 'bg-amber-50 text-amber-700 border-amber-200'
                                       : 'bg-red-50 text-red-600 border-red-200'
@@ -740,22 +745,22 @@ export default function FournisseurPage() {
                     {solde ? 'Soldée' : fPaye > 0 ? `Reste ${fDu.toLocaleString('fr-FR')} DH` : 'Non payée'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">{fQte} pcs · <span className="font-bold text-gray-700">{fCout.toLocaleString('fr-FR')} DH</span></span>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center [&>button]:justify-center [&>button]:py-2 sm:[&>button]:py-1.5">
+                  <span className="hidden sm:inline text-xs text-gray-500 whitespace-nowrap">{fQte} pcs · <span className="font-bold text-gray-700">{fCout.toLocaleString('fr-FR')} DH</span></span>
                   {ouverte ? (
                     <>
                       <button onClick={() => { setModalItem(null); setTargetFactureId(f.id); setModalOpen(true); }}
-                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
+                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 whitespace-nowrap">
                         <Plus size={13} /> Article
                       </button>
                       <button onClick={() => cloturerFacture(f.id)}
-                        className="text-xs bg-gray-800 hover:bg-gray-900 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
+                        className="text-xs bg-gray-800 hover:bg-gray-900 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 whitespace-nowrap">
                         <Lock size={13} /> Clôturer
                       </button>
                     </>
                   ) : (
                     <button onClick={() => rouvrirFacture(f.id)}
-                      className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg font-semibold transition">
+                      className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg font-semibold transition whitespace-nowrap flex items-center gap-1">
                       Rouvrir
                     </button>
                   )}
@@ -767,14 +772,14 @@ export default function FournisseurPage() {
                     <Camera size={13} /> {(f.photos || []).length ? `Bon (${f.photos.length})` : 'Pas de bon'}
                   </button>
                   <button onClick={() => setRetourFacture(f)}
-                    className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
+                    className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 whitespace-nowrap">
                     <Undo2 size={13} /> Retour
                   </button>
                   <button onClick={() => setPayFacture(f)}
-                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">
+                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 whitespace-nowrap">
                     <Plus size={13} /> Versement
                   </button>
-                  <button onClick={() => deleteFacture(f.id)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50" title="Supprimer la facture">
+                  <button onClick={() => deleteFacture(f.id)} className="hidden sm:flex p-1.5 rounded-lg text-red-400 hover:bg-red-50" title="Supprimer la facture">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -782,7 +787,43 @@ export default function FournisseurPage() {
 
               {/* Lignes de la facture — visibles seulement quand la facture est ouverte à l'œil */}
               {expanded.has(f.id) && (
-              <div className="overflow-x-auto">
+              <div className="sm:hidden divide-y divide-gray-100">
+                {(f.items || []).length === 0 && (
+                  <p className="px-4 py-6 text-center text-gray-400 text-xs">Facture vide — ajoutez un article.</p>
+                )}
+                {(f.items || []).map(it => (
+                  <div key={it.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{it.modele}</p>
+                        <p className="text-xs text-gray-500 truncate">{it.couleur || '—'}</p>
+                      </div>
+                      <div className="flex items-center shrink-0 -mr-1.5">
+                        <button onClick={() => { setModalItem(it); setTargetFactureId(f.id); setModalOpen(true); }}
+                          className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50" title="Modifier"><Pencil size={14} /></button>
+                        <button onClick={() => deleteItem(f.id, it.id)}
+                          className="p-1.5 rounded-lg text-red-400 hover:bg-red-50" title="Supprimer"><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                    {(it.sizes || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {(it.sizes || []).map((sz, i) => (
+                          <span key={i} className="text-[11px] px-2 py-0.5 rounded-full font-semibold border whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200">
+                            {sz.taille} : {sz.qte}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mt-2 text-xs">
+                      <span className="text-gray-500">{itemQty(it)} pcs × {(it.prix || 0).toLocaleString('fr-FR')} DH</span>
+                      <span className="font-bold text-gray-900">{itemCost(it).toLocaleString('fr-FR')} DH</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              )}
+              {expanded.has(f.id) && (
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm min-w-[620px]">
                   <thead className="bg-white border-b border-gray-200">
                     <tr>
@@ -835,7 +876,7 @@ export default function FournisseurPage() {
               {/* ── Règlement de la facture ── */}
               {expanded.has(f.id) && (
                 <div className="border-t border-gray-200 bg-gray-50/60 px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
+                  <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2 mb-3">
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Total facture</p>
                       <p className="text-sm font-bold text-gray-800">{fCout.toLocaleString('fr-FR')} DH</p>
@@ -857,7 +898,7 @@ export default function FournisseurPage() {
                       </p>
                     </div>
                     {/* Avancement du règlement, d'un coup d'œil. */}
-                    <div className="flex-1 min-w-[140px]">
+                    <div className="col-span-3 sm:col-span-1 flex-1 min-w-[140px]">
                       <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
                         <div className={`h-full rounded-full transition-all ${fDu > 0 ? 'bg-amber-400' : 'bg-emerald-500'}`}
                           style={{ width: `${fCout > 0 ? Math.min(100, Math.round((fPaye / fCout) * 100)) : 0}%` }} />
@@ -872,17 +913,18 @@ export default function FournisseurPage() {
                     <div className="space-y-1.5 mb-3">
                       <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Retours au fournisseur</p>
                       {(f.retours || []).map(r => (
-                        <div key={r.id} className="flex items-center gap-2 bg-orange-50/60 border border-orange-100 rounded-lg px-3 py-2">
-                          <span className="text-sm font-bold text-orange-700 w-28 shrink-0">
-                            −{retourMontant(r).toLocaleString('fr-FR')} DH
-                          </span>
-                          <span className="text-xs font-semibold text-gray-700 shrink-0">{retourQty(r)} pcs × {(parseFloat(r.prix) || 0).toLocaleString('fr-FR')} DH</span>
-                          <span className="text-xs text-gray-500 shrink-0">{r.date}</span>
-                          {(r.modele || r.note) && <span className="text-xs text-gray-400 truncate">{[r.modele, r.note].filter(Boolean).join(' · ')}</span>}
-                          <button onClick={() => deleteRetour(f.id, r.id)}
-                            className="ml-auto p-1.5 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Supprimer ce retour">
-                            <Trash2 size={13} />
-                          </button>
+                        <div key={r.id} className="bg-orange-50/60 border border-orange-100 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-orange-700 whitespace-nowrap">
+                              −{retourMontant(r).toLocaleString('fr-FR')} DH
+                            </span>
+                            <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{retourQty(r)} pcs × {(parseFloat(r.prix) || 0).toLocaleString('fr-FR')} DH</span>
+                            <button onClick={() => deleteRetour(f.id, r.id)}
+                              className="ml-auto -mr-1.5 p-1.5 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Supprimer ce retour">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">{[r.date, r.modele, r.note].filter(Boolean).join(' · ')}</p>
                         </div>
                       ))}
                     </div>
@@ -895,26 +937,27 @@ export default function FournisseurPage() {
                       {(f.paiements || []).map(p => {
                         const m = methodOf(p.methode);
                         return (
-                          <div key={p.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
-                            <span className="text-sm font-bold text-gray-800 w-28 shrink-0">
-                              {(parseFloat(p.montant) || 0).toLocaleString('fr-FR')} DH
-                            </span>
-                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${m.color}`}>
-                              {m.label}
-                            </span>
-                            <span className="text-xs text-gray-500 shrink-0">{p.date}</span>
-                            {p.note && <span className="text-xs text-gray-400 truncate">{p.note}</span>}
-                            {(p.recus || []).map((r, k) => (
-                              <button key={r.path} onClick={() => ouvrirRecu(r.path)}
-                                className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline shrink-0" title="Voir le reçu">
-                                <Receipt size={13} /> Reçu{p.recus.length > 1 ? ` ${k + 1}` : ''}
+                          <div key={p.id} className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base font-bold text-gray-900 whitespace-nowrap">
+                                {(parseFloat(p.montant) || 0).toLocaleString('fr-FR')} DH
+                              </span>
+                              <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border whitespace-nowrap ${m.color}`}>
+                                {m.label}
+                              </span>
+                              <button onClick={() => deletePaiement(f.id, p.id)}
+                                className="ml-auto -mr-1.5 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 shrink-0" title="Supprimer ce versement">
+                                <Trash2 size={14} />
                               </button>
-                            ))}
-                            <AjoutRecu factureId={f.id} onAjoute={rs => ajouterRecusVersement(f.id, p.id, rs)} />
-                            <button onClick={() => deletePaiement(f.id, p.id)}
-                              className="ml-auto p-1.5 rounded-lg text-red-400 hover:bg-red-50 shrink-0" title="Supprimer ce versement">
-                              <Trash2 size={13} />
-                            </button>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1.5 min-w-0">
+                              <span className="text-xs text-gray-500 whitespace-nowrap">{p.date}</span>
+                              {p.note && <span className="text-xs text-gray-400 truncate min-w-0">· {p.note}</span>}
+                              <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                                <RecusVersement recus={p.recus || []} />
+                                <AjoutRecu factureId={f.id} onAjoute={rs => ajouterRecusVersement(f.id, p.id, rs)} />
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
