@@ -3,7 +3,6 @@ import { Plus, X, Pencil, Trash2, Truck, Package, Search, Lock, FileText, Eye, E
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
 import useSearchShortcut from '../hooks/useSearchShortcut';
-import { chargerStockManuel, lireStockManuelCache } from '../lib/stockManuel';
 import BonFournisseurModal from './fournisseur/BonFournisseurModal';
 import CameraPhoto from './fournisseur/CameraPhoto';
 import AjoutRecu from './fournisseur/AjoutRecu';
@@ -11,6 +10,7 @@ import RecusVersement from './fournisseur/RecusVersement';
 import { envoyerPhotoBon, supprimerPhotoBon } from '../lib/photosFournisseur';
 
 const STORAGE_KEY = 'victoury_fournisseur_factures';
+const STOCK_LOCAL_KEY = 'victoury_fournisseur_stock_local';
 const LEGACY_KEY = 'victoury_fournisseur'; // ancienne liste plate d'articles
 
 
@@ -460,19 +460,20 @@ export default function FournisseurPage() {
   const searchRef = useRef(null);
   useSearchShortcut(searchRef);
 
-  // Stock physique restant, compté et réglé à la main dans /store/stock —
-  // affiché ici en LECTURE SEULE, pour comparer d'un coup d'œil avec ce qui
-  // a été pris chez le fournisseur. Descend tout seul quand une commande
-  // passe à "Confirmé" (voir lib/stockManuel).
-  const [stockManuel, setStockManuel] = useState(lireStockManuelCache);
-  useEffect(() => { chargerStockManuel().then(setStockManuel); }, []);
+  // Stock au local : un simple chiffre saisi à la main ICI, pour ses propres
+  // comptes. Indépendant du site et du stock de l'app — rien ne le modifie
+  // tout seul (pas de baisse aux commandes confirmées).
+  const [stockLocal, setStockLocal] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STOCK_LOCAL_KEY) || 'null'); } catch { return null; }
+  });
   useEffect(() => {
-    const id = setInterval(() => setStockManuel(v => {
-      const frais = lireStockManuelCache();
-      return frais === v ? v : frais;
-    }), 2000);
-    return () => clearInterval(id);
+    cloudGet(STOCK_LOCAL_KEY).then(v => { if (v && typeof v === 'object') setStockLocal(v); }).catch(() => {});
   }, []);
+  function enregistrerStockLocal(qte) {
+    const v = { qte, maj: todayFr() };
+    setStockLocal(v);
+    cloudSet(STOCK_LOCAL_KEY, v);
+  }
 
   useEffect(() => {
     cloudGet(STORAGE_KEY).then(remote => {
@@ -681,8 +682,7 @@ export default function FournisseurPage() {
           hint={totals.prixPiece > 0 ? `au prix de chaque facture · moyenne ${Math.round(totals.prixPiece).toLocaleString('fr-FR')} DH` : undefined} />
         <SummaryCard label="Retours" value={`${totals.retQte} pcs`} color={totals.retQte > 0 ? 'text-orange-600' : 'text-gray-400'}
           hint={totals.retMontant > 0 ? `−${totals.retMontant.toLocaleString('fr-FR')} DH déduits` : 'Pièces défectueuses rendues'} />
-        <SummaryCard label="Stock au local" value={stockManuel} color="text-indigo-600"
-          hint="Réglable dans Stock — descend à chaque commande confirmée" />
+        <StockLocalCard valeur={stockLocal} onEnregistrer={enregistrerStockLocal} />
       </div>
 
       <div className="relative mb-4 max-w-xs">
@@ -1028,6 +1028,48 @@ export default function FournisseurPage() {
           onSave={saveItem}
         />
       )}
+    </div>
+  );
+}
+
+/* Carte « Stock au local » modifiable sur place (crayon → chiffre → OK). */
+function StockLocalCard({ valeur, onEnregistrer }) {
+  const [edition, setEdition] = useState(false);
+  const [saisie, setSaisie] = useState('');
+  const qte = valeur?.qte;
+  function ouvrir() { setSaisie(qte != null ? String(qte) : ''); setEdition(true); }
+  function valider() {
+    const n = parseInt(saisie, 10);
+    if (Number.isNaN(n) || n < 0) return;
+    onEnregistrer(n);
+    setEdition(false);
+  }
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[11px] text-gray-400 uppercase font-semibold">Stock au local</p>
+        {!edition && (
+          <button type="button" onClick={ouvrir} title="Modifier" className="p-1 -m-1 rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
+            <Pencil size={13} />
+          </button>
+        )}
+      </div>
+      {edition ? (
+        <div className="flex items-center gap-1.5">
+          <input type="number" inputMode="numeric" min="0" autoFocus value={saisie}
+            onChange={e => setSaisie(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') valider(); if (e.key === 'Escape') setEdition(false); }}
+            className="w-full min-w-0 border border-indigo-300 rounded-lg px-2 py-1 text-lg font-bold text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+          <button type="button" onClick={valider} className="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold">OK</button>
+        </div>
+      ) : (
+        <button type="button" onClick={ouvrir} className="text-left">
+          <p className="text-lg font-bold text-indigo-600">{qte != null ? `${qte.toLocaleString('fr-FR')} pcs` : '—'}</p>
+        </button>
+      )}
+      <p className="text-[10px] text-gray-400 mt-0.5">
+        {valeur?.maj ? `Saisi à la main · mis à jour le ${valeur.maj}` : 'Saisi à la main — touchez pour le renseigner'}
+      </p>
     </div>
   );
 }
