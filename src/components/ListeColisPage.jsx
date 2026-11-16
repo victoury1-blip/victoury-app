@@ -19,6 +19,7 @@ import DeliveryStatusModal, { DELIVERY_STATUSES } from './colis/DeliveryStatusMo
 import ScanModal from './colis/ScanModal';
 import { estRecu, estEchange } from '../lib/colisRetours';
 import { couleurProduit } from '../lib/couleurProduit';
+import { chargerEtapeOzon, lireEtapesCache, ecrireEtapeCache } from '../lib/ozonEtape';
 function isLight(hex) {
   if (!hex || hex.length < 7) return true;
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
@@ -886,6 +887,30 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
   }, [pgPage, maxPage, colis.length]);
   const pagedColis = useMemo(() => paginate(colis, Math.min(pgPage, maxPage), pgPer), [colis, pgPage, maxPage, pgPer]);
 
+  /* Motif Ozon des colis refusés / annulés affichés (« Annulé par : Client »…),
+     demandé en arrière-plan, deux à la fois, et gardé en cache 6 h. */
+  const [etapesOz, setEtapesOz] = useState(lireEtapesCache);
+  const motifsACharger = pagedColis
+    .filter(o => /refus|annul/i.test(o.ozoneLastStatus || '') && /ozon/i.test(o.recipient?.delivery || '')
+      && !(etapesOz[o.id] && Date.now() - etapesOz[o.id].at < 6 * 3600e3))
+    .map(o => o.id).join(',');
+  useEffect(() => {
+    if (!motifsACharger) return;
+    const file = pagedColis.filter(o => motifsACharger.split(',').includes(o.id));
+    let annule = false;
+    const ouvrier = async () => {
+      while (!annule && file.length) {
+        const o = file.shift();
+        const e = (await chargerEtapeOzon(o).catch(() => null)) || { statut: '', commentaire: '', date: '', motif: '' };
+        const saved = ecrireEtapeCache(o.id, e);
+        if (!annule) setEtapesOz(prev => ({ ...prev, [o.id]: saved }));
+      }
+    };
+    Promise.all([ouvrier(), ouvrier()]);
+    return () => { annule = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [motifsACharger]);
+
   function handleStatusSave(orderId, newStatus, note, reportDate) {
     const ts = now();
     const order = orders.find(o => o.id === orderId);
@@ -1429,7 +1454,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                             : ls.includes('expédi') || ls.includes('recu') || ls.includes('reçu') ? 'bg-blue-100 text-blue-700'
                             : ls.includes('retour') ? 'bg-gray-200 text-gray-700'
                             : 'bg-teal-100 text-teal-700';
-                          return <span className={`text-sm font-bold px-2.5 py-1 rounded-md ${ozColor}`}>{o.ozoneLastStatus}</span>;
+                          const motif = /refus|annul/i.test(ls) ? etapesOz[o.id]?.motif : '';
+                          return (
+                            <>
+                              <span className={`text-sm font-bold px-2.5 py-1 rounded-md ${ozColor}`}>{o.ozoneLastStatus}</span>
+                              {motif && (
+                                <span className="max-w-[220px] text-[11px] font-semibold text-red-700 bg-red-50 border border-red-100 rounded-md px-1.5 py-1 leading-snug" dir="auto">
+                                  💬 {motif}
+                                </span>
+                              )}
+                            </>
+                          );
                         })()}
                       </div>
                     ) : <span className="text-gray-300 text-xs">—</span>}

@@ -46,3 +46,18 @@ describe('livreur depuis l’historique Ozon', () => {
     expect(livreurDepuisHistorique([{ STATUT: 'Nouveau Colis' }])).toBeNull();
   });
 });
+
+import { motifRefus } from '../lib/ozonEtape';
+describe('motif de refus / annulation', () => {
+  it('prend le commentaire de l\'étape Annulé, pas des étapes de retour qui suivent', () => {
+    const h = [
+      { STATUT: 'Mise en distribution', TIME_STR: '2026-11-16 09:00', COMMENT: '| Livreur: reda mouzouna | Téléphone: 0681092788' },
+      { STATUT: 'Annulé', TIME_STR: '2026-11-16 12:00', COMMENT: '| Commentaire: déjà qalt lihum annuleatha <br /> Annulé par : Client' },
+      { STATUT: 'Retourné', TIME_STR: '2026-11-16 14:40', COMMENT: '| Commentaire: Preparation Retour .2' },
+    ];
+    expect(motifRefus(h)).toBe('déjà qalt lihum annuleatha Annulé par : Client');
+  });
+  it('vide sans étape de refus', () => {
+    expect(motifRefus([{ STATUT: 'Livré', TIME_STR: '2026-11-12', COMMENT: 'ok' }])).toBe('');
+  });
+});

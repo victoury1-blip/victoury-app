@@ -9,7 +9,8 @@
 const cloud = () => import('./cloudSettings');
 
 // v2 : les anciennes entrées avaient perdu « Reporté pour : <date> » (voir plus bas).
-const CACHE_KEY = 'ozon_etapes_v2';
+// v3 : + motif du refus / de l'annulation.
+const CACHE_KEY = 'ozon_etapes_v3';
 
 /** Commentaire Ozon lisible : sans HTML, sans « | Commentaire : ». */
 export function nettoyerCommentaire(raw) {
@@ -47,6 +48,22 @@ export function derniereEtape(histList) {
     commentaire,
     date: dateDe(h),
   };
+}
+
+/** Motif d'un refus ou d'une annulation : commentaire de l'étape « Refusé » /
+    « Annulé » la plus récente (« déjà qalt lihum annuleatha | Annulé par :
+    Client »). Les étapes de retour qui suivent (« Preparation Retour »,
+    « Reçu par client »…) ne disent pas POURQUOI le colis revient. */
+export function motifRefus(histList) {
+  const list = (Array.isArray(histList) ? histList : Object.values(histList || {})).filter(Boolean);
+  const indexees = list.map((h, i) => ({ h, i }))
+    .sort((a, b) => dateDe(b.h).localeCompare(dateDe(a.h)) || b.i - a.i);
+  for (const { h } of indexees) {
+    if (!/refus|annul/i.test(statutDe(h))) continue;
+    const motif = nettoyerCommentaire(h.COMMENT);
+    if (motif) return motif;
+  }
+  return '';
 }
 
 /** Livreur qui a le colis, lu dans l'historique Ozon : les étapes « Mise en
@@ -112,7 +129,7 @@ export async function chargerEtapeOzon(order) {
       const last = track.LAST_TRACKING || track['LAST-TRACKING'] || {};
       const statut = etape?.statut || last.STATUT || last.STATUS || '';
       if (!statut && !etape) continue;
-      return { statut, commentaire: etape?.commentaire || '', date: etape?.date || '', livreur: livreurDepuisHistorique(historique) };
+      return { statut, commentaire: etape?.commentaire || '', date: etape?.date || '', livreur: livreurDepuisHistorique(historique), motif: motifRefus(historique) };
     } catch {
       clearTimeout(t);
     }

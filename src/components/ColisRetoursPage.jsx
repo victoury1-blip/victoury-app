@@ -310,7 +310,13 @@ export default function ColisRetoursPage({ orders, setOrders }) {
                               <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${couleurOzon(statut)}`}>
                                 {statut}
                               </span>
-                              {e?.commentaire && <p className="text-[11px] font-semibold text-gray-700 mt-1 leading-snug">{e.commentaire}</p>}
+                              {/* Pourquoi le colis revient : commentaire de l'étape Refusé / Annulé. */}
+                              {e?.motif && (
+                                <p className="text-[11px] font-semibold text-red-700 bg-red-50 border border-red-100 rounded-md px-1.5 py-1 mt-1 leading-snug" dir="auto">
+                                  💬 {e.motif}
+                                </p>
+                              )}
+                              {e?.commentaire && e.commentaire !== e.motif && <p className="text-[11px] font-semibold text-gray-700 mt-1 leading-snug">{e.commentaire}</p>}
                               {e?.date && <p className="text-[10px] text-gray-400 mt-0.5">{e.date}</p>}
                             </div>
                           );
