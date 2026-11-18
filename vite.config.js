@@ -61,7 +61,7 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        orientation: 'portrait',
+        orientation: 'any',
         icons: [
           {
             src: 'icon.svg',
