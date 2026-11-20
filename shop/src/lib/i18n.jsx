@@ -106,7 +106,7 @@ const remisePalier = (lang, pourcent, rang) => lang === 'ar'
 // Sens de lecture forcé sur toute la phrase : sur une carte produit (bloc
 // en LTR), la version arabe s'affichait mots dans le désordre.
 const offreLot = (lang, n, total, brut) => lang === 'ar'
-  ? <bdi dir="rtl">🎁 {n === 2 ? 'جوج' : `${n} قطع`} ب <b className="font-bold">{total}</b> بلاصة <span className="line-through opacity-70">{brut}</span></bdi>
+  ? <bdi dir="rtl">🎁 {n === 2 ? 'جوج' : `${n} قطع`} ب <b className="font-bold">{total}</b> عوض <span className="line-through opacity-70">{brut}</span></bdi>
   : <bdi dir="ltr">🎁 <Ltr>{n} pour {total}</Ltr> au lieu de <span className="line-through opacity-70">{brut}</span></bdi>;
 
 /** "Encore 1 article et −20% sur toute la commande" / version arabe — le

@@ -23,7 +23,7 @@ function offrePour(o, produits, remises) {
   if (!paliers.length) return '';
   const n = paliers[0].rang;
   const { brutAffiche: brut, total } = prixLot(p.price, paliers, n);
-  return `${n === 2 ? 'جوج' : `${n} قطع`} ب ${fmtMontant(total, 'ar')} بلاصة ${fmtMontant(brut, 'ar')}`;
+  return `${n === 2 ? 'جوج' : `${n} قطع`} ب ${fmtMontant(total, 'ar')} عوض ${fmtMontant(brut, 'ar')}`;
 }
 
 /** Stock actuel de la taille réservée — une taille réapprovisionnée entre-temps
