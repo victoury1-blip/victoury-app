@@ -21,21 +21,14 @@ describe('stock au local par modèle', () => {
     expect(lireStockHijabCache()).toBe(80);
   });
 
-  it('une confirmation baisse le total et la part hijab', async () => {
+  it('les commandes ne touchent plus au stock au local (saisie manuelle uniquement)', async () => {
     await definirStockParModele({ sport: 300, hijab: 80 });
     await decrementerStockManuel({ products: [{ name: 'Ensemble Hijab Vert sauge', qty: 1 }, { name: 'Ensemble Sport Noir', qty: 2 }] });
+    await ajusterStockManuelSiConfirmeeModifiee(
+      { status: 'confirme', products: [{ name: 'Ensemble Hijab Sport Noir', qty: 1 }] },
+      { status: 'confirme', products: [{ name: 'Ensemble Hijab Sport Noir', qty: 3 }] });
     await new Promise(r => setTimeout(r, 0));
-    expect(lireStockManuelCache()).toBe(377);
-    expect(lireStockHijabCache()).toBe(79);
-  });
-
-  it('modifier une commande confirmée ajuste la différence', async () => {
-    await definirStockParModele({ sport: 10, hijab: 10 });
-    const avant = { status: 'confirme', products: [{ name: 'Ensemble Hijab Sport Noir', qty: 1 }] };
-    const apres = { status: 'confirme', products: [{ name: 'Ensemble Hijab Sport Noir', qty: 3 }] };
-    await ajusterStockManuelSiConfirmeeModifiee(avant, apres);
-    await new Promise(r => setTimeout(r, 0));
-    expect(lireStockManuelCache()).toBe(18);
-    expect(lireStockHijabCache()).toBe(8);
+    expect(lireStockManuelCache()).toBe(380);
+    expect(lireStockHijabCache()).toBe(80);
   });
 });

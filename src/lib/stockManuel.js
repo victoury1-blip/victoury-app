@@ -47,25 +47,17 @@ export function nbPieces(order) {
 }
 
 /** Décrémente le total manuel du nombre de pièces d'UNE commande qui vient de passer à "Confirmé". */
-export function decrementerStockManuel(order) {
-  const qte = nbPieces(order);
-  if (!qte) return;
-  decrementerStockHijab(order);
-  return definirStockManuel(lireStockManuelCache() - qte);
-}
+/* Désactivé à la demande : le stock au local ne bouge QUE quand l'admin le
+   modifie à la main (il compte lui-même ce qui est dans le local). Les
+   appels depuis les commandes restent en place mais ne font plus rien. */
+export function decrementerStockManuel() { /* manuel uniquement */ }
 
 /* Une commande DÉJÀ confirmée peut ensuite être modifiée (le client rajoute
  * une pièce, par exemple) sans jamais changer de statut — un simple "encore
  * confirmée avant/après" ne suffit donc pas à savoir si le stock a bougé.
  * On compare le nombre de pièces avant/après : le stock ne descend (ou ne
  * remonte, si des pièces sont retirées) QUE de la différence. */
-export function ajusterStockManuelSiConfirmeeModifiee(avant, apres) {
-  if (avant?.status !== 'confirme' || apres?.status !== 'confirme') return;
-  ajusterStockHijabSiConfirmeeModifiee(avant, apres);
-  const delta = nbPieces(apres) - nbPieces(avant);
-  if (!delta) return;
-  return definirStockManuel(lireStockManuelCache() - delta);
-}
+export function ajusterStockManuelSiConfirmeeModifiee() { /* manuel uniquement */ }
 
 /* ── Répartition Sport / Hijab ──
  * Le total reste LA référence (page Stock, baisse à chaque confirmation) ;
@@ -104,15 +96,6 @@ export async function definirStockParModele({ sport, hijab }) {
 }
 
 /** Part hijab à retirer quand une commande est confirmée (appelée avec le total). */
-export function decrementerStockHijab(order) {
-  const q = piecesHijab(order);
-  if (!q) return;
-  return definirStockHijab(lireStockHijabCache() - q);
-}
+export function decrementerStockHijab() { /* manuel uniquement */ }
 
-export function ajusterStockHijabSiConfirmeeModifiee(avant, apres) {
-  if (avant?.status !== 'confirme' || apres?.status !== 'confirme') return;
-  const delta = piecesHijab(apres) - piecesHijab(avant);
-  if (!delta) return;
-  return definirStockHijab(lireStockHijabCache() - delta);
-}
+export function ajusterStockHijabSiConfirmeeModifiee() { /* manuel uniquement */ }

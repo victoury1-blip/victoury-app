@@ -455,8 +455,8 @@ export default function StockPage() {
         </div>
 
         {/* Compté à la main au local (pas la somme des variations ci-dessous,
-            affichée juste à côté) — descend tout seul quand une commande
-            passe à "Confirmé". Cliquer le nombre l'ouvre en édition. */}
+            affichée juste à côté) — saisie à la main uniquement (les commandes
+            n'y touchent plus). Cliquer le nombre l'ouvre en édition. */}
         <div className="ml-auto flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-700">
           <span>📦</span>
           {editStockManuel ? (

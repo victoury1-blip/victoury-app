@@ -154,7 +154,7 @@ export default function MaMarchandisePage({ orders }) {
         <Carte icon={Ban} titre="Annulés à récupérer" pieces={p.annules.aRecuperer} dh={v.aRecuperer.annules}
           sous={`${fmt(p.annules.recus)} pièces déjà rentrées au local`} cls="bg-orange-50 border-orange-200 text-orange-800" />
         <Carte icon={Warehouse} titre="Stock au local" pieces={stockLocal} dh={valeurLocal}
-          sous="baisse tout seul à chaque commande confirmée" cls="bg-indigo-50 border-indigo-200 text-indigo-900">
+          sous="saisi à la main — ne change que quand vous le modifiez" cls="bg-indigo-50 border-indigo-200 text-indigo-900">
           <ParModele sport={localSport} hijab={localHijab} onEnregistrer={enregistrerStock} couleur="text-indigo-700" />
           <Link to="/stock" className="mt-1 block text-[11px] text-indigo-600/70 hover:underline">Le total est aussi visible dans Stock</Link>
         </Carte>
@@ -165,8 +165,8 @@ export default function MaMarchandisePage({ orders }) {
       </div>
 
       <p className="mt-6 text-xs text-gray-400 leading-relaxed">
-        Valeur d'achat : Ensemble Sport {P_SPORT} DH, Ensemble Hijab {P_HIJAB} DH la pièce. Une commande confirmée retire ses pièces du stock
-        (de la ligne Hijab pour les hijabs). Les retours déjà rentrés sont supposés comptés dans le stock au local.
+        Valeur d'achat : Ensemble Sport {P_SPORT} DH, Ensemble Hijab {P_HIJAB} DH la pièce. Le stock au local ne change que quand vous le modifiez
+        (bouton Modifier). Les retours déjà rentrés sont supposés comptés dans le stock au local.
       </p>
     </div>
   );
