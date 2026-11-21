@@ -5,6 +5,7 @@ import { Check } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { useLang } from '../lib/i18n';
 import { miniature, surErreurMiniature } from '../lib/img';
+import { normaliserTelephone, numeroWhatsApp } from '../lib/commande';
 
 /* Reçu de commande complet (coordonnées + articles + total), transmis
    depuis Commander.jsx au moment de la validation — la commande n'existe
@@ -63,6 +64,28 @@ export default function Merci({ reglages }) {
 
   const { form, lignes, total } = state;
 
+  /* « Confirmer sur WhatsApp » : la cliente envoie elle-même le récapitulatif
+     au numéro de la boutique — commande confirmée sans attendre l'appel. */
+  const waBoutique = numeroWhatsApp(reglages?.theme?.footer?.contacts?.whatsapp);
+  const messageWa = [
+    `السلام عليكم، بغيت نأكد الكوموند ديالي ✅`,
+    id ? `رقم الطلب: ${id}` : '',
+    ...lignes.map(l => `• ${l.name}${l.size ? ` — ${l.size}` : ''}${l.color ? ` — ${l.color}` : ''} × ${l.qty}`),
+    `المجموع: ${fmtPrix(total, 'ar')}`,
+    `الاسم: ${form.nom}`,
+    `الهاتف: ${normaliserTelephone(form.telephone)}`,
+    `المدينة: ${form.ville}`,
+    `العنوان: ${form.adresse}`,
+  ].filter(Boolean).join('\n');
+  const lienWa = waBoutique ? `https://wa.me/${waBoutique}?text=${encodeURIComponent(messageWa)}` : '';
+  const boutonWa = lienWa && (
+    <a href={lienWa} target="_blank" rel="noreferrer"
+      className="mt-6 flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] hover:bg-[#1ebe5b] text-white py-4 px-4 text-sm font-bold shadow-sm">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.8.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 21.8c-1.8 0-3.5-.5-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4C2.7 15.6 2.2 13.8 2.2 12 2.2 6.6 6.6 2.2 12 2.2S21.8 6.6 21.8 12 17.4 21.8 12 21.8zM12 0C5.4 0 0 5.4 0 12c0 2.1.6 4.2 1.6 6L0 24l6.2-1.6c1.8 1 3.8 1.5 5.8 1.5 6.6 0 12-5.4 12-12S18.6 0 12 0z"/></svg>
+      {ar ? 'أكّدي الطلب ديالك فالواتساب' : 'Confirmer ma commande sur WhatsApp'}
+    </a>
+  );
+
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
       {popup}
@@ -70,6 +93,8 @@ export default function Merci({ reglages }) {
         <div className="w-14 h-14 rounded-full bg-green-600 text-white grid place-items-center mx-auto"><Check size={26} /></div>
         <h1 className="mt-6 text-lg tracking-[0.2em] uppercase">{ar ? 'تم تأكيد الطلب' : 'Commande confirmée'}</h1>
         {id && <p className="mt-1 text-xs text-gray-400 font-mono">{ar ? 'رقم' : 'Numéro'} #{id}</p>}
+        {boutonWa}
+        {boutonWa && <p className="mt-2 text-[11px] text-gray-400">{ar ? 'ضغطي باش تأكدي دابا، بلا ما تستناي المكالمة' : 'Confirmez maintenant, sans attendre notre appel'}</p>}
         {encart}
       </div>
 
@@ -84,7 +109,7 @@ export default function Merci({ reglages }) {
         <dl className="mt-3 space-y-2 text-sm" dir={ar ? 'rtl' : 'ltr'}>
           {[
             [ar ? 'الاسم' : 'Nom', form.nom],
-            [ar ? 'الهاتف' : 'Téléphone', form.telephone],
+            [ar ? 'الهاتف' : 'Téléphone', normaliserTelephone(form.telephone) || form.telephone],
             [ar ? 'المدينة' : 'Ville', form.ville],
             [ar ? 'العنوان' : 'Adresse', form.adresse],
           ].filter(([, v]) => v).map(([k, v]) => (
