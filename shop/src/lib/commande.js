@@ -47,7 +47,8 @@ export function normaliserTelephone(tel) {
     .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660))
     .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06F0))
     .replace(/\D/g, '')
-    .replace(/^(00212|212)/, '0');
+    // « +212 06… » : beaucoup gardent le 0 après l'indicatif — on l'enlève.
+    .replace(/^(00212|212)0?/, '0');
   if (/^[5-7]\d{8}$/.test(s)) s = '0' + s;
   return s;
 }

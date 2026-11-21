@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { X, Minus, Plus, Banknote, RotateCcw, ShieldCheck, Loader2 } from 'lucide-react';
 import { fmtPrix, totalPanier, lignesAvecRemise } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
-import { champsManquants } from '../lib/commande';
+import { champsManquants, telephoneValide, normaliserTelephone } from '../lib/commande';
 import { envoyerCommande } from '../lib/envoi';
 import { localiserClient } from '../lib/geoloc';
 import { verifierPromo } from '../lib/catalog';
@@ -42,6 +42,8 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState('');
   const [manque, setManque] = useState([]);
+  // Le numéro est vérifié dès qu'on quitte la case, pas seulement à l'envoi.
+  const [telTouche, setTelTouche] = useState(false);
   // Une seule LIGNE par visite (pas un insert à chaque perte de focus), mais
   // mise à jour à chaque nouvel appel : la ville et l'adresse ne sont
   // connues qu'après le téléphone (premier déclencheur), donc un simple
@@ -418,11 +420,20 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
             <div>
               <label className={`block text-sm text-ink font-medium mb-1.5 ${alignTexte}`}>{tr('telephone')} <span className="text-red-500">*</span></label>
               <input value={form.telephone} onChange={e => u('telephone', e.target.value)}
-                onBlur={() => { noterPanierAbandonne(); noterInfosInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
-                inputMode="tel" placeholder="06 12 34 56 78" dir="ltr" className={`${champ} text-left ${enErreur('telephone')}`} />
-              {manque.includes('telephone') && (
-                <p className={`mt-1 text-[11px] text-red-500 ${alignTexte}`}>{lang === 'ar' ? 'رقم هاتف مغربي مكوّن من 10 أرقام' : 'Numéro marocain à 10 chiffres'}</p>
-              )}
+                onBlur={() => { setTelTouche(true); noterPanierAbandonne(); noterInfosInitiateCheckout(); correspondanceAvancee(reglages?.pixel?.pixelId, { email: form.email, telephone: form.telephone }); }}
+                inputMode="tel" autoComplete="tel" placeholder="06 12 34 56 78" dir="ltr"
+                className={`${champ} text-left ${enErreur('telephone')} ${telTouche && form.telephone && !telephoneValide(form.telephone) ? 'border-red-400' : ''}`} />
+              {(manque.includes('telephone') || (telTouche && form.telephone && !telephoneValide(form.telephone))) ? (
+                <p className={`mt-1 text-[11px] text-red-500 ${alignTexte}`}>
+                  {(() => {
+                    const n = normaliserTelephone(form.telephone).length;
+                    if (lang === 'ar') return n && n !== 10 ? `الرقم فيه ${n} أرقام — خاصو يكون 10 أرقام (مثال: 06 12 34 56 78)` : 'رقم هاتف مغربي مكوّن من 10 أرقام، كيبدا بـ 05 أو 06 أو 07';
+                    return n && n !== 10 ? `Le numéro a ${n} chiffres — il en faut 10 (ex. 06 12 34 56 78)` : 'Numéro marocain à 10 chiffres, commençant par 05, 06 ou 07';
+                  })()}
+                </p>
+              ) : telephoneValide(form.telephone) ? (
+                <p className={`mt-1 text-[11px] text-emerald-600 ${alignTexte}`}>✓ {normaliserTelephone(form.telephone)}</p>
+              ) : null}
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
