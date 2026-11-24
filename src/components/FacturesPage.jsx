@@ -4,6 +4,7 @@ import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw, Folder, FolderOpen
 import { loadFactures, saveFactures, loadFacturesRemote, supprimerFacture, fusionnerFactures, lireSupprimees, nextRef, ELIGIBLE_STATUSES, statusLabel, dedupeFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
+import { fmtDate } from '../lib/dateUtils';
 import { useToast } from './Toast';
 
 /* ─── Auto-fetch Ozone cities frais ─── */
@@ -37,9 +38,11 @@ async function fetchOzoneFrais(livreurId) {
 
 /* ─── helpers ─── */
 function fmt(n) { return Number(n || 0).toFixed(2); }
+/* Heure dans le fuseau de l'application (Réglages, Casablanca par défaut),
+   pas celui du téléphone : un appareil réglé sur un autre fuseau créait des
+   factures décalées d'une heure. Format inchangé « jj/mm/aaaa hh:mm ». */
 function nowTs() {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return fmtDate(new Date()).slice(0, 16);
 }
 
 const STATUT_STYLE = {
