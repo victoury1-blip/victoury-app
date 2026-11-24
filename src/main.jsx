@@ -82,8 +82,8 @@ try {
  * Passé le démarrage, on se contente donc de proposer la mise à jour. */
 let appDemarree = false;
 
-function autoRecover() {
-  if (appDemarree) {
+function autoRecover(force = false) {
+  if (appDemarree && !force) {
     // La bannière prend le relais : elle attend d'être cliquée.
     try { window.dispatchEvent(new CustomEvent('app:update-available')); } catch { /* ignore */ }
     return false;
@@ -111,6 +111,12 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   if (isStaleBundleError(e?.reason?.message || e?.reason)) autoRecover();
 });
+
+/* Une page chargée à la demande (Commandes, Colis…) qui ne trouve plus son
+   fichier après une mise en ligne : l'écran ne peut de toute façon pas
+   s'afficher, il n'y a rien à perdre — on répare tout de suite, même si
+   l'application tourne déjà (frontière d'erreur des pages, voir ErrorBoundary). */
+window.addEventListener('app:stale-bundle', () => { autoRecover(true); });
 
 window.addEventListener('vite:preloadError', (e) => {
   // ne supprimer l'erreur que si on recharge vraiment — sinon la laisser
