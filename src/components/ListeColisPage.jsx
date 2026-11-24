@@ -579,7 +579,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     });
   }, []);
   const { statuses } = useStatuses();
-  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '', status: '', recu: '' };
+  const emptyFilter = { livreur: '', ville: '', produit: '', dateFrom: '', dateTo: '', status: '', recu: '', info: '' };
   const [filterForm, setFilterForm] = useState(emptyFilter);
   const [appliedFilter, setAppliedFilter] = useState(emptyFilter);
   const isFilterActive = Object.values(appliedFilter).some(v => v !== '');
@@ -802,6 +802,17 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     return (Date.now() - d.getTime()) > ARCHIVE_DAYS * 86400000;
   };
 
+  /* Bouton « Envoyer info » : visible si le colis est en route, a un téléphone,
+     et si l'info du livreur est connue (agent Ozon réel récupéré, ou livreur
+     personnel nommé avec téléphone). Même règle pour le filtre « Info livreur ». */
+  const infoLivreurDispo = (o) => {
+    if (!((o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone)) return false;
+    const delivery = o.recipient?.delivery || '';
+    if (/ozon/i.test(delivery)) { const dp = getOzonDp(o); return !!(dp.name || dp.phone); }
+    if (!delivery) return false;
+    try { return JSON.parse(localStorage.getItem('livreurs') || '[]').some(l => l.nom === delivery && l.telephone); } catch { return false; }
+  };
+
   const colis = useMemo(() => {
     const q = debouncedSearch.toLowerCase();
     const af = appliedFilter;
@@ -836,6 +847,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
         const recu = estRecu(o, recuIds);
         if (af.recu === 'oui' ? !recu : recu) return false;
       }
+      // Info livreur : « à envoyer » = bouton bleu 📩, « envoyé » = ✓ Envoyé.
+      if (af.info === 'envoye' && !sentLivreurInfo.has(o.id)) return false;
+      if (af.info === 'a_envoyer' && (sentLivreurInfo.has(o.id) || !infoLivreurDispo(o))) return false;
       if (af.livreur && !(o.recipient?.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
       if (af.ville && !(o.recipient?.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
       if (af.produit) {
@@ -874,7 +888,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       return String(b.id).localeCompare(String(a.id));
     };
     return filtered.sort(cmp);
-  }, [orders, debouncedSearch, appliedFilter, showArchived, recuIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, debouncedSearch, appliedFilter, showArchived, recuIds, sentLivreurInfo]);
 
   const archivedCount = useMemo(() => orders.reduce((n, o) => {
     const inPipeline = COLIS_PIPELINE.includes(o.status) || (!!o.trackingNumber && !!o.validated);
@@ -1095,6 +1110,19 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                     <option value="">Tous</option>
                     <option value="oui">Reçu</option>
                     <option value="non">Non reçu</option>
+                  </select>
+                </div>
+                {/* Info livreur envoyée au client (bouton 📩 Envoyer info / ✓ Envoyé). */}
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">Info livreur</label>
+                  <select
+                    value={filterForm.info || ''}
+                    onChange={e => setFilterForm(p => ({ ...p, info: e.target.value }))}
+                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+                  >
+                    <option value="">Tous</option>
+                    <option value="a_envoyer">📩 À envoyer</option>
+                    <option value="envoye">✓ Envoyé</option>
                   </select>
                 </div>
                 {/* Livreurs — autocomplete */}
