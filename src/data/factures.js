@@ -23,18 +23,85 @@ export function dedupeFactures(list) {
 export function loadFactures() {
   try { return dedupeFactures(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch { return []; }
 }
-export function saveFactures(list) {
-  const clean = dedupeFactures(list);
-  localStorage.setItem(KEY, JSON.stringify(clean));
-  cloudSet(KEY, clean);
+
+/* ── Plusieurs appareils ──
+ * Les factures vivent dans UNE ligne « settings » (toute la liste). Écrire la
+ * liste entière depuis un appareil qui ne connaissait pas encore la facture
+ * créée sur un autre téléphone l'effaçait. On fusionne donc facture par
+ * facture (la plus récemment modifiée gagne, `majLe`), et les suppressions
+ * sont retenues dans une liste à part pour ne pas « ressusciter ». */
+export const KEY_SUPPR = 'victoury_factures_supprimees';
+
+export function lireSupprimees() {
+  try { const v = JSON.parse(localStorage.getItem(KEY_SUPPR) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
 }
+
+/** Union par id ; pour une même facture, la plus récente (`majLe`) gagne, sinon `a`. */
+export function fusionnerFactures(a = [], b = [], supprimees = []) {
+  const suppr = new Set(supprimees);
+  const parId = new Map();
+  for (const f of [...(Array.isArray(b) ? b : []), ...(Array.isArray(a) ? a : [])]) {
+    if (!f || suppr.has(f.id)) continue;
+    const k = f.id || `${f.ref}|${f.dateCreation}`;
+    const deja = parId.get(k);
+    if (!deja || (Number(f.majLe) || 0) >= (Number(deja.majLe) || 0)) parId.set(k, f);
+  }
+  return dedupeFactures([...parId.values()]);
+}
+
+function publier(list) {
+  try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* quota */ }
+  // Différé : saveFactures est appelé depuis des mises à jour d'état React.
+  setTimeout(() => {
+    try { window.dispatchEvent(new CustomEvent('factures:maj', { detail: list })); } catch { /* hors navigateur */ }
+  }, 0);
+}
+
+async function supprimeesCloud() {
+  const remote = await cloudGet(KEY_SUPPR).catch(() => null);
+  const toutes = [...new Set([...(Array.isArray(remote) ? remote : []), ...lireSupprimees()])];
+  try { localStorage.setItem(KEY_SUPPR, JSON.stringify(toutes)); } catch { /* quota */ }
+  return toutes;
+}
+
+/** Enregistre la liste de CET appareil, fusionnée avec celle du cloud. */
+export function saveFactures(list) {
+  const local = fusionnerFactures(list, [], lireSupprimees());
+  publier(local);
+  return (async () => {
+    try {
+      const [remote, suppr] = await Promise.all([cloudGet(KEY).catch(() => null), supprimeesCloud()]);
+      const fusion = fusionnerFactures(local, Array.isArray(remote) ? remote : [], suppr);
+      await cloudSet(KEY, fusion);
+      publier(fusion);
+      return fusion;
+    } catch {
+      cloudSet(KEY, local);
+      return local;
+    }
+  })();
+}
+
+/** Supprime une facture partout (et l'empêche de revenir depuis un autre appareil). */
+export async function supprimerFacture(id, list) {
+  const suppr = [...new Set([...lireSupprimees(), id])];
+  try { localStorage.setItem(KEY_SUPPR, JSON.stringify(suppr)); } catch { /* quota */ }
+  const remote = await cloudGet(KEY_SUPPR).catch(() => null);
+  await cloudSet(KEY_SUPPR, [...new Set([...(Array.isArray(remote) ? remote : []), ...suppr])]);
+  return saveFactures((list || loadFactures()).filter(f => f.id !== id));
+}
+
 export async function loadFacturesRemote() {
   try {
-    const remote = await cloudGet(KEY);
+    const [remote, suppr] = await Promise.all([cloudGet(KEY), supprimeesCloud()]);
     if (Array.isArray(remote)) {
-      const clean = dedupeFactures(remote);
-      localStorage.setItem(KEY, JSON.stringify(clean));
-      return clean;
+      const local = loadFactures();
+      const fusion = fusionnerFactures(remote, local, suppr);
+      publier(fusion);
+      // Une facture restée sur cet appareil seulement repart vers le cloud.
+      const idsRemote = new Set(remote.map(f => f?.id));
+      if (fusion.some(f => !idsRemote.has(f.id))) cloudSet(KEY, fusion);
+      return fusion;
     }
   } catch {}
   return null;

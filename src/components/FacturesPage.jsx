@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { findCityRow, feeFromRow } from '../lib/cityMatch';
 import { Plus, Printer, X, Eye, ArrowLeft, Trash2, RefreshCw, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
-import { loadFactures, saveFactures, loadFacturesRemote, nextRef, ELIGIBLE_STATUSES, statusLabel, dedupeFactures } from '../data/factures';
+import { loadFactures, saveFactures, loadFacturesRemote, supprimerFacture, fusionnerFactures, lireSupprimees, nextRef, ELIGIBLE_STATUSES, statusLabel, dedupeFactures } from '../data/factures';
 import { supabase } from '../lib/supabase';
 import { cloudGet, cloudSet } from '../lib/cloudSettings';
 import { useToast } from './Toast';
@@ -590,6 +590,7 @@ function NewFactureModal({ orders, onClose, onCreated }) {
       totalFrais,
       totalNet,
       locked: false,
+      majLe: Date.now(),
     };
     const list = [...loadFactures(), facture];
     saveFactures(list);
@@ -741,11 +742,14 @@ export default function FacturesPage({ orders }) {
 
   useEffect(() => {
     loadFacturesRemote().then(remote => {
-      if (Array.isArray(remote)) {
-        setFactures(remote);
-        saveFactures(remote);
-      }
+      if (Array.isArray(remote)) setFactures(remote);
     });
+    // Toute écriture (ici ou synchro) republie la liste fusionnée.
+    const surMaj = (e) => { if (Array.isArray(e.detail)) setFactures(e.detail); };
+    window.addEventListener('factures:maj', surMaj);
+    // Retour sur l'application : relire le cloud (facture créée sur un autre téléphone).
+    const surVisible = () => { if (document.visibilityState === 'visible') loadFacturesRemote(); };
+    document.addEventListener('visibilitychange', surVisible);
     cloudGet('livreurs').then(remote => {
       if (Array.isArray(remote) && remote.length) {
         localStorage.setItem('livreurs', JSON.stringify(remote));
@@ -770,14 +774,18 @@ export default function FacturesPage({ orders }) {
         if (currentUserId && row?.user_id && row.user_id !== currentUserId) return;
         const val = row?.value;
         if (Array.isArray(val)) {
-          const clean = dedupeFactures(val);
+          const clean = fusionnerFactures(val, loadFactures(), lireSupprimees());
           setFactures(clean);
           localStorage.setItem('victoury_factures', JSON.stringify(clean));
         }
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('factures:maj', surMaj);
+      document.removeEventListener('visibilitychange', surVisible);
+    };
   }, []);
   const [detail, setDetail] = useState(null);
   const [filterLivreur, setFilterLivreur] = useState('');
@@ -835,6 +843,7 @@ export default function FacturesPage({ orders }) {
   }
 
   function updateFacture(updated) {
+    updated = { ...updated, majLe: Date.now() };
     setFactures(prev => {
       const list = prev.map(f => f.id === updated.id ? updated : f);
       saveFactures(list);
@@ -857,7 +866,7 @@ export default function FacturesPage({ orders }) {
     if (!window.confirm('Supprimer cette facture ?')) return;
     setFactures(prev => {
       const list = prev.filter(f => f.id !== id);
-      saveFactures(list);
+      supprimerFacture(id, list);
       return list;
     });
     if (detail?.id === id) setDetail(null);

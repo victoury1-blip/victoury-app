@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { cloudSet } from '../lib/cloudSettings';
+import { fusionnerFactures, lireSupprimees } from '../data/factures';
 
 const SYNC_KEYS = [
   'victoury_products',
   'victoury_statuses',
   'victoury_factures',
+  'victoury_factures_supprimees',
   'victoury_fct_counter',
   'livreurs',
   'victoury_recu_ids',
@@ -41,6 +43,8 @@ const SYNC_KEYS = [
 // « Reçu » / « Facturé » doit tenir après la synchro (sinon l'union ré-ajoute
 // l'id retiré) ; la colonne orders.recu et les factures sont la source de vérité.
 const MERGE_KEYS = new Set([
+  // Suppressions de factures : liste additive (voir data/factures.js).
+  'victoury_factures_supprimees',
   'victoury_sent_livreur',
   'deleted_order_ids',
   // Masquage des commandes/produits d'affiliation : additif, doit tenir sur
@@ -123,6 +127,14 @@ export default function useAutoSync(session) {
             } catch {
               localStorage.setItem(row.key, JSON.stringify(row.value));
             }
+          } else if (row.key === 'victoury_factures' && Array.isArray(row.value)) {
+            // Fusion facture par facture : écraser la liste locale perdait une
+            // facture créée ici et pas encore envoyée.
+            let local = [];
+            try { local = JSON.parse(localStorage.getItem(row.key) || '[]'); } catch { /* illisible */ }
+            const fusion = JSON.stringify(fusionnerFactures(row.value, local, lireSupprimees()));
+            localStorage.setItem(row.key, fusion);
+            lastPulledRef.current[row.key] = fusion;
           } else {
             const localRaw = localStorage.getItem(row.key);
             const remoteJson = JSON.stringify(row.value);
@@ -143,6 +155,9 @@ export default function useAutoSync(session) {
           if (!raw) continue;
           // Inchangé depuis le dernier pull -> rien à pousser.
           if (lastPulledRef.current[key] === raw) continue;
+          // Les factures s'envoient fusionnées par saveFactures, jamais en bloc
+          // (un bloc périmé effaçait celles créées sur un autre appareil).
+          if (key === 'victoury_factures') continue;
           try {
             await cloudSet(key, JSON.parse(raw));
             lastPulledRef.current[key] = raw;
