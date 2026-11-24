@@ -813,6 +813,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
     try { return JSON.parse(localStorage.getItem('livreurs') || '[]').some(l => l.nom === delivery && l.telephone); } catch { return false; }
   };
 
+  const enDistributionOzon = (o) => !!o.recipient?.phone && /ozon/i.test(o.recipient?.delivery || '')
+    && /distribution/i.test(o.ozoneLastStatus || '');
+
   const colis = useMemo(() => {
     const q = debouncedSearch.toLowerCase();
     const af = appliedFilter;
@@ -849,7 +852,9 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
       }
       // Info livreur : « à envoyer » = bouton bleu 📩, « envoyé » = ✓ Envoyé.
       if (af.info === 'envoye' && !sentLivreurInfo.has(o.id)) return false;
-      if (af.info === 'a_envoyer' && (sentLivreurInfo.has(o.id) || !infoLivreurDispo(o))) return false;
+      // « À envoyer » : info du livreur connue, OU colis Ozon « Mise en distribution »
+      // (le livreur est sorti avec : on récupère son numéro via 🚚 puis on l'envoie).
+      if (af.info === 'a_envoyer' && (sentLivreurInfo.has(o.id) || !(infoLivreurDispo(o) || enDistributionOzon(o)))) return false;
       if (af.livreur && !(o.recipient?.delivery || '').toLowerCase().includes(af.livreur.toLowerCase())) return false;
       if (af.ville && !(o.recipient?.city || '').toLowerCase().includes(af.ville.toLowerCase())) return false;
       if (af.produit) {
@@ -1375,7 +1380,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                         disponible (à envoyer au client) — soit l'info Ozon locale, soit un
                         livreur nommé (recipient.delivery) trouvé dans la liste `livreurs`.
                         Une fois envoyé → « ✓ Envoyé » (état synchronisé, visible partout). */}
-                    {(o.status === 'expedier' || o.status === 'recu_livreur') && o.recipient?.phone && (() => {
+                    {(o.status === 'expedier' || o.status === 'recu_livreur' || enDistributionOzon(o)) && o.recipient?.phone && (() => {
                       const sent = sentLivreurInfo.has(o.id);
                       // Info disponible si :
                       //  - livreur Ozon RÉEL déjà récupéré (via le bouton Livraison 🚚 qui
