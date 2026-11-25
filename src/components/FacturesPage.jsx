@@ -143,157 +143,174 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
     }
   }
 
+  const nb = (st) => facture.colis.filter(c => c.status === st).length;
+  const nbLivres = nb('livre'), nbRefuses = nb('refuse'), nbAutres = facture.colis.length - nbLivres - nbRefuses;
+  const statutCls = {
+    paye: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+    cloture: 'bg-gray-100 text-gray-600 ring-gray-200',
+    en_attente: 'bg-blue-100 text-blue-700 ring-blue-200',
+  }[facture.statut] || 'bg-gray-100 text-gray-600 ring-gray-200';
+  const badgeColis = (st) => st === 'livre' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+    : st === 'refuse' ? 'bg-red-50 text-red-600 ring-red-200'
+    : st === 'change' ? 'bg-violet-50 text-violet-700 ring-violet-200'
+    : 'bg-gray-50 text-gray-600 ring-gray-200';
+  const champFrais = (c, i, large) => facture.locked ? (
+    c.fraisLivraison > 0
+      ? <span className="text-red-500 font-medium whitespace-nowrap">−{fmt(c.fraisLivraison)} DH</span>
+      : <span className="text-gray-300 font-medium whitespace-nowrap">0.00 DH</span>
+  ) : (
+    <input type="number" min="0" step="0.01" inputMode="decimal"
+      defaultValue={c.fraisLivraison ?? ''}
+      onBlur={(e) => setFraisColis(i, e.target.value)}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      placeholder="0.00"
+      title={fraisAbsent(c) ? 'Aucun tarif pour cette ville — saisis le montant réel' : 'Frais de livraison'}
+      className={`${large ? 'w-24' : 'w-20'} border rounded-lg px-2 py-1 text-right text-sm text-red-600 focus:outline-none focus:ring-2 focus:ring-blue-300 ${fraisAbsent(c) ? 'border-amber-400 bg-amber-50' : 'border-gray-200'}`} />
+  );
+
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Facture {facture.ref}</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Gestion des factures des livreurs</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => printFacture(facture, toast)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
-            <Printer size={14} /> Télécharger PDF
+    <div className="min-h-full bg-gray-50">
+      {/* Barre du haut : retour, numéro, actions */}
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-200">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <button onClick={onBack} aria-label="Retour à la liste"
+            className="shrink-0 w-9 h-9 grid place-items-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100">
+            <ArrowLeft size={16} />
           </button>
-          <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">
-            <ArrowLeft size={14} /> Retour à la liste
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Facture livreur</p>
+            <h1 className="font-mono font-bold text-gray-900 text-sm sm:text-base truncate">{facture.ref}</h1>
+          </div>
+          <button onClick={() => printFacture(facture, toast)}
+            className="shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-black">
+            <Printer size={15} /> <span className="hidden sm:inline">Télécharger</span> PDF
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* Top 3 boxes */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 text-lg">👤</div>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+        {/* Résumé : montant net en grand */}
+        <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-white p-5 sm:p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Livreur</div>
-              <div className="font-bold text-gray-800 mt-0.5">{facture.livreur || '—'}</div>
+              <p className="text-xs uppercase tracking-wider text-white/60 font-semibold">Total net à recevoir</p>
+              <p className="mt-1 text-3xl sm:text-4xl font-bold tabular-nums whitespace-nowrap">{fmt(facture.totalNet)} <span className="text-lg text-white/70">DH</span></p>
             </div>
+            <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold ring-1 ${statutCls}`}>{STATUT_LABEL[facture.statut]}</span>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">💰</div>
-            <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Net</div>
-              <div className="font-bold text-gray-800 mt-0.5 text-lg">{fmt(facture.totalNet)} DH</div>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white/10 px-3 py-2.5">
+              <p className="text-[11px] text-white/60">Encaissé (CRBT)</p>
+              <p className="font-semibold tabular-nums whitespace-nowrap">{fmt(facture.totalLivre)} DH</p>
             </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">📋</div>
-            <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</div>
-              <span className={`inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-bold ${STATUT_STYLE[facture.statut]}`}>
-                {STATUT_LABEL[facture.statut]}
-              </span>
+            <div className="rounded-xl bg-white/10 px-3 py-2.5">
+              <p className="text-[11px] text-white/60">Frais livreur</p>
+              <p className="font-semibold tabular-nums text-red-300 whitespace-nowrap">−{fmt(facture.totalFrais)} DH</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* Informations */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-bold text-gray-700 mb-4 text-sm">Informations</h3>
-            <div className="space-y-3 text-sm">
-              {[
-                ['Numéro de facture', facture.ref],
-                ['Livreur', facture.livreur || '—'],
-                ['Téléphone', facture.phone || '—'],
-                ['Date de création', facture.dateCreation],
-                ['Nombre de commandes', facture.colis.length],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between">
-                  <span className="text-gray-500">{label}</span>
-                  <span className="font-semibold text-gray-800">{value}</span>
+        {/* Informations */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
+            <div><dt className="text-xs text-gray-400">Livreur</dt><dd className="font-semibold text-gray-900 truncate">{facture.livreur || '—'}</dd></div>
+            <div><dt className="text-xs text-gray-400">Date</dt><dd className="font-semibold text-gray-900">{facture.dateCreation || '—'}</dd></div>
+            <div><dt className="text-xs text-gray-400">Colis</dt><dd className="font-semibold text-gray-900">{facture.colis.length}</dd></div>
+            <div><dt className="text-xs text-gray-400">Téléphone</dt><dd className="font-semibold text-gray-900">{facture.phone || '—'}</dd></div>
+            {facture.datePaiement && (
+              <div className="col-span-2 sm:col-span-4"><dt className="text-xs text-gray-400">Versé le</dt><dd className="font-semibold text-emerald-700">{facture.datePaiement}</dd></div>
+            )}
+          </dl>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 font-semibold">{nbLivres} livré{nbLivres > 1 ? 's' : ''}</span>
+            {nbRefuses > 0 && <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-600 ring-1 ring-red-200 font-semibold">{nbRefuses} refusé{nbRefuses > 1 ? 's' : ''}</span>}
+            {nbAutres > 0 && <span className="px-2.5 py-1 rounded-full bg-gray-50 text-gray-600 ring-1 ring-gray-200 font-semibold">{nbAutres} autre{nbAutres > 1 ? 's' : ''}</span>}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={recalculerFrais} disabled={recalculating}
+            className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 text-xs sm:text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+            <RefreshCw size={14} className={recalculating ? 'animate-spin' : ''} /> Recalculer
+          </button>
+          <button onClick={toggleCloture}
+            className={`px-2 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${facture.locked ? 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50' : 'bg-amber-500 text-white hover:bg-amber-600'}`}>
+            {facture.locked ? 'Rouvrir' : 'Clôturer'}
+          </button>
+          <button onClick={() => onDelete(facture.id)}
+            className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl bg-white border border-red-200 text-red-600 text-xs sm:text-sm font-semibold hover:bg-red-50">
+            <Trash2 size={14} /> Supprimer
+          </button>
+        </div>
+
+        {/* Colis — cartes sur téléphone */}
+        <div className="sm:hidden space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-gray-400">Colis ({facture.colis.length})</h3>
+          {facture.colis.map((c, i) => (
+            <div key={i} className={`bg-white border rounded-xl p-3.5 shadow-sm ${fraisAbsent(c) ? 'border-amber-300' : 'border-gray-200'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-bold text-blue-600">{c.orderId}</p>
+                  <p className="text-sm font-semibold text-gray-900 truncate">{c.recipient || '—'}</p>
+                  <p className="text-xs text-gray-500 truncate">{[c.city, c.phone].filter(Boolean).join(' · ') || '—'}</p>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Totaux */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-bold text-gray-700 mb-4 text-sm">Totaux</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Total Brut (CRBT)</span>
-                <span className="font-semibold">{fmt(facture.totalLivre)} DH</span>
+                <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full font-semibold ring-1 ${badgeColis(c.status)}`}>{statusLabel(c.status)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Total Frais</span>
-                <span className="font-semibold text-red-500">{fmt(facture.totalFrais)} DH</span>
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5">
+                <div>
+                  <p className="text-[11px] text-gray-400">Montant</p>
+                  <p className="text-sm font-bold text-gray-900 tabular-nums">{fmt(c.prix)} DH</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] text-gray-400">Frais</p>
+                  {champFrais(c, i, true)}
+                </div>
               </div>
-              <div className="flex justify-between border-t pt-3 mt-3">
-                <span className="font-bold text-gray-700">Total Net</span>
-                <span className="font-bold text-green-700 text-base">{fmt(facture.totalNet)} DH</span>
-              </div>
+              {c.date && <p className="mt-2 text-[11px] text-gray-400">{c.date}</p>}
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={recalculerFrais} disabled={recalculating}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-blue-500 text-white text-xs font-semibold hover:bg-blue-600 disabled:opacity-50">
-                <RefreshCw size={12} className={recalculating ? 'animate-spin' : ''} /> {recalculating ? '...' : 'Recalculer (villes + frais)'}
-              </button>
-              <button onClick={toggleCloture} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${facture.locked ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-amber-500 text-white hover:bg-amber-600'}`}>
-                {facture.locked ? 'Rouvrir' : 'Clôturer la facture'}
-              </button>
-              <button onClick={() => onDelete(facture.id)}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600">
-                <Trash2 size={12} /> Supprimer
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Commandes associées */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-5 py-3 border-b bg-gray-50">
-            <h3 className="font-bold text-gray-700 text-sm">Commandes associées</h3>
+        {/* Colis — tableau à l'écran large */}
+        <div className="hidden sm:block bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-bold text-gray-800 text-sm">Colis de la facture</h3>
+            <span className="text-xs text-gray-400">{facture.colis.length} colis</span>
           </div>
-          <div className="overflow-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  {['ID','Client','Ville','Téléphone','Produit','Statut','Montant','Frais','Date'].map(h => (
-                    <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">{h}</th>
+                  {['Commande', 'Client', 'Ville', 'Statut', 'Montant', 'Frais', 'Date'].map(h => (
+                    <th key={h} className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap ${['Montant', 'Frais'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {facture.colis.map((c, i) => (
-                  <tr key={i} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-mono text-xs font-bold text-blue-600">{c.orderId}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-700">{c.recipient || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-500">{c.city || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-500">{c.phone || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[180px] truncate">{c.product || '—'}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                        c.status === 'livre' ? 'bg-green-100 text-green-700' :
-                        c.status === 'refuse' ? 'bg-red-100 text-red-600' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>{statusLabel(c.status)}</span>
+                  <tr key={i} className={`${i % 2 ? 'bg-gray-50/60' : 'bg-white'} ${fraisAbsent(c) ? '!bg-amber-50' : ''}`}>
+                    <td className="px-4 py-3 font-mono text-xs font-bold text-blue-600 whitespace-nowrap">{c.orderId}</td>
+                    <td className="px-4 py-3">
+                      <p className="text-gray-900 font-medium">{c.recipient || '—'}</p>
+                      {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
                     </td>
-                    <td className="px-4 py-2.5 font-semibold text-gray-800">{fmt(c.prix)} DH</td>
-                    {/* Saisissable : le recalcul automatique ne peut rien pour une
-                        ville absente des tarifs, et un zéro laissé là fausse le
-                        profit. La facture close reste en lecture seule. */}
-                    <td className={`px-4 py-2.5 text-xs ${fraisAbsent(c) ? 'bg-amber-100/70' : ''}`}>
-                      {facture.locked ? (
-                        <span className="text-red-500">{fmt(c.fraisLivraison)} DH</span>
-                      ) : (
-                        <input
-                          type="number" min="0" step="0.01"
-                          defaultValue={c.fraisLivraison ?? ''}
-                          onBlur={(e) => setFraisColis(i, e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                          placeholder="0.00"
-                          title={fraisAbsent(c) ? 'Aucun tarif pour cette ville — saisis le montant réel' : 'Frais de livraison'}
-                          className={`w-20 border rounded px-1.5 py-1 text-right text-xs text-red-600 focus:outline-none focus:ring-2 focus:ring-blue-300 ${fraisAbsent(c) ? 'border-amber-400' : 'border-gray-200'}`}
-                        />
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-gray-400">{c.date || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{c.city || '—'}</td>
+                    <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ring-1 whitespace-nowrap ${badgeColis(c.status)}`}>{statusLabel(c.status)}</span></td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums whitespace-nowrap">{fmt(c.prix)} DH</td>
+                    <td className="px-4 py-3 text-right">{champFrais(c, i, false)}</td>
+                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{c.date || '—'}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t-2 border-gray-200 bg-gray-50">
+                <tr>
+                  <td colSpan={4} className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Totaux</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{fmt(facture.totalLivre)} DH</td>
+                  <td className="px-4 py-3 text-right font-bold text-red-500 tabular-nums whitespace-nowrap">−{fmt(facture.totalFrais)} DH</td>
+                  <td className="px-4 py-3 font-bold text-emerald-700 tabular-nums whitespace-nowrap">= {fmt(facture.totalNet)} DH</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
