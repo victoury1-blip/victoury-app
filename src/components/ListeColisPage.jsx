@@ -19,6 +19,7 @@ import DeliveryStatusModal, { DELIVERY_STATUSES } from './colis/DeliveryStatusMo
 import ScanModal from './colis/ScanModal';
 import { estRecu, estEchange } from '../lib/colisRetours';
 import { couleurProduit } from '../lib/couleurProduit';
+import { RE_RELANCE, BadgeRelance } from './orders/BadgeRelance';
 import { chargerEtapeOzon, lireEtapesCache, ecrireEtapeCache } from '../lib/ozonEtape';
 function isLight(hex) {
   if (!hex || hex.length < 7) return true;
@@ -1306,7 +1307,8 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                 </div>
               </td></tr>
             ) : pagedColis.map((o, idx) => {
-              const note = (o.note || '').replace('Note interne: ', '').trim();
+              const relance = RE_RELANCE.test(o.note || '');
+              const note = (o.note || '').split('\n').filter(l => !RE_RELANCE.test(l)).join('\n').replace('Note interne: ', '').trim();
               const delivery = o.recipient?.delivery || '—';
               return (
                 <tr key={o.id} className={`border rounded-xl transition-all ${selected.includes(o.id) ? 'bg-indigo-50 border-indigo-300 shadow-sm' : isCasa(o.recipient?.city) ? 'bg-sky-50/70 border-sky-300 hover:bg-sky-100/60' : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}`}>
@@ -1464,6 +1466,7 @@ export default function ListeColisPage({ orders, setOrders, isLoading, onDeleteO
                           ⏳ RÉSERVATION
                         </span>
                       )}
+                      {relance && <BadgeRelance />}
                       {note && <span className="block text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">Note interne:<br/>{note}</span>}
                       {o.noteLivraison && (
                         <span className={`block text-sm text-red-600 font-semibold whitespace-pre-wrap break-words ${note ? 'pt-3 border-t border-gray-200' : ''}`}>

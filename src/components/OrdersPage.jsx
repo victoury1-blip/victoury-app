@@ -3,6 +3,7 @@ import { isAffiliateSource, platformOfSource, platformOf } from '../lib/affiliat
 import useDebounce from '../hooks/useDebounce';
 import useSearchShortcut from '../hooks/useSearchShortcut';
 import Pagination, { paginate } from './Pagination';
+import { RE_RELANCE, BadgeRelance } from './orders/BadgeRelance';
 import {
   Search,
   Filter,
@@ -1163,7 +1164,9 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                         const internes = lignes.filter(l => /^note interne\s*:/i.test(l)).map(l => l.replace(/^note interne\s*:\s*/i, ''));
                         // Réservation (précommande du site) : à ne pas expédier avant l'arrivage.
                         const reservations = lignes.filter(l => /^⏳\s*RÉSERVATION/i.test(l));
-                        const autres = lignes.filter(l => !/^note interne\s*:/i.test(l) && !/^⏳\s*RÉSERVATION/i.test(l));
+                        // Relance d'un panier abandonné : un badge à la place de la longue phrase.
+                        const relance = lignes.some(l => RE_RELANCE.test(l));
+                        const autres = lignes.filter(l => !/^note interne\s*:/i.test(l) && !/^⏳\s*RÉSERVATION/i.test(l) && !RE_RELANCE.test(l));
                         return (
                           <>
                             {reservations.length > 0 && (
@@ -1171,6 +1174,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
                                 ⏳ RÉSERVATION
                               </p>
                             )}
+                            {relance && <BadgeRelance />}
                             {autres.length > 0 && (
                               <p className="text-xs text-gray-600 leading-relaxed line-clamp-3 whitespace-pre-line">{autres.join('\n')}</p>
                             )}
