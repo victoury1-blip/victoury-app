@@ -41,5 +41,10 @@ body {
   to   { opacity: 1; transform: none; }
 }
 .page-enter {
-  animation: page-enter 0.2s ease-out both;
+  /* « backwards » et non « both » : une fois l'animation finie, plus aucun
+     effet ne reste appliqué. Avec « both », Chrome (Android surtout) garde
+     l'animation de transform « en vigueur » : la page devient le cadre des
+     fenêtres fixed, qui s'ouvraient alors au milieu d'une longue liste, hors
+     de l'écran, sous un voile gris. */
+  animation: page-enter 0.2s ease-out backwards;
 }
