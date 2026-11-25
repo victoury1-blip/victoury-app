@@ -9,7 +9,7 @@ import {
   Printer,
   Upload,
   Download,
-  Settings,
+  FileText,
   Pencil,
   MessageCircle,
   Phone,
@@ -864,9 +864,6 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
           >
             <Filter size={14} />
           </button>
-          <button onClick={() => window.print()} className="p-2 rounded-lg border border-sky-100 bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors" title="Imprimer">
-            <Printer size={14} />
-          </button>
           <button onClick={() => exportOrdersCSV(filtered)} className="p-2 rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Exporter CSV">
             <Upload size={14} />
           </button>
@@ -874,10 +871,7 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
             <Download size={14} />
           </button>
           <button onClick={() => { if (exportToPDF(filtered, `commandes_${activeTab}`) === false) toast.error('Popup bloquée — autorisez les popups pour ce site.'); }} className="p-2 rounded-lg border border-rose-100 bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Exporter PDF">
-            <Printer size={14} />
-          </button>
-          <button className="p-2 rounded-lg border border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors" title="Paramètres">
-            <Settings size={14} />
+            <FileText size={14} />
           </button>
           <button
             onClick={() => setNewOrderOpen(true)}
