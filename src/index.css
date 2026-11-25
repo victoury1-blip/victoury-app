@@ -6,6 +6,15 @@
   box-sizing: border-box;
 }
 
+/* Jamais de défilement horizontal de la page : un élément un peu trop large
+   (tableau, barre d'outils) laissait glisser tout l'écran vers la gauche sur
+   téléphone, avec une bande vide à droite. « clip » (et non « hidden ») ne
+   crée pas de zone de défilement : les en-têtes collants (sticky) marchent. */
+html, body {
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
