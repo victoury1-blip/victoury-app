@@ -179,10 +179,10 @@ export default function AdminLayout() {
       <nav className="flex-1 py-3 overflow-y-auto">
         {LIENS.map(({ to, label, icon: Icon, fin }) => (
           <NavLink key={to} to={to} end={fin}
-            className={({ isActive }) => `flex items-center gap-3 px-5 py-2.5 text-sm border-l-2 transition-colors ${
+            className={({ isActive }) => `flex items-center gap-3 px-5 py-2.5 text-sm border-l-4 transition-colors ${
               isActive
-                ? 'text-white font-medium bg-white/10 border-l-white'
-                : 'text-gray-300 border-l-transparent hover:bg-white/5 hover:text-white'}`}>
+                ? 'text-white font-semibold bg-blue-600 border-l-blue-300 shadow-inner'
+                : 'text-gray-300 border-l-transparent hover:bg-white/10 hover:text-white'}`}>
             <Icon size={16} /> {label}
             {to === '/store/paniers-abandonnes' && nbPaniers > 0 && (
               <span className="ml-auto bg-red-500 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center">
