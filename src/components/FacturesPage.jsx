@@ -52,6 +52,13 @@ const STATUT_STYLE = {
 };
 const STATUT_LABEL = { en_attente: 'Ouvert', paye: 'Versé', cloture: 'Clôturé' };
 
+/* Horodatage d'une facture (« jj/mm/aaaa hh:mm »), pour le tri. */
+function tsFacture(f) {
+  const m = /(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(f?.dateCreation || '');
+  if (!m) return 0;
+  return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime();
+}
+
 /* ─── Facture Detail View ─── */
 function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
   const toast = useToast();
@@ -172,7 +179,7 @@ function FactureDetail({ facture, onBack, onUpdate, onDelete, orders = [] }) {
     <div className="min-h-full bg-gray-50">
       {/* Barre du haut : retour, numéro, actions */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto pl-16 pr-4 sm:px-6 py-3 flex items-center gap-3">
           <button onClick={onBack} aria-label="Retour à la liste"
             className="shrink-0 w-9 h-9 grid place-items-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100">
             <ArrowLeft size={16} />
@@ -833,7 +840,8 @@ export default function FacturesPage({ orders }) {
       .sort(([a], [b]) => (a === 'inconnu') - (b === 'inconnu') || b.localeCompare(a))
       .map(([key, list]) => ({
         key,
-        list,
+        // Dans chaque mois : la facture la plus récente en haut.
+        list: [...list].sort((a, b) => tsFacture(b) - tsFacture(a)),
         totalNet: list.reduce((s, f) => s + (Number(f.totalNet) || 0), 0),
         nbCom: list.reduce((s, f) => s + (f.colis?.length || 0), 0),
         nonVersees: list.filter(f => f.statut !== 'paye').length,
