@@ -737,6 +737,13 @@ export default function FournisseurPage() {
                   }`}>
                     {solde ? 'Soldée' : fPaye > 0 ? `Reste ${fDu.toLocaleString('fr-FR')} DH` : 'Non payée'}
                   </span>
+                  {/* Retours rendus au fournisseur : visibles sans ouvrir le bon. */}
+                  {(f.retours || []).length > 0 && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full font-bold border bg-red-600 text-white border-red-600 whitespace-nowrap"
+                      title="Pièces retournées au fournisseur (déjà déduites du total)">
+                      ↩ Retour {retoursQtyOf(f)} pcs · −{fRet.toLocaleString('fr-FR')} DH
+                    </span>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center [&>button]:justify-center [&>button]:py-2 sm:[&>button]:py-1.5">
                   <span className="hidden sm:inline text-xs text-gray-500 whitespace-nowrap">{fQte} pcs · <span className="font-bold text-gray-700">{fCout.toLocaleString('fr-FR')} DH</span></span>
