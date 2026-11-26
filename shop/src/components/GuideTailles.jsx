@@ -75,14 +75,12 @@ export default function GuideTailles({ onFermer, tailles, onChoisir, imageAdmin,
 
           {/* Tableau */}
           <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <table className="w-full text-[12px] text-center">
+            <table className="w-full text-[13px] text-center">
               <thead className="bg-gray-100 text-gray-600">
                 <tr>
                   <th className="py-2 px-1">{ar ? 'المقاس' : 'Taille'}</th>
                   <th className="py-2 px-1">{ar ? 'الوزن (كلغ)' : 'Poids (kg)'}</th>
-                  <th className="py-2 px-1">{ar ? 'الصدر' : 'Poitrine'}</th>
-                  <th className="py-2 px-1">{ar ? 'الخصر' : 'Tour taille'}</th>
-                  <th className="py-2 px-1">{ar ? 'الأرداف' : 'Hanches'}</th>
+                  <th className="py-2 px-1">{ar ? 'الطول (سم)' : 'Hauteur (cm)'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -93,17 +91,13 @@ export default function GuideTailles({ onFermer, tailles, onChoisir, imageAdmin,
                     <tr key={g.taille} className={actif ? 'bg-emerald-50 font-semibold' : i % 2 ? 'bg-gray-50' : 'bg-white'}>
                       <td className={`py-2 px-1 font-bold ${auProduit ? 'text-ink' : 'text-gray-300'}`}>{g.taille}</td>
                       <td dir="ltr" className="py-2 px-1">{plage(g.poids)}</td>
-                      <td dir="ltr" className="py-2 px-1">{plage(g.poitrine)}</td>
-                      <td dir="ltr" className="py-2 px-1">{plage(g.tourTaille)}</td>
-                      <td dir="ltr" className="py-2 px-1">{plage(g.hanches)}</td>
+                      <td dir="ltr" className="py-2 px-1">{plage(g.hauteur)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <p className="text-[10px] text-gray-400 px-2 py-1.5 bg-gray-50 border-t border-gray-100">
-              {ar ? 'القياسات بالسنتيمتر (سم)' : 'Mesures du corps en centimètres (cm)'}
-            </p>
+            
           </div>
 
           <ul className="text-[12px] text-gray-600 space-y-1.5">

@@ -14,7 +14,8 @@ describe('guide des tailles', () => {
   it('monte d’une taille si grande et en haut de plage', () => {
     expect(suggererTaille(61, 160).taille).toBe('M');
     expect(suggererTaille(61, 175).taille).toBe('L');
-    expect(suggererTaille(56, 175).taille).toBe('M');
+    expect(suggererTaille(56, 175).taille).toBe('L');
+    expect(suggererTaille(56, 162).taille).toBe('M');
   });
   it('signale le bord de plage et refuse les valeurs absurdes', () => {
     expect(suggererTaille(61, 160).bord).toBe(true);
@@ -42,15 +43,15 @@ describe('grille réglable', () => {
     expect(lirePlage('abc')).toBeNull();
   });
   it('utilise la grille de l’admin (texte) et ignore les lignes vides', () => {
-    const g = [{ taille: 'm', poids: '52-60', poitrine: '84-90' }, { taille: 'S', poids: '38-52' }, { taille: '', poids: '1-2' }];
+    const g = [{ taille: 'm', poids: '52-60', hauteur: '' }, { taille: 'S', poids: '38-52' }, { taille: '', poids: '1-2' }];
     const e = grilleEffective(g);
     expect(e.map(x => x.taille)).toEqual(['S', 'M']);
     expect(suggererTaille(55, 160, g).taille).toBe('M');
-    expect(e[0].poitrine).toBeNull();
+    expect(e[0].hauteur).toBeNull();
   });
   it('retombe sur la grille standard si rien d’utilisable', () => {
     expect(grilleEffective(undefined)).toBe(GRILLE_TAILLES);
     expect(grilleEffective([{ taille: 'S', poids: 'x' }])).toBe(GRILLE_TAILLES);
-    expect(grilleEnTexte(undefined)[0]).toEqual({ taille: 'S', poids: '40-54', poitrine: '80-86', tourTaille: '62-68', hanches: '86-92' });
+    expect(grilleEnTexte(undefined)[0]).toEqual({ taille: 'S', poids: '40-54', hauteur: '150-160' });
   });
 });

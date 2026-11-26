@@ -5,15 +5,15 @@
  * départager quand on est en haut d'une plage. */
 
 export const GRILLE_TAILLES = [
-  { taille: 'S',   poids: [40, 54],  poitrine: [80, 86],   tourTaille: [62, 68],  hanches: [86, 92] },
-  { taille: 'M',   poids: [54, 62],  poitrine: [86, 92],   tourTaille: [68, 74],  hanches: [92, 98] },
-  { taille: 'L',   poids: [62, 70],  poitrine: [92, 98],   tourTaille: [74, 80],  hanches: [98, 104] },
-  { taille: 'XL',  poids: [70, 78],  poitrine: [98, 104],  tourTaille: [80, 86],  hanches: [104, 110] },
-  { taille: '2XL', poids: [78, 87],  poitrine: [104, 110], tourTaille: [86, 92],  hanches: [110, 116] },
-  { taille: '3XL', poids: [87, 98],  poitrine: [110, 118], tourTaille: [92, 100], hanches: [116, 124] },
+  { taille: 'S',   poids: [40, 54], hauteur: [150, 160] },
+  { taille: 'M',   poids: [54, 62], hauteur: [155, 165] },
+  { taille: 'L',   poids: [62, 70], hauteur: [158, 168] },
+  { taille: 'XL',  poids: [70, 78], hauteur: [160, 170] },
+  { taille: '2XL', poids: [78, 87], hauteur: [160, 172] },
+  { taille: '3XL', poids: [87, 98], hauteur: [160, 175] },
 ];
 
-const MESURES = ['poids', 'poitrine', 'tourTaille', 'hanches'];
+const MESURES = ['poids', 'hauteur'];
 
 /** '40-54' / '40 – 54' → [40, 54] ; null si illisible. */
 export function lirePlage(txt) {
@@ -73,9 +73,12 @@ export function suggererTaille(poids, hauteur, grilleBrute = GRILLE_TAILLES) {
   if (i === -1) i = GRILLE.length - 1;
   const [min, max] = GRILLE[i].poids;
   const hautDePlage = p >= min + (max - min) * 0.7;
-  // Grande (≥ 170 cm) et en haut de sa plage : le tissu tire en longueur,
-  // la taille au-dessus tombe mieux.
-  if (Number.isFinite(h) && h >= 170 && hautDePlage && i < GRILLE.length - 1) i += 1;
+  // Plus grande que la plage de hauteur de cette taille (ou ≥ 170 cm en
+  // haut de plage de poids) : le tissu tire en longueur, la taille au-dessus
+  // tombe mieux.
+  const tropGrande = Number.isFinite(h) && h > 0 && (
+    (GRILLE[i].hauteur && h > GRILLE[i].hauteur[1]) || (h >= 170 && hautDePlage));
+  if (tropGrande && i < GRILLE.length - 1) i += 1;
   const bord = hautDePlage && i < GRILLE.length - 1;
   return { taille: GRILLE[i].taille, index: i, bord };
 }

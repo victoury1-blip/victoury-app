@@ -3,19 +3,17 @@ import { Plus, Trash2, RotateCcw } from 'lucide-react';
 import { grilleEnTexte, lirePlage, GRILLE_TAILLES } from '../lib/guideTailles';
 
 const COLONNES = [
-  { k: 'poids', label: 'Poids (kg)' },
-  { k: 'poitrine', label: 'Poitrine (cm)' },
-  { k: 'tourTaille', label: 'Tour de taille (cm)' },
-  { k: 'hanches', label: 'Hanches (cm)' },
+  { k: 'poids', label: 'Poids (kg)', ex: '54-62' },
+  { k: 'hauteur', label: 'Taille (cm)', ex: '155-165' },
 ];
 
 /* Tableau du guide des tailles, modifiable case par case. Les plages se
-   tapent "40-54" ; une case vide ou illisible apparaît « — » côté client
-   (seul le poids est obligatoire : il sert à la calculatrice). */
+   tapent "40-54" ; le poids est obligatoire, la taille en cm optionnelle
+   (« — » côté client si vide). */
 export default function EditeurGrilleTailles({ grille, onChange }) {
   const lignes = grilleEnTexte(grille);
   const maj = (i, k, v) => onChange(lignes.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
-  const ajouter = () => onChange([...lignes, { taille: '', poids: '', poitrine: '', tourTaille: '', hanches: '' }]);
+  const ajouter = () => onChange([...lignes, { taille: '', poids: '', hauteur: '' }]);
   const retirer = (i) => onChange(lignes.filter((_, j) => j !== i));
 
   return (
@@ -28,7 +26,7 @@ export default function EditeurGrilleTailles({ grille, onChange }) {
         </button>
       </div>
       <div className="border border-gray-200 rounded-xl overflow-x-auto">
-        <table className="w-full text-xs min-w-[520px]">
+        <table className="w-full text-xs min-w-[320px]">
           <thead className="bg-gray-50 text-gray-500">
             <tr>
               <th className="py-2 px-2 text-left font-medium">Taille</th>
@@ -48,7 +46,7 @@ export default function EditeurGrilleTailles({ grille, onChange }) {
                   const manque = c.k === 'poids' && !l[c.k];
                   return (
                     <td key={c.k} className="p-1.5">
-                      <input value={l[c.k]} onChange={e => maj(i, c.k, e.target.value)} placeholder="40-54"
+                      <input value={l[c.k]} onChange={e => maj(i, c.k, e.target.value)} placeholder={c.ex}
                         className={`w-full min-w-[72px] border rounded-md px-2 py-1.5 ${invalide || manque ? 'border-red-300 bg-red-50' : 'border-gray-200'}`} />
                     </td>
                   );
@@ -65,7 +63,7 @@ export default function EditeurGrilleTailles({ grille, onChange }) {
       <button type="button" onClick={ajouter}
         className="mt-2 text-xs text-blue-600 hover:underline inline-flex items-center gap-1"><Plus size={12} /> Ajouter une taille</button>
       <p className="text-[11px] text-gray-400 mt-1">
-        Écrire les plages comme « 54-62 ». Le poids sert à la calculatrice « Quelle est ma taille ? » ; les autres colonnes sont seulement affichées.
+        Écrire les plages comme « 54-62 ». La calculatrice « Quelle est ma taille ? » se base sur le poids, puis la taille (cm) pour les personnes grandes.
       </p>
     </div>
   );
