@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import EditeurGrilleTailles from './EditeurGrilleTailles';
 import { Upload, Trash2, Plus, GripVertical, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { televerserPhoto } from '../lib/admin';
@@ -419,18 +420,6 @@ export default function EditTheme() {
             </div>
           </section>
 
-          <section className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-medium">Guide des tailles</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Une seule photo (tableau de mesures), valable pour toute la boutique — affichée en pop-up sur chaque fiche produit</p>
-              </div>
-              <Bascule actif={t.guideTailles.active} onChange={() => uGuide('active', !t.guideTailles.active)} />
-            </div>
-            <div className="mt-4">
-              <DeposeImage titre="Photo du tableau" url={t.guideTailles.image} onChange={v => uGuide('image', v)} className="w-full h-40" />
-            </div>
-          </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <h2 className="text-sm font-medium">Texte sous Hero</h2>
@@ -621,6 +610,24 @@ export default function EditTheme() {
 
       {onglet === 'Produit' && (
         <div className="mt-6 space-y-5">
+          <section className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">Guide des tailles</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Bouton « 📏 Guide des tailles » sur chaque fiche produit en S…3XL : calculatrice poids/taille + ce tableau</p>
+              </div>
+            </div>
+            <EditeurGrilleTailles grille={t.guideTailles.grille} onChange={v => uGuide('grille', v)} />
+            <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-xs text-gray-500">Photo en plus (optionnelle), sous le tableau</p>
+              <Bascule actif={t.guideTailles.active} onChange={() => uGuide('active', !t.guideTailles.active)} />
+            </div>
+            {t.guideTailles.active && (
+              <div className="mt-3">
+                <DeposeImage titre="Photo du tableau" url={t.guideTailles.image} onChange={v => uGuide('image', v)} className="w-full h-40" />
+              </div>
+            )}
+          </section>
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <h2 className="text-sm font-medium">Page Produit</h2>
             <p className="text-xs text-gray-400 mt-0.5">Paramètres affectant l'expérience sur les fiches produits.</p>

@@ -2,21 +2,22 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Ruler } from 'lucide-react';
 import { useLang } from '../lib/i18n';
-import { GRILLE_TAILLES, suggererTaille, tailleProduitCorrespondante, normaliserTaille } from '../lib/guideTailles';
+import { grilleEffective, suggererTaille, tailleProduitCorrespondante, normaliserTaille } from '../lib/guideTailles';
 
 /* Fenêtre « Guide des tailles » : calculatrice (poids + taille → taille
    conseillée, un clic la sélectionne) puis le tableau des mesures. La photo
    déposée dans /store/theme, si l'admin en a mis une, s'affiche en dessous. */
-export default function GuideTailles({ onFermer, tailles, onChoisir, imageAdmin }) {
+export default function GuideTailles({ onFermer, tailles, onChoisir, imageAdmin, grille }) {
+  const GRILLE = grilleEffective(grille);
   const { lang } = useLang();
   const ar = lang === 'ar';
   const [poids, setPoids] = useState('');
   const [hauteur, setHauteur] = useState('');
-  const sugg = poids ? suggererTaille(poids, hauteur) : null;
+  const sugg = poids ? suggererTaille(poids, hauteur, GRILLE) : null;
   const dispo = sugg ? tailleProduitCorrespondante(tailles, sugg.taille) : null;
   const stockDispo = dispo ? (tailles.find(s => s.size === dispo)?.stock > 0) : false;
-  const suivante = sugg?.bord ? GRILLE_TAILLES[sugg.index + 1]?.taille : null;
-  const plage = ([a, b]) => `${a}–${b}`;
+  const suivante = sugg?.bord ? GRILLE[sugg.index + 1]?.taille : null;
+  const plage = (v) => (Array.isArray(v) ? `${v[0]}–${v[1]}` : '—');
 
   return createPortal(
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onFermer}>
@@ -85,7 +86,7 @@ export default function GuideTailles({ onFermer, tailles, onChoisir, imageAdmin 
                 </tr>
               </thead>
               <tbody>
-                {GRILLE_TAILLES.map((g, i) => {
+                {GRILLE.map((g, i) => {
                   const actif = sugg?.taille === g.taille;
                   const auProduit = (tailles || []).some(s => normaliserTaille(s.size) === g.taille);
                   return (

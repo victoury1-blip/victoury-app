@@ -217,7 +217,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
       />
       {guideOuvert && (
         <GuideTailles onFermer={() => setGuideOuvert(false)} tailles={tailles} onChoisir={setTaille}
-          imageAdmin={theme?.guideTailles?.active ? theme?.guideTailles?.image : ''} />
+          imageAdmin={theme?.guideTailles?.active ? theme?.guideTailles?.image : ''}
+          grille={theme?.guideTailles?.grille} />
       )}
       </>
     );
@@ -399,7 +400,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             {/* Réglé (photo + activation) depuis /store/edit-theme — absent
                 tant que l'admin n'a rien déposé, pour ne jamais afficher un
                 lien mort. */}
-            {(produitAvecGrille(tailles) || (theme?.guideTailles?.active && theme?.guideTailles?.image)) && (
+            {(produitAvecGrille(tailles, theme?.guideTailles?.grille) || (theme?.guideTailles?.active && theme?.guideTailles?.image)) && (
               <button type="button" onClick={() => setGuideOuvert(true)}
                 className="text-[12px] font-medium underline text-ink hover:opacity-70">
                 📏 {t('guideTailles')}
@@ -605,7 +606,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
 
       {guideOuvert && (
         <GuideTailles onFermer={() => setGuideOuvert(false)} tailles={tailles} onChoisir={setTaille}
-          imageAdmin={theme?.guideTailles?.active ? theme?.guideTailles?.image : ''} />
+          imageAdmin={theme?.guideTailles?.active ? theme?.guideTailles?.image : ''}
+          grille={theme?.guideTailles?.grille} />
       )}
 
       {/* Zoom plein écran sur la photo active — tap la photo pour entrer,

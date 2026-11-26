@@ -33,3 +33,24 @@ describe('guide des tailles', () => {
     expect(produitAvecGrille([])).toBe(false);
   });
 });
+
+import { grilleEffective, lirePlage, grilleEnTexte, GRILLE_TAILLES } from '../lib/guideTailles';
+describe('grille réglable', () => {
+  it('lit les plages tapées', () => {
+    expect(lirePlage('40-54')).toEqual([40, 54]);
+    expect(lirePlage('54 – 40')).toEqual([40, 54]);
+    expect(lirePlage('abc')).toBeNull();
+  });
+  it('utilise la grille de l’admin (texte) et ignore les lignes vides', () => {
+    const g = [{ taille: 'm', poids: '52-60', poitrine: '84-90' }, { taille: 'S', poids: '38-52' }, { taille: '', poids: '1-2' }];
+    const e = grilleEffective(g);
+    expect(e.map(x => x.taille)).toEqual(['S', 'M']);
+    expect(suggererTaille(55, 160, g).taille).toBe('M');
+    expect(e[0].poitrine).toBeNull();
+  });
+  it('retombe sur la grille standard si rien d’utilisable', () => {
+    expect(grilleEffective(undefined)).toBe(GRILLE_TAILLES);
+    expect(grilleEffective([{ taille: 'S', poids: 'x' }])).toBe(GRILLE_TAILLES);
+    expect(grilleEnTexte(undefined)[0]).toEqual({ taille: 'S', poids: '40-54', poitrine: '80-86', tourTaille: '62-68', hanches: '86-92' });
+  });
+});

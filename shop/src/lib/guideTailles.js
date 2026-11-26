@@ -13,6 +13,37 @@ export const GRILLE_TAILLES = [
   { taille: '3XL', poids: [87, 98],  poitrine: [110, 118], tourTaille: [92, 100], hanches: [116, 124] },
 ];
 
+const MESURES = ['poids', 'poitrine', 'tourTaille', 'hanches'];
+
+/** '40-54' / '40 – 54' → [40, 54] ; null si illisible. */
+export function lirePlage(txt) {
+  const m = /(\d+(?:[.,]\d+)?)\s*[-–—à]\s*(\d+(?:[.,]\d+)?)/.exec(String(txt ?? ''));
+  if (!m) return null;
+  const a = Number(m[1].replace(',', '.')), b = Number(m[2].replace(',', '.'));
+  return a <= b ? [a, b] : [b, a];
+}
+
+/** Grille réglée dans /store/theme si elle est utilisable, sinon la grille standard. */
+export function grilleEffective(grille) {
+  if (!Array.isArray(grille)) return GRILLE_TAILLES;
+  // Chaque mesure peut être [min, max] ou le texte tapé dans l'admin ("40-54").
+  const plage = (v) => (Array.isArray(v) && v.length === 2 && v.every(Number.isFinite) ? v : lirePlage(v));
+  const ok = grille
+    .map(g => g && ({
+      taille: normaliserTaille(g.taille),
+      ...Object.fromEntries(MESURES.map(k => [k, plage(g[k])])),
+    }))
+    .filter(g => g && g.taille && g.poids);
+  return ok.length ? ok.sort((a, b) => a.poids[0] - b.poids[0]) : GRILLE_TAILLES;
+}
+
+/** Grille sous forme de texte, pour l'éditer dans /store/theme. */
+export function grilleEnTexte(grille) {
+  const txt = (v) => (Array.isArray(v) ? `${v[0]}-${v[1]}` : String(v ?? ''));
+  return (Array.isArray(grille) ? grille : GRILLE_TAILLES)
+    .map(g => ({ taille: g.taille || '', ...Object.fromEntries(MESURES.map(k => [k, txt(g[k])])) }));
+}
+
 /** 'xxl' / 'XXL' / '2xl' → '2XL', 'XXXL' → '3XL' ; le reste en majuscules. */
 export function normaliserTaille(t) {
   const s = String(t || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -22,8 +53,8 @@ export function normaliserTaille(t) {
 }
 
 /** Le guide n'a de sens que si le produit utilise cette grille (S…3XL). */
-export function produitAvecGrille(tailles) {
-  const connues = new Set(GRILLE_TAILLES.map(g => g.taille));
+export function produitAvecGrille(tailles, grille = GRILLE_TAILLES) {
+  const connues = new Set(grilleEffective(grille).map(g => g.taille));
   return (tailles || []).some(s => connues.has(normaliserTaille(s?.size ?? s)));
 }
 
@@ -33,19 +64,20 @@ export function produitAvecGrille(tailles) {
  * `bord` = vrai quand on est tout en haut de la plage : la taille au-dessus
  * peut aussi convenir à celle qui aime porter plus ample.
  */
-export function suggererTaille(poids, hauteur) {
+export function suggererTaille(poids, hauteur, grilleBrute = GRILLE_TAILLES) {
+  const GRILLE = grilleEffective(grilleBrute);
   const p = Number(poids);
   const h = Number(hauteur);
   if (!Number.isFinite(p) || p < 30 || p > 160) return null;
-  let i = GRILLE_TAILLES.findIndex(g => p < g.poids[1]);
-  if (i === -1) i = GRILLE_TAILLES.length - 1;
-  const [min, max] = GRILLE_TAILLES[i].poids;
+  let i = GRILLE.findIndex(g => p < g.poids[1]);
+  if (i === -1) i = GRILLE.length - 1;
+  const [min, max] = GRILLE[i].poids;
   const hautDePlage = p >= min + (max - min) * 0.7;
   // Grande (≥ 170 cm) et en haut de sa plage : le tissu tire en longueur,
   // la taille au-dessus tombe mieux.
-  if (Number.isFinite(h) && h >= 170 && hautDePlage && i < GRILLE_TAILLES.length - 1) i += 1;
-  const bord = hautDePlage && i < GRILLE_TAILLES.length - 1;
-  return { taille: GRILLE_TAILLES[i].taille, index: i, bord };
+  if (Number.isFinite(h) && h >= 170 && hautDePlage && i < GRILLE.length - 1) i += 1;
+  const bord = hautDePlage && i < GRILLE.length - 1;
+  return { taille: GRILLE[i].taille, index: i, bord };
 }
 
 /** Retrouve, parmi les tailles du produit, celle qui correspond (XXL ↔ 2XL…). */

@@ -108,7 +108,7 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
           <>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[13px] font-medium text-ink">{t('tailleLabel')}</p>
-              {onGuideTailles && produitAvecGrille(tailles) && (
+              {onGuideTailles && produitAvecGrille(tailles, theme?.guideTailles?.grille) && (
                 <button type="button" onClick={onGuideTailles} className="text-[12px] font-medium underline text-ink">
                   📏 {t('guideTailles')}
                 </button>
