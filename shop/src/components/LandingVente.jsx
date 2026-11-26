@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react';
 import { fmtPrix } from '../lib/pricing';
 import { cleLigne } from '../lib/panier';
 import { useLang } from '../lib/i18n';
+import { produitAvecGrille } from '../lib/guideTailles';
 import OffreTimer from './OffreTimer';
 
 // Même chargement différé que dans App.jsx (son code n'est pas nécessaire
@@ -28,7 +29,7 @@ const Commander = lazy(() => import('../pages/Commander'));
    collection. Le total exact s'affiche dans le récapitulatif du formulaire
    ci-dessous dès que la quantité change. */
 export default function LandingVente({ produit, photos, taille, setTaille, tailles, stockTaille, promo, theme,
-  lignes, reglages, onQuantite, onRetirer, onVider, onAjouterAuPanier }) {
+  lignes, reglages, onQuantite, onRetirer, onVider, onAjouterAuPanier, onGuideTailles }) {
   const { t, lang } = useLang();
   const ar = lang === 'ar';
   const [zoomUrl, setZoomUrl] = useState(null);
@@ -105,7 +106,14 @@ export default function LandingVente({ produit, photos, taille, setTaille, taill
       <div id="lv-tailles" className="mt-6">
         {tailles.length > 0 && (
           <>
-            <p className="text-[13px] font-medium text-ink mb-2">{t('tailleLabel')}</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[13px] font-medium text-ink">{t('tailleLabel')}</p>
+              {onGuideTailles && produitAvecGrille(tailles) && (
+                <button type="button" onClick={onGuideTailles} className="text-[12px] font-medium underline text-ink">
+                  📏 {t('guideTailles')}
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {tailles.map(s => {
                 const indispo = !(s.stock > 0);

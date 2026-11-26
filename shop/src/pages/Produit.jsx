@@ -16,6 +16,8 @@ import { IconeWhatsApp } from '../components/icons';
 import { numeroWhatsApp } from '../lib/commande';
 import OffreTimer from '../components/OffreTimer';
 import LandingVente from '../components/LandingVente';
+import GuideTailles from '../components/GuideTailles';
+import { produitAvecGrille } from '../lib/guideTailles';
 import { lignePromoWhatsApp } from '../lib/promoAuto';
 import { reservationProduit, reservationTaille, dateDispo } from '../lib/precommande';
 
@@ -199,7 +201,9 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
   // articles) — voir le champ du formulaire admin dans ProduitForm.jsx.
   if (produit.unlisted) {
     return (
+      <>
       <LandingVente
+        onGuideTailles={() => setGuideOuvert(true)}
         produit={produit} photos={photos} taille={taille} setTaille={setTaille}
         tailles={tailles} stockTaille={stockTaille} promo={promo} theme={theme}
         lignes={lignes} reglages={reglages} onQuantite={onQuantite} onRetirer={onRetirer} onVider={onVider}
@@ -211,6 +215,11 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           }, { ouvrirTiroir: false });
         }}
       />
+      {guideOuvert && (
+        <GuideTailles onFermer={() => setGuideOuvert(false)} tailles={tailles} onChoisir={setTaille}
+          imageAdmin={theme?.guideTailles?.active ? theme?.guideTailles?.image : ''} />
+      )}
+      </>
     );
   }
 
@@ -390,10 +399,10 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
             {/* Réglé (photo + activation) depuis /store/edit-theme — absent
                 tant que l'admin n'a rien déposé, pour ne jamais afficher un
                 lien mort. */}
-            {theme?.guideTailles?.active && theme?.guideTailles?.image && (
+            {(produitAvecGrille(tailles) || (theme?.guideTailles?.active && theme?.guideTailles?.image)) && (
               <button type="button" onClick={() => setGuideOuvert(true)}
-                className="text-[12px] underline text-gray-500 hover:text-ink">
-                {t('guideTailles')}
+                className="text-[12px] font-medium underline text-ink hover:opacity-70">
+                📏 {t('guideTailles')}
               </button>
             )}
           </div>
@@ -595,17 +604,8 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           WhatsApp (CarrouselProduits), plus en grille en bas de page. */}
 
       {guideOuvert && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setGuideOuvert(false)}>
-          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-medium">{t('guideTailles')}</h2>
-              <button onClick={() => setGuideOuvert(false)} aria-label="Fermer" className="p-1.5 rounded hover:bg-gray-100">
-                <X size={16} className="text-gray-400" />
-              </button>
-            </div>
-            <img src={theme.guideTailles.image} alt={t('guideTailles')} className="w-full h-auto" />
-          </div>
-        </div>
+        <GuideTailles onFermer={() => setGuideOuvert(false)} tailles={tailles} onChoisir={setTaille}
+          imageAdmin={theme?.guideTailles?.active ? theme?.guideTailles?.image : ''} />
       )}
 
       {/* Zoom plein écran sur la photo active — tap la photo pour entrer,
