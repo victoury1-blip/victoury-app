@@ -769,9 +769,17 @@ export default function OrdersPage({ activeTab, setActiveTab, externalOrders, se
     // déjà `trackingNumber || id` en repli. Sinon ce placeholder (WC-xxxx)
     // masque le vrai numéro de suivi Ozon lors de la création du colis.
     setModifiedIds(prev => new Set([...prev, updated.id]));
+    // Confirmée depuis le crayon (statut choisi dans le formulaire) : même
+    // règle que le changement de statut rapide — un code VICT si la commande
+    // n'en a encore aucun. Sans ça une commande du site restait affichée
+    // « VS-… » une fois confirmée. Réenregistrer une commande déjà confirmée
+    // sans code lui en donne un aussi (rattrapage). Généré avant setOrders.
+    const sansCode = !String(updated.trackingNumber || '').trim() && !isVictCode(updated.id);
+    const vict = VICT_ON_STATUS.has(updated.status) && sansCode ? generateVictId(orders) : null;
     // Rafraîchir la date de mise à jour pour que la commande éditée remonte en tête
     // (tri par dernière màj) et que le nouveau timestamp soit synchronisé en base.
-    setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...updated, dateUpdated: now() } : o)));
+    setOrders((prev) => prev.map((o) => (o.id === updated.id
+      ? { ...updated, trackingNumber: vict || updated.trackingNumber, dateUpdated: now() } : o)));
     setModalOpen(false);
   }
 
