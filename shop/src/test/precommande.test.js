@@ -69,7 +69,7 @@ describe('commandes réservées', () => {
     expect(m).toContain('السلام عليكم Sara');
     expect(m).toContain('• Ensemble Sport Noir — المقاس XXL');
     expect(m).toContain('🎁 عرض خاص: جوج ب 448 درهم');
-    expect(m).toContain('نهار الثلاثاء 03/11');
+    expect(m).toContain('ابتداءً من الثلاثاء 03/11');
     expect(m).toContain('نأكدو معاك الطلب');
   });
 });

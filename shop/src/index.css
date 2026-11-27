@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Jamais de défilement horizontal de la page entière sur téléphone : un
+   élément un peu trop large (en-tête, bandeau…) faisait « flotter » toute la
+   page de gauche à droite avec une bande blanche à droite. `clip` (et non
+   `hidden`) ne casse pas les en-têtes `sticky`. */
+html, body { overflow-x: clip; overscroll-behavior-x: none; }
+
 /* Police "Jost" hébergée ici (public/fonts) plutôt que chargée chez Google
    Fonts : ça évite la connexion à un domaine tiers (fonts.googleapis.com +
    fonts.gstatic.com) et surtout permet de la précharger (voir index.html)

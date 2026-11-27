@@ -364,7 +364,7 @@ export default function ProduitForm() {
                     className="border border-gray-200 px-2 py-1.5 text-sm bg-white disabled:opacity-50" />
                 </label>
                 <span className="block text-[11px] text-gray-500">
-                  La fiche affiche « السلعة جاية — غتوجد نهار … » et la commande arrive avec « ⏳ RÉSERVATION » dans sa note.
+                  La fiche affiche « السلعة فالطريق — متوفرة ابتداءً من … » et la commande arrive avec « ⏳ RÉSERVATION » dans sa note.
                   {resa.auto ? ' Chaque taille a sa propre date ; une taille revenue en stock se vend normalement.' : ' Se désactive tout seul après cette date.'}
                 </span>
               </div>

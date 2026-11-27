@@ -454,7 +454,7 @@ export default function Produit({ onAjouter, theme, remises, tiktok, onAchatRapi
           {resa && dateResa && (epuise || reserveTaille) && (
             <div className={`mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-900 leading-relaxed ${ar ? 'text-right' : 'text-left'}`}>
               <p className="font-semibold">
-                {ar ? `⏳ السلعة جاية — غتوجد نهار ${dateDispo(dateResa, true)}` : `⏳ Arrivage en cours — disponible le ${dateDispo(dateResa)}`}
+                {ar ? `🚚 السلعة فالطريق — متوفرة ابتداءً من ${dateDispo(dateResa, true)}` : `⏳ Arrivage en cours — disponible le ${dateDispo(dateResa)}`}
               </p>
               <p className="mt-0.5">
                 {ar

@@ -465,7 +465,7 @@ export default function Commander({ lignes, reglages, onQuantite, onRetirer, onV
                   </p>
                   {l.precommande && (
                     <p className="text-[11px] text-amber-700 font-medium mt-0.5">
-                      {ar ? `⏳ حجز — غتوجد نهار ${dateDispo(l.precommande, true)}` : `⏳ Réservation — disponible le ${dateDispo(l.precommande)}`}
+                      {ar ? `⏳ حجز — متوفرة ابتداءً من ${dateDispo(l.precommande, true)}` : `⏳ Réservation — disponible le ${dateDispo(l.precommande)}`}
                     </p>
                   )}
                   {/* Même signal que le tiroir panier : rouge, quand une remise

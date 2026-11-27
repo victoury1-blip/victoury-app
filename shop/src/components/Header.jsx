@@ -27,8 +27,8 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
   const estSoldes = (c) => /soldes?/i.test(c.slug || c.name || '');
 
   const Logo = (
-    <Link to="/" className="shrink-0 flex items-center justify-center overflow-hidden"
-      style={{ height: logoHauteur || 36, width: 160 }}>
+    <Link to="/" className="shrink min-w-0 w-[128px] sm:w-[160px] flex items-center justify-center overflow-hidden"
+      style={{ height: logoHauteur || 36 }}>
       {/* Un logo déposé remplace le texte ; sans lui, le nom en capitales
           reste net à toute taille — jamais de logo cassé ou flou. Boîte de
           taille FIXE (hauteur et largeur) dans les deux cas : sinon, le
@@ -100,9 +100,9 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
   );
 
   const Icones = (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
       {BoutonLangue}
-      <Link to="/favoris" className="relative p-2 text-gray-600 hover:text-ink" aria-label={t('mesFavoris')}>
+      <Link to="/favoris" className="relative p-1.5 sm:p-2 text-gray-600 hover:text-ink" aria-label={t('mesFavoris')}>
         <Heart size={19} />
         {nbFavoris > 0 && (
           <span className="absolute -top-0.5 -right-0.5 bg-ink text-white text-[10px] font-semibold
@@ -111,7 +111,7 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
       </Link>
       {/* Le compteur porte un libellé lisible : « 2 » seul ne dit rien à
           qui n'a pas l'icône sous les yeux. */}
-      <button onClick={onOuvrirPanier} className="relative p-2 text-gray-600 hover:text-ink"
+      <button onClick={onOuvrirPanier} className="relative p-1.5 sm:p-2 text-gray-600 hover:text-ink"
         aria-label={`${t('votrePanier')}, ${nbArticles}`}>
         <ShoppingBag size={19} />
         {nbArticles > 0 && (
@@ -148,13 +148,13 @@ function Header({ collections = [], nbArticles = 0, onOuvrirPanier, logoUrl, log
             {Icones}
           </div>
         ) : logoPosition === 'droite' ? (
-          <div className="flex items-center gap-4 h-16">
+          <div className="flex items-center gap-2 sm:gap-4 h-16 min-w-0">
             {MenuMobile}
             {Icones}
             <div className="ml-auto">{Logo}</div>
           </div>
         ) : (
-          <div className="flex items-center gap-4 h-16">
+          <div className="flex items-center gap-2 sm:gap-4 h-16 min-w-0">
             {MenuMobile}
             {Logo}
             <div className="ml-auto">{Icones}</div>
