@@ -11,7 +11,7 @@ import { chargerPaniersActifs } from '../lib/paniersAbandonnes';
 import { compterCommandesEnAttente } from '../lib/commandesSite';
 import { reservationEnAttente } from '../lib/precommande';
 import { lireCommandesNonVues, ajouterCommandeNonVue, marquerCommandesVues } from '../lib/clocheCommandes';
-import Wordmark from '../components/Wordmark';
+import LogoAdmin from './LogoAdmin';
 import AlertesStock from './AlertesStock';
 
 const LIENS = [
@@ -220,7 +220,7 @@ export default function AdminLayout() {
           <button onClick={() => setMenuOuvert(true)} className="text-white p-1.5 -ml-1.5" aria-label="Menu">
             <Menu size={20} />
           </button>
-          <Wordmark className="text-white text-sm" />
+          <LogoAdmin taille="sm" />
         </div>
         <BoutonCloche count={commandesNonVues.length} onClick={ouvrirCloche} />
       </div>
@@ -231,8 +231,8 @@ export default function AdminLayout() {
           <aside className="relative w-64 max-w-[80vw] bg-[#0f1424] flex flex-col">
             <div className="px-5 py-5 flex items-center justify-between border-b border-white/10">
               <div className="flex items-center gap-2">
-                <Wordmark className="text-white text-base" />
-                <span className="text-[9px] font-semibold tracking-wider uppercase bg-white/10 text-white/70 px-1.5 py-0.5 rounded">Admin</span>
+                <LogoAdmin />
+                <span className="text-[9px] font-semibold tracking-wider uppercase bg-white/10 text-white/70 px-1.5 py-0.5 rounded">Shop</span>
               </div>
               <button onClick={() => setMenuOuvert(false)} className="text-white/70 p-1" aria-label="Fermer"><X size={18} /></button>
             </div>
@@ -244,9 +244,9 @@ export default function AdminLayout() {
       <aside className="w-60 shrink-0 bg-[#0f1424] hidden sm:flex flex-col">
         <div className="px-5 py-5 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-2">
-            <Wordmark className="text-white text-base" />
+            <LogoAdmin />
             <span className="text-[9px] font-semibold tracking-wider uppercase bg-white/10 text-white/70 px-1.5 py-0.5 rounded">
-              Admin
+              Shop
             </span>
           </div>
           <BoutonCloche count={commandesNonVues.length} onClick={ouvrirCloche} />
