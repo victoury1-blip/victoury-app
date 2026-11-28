@@ -10,7 +10,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(titre, {
       body: data.body || '',
-      icon: '/icon-512.png',
+      icon: '/icon-shop-v3-192.png',
       badge: '/badge-96.png', // silhouette blanche sur fond transparent : Android n'affiche que la forme (sinon un carré gris)
       tag: data.tag || undefined,
       data: { url: data.url || '/store/commandes' },

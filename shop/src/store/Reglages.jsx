@@ -21,6 +21,35 @@ export default function Reglages() {
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
   const [activationPush, setActivationPush] = useState(null); // { ok, raison } | null
+  const [test, setTest] = useState(null); // null | 'envoi' | { ok, message }
+
+  /* Envoie une vraie notification push à CE téléphone, en passant par le
+     serveur comme une vraie commande : si elle n'arrive pas, le message dit
+     pourquoi (clé manquante sur Vercel, abonnement absent, refus du service
+     push…) au lieu de laisser deviner. */
+  async function envoyerTest() {
+    setTest('envoi');
+    try {
+      const act = await activerPushCommande(); // (ré)enregistre l'abonnement de cet appareil
+      if (!act.ok) { setTest({ ok: false, message: `Abonnement impossible sur ce téléphone : ${act.raison}` }); return; }
+      const reg = await navigator.serviceWorker.getRegistration('/store/');
+      const sub = await reg?.pushManager.getSubscription();
+      const { data: { session } } = await supabase.auth.getSession();
+      const rep = await fetch('/api/push-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ test: true, endpoint: sub?.endpoint }),
+      });
+      const j = await rep.json().catch(() => ({}));
+      if (j.manque?.length) setTest({ ok: false, message: `Configuration manquante sur Vercel (projet du site) : ${j.manque.join(', ')}` });
+      else if (j.ok) setTest({ ok: true, message: 'Notification envoyée — elle doit apparaître dans quelques secondes. Si rien n\'arrive : réglages Android de Chrome / batterie.' });
+      else if (j.erreurs?.length) setTest({ ok: false, message: `Refusée par le service push : ${j.erreurs[0]}` });
+      else if (j.abonnes === 0) setTest({ ok: false, message: 'Aucun abonnement trouvé pour ce téléphone en base.' });
+      else setTest({ ok: false, message: j.error || `Échec (HTTP ${rep.status})` });
+    } catch (e) {
+      setTest({ ok: false, message: e.message });
+    }
+  }
 
   // Comme un simple Notification.requestPermission(), MAIS enregistre en plus
   // un abonnement Push : c'est lui qui permet à la notification d'arriver
@@ -194,6 +223,17 @@ export default function Reglages() {
                   ? '✓ Reçoit aussi les notifications écran verrouillé / onglet fermé, sur cet appareil.'
                   : `Notification "en direct" seulement (push indisponible : ${activationPush.raison}).`}
             </p>
+          )}
+          {permissionNotif === 'granted' && pushDisponible() && (
+            <div className="mb-4">
+              <button type="button" onClick={envoyerTest} disabled={test === 'envoi'}
+                className="text-xs border border-gray-300 px-3 py-2 hover:border-ink disabled:opacity-50">
+                {test === 'envoi' ? 'Envoi…' : '🔔 Envoyer une notification de test'}
+              </button>
+              {test && test !== 'envoi' && (
+                <p className={`text-[11px] mt-2 ${test.ok ? 'text-green-600' : 'text-red-600'}`}>{test.message}</p>
+              )}
+            </div>
           )}
           {permissionNotif === 'granted' && !pushDisponible() && (
             <p className="text-[11px] text-gray-400 mb-4">

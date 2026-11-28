@@ -11,6 +11,7 @@ import { champsManquants, construireCommande, normaliserTelephone } from '../src
 import { totalPanier } from '../src/lib/pricing.js';
 import { rateLimited, clientIp } from './_rateLimit.js';
 import { reservationTaille } from '../src/lib/precommande.js';
+import { envoyerPush, payloadCommande } from './_pushCommande.js';
 
 const SOURCES_CONNUES = new Set(['Instagram', 'Facebook', 'TikTok', 'Google', 'WhatsApp', 'Direct']);
 
@@ -341,6 +342,10 @@ export default async function handler(req, res) {
   // La copie vers la feuille Google part en arrière-plan : un Apps Script
   // lent (jusqu'à 7 s) ne retient plus la cliente sur « Envoi en cours ».
   const copie = apresReponse(copierVersSheet(url, key, commande));
+  // Notification « Nouvelle commande » sur les téléphones de l'équipe —
+  // envoyée d'ici, sans attendre un webhook Supabase. En arrière-plan :
+  // jamais bloquant pour la cliente.
+  apresReponse(envoyerPush(payloadCommande(commande)).catch(() => {}));
   await Promise.all([
     ...serverLignes.map(l =>
       fetch(`${url}/rest/v1/rpc/shop_decrement_stock`, {
